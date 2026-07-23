@@ -22,7 +22,7 @@ Decoder_elf_header_ident(p)
 }
 
 /// expected size: 5
-/// trait-ready: unique decoder function (d#276)
+/// trait-ready: unique decoder function (d#274)
 #[derive(Debug, Copy, Clone)]
 pub struct elf_header_ident {
 class: u8,
@@ -44,7 +44,7 @@ Decoder_elf_types_elf_addr(p, is_be, class)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#265)
+/// trait-ready: unique decoder function (d#263)
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_addr { Addr32(u32), Addr64(u64) }
 
@@ -60,7 +60,7 @@ Decoder_elf_types_elf_off(p, is_be, class)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#266)
+/// trait-ready: unique decoder function (d#264)
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_off { Off32(u32), Off64(u64) }
 
@@ -75,7 +75,7 @@ Decoder_elf_header(p)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#257)
+/// trait-ready: unique decoder function (d#255)
 #[derive(Debug, Copy, Clone)]
 pub struct elf_header {
 ident: elf_header_ident,
@@ -106,7 +106,7 @@ Decoder_elf_types_elf_full(p, is_be, class)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#264)
+/// trait-ready: unique decoder function (d#262)
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_full { Full32(u32), Full64(u64) }
 
@@ -122,7 +122,7 @@ Decoder_elf_phdr(p, is_be, class)
 }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#273)
+/// trait-ready: unique decoder function (d#271)
 #[derive(Debug, Copy, Clone)]
 pub struct elf_phdr {
 r#type: u32,
@@ -148,7 +148,7 @@ Decoder_elf_shdr(p, is_be, class)
 }
 
 /// expected size: 112
-/// trait-ready: unique decoder function (d#261)
+/// trait-ready: unique decoder function (d#259)
 #[derive(Debug, Copy, Clone)]
 pub struct elf_shdr {
 name: u32,
@@ -194,7 +194,7 @@ Decoder_gif_header(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#477)
+/// trait-ready: unique decoder function (d#475)
 #[derive(Debug, Clone)]
 pub struct gif_header {
 signature: (u8, u8, u8),
@@ -212,7 +212,7 @@ Decoder_gif_logical_screen_descriptor_flags(p)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#497)
+/// trait-ready: unique decoder function (d#495)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_logical_screen_descriptor_flags {
 table_flag: bool,
@@ -232,7 +232,7 @@ Decoder_gif_logical_screen_descriptor(p)
 }
 
 /// expected size: 10
-/// trait-ready: unique decoder function (d#496)
+/// trait-ready: unique decoder function (d#494)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_logical_screen_descriptor {
 screen_width: u16,
@@ -243,7 +243,7 @@ pixel_aspect_ratio: u8
 }
 
 /// expected size: 3
-/// trait-unready: multiple (2) decoders exist (d#{463, 492})
+/// trait-unready: multiple (2) decoders exist (d#{461, 490})
 #[derive(Debug, Copy, Clone)]
 pub struct gif_color_table_entry {
 r: u8,
@@ -262,7 +262,7 @@ Decoder_gif_logical_screen(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#478)
+/// trait-ready: unique decoder function (d#476)
 #[derive(Debug, Clone)]
 pub struct gif_logical_screen {
 descriptor: gif_logical_screen_descriptor,
@@ -280,7 +280,7 @@ Decoder_gif_graphic_control_extension_flags(p)
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#495)
+/// trait-ready: unique decoder function (d#493)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_graphic_control_extension_flags {
 disposal_method: u8,
@@ -299,7 +299,7 @@ Decoder_gif_graphic_control_extension(p)
 }
 
 /// expected size: 10
-/// trait-ready: unique decoder function (d#487)
+/// trait-ready: unique decoder function (d#485)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_graphic_control_extension {
 separator: u8,
@@ -322,7 +322,7 @@ Decoder_gif_subblock(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#485)
+/// trait-ready: unique decoder function (d#483)
 #[derive(Debug, Clone)]
 pub struct gif_subblock {
 len_bytes: u8,
@@ -340,7 +340,7 @@ Decoder_gif_plain_text_extension(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#490)
+/// trait-ready: unique decoder function (d#488)
 #[derive(Debug, Clone)]
 pub struct gif_plain_text_extension {
 separator: u8,
@@ -369,7 +369,7 @@ Decoder_gif_image_descriptor_flags(p)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#494)
+/// trait-ready: unique decoder function (d#492)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_image_descriptor_flags {
 table_flag: bool,
@@ -389,7 +389,7 @@ Decoder_gif_image_descriptor(p)
 }
 
 /// expected size: 14
-/// trait-ready: unique decoder function (d#491)
+/// trait-ready: unique decoder function (d#489)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_image_descriptor {
 separator: u8,
@@ -411,7 +411,7 @@ Decoder_gif_table_based_image_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#493)
+/// trait-ready: unique decoder function (d#491)
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image_data {
 lzw_min_code_size: u8,
@@ -430,7 +430,7 @@ Decoder_gif_table_based_image(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#489)
+/// trait-ready: unique decoder function (d#487)
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image {
 descriptor: gif_image_descriptor,
@@ -449,7 +449,7 @@ Decoder_gif_graphic_rendering_block(p)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#488)
+/// trait-ready: unique decoder function (d#486)
 #[derive(Debug, Clone)]
 pub enum gif_graphic_rendering_block { plain_text_extension(gif_plain_text_extension), table_based_image(gif_table_based_image) }
 
@@ -464,7 +464,7 @@ Decoder_gif_graphic_block(p)
 }
 
 /// expected size: 96
-/// trait-ready: unique decoder function (d#481)
+/// trait-ready: unique decoder function (d#479)
 #[derive(Debug, Clone)]
 pub struct gif_graphic_block {
 graphic_control_extension: Option<gif_graphic_control_extension>,
@@ -482,7 +482,7 @@ Decoder_gif_application_extension(p)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#483)
+/// trait-ready: unique decoder function (d#481)
 #[derive(Debug, Clone)]
 pub struct gif_application_extension {
 separator: u8,
@@ -505,7 +505,7 @@ Decoder_gif_comment_extension(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#484)
+/// trait-ready: unique decoder function (d#482)
 #[derive(Debug, Clone)]
 pub struct gif_comment_extension {
 separator: u8,
@@ -525,7 +525,7 @@ Decoder_gif_special_purpose_block(p)
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#482)
+/// trait-ready: unique decoder function (d#480)
 #[derive(Debug, Clone)]
 pub enum gif_special_purpose_block { application_extension(gif_application_extension), comment_extension(gif_comment_extension) }
 
@@ -540,7 +540,7 @@ Decoder_gif_block(p)
 }
 
 /// expected size: 104
-/// trait-ready: unique decoder function (d#479)
+/// trait-ready: unique decoder function (d#477)
 #[derive(Debug, Clone)]
 pub enum gif_block { graphic_block(gif_graphic_block), special_purpose_block(gif_special_purpose_block) }
 
@@ -555,7 +555,7 @@ Decoder_gif_trailer(p)
 }
 
 /// expected size: 1
-/// trait-ready: unique decoder function (d#480)
+/// trait-ready: unique decoder function (d#478)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_trailer {
 separator: u8
@@ -663,7 +663,7 @@ subfields: Vec<gzip_fextra_subfield>
 }
 
 /// expected size: 24
-/// trait-unready: multiple (3) decoders exist (d#{85, 472, 476})
+/// trait-unready: multiple (3) decoders exist (d#{85, 470, 474})
 #[derive(Debug, Clone)]
 pub struct gzip_fcomment {
 comment: Vec<u8>
@@ -892,7 +892,7 @@ footer: gzip_footer
 }
 
 /// expected size: 1
-/// trait-unready: multiple (10) decoders exist (d#{393, 395, 406, 407, 408, 409, 410, 411, 412, 413})
+/// trait-unready: multiple (10) decoders exist (d#{391, 393, 404, 405, 406, 407, 408, 409, 410, 411})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_soi {
 marker: u8
@@ -909,7 +909,7 @@ Decoder_jpeg_app0_jfif(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#462)
+/// trait-ready: unique decoder function (d#460)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0_jfif {
 version_major: u8,
@@ -933,7 +933,7 @@ Decoder_jpeg_app0_data_data(p, identifier)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#461)
+/// trait-ready: unique decoder function (d#459)
 #[derive(Debug, Clone)]
 pub enum jpeg_app0_data_data { jfif(jpeg_app0_jfif), other(Vec<u8>) }
 
@@ -948,7 +948,7 @@ Decoder_jpeg_app0_data(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#460)
+/// trait-ready: unique decoder function (d#458)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0_data {
 identifier: Vec<u8>,
@@ -966,7 +966,7 @@ Decoder_jpeg_app0(p)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#439)
+/// trait-ready: unique decoder function (d#437)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0 {
 marker: jpeg_soi,
@@ -985,7 +985,7 @@ Decoder_tiff_byte_order(p)
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#292)
+/// trait-ready: unique decoder function (d#290)
 #[derive(Debug, Copy, Clone)]
 pub enum tiff_byte_order { be(u8, u8), le(u8, u8) }
 
@@ -1000,7 +1000,7 @@ offset_or_data: u32
 }
 
 /// expected size: 56
-/// trait-unready: multiple (3) decoders exist (d#{293, 294, 295})
+/// trait-unready: multiple (3) decoders exist (d#{291, 292, 293})
 #[derive(Debug, Clone)]
 pub struct tiff_ifd_le {
 num_fields: u16,
@@ -1041,7 +1041,7 @@ Decoder_jpeg_app1_exif(p)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#458)
+/// trait-ready: unique decoder function (d#456)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_exif {
 padding: u8,
@@ -1059,7 +1059,7 @@ Decoder_jpeg_app1_xmp(p)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#459)
+/// trait-ready: unique decoder function (d#457)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_xmp {
 xmp: Vec<u8>
@@ -1076,7 +1076,7 @@ Decoder_jpeg_app1_data_data(p, identifier)
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#457)
+/// trait-ready: unique decoder function (d#455)
 #[derive(Debug, Clone)]
 pub enum jpeg_app1_data_data { exif(jpeg_app1_exif), other(Vec<u8>), xmp(jpeg_app1_xmp) }
 
@@ -1091,7 +1091,7 @@ Decoder_jpeg_app1_data(p)
 }
 
 /// expected size: 112
-/// trait-ready: unique decoder function (d#456)
+/// trait-ready: unique decoder function (d#454)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_data {
 identifier: Vec<u8>,
@@ -1109,7 +1109,7 @@ Decoder_jpeg_app1(p)
 }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#440)
+/// trait-ready: unique decoder function (d#438)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1 {
 marker: jpeg_soi,
@@ -1128,12 +1128,12 @@ Decoder_jpeg_frame_initial_segment(p)
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#396)
+/// trait-ready: unique decoder function (d#394)
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_initial_segment { app0(jpeg_app0), app1(jpeg_app1) }
 
 /// expected size: 32
-/// trait-unready: multiple (16) decoders exist (d#{441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 505})
+/// trait-unready: multiple (16) decoders exist (d#{439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 503})
 #[derive(Debug, Clone)]
 pub struct jpeg_app2 {
 marker: jpeg_soi,
@@ -1152,7 +1152,7 @@ Decoder_jpeg_class_table_id(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#466)
+/// trait-ready: unique decoder function (d#464)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_class_table_id {
 class: u8,
@@ -1170,7 +1170,7 @@ Decoder_jpeg_dac_data(p)
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#465)
+/// trait-ready: unique decoder function (d#463)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac_data {
 class_table_id: jpeg_class_table_id,
@@ -1188,7 +1188,7 @@ Decoder_jpeg_dac(p)
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#437)
+/// trait-ready: unique decoder function (d#435)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac {
 marker: jpeg_soi,
@@ -1207,7 +1207,7 @@ Decoder_jpeg_dht_data(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#467)
+/// trait-ready: unique decoder function (d#465)
 #[derive(Debug, Clone)]
 pub struct jpeg_dht_data {
 class_table_id: jpeg_class_table_id,
@@ -1226,7 +1226,7 @@ Decoder_jpeg_dht(p)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#436)
+/// trait-ready: unique decoder function (d#434)
 #[derive(Debug, Clone)]
 pub struct jpeg_dht {
 marker: jpeg_soi,
@@ -1245,7 +1245,7 @@ Decoder_jpeg_precision_table_id(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#469)
+/// trait-ready: unique decoder function (d#467)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_precision_table_id {
 precision: u8,
@@ -1263,7 +1263,7 @@ Decoder_jpeg_dqt_data_elements(p, precision)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#470)
+/// trait-ready: unique decoder function (d#468)
 #[derive(Debug, Clone)]
 pub enum jpeg_dqt_data_elements { Bytes(Vec<u8>), Shorts(Vec<u16>) }
 
@@ -1278,7 +1278,7 @@ Decoder_jpeg_dqt_data(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#468)
+/// trait-ready: unique decoder function (d#466)
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt_data {
 precision_table_id: jpeg_precision_table_id,
@@ -1296,7 +1296,7 @@ Decoder_jpeg_dqt(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#435)
+/// trait-ready: unique decoder function (d#433)
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt {
 marker: jpeg_soi,
@@ -1315,7 +1315,7 @@ Decoder_jpeg_dri_data(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#464)
+/// trait-ready: unique decoder function (d#462)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri_data {
 restart_interval: u16
@@ -1332,7 +1332,7 @@ Decoder_jpeg_dri(p)
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#438)
+/// trait-ready: unique decoder function (d#436)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri {
 marker: jpeg_soi,
@@ -1351,12 +1351,12 @@ Decoder_jpeg_table_or_misc(p)
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#397)
+/// trait-ready: unique decoder function (d#395)
 #[derive(Debug, Clone)]
 pub enum jpeg_table_or_misc { app0(jpeg_app0), app1(jpeg_app1), app10(jpeg_app2), app11(jpeg_app2), app12(jpeg_app2), app13(jpeg_app2), app14(jpeg_app2), app15(jpeg_app2), app2(jpeg_app2), app3(jpeg_app2), app4(jpeg_app2), app5(jpeg_app2), app6(jpeg_app2), app7(jpeg_app2), app8(jpeg_app2), app9(jpeg_app2), com(jpeg_app2), dac(jpeg_dac), dht(jpeg_dht), dqt(jpeg_dqt), dri(jpeg_dri) }
 
 /// expected size: 2
-/// trait-unready: multiple (2) decoders exist (d#{499, 501})
+/// trait-unready: multiple (2) decoders exist (d#{497, 499})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dhp_image_component_sampling_factor {
 horizontal: u8,
@@ -1364,7 +1364,7 @@ vertical: u8
 }
 
 /// expected size: 4
-/// trait-unready: multiple (3) decoders exist (d#{434, 500, 503})
+/// trait-unready: multiple (3) decoders exist (d#{432, 498, 501})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sof_image_component {
 id: u8,
@@ -1373,7 +1373,7 @@ quantization_table_id: u8
 }
 
 /// expected size: 32
-/// trait-unready: multiple (3) decoders exist (d#{433, 502, 507})
+/// trait-unready: multiple (3) decoders exist (d#{431, 500, 505})
 #[derive(Debug, Clone)]
 pub struct jpeg_sof_data {
 sample_precision: u8,
@@ -1384,7 +1384,7 @@ image_components: Vec<jpeg_sof_image_component>
 }
 
 /// expected size: 40
-/// trait-unready: multiple (14) decoders exist (d#{420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 506})
+/// trait-unready: multiple (14) decoders exist (d#{418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 504})
 #[derive(Debug, Clone)]
 pub struct jpeg_sof0 {
 marker: jpeg_soi,
@@ -1403,7 +1403,7 @@ Decoder_jpeg_frame_header(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#398)
+/// trait-ready: unique decoder function (d#396)
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_header { sof0(jpeg_sof0), sof1(jpeg_sof0), sof10(jpeg_sof0), sof11(jpeg_sof0), sof13(jpeg_sof0), sof14(jpeg_sof0), sof15(jpeg_sof0), sof2(jpeg_sof0), sof3(jpeg_sof0), sof5(jpeg_sof0), sof6(jpeg_sof0), sof7(jpeg_sof0), sof9(jpeg_sof0) }
 
@@ -1418,7 +1418,7 @@ Decoder_jpeg_sos_image_component_entropy_coding_table_ids(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#417)
+/// trait-ready: unique decoder function (d#415)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_image_component_entropy_coding_table_ids {
 dc_entropy_coding_table_id: u8,
@@ -1436,7 +1436,7 @@ Decoder_jpeg_sos_image_component(p)
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#415)
+/// trait-ready: unique decoder function (d#413)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_image_component {
 component_selector: u8,
@@ -1454,7 +1454,7 @@ Decoder_jpeg_sos_data_approximation_bit_position(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#416)
+/// trait-ready: unique decoder function (d#414)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_data_approximation_bit_position {
 high: u8,
@@ -1472,7 +1472,7 @@ Decoder_jpeg_sos_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#414)
+/// trait-ready: unique decoder function (d#412)
 #[derive(Debug, Clone)]
 pub struct jpeg_sos_data {
 num_image_components: u8,
@@ -1493,7 +1493,7 @@ Decoder_jpeg_sos(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#402)
+/// trait-ready: unique decoder function (d#400)
 #[derive(Debug, Clone)]
 pub struct jpeg_sos {
 marker: jpeg_soi,
@@ -1512,12 +1512,12 @@ Decoder_jpeg_scan_data_entropy_coded_segment(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#404)
+/// trait-ready: unique decoder function (d#402)
 #[derive(Debug, Copy, Clone)]
 pub enum jpeg_scan_data_entropy_coded_segment { mcu(u8), rst0(jpeg_soi), rst1(jpeg_soi), rst2(jpeg_soi), rst3(jpeg_soi), rst4(jpeg_soi), rst5(jpeg_soi), rst6(jpeg_soi), rst7(jpeg_soi) }
 
 /// expected size: 48
-/// trait-unready: multiple (2) decoders exist (d#{403, 419})
+/// trait-unready: multiple (2) decoders exist (d#{401, 417})
 #[derive(Debug, Clone)]
 pub struct jpeg_scan_data {
 scan_data: Vec<jpeg_scan_data_entropy_coded_segment>,
@@ -1525,7 +1525,7 @@ scan_data_stream: Vec<u8>
 }
 
 /// expected size: 112
-/// trait-unready: multiple (2) decoders exist (d#{399, 401})
+/// trait-unready: multiple (2) decoders exist (d#{397, 399})
 #[derive(Debug, Clone)]
 pub struct jpeg_scan {
 segments: Vec<jpeg_table_or_misc>,
@@ -1544,7 +1544,7 @@ Decoder_jpeg_dnl_data(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#418)
+/// trait-ready: unique decoder function (d#416)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl_data {
 num_lines: u16
@@ -1561,7 +1561,7 @@ Decoder_jpeg_dnl(p)
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#400)
+/// trait-ready: unique decoder function (d#398)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl {
 marker: jpeg_soi,
@@ -1580,7 +1580,7 @@ Decoder_jpeg_frame(p)
 }
 
 /// expected size: 344
-/// trait-ready: unique decoder function (d#394)
+/// trait-ready: unique decoder function (d#392)
 #[derive(Debug, Clone)]
 pub struct jpeg_frame {
 initial_segment: jpeg_frame_initial_segment,
@@ -1621,7 +1621,7 @@ Decoder_mpeg4_ftyp_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#339)
+/// trait-ready: unique decoder function (d#337)
 #[derive(Debug, Clone)]
 pub struct mpeg4_ftyp_data {
 major_brand: (u8, u8, u8, u8),
@@ -1630,7 +1630,7 @@ compatible_brands: Vec<(u8, u8, u8, u8)>
 }
 
 /// expected size: 40
-/// trait-unready: multiple (2) decoders exist (d#{368, 370})
+/// trait-unready: multiple (2) decoders exist (d#{366, 368})
 #[derive(Debug, Clone)]
 pub struct mpeg4_dref_data_data {
 size_field: u32,
@@ -1650,7 +1650,7 @@ Decoder_mpeg4_dref_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#369)
+/// trait-ready: unique decoder function (d#367)
 #[derive(Debug, Clone)]
 pub struct mpeg4_dref_data {
 version: u8,
@@ -1675,7 +1675,7 @@ Decoder_mpeg4_dinf_atom(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#354)
+/// trait-ready: unique decoder function (d#352)
 #[derive(Debug, Clone)]
 pub struct mpeg4_dinf_atom {
 size_field: u32,
@@ -1695,7 +1695,7 @@ Decoder_mpeg4_meta_hdlr_data(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#374)
+/// trait-ready: unique decoder function (d#372)
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_hdlr_data {
 version: u8,
@@ -1717,7 +1717,7 @@ Decoder_mpeg4_infe_data_fields_version_lt2(p)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#388)
+/// trait-ready: unique decoder function (d#386)
 #[derive(Debug, Clone)]
 pub struct mpeg4_infe_data_fields_version_lt2 {
 item_ID: u16,
@@ -1738,7 +1738,7 @@ Decoder_mpeg4_infe_atom_data_extra_fields_mime(p)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#391)
+/// trait-ready: unique decoder function (d#389)
 #[derive(Debug, Clone)]
 pub struct mpeg4_infe_atom_data_extra_fields_mime {
 content_type: Vec<u8>
@@ -1755,7 +1755,7 @@ Decoder_mpeg4_infe_atom_data_extra_fields_uri(p)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#392)
+/// trait-ready: unique decoder function (d#390)
 #[derive(Debug, Clone)]
 pub struct mpeg4_infe_atom_data_extra_fields_uri {
 item_uri_type: Vec<u8>
@@ -1772,7 +1772,7 @@ Decoder_mpeg4_infe_atom_data_extra_fields(p, item_type)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#390)
+/// trait-ready: unique decoder function (d#388)
 #[derive(Debug, Clone)]
 pub enum mpeg4_infe_atom_data_extra_fields { mime(mpeg4_infe_atom_data_extra_fields_mime), unknown, uri(mpeg4_infe_atom_data_extra_fields_uri) }
 
@@ -1787,7 +1787,7 @@ Decoder_mpeg4_infe_data_fields_version_gte2(p, version)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#389)
+/// trait-ready: unique decoder function (d#387)
 #[derive(Debug, Clone)]
 pub struct mpeg4_infe_data_fields_version_gte2 {
 item_ID: u32,
@@ -1808,7 +1808,7 @@ Decoder_mpeg4_infe_data_fields(p, version)
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#387)
+/// trait-ready: unique decoder function (d#385)
 #[derive(Debug, Clone)]
 pub enum mpeg4_infe_data_fields { Version1(mpeg4_infe_data_fields_version_lt2), Version2(mpeg4_infe_data_fields_version_gte2) }
 
@@ -1823,7 +1823,7 @@ Decoder_mpeg4_iinf_atom_data_infe(p)
 }
 
 /// expected size: 96
-/// trait-ready: unique decoder function (d#386)
+/// trait-ready: unique decoder function (d#384)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom_data_infe {
 version: u8,
@@ -1847,7 +1847,7 @@ Decoder_mpeg4_iinf_atom(p)
 }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#385)
+/// trait-ready: unique decoder function (d#383)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom {
 size_field: u32,
@@ -1867,7 +1867,7 @@ Decoder_mpeg4_iinf(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#376)
+/// trait-ready: unique decoder function (d#374)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf {
 version: u8,
@@ -1888,7 +1888,7 @@ Decoder_mpeg4_iloc_extent(p, offset_size, length_size, index_size)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#382)
+/// trait-ready: unique decoder function (d#380)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_iloc_extent {
 extent_index: u64,
@@ -1919,7 +1919,7 @@ Decoder_mpeg4_iloc_atom_data(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#378)
+/// trait-ready: unique decoder function (d#376)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iloc_atom_data {
 version: u8,
@@ -1943,7 +1943,7 @@ Decoder_mpeg4_tool_atom_data_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#381)
+/// trait-ready: unique decoder function (d#379)
 #[derive(Debug, Clone)]
 pub struct mpeg4_tool_atom_data_data {
 type_indicator: u32,
@@ -1967,7 +1967,7 @@ Decoder_mpeg4_tool_atom(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#380)
+/// trait-ready: unique decoder function (d#378)
 #[derive(Debug, Clone)]
 pub struct mpeg4_tool_atom {
 size_field: u32,
@@ -1992,7 +1992,7 @@ Decoder_mpeg4_ilst_atom(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#379)
+/// trait-ready: unique decoder function (d#377)
 #[derive(Debug, Clone)]
 pub struct mpeg4_ilst_atom {
 size_field: u32,
@@ -2021,7 +2021,7 @@ Decoder_mpeg4_iref_data_single_item_reference_large(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#384)
+/// trait-ready: unique decoder function (d#382)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iref_data_single_item_reference_large {
 size_field: u32,
@@ -2050,7 +2050,7 @@ Decoder_mpeg4_iref_data_single_item_reference_small(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#383)
+/// trait-ready: unique decoder function (d#381)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iref_data_single_item_reference_small {
 size_field: u32,
@@ -2075,7 +2075,7 @@ Decoder_mpeg4_iref_data(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#377)
+/// trait-ready: unique decoder function (d#375)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iref_data {
 version: u8,
@@ -2099,7 +2099,7 @@ Decoder_mpeg4_pitm_atom_data(p)
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#375)
+/// trait-ready: unique decoder function (d#373)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_pitm_atom_data {
 version: u8,
@@ -2118,7 +2118,7 @@ Decoder_mpeg4_meta_atom_data(p, r#type)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#373)
+/// trait-ready: unique decoder function (d#371)
 #[derive(Debug, Clone)]
 pub enum mpeg4_meta_atom_data { dinf(Vec<mpeg4_dinf_atom>), hdlr(mpeg4_meta_hdlr_data), idat(Vec<u8>), iinf(mpeg4_iinf), iloc(mpeg4_iloc_atom_data), ilst(Vec<mpeg4_ilst_atom>), iref(mpeg4_iref_data), pitm(mpeg4_pitm_atom_data), unknown(Vec<u8>) }
 
@@ -2133,7 +2133,7 @@ Decoder_mpeg4_meta_atom(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#340)
+/// trait-ready: unique decoder function (d#338)
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom {
 size_field: u32,
@@ -2178,7 +2178,7 @@ Decoder_mpeg4_mvhd_data(p)
 }
 
 /// expected size: 112
-/// trait-ready: unique decoder function (d#342)
+/// trait-ready: unique decoder function (d#340)
 #[derive(Debug, Clone)]
 pub struct mpeg4_mvhd_data {
 version: u8,
@@ -2204,7 +2204,7 @@ Decoder_mpeg4_elst_data_entry(p)
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#372)
+/// trait-ready: unique decoder function (d#370)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_elst_data_entry {
 track_duration: u32,
@@ -2223,7 +2223,7 @@ Decoder_mpeg4_elst_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#371)
+/// trait-ready: unique decoder function (d#369)
 #[derive(Debug, Clone)]
 pub struct mpeg4_elst_data {
 version: u8,
@@ -2248,7 +2248,7 @@ Decoder_mpeg4_edts_atom(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#346)
+/// trait-ready: unique decoder function (d#344)
 #[derive(Debug, Clone)]
 pub struct mpeg4_edts_atom {
 size_field: u32,
@@ -2268,7 +2268,7 @@ Decoder_mpeg4_mdia_hdlr_data(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#349)
+/// trait-ready: unique decoder function (d#347)
 #[derive(Debug, Clone)]
 pub struct mpeg4_mdia_hdlr_data {
 version: u8,
@@ -2292,7 +2292,7 @@ Decoder_mpeg4_mdhd_data(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#350)
+/// trait-ready: unique decoder function (d#348)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_mdhd_data {
 version: u8,
@@ -2313,7 +2313,7 @@ Decoder_mpeg4_smhd_data(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#353)
+/// trait-ready: unique decoder function (d#351)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_smhd_data {
 version: u8,
@@ -2333,7 +2333,7 @@ Decoder_mpeg4_co64_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#363)
+/// trait-ready: unique decoder function (d#361)
 #[derive(Debug, Clone)]
 pub struct mpeg4_co64_data {
 version: u8,
@@ -2353,7 +2353,7 @@ Decoder_mpeg4_ctts_sample_entry(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#366)
+/// trait-ready: unique decoder function (d#364)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_ctts_sample_entry {
 sample_count: u32,
@@ -2371,7 +2371,7 @@ Decoder_mpeg4_ctts_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#358)
+/// trait-ready: unique decoder function (d#356)
 #[derive(Debug, Clone)]
 pub struct mpeg4_ctts_data {
 version: u8,
@@ -2399,7 +2399,7 @@ Decoder_mpeg4_sbgp_data(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#365)
+/// trait-ready: unique decoder function (d#363)
 #[derive(Debug, Clone)]
 pub struct mpeg4_sbgp_data {
 version: u8,
@@ -2429,7 +2429,7 @@ Decoder_mpeg4_sgpd_data(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#364)
+/// trait-ready: unique decoder function (d#362)
 #[derive(Debug, Clone)]
 pub struct mpeg4_sgpd_data {
 version: u8,
@@ -2451,7 +2451,7 @@ Decoder_mpeg4_stco_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#362)
+/// trait-ready: unique decoder function (d#360)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stco_data {
 version: u8,
@@ -2480,7 +2480,7 @@ Decoder_mpeg4_stsc_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#360)
+/// trait-ready: unique decoder function (d#358)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stsc_data {
 version: u8,
@@ -2500,7 +2500,7 @@ Decoder_mpeg4_stsd_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#356)
+/// trait-ready: unique decoder function (d#354)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stsd_data {
 version: u8,
@@ -2520,7 +2520,7 @@ Decoder_mpeg4_stss_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#359)
+/// trait-ready: unique decoder function (d#357)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stss_data {
 version: u8,
@@ -2540,7 +2540,7 @@ Decoder_mpeg4_stsz_data(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#361)
+/// trait-ready: unique decoder function (d#359)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stsz_data {
 version: u8,
@@ -2561,7 +2561,7 @@ Decoder_mpeg4_stts_sample_entry(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#367)
+/// trait-ready: unique decoder function (d#365)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_stts_sample_entry {
 sample_count: u32,
@@ -2579,7 +2579,7 @@ Decoder_mpeg4_stts_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#357)
+/// trait-ready: unique decoder function (d#355)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stts_data {
 version: u8,
@@ -2604,7 +2604,7 @@ Decoder_mpeg4_stbl_atom(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#355)
+/// trait-ready: unique decoder function (d#353)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom {
 size_field: u32,
@@ -2624,7 +2624,7 @@ Decoder_mpeg4_vmhd_data(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#352)
+/// trait-ready: unique decoder function (d#350)
 #[derive(Debug, Clone)]
 pub struct mpeg4_vmhd_data {
 version: u8,
@@ -2649,7 +2649,7 @@ Decoder_mpeg4_minf_atom(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#351)
+/// trait-ready: unique decoder function (d#349)
 #[derive(Debug, Clone)]
 pub struct mpeg4_minf_atom {
 size_field: u32,
@@ -2669,7 +2669,7 @@ Decoder_mpeg4_mdia_atom_data(p, r#type)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#348)
+/// trait-ready: unique decoder function (d#346)
 #[derive(Debug, Clone)]
 pub enum mpeg4_mdia_atom_data { hdlr(mpeg4_mdia_hdlr_data), mdhd(mpeg4_mdhd_data), minf(Vec<mpeg4_minf_atom>), unknown(Vec<u8>) }
 
@@ -2684,7 +2684,7 @@ Decoder_mpeg4_mdia_atom(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#347)
+/// trait-ready: unique decoder function (d#345)
 #[derive(Debug, Clone)]
 pub struct mpeg4_mdia_atom {
 size_field: u32,
@@ -2731,7 +2731,7 @@ Decoder_mpeg4_tkhd_data(p)
 }
 
 /// expected size: 96
-/// trait-ready: unique decoder function (d#345)
+/// trait-ready: unique decoder function (d#343)
 #[derive(Debug, Clone)]
 pub struct mpeg4_tkhd_data {
 version: u8,
@@ -2763,7 +2763,7 @@ Decoder_mpeg4_trak_atom(p)
 }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#343)
+/// trait-ready: unique decoder function (d#341)
 #[derive(Debug, Clone)]
 pub struct mpeg4_trak_atom {
 size_field: u32,
@@ -2788,7 +2788,7 @@ Decoder_mpeg4_udta_atom(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#344)
+/// trait-ready: unique decoder function (d#342)
 #[derive(Debug, Clone)]
 pub struct mpeg4_udta_atom {
 size_field: u32,
@@ -2813,7 +2813,7 @@ Decoder_mpeg4_moov_atom(p)
 }
 
 /// expected size: 136
-/// trait-ready: unique decoder function (d#341)
+/// trait-ready: unique decoder function (d#339)
 #[derive(Debug, Clone)]
 pub struct mpeg4_moov_atom {
 size_field: u32,
@@ -2838,7 +2838,7 @@ Decoder_mpeg4_atom(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#337)
+/// trait-ready: unique decoder function (d#335)
 #[derive(Debug, Clone)]
 pub struct mpeg4_atom {
 size_field: u32,
@@ -2927,7 +2927,7 @@ Decoder_opentype_cmap_subtable_format0(p, _platform)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#246)
+/// trait-ready: unique decoder function (d#244)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format0 {
 length: u16,
@@ -2946,7 +2946,7 @@ Decoder_opentype_cmap_subtable_format10(p, _platform)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#251)
+/// trait-ready: unique decoder function (d#249)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format10 {
 length: u32,
@@ -2967,7 +2967,7 @@ Decoder_opentype_types_sequential_map_record(p)
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#256)
+/// trait-ready: unique decoder function (d#254)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_types_sequential_map_record {
 start_char_code: u32,
@@ -2976,7 +2976,7 @@ start_glyph_id: u32
 }
 
 /// expected size: 40
-/// trait-unready: multiple (2) decoders exist (d#{252, 253})
+/// trait-unready: multiple (2) decoders exist (d#{250, 251})
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format12 {
 length: u32,
@@ -3044,7 +3044,7 @@ Decoder_opentype_variation_selector(p, table_view)
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#255)
+/// trait-ready: unique decoder function (d#253)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_variation_selector {
 var_selector: u32,
@@ -3063,7 +3063,7 @@ Decoder_opentype_cmap_subtable_format14(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#254)
+/// trait-ready: unique decoder function (d#252)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format14 {
 length: u32,
@@ -3092,7 +3092,7 @@ Decoder_opentype_cmap_subtable_format2(p, _platform)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#247)
+/// trait-ready: unique decoder function (d#245)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format2 {
 length: u16,
@@ -3113,7 +3113,7 @@ Decoder_opentype_cmap_subtable_format4(p, _platform)
 }
 
 /// expected size: 136
-/// trait-ready: unique decoder function (d#248)
+/// trait-ready: unique decoder function (d#246)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format4 {
 length: u16,
@@ -3140,7 +3140,7 @@ Decoder_opentype_cmap_subtable_format6(p, _platform)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#249)
+/// trait-ready: unique decoder function (d#247)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format6 {
 _format: u16,
@@ -3162,7 +3162,7 @@ Decoder_opentype_cmap_subtable_format8(p, _platform)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#250)
+/// trait-ready: unique decoder function (d#248)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format8 {
 length: u32,
@@ -3188,7 +3188,7 @@ Decoder_opentype_cmap_subtable(p, _platform)
 }
 
 /// expected size: 176
-/// trait-ready: unique decoder function (d#245)
+/// trait-ready: unique decoder function (d#243)
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable<'input> {
 table_scope: View<'input>,
@@ -3215,7 +3215,7 @@ Decoder_opentype_encoding_record(p, table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#244)
+/// trait-ready: unique decoder function (d#242)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_encoding_record<'input> {
 platform: u16,
@@ -3345,7 +3345,7 @@ Decoder_opentype_maxp_version1(p)
 }
 
 /// expected size: 26
-/// trait-ready: unique decoder function (d#242)
+/// trait-ready: unique decoder function (d#240)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_maxp_version1 {
 max_points: u16,
@@ -3422,7 +3422,7 @@ Decoder_opentype_name_name_record(p, storage_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#239)
+/// trait-ready: unique decoder function (d#237)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_name_name_record<'input> {
 platform: u16,
@@ -3444,7 +3444,7 @@ Decoder_opentype_name_lang_tag_record(p, storage_view)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#241)
+/// trait-ready: unique decoder function (d#239)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_name_lang_tag_record<'input> {
 length: u16,
@@ -3462,7 +3462,7 @@ Decoder_opentype_name_name_version_1(p, storage_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#240)
+/// trait-ready: unique decoder function (d#238)
 #[derive(Debug, Clone)]
 pub struct opentype_name_name_version_1<'input> {
 lang_tag_count: u16,
@@ -3590,7 +3590,7 @@ Decoder_opentype_post_pascal_string(p)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#238)
+/// trait-ready: unique decoder function (d#236)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_post_pascal_string<'input> {
 length: u8,
@@ -3608,7 +3608,7 @@ Decoder_opentype_post_version2(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#237)
+/// trait-ready: unique decoder function (d#235)
 #[derive(Debug, Clone)]
 pub struct opentype_post_version2<'input> {
 num_glyphs: u16,
@@ -3741,7 +3741,7 @@ Decoder_opentype_glyf_composite(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#235)
+/// trait-ready: unique decoder function (d#233)
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_composite {
 glyphs: Vec<opentype_glyf_composite_acc_glyphs>,
@@ -3771,7 +3771,7 @@ Decoder_opentype_glyf_simple(p, n_contours)
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#234)
+/// trait-ready: unique decoder function (d#232)
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_simple {
 end_points_of_contour: Vec<u16>,
@@ -3795,7 +3795,7 @@ Decoder_opentype_glyf_description(p, n_contours)
 
 /// expected size: 136
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, Noop, DirectHeap] }, Layout { size: 48, align: 8 (1 << 3) })
-/// trait-ready: unique decoder function (d#233)
+/// trait-ready: unique decoder function (d#231)
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_description { Composite(opentype_glyf_composite), HeaderOnly, Simple(opentype_glyf_simple) }
 
@@ -3811,7 +3811,7 @@ Decoder_opentype_glyf_entry(p)
 
 /// expected size: 152
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, Noop, Noop, InDef(InEnum { variants: [Noop, Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
-/// trait-ready: unique decoder function (d#232)
+/// trait-ready: unique decoder function (d#230)
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_entry {
 number_of_contours: i16,
@@ -3887,7 +3887,7 @@ Decoder_opentype_gasp_gasp_record(p, version)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#231)
+/// trait-ready: unique decoder function (d#229)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gasp_gasp_record {
 range_max_ppem: u16,
@@ -3968,7 +3968,7 @@ Decoder_opentype_common_device_or_variation_index_table(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#194)
+/// trait-ready: unique decoder function (d#192)
 #[derive(Debug, Clone)]
 pub enum opentype_common_device_or_variation_index_table { DeviceTable(opentype_common_device_or_variation_index_table_DeviceTable), OtherTable(opentype_common_device_or_variation_index_table_OtherTable), VariationIndexTable(opentype_common_device_or_variation_index_table_VariationIndexTable) }
 
@@ -4011,7 +4011,7 @@ Decoder_opentype_layout_base_coord(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#229)
+/// trait-ready: unique decoder function (d#227)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_base_coord<'input> {
 table_scope: View<'input>,
@@ -4039,7 +4039,7 @@ Decoder_opentype_layout_base_values(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#226)
+/// trait-ready: unique decoder function (d#224)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_values<'input> {
 table_scope: View<'input>,
@@ -4067,7 +4067,7 @@ Decoder_opentype_layout_feat_min_max(p, table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#230)
+/// trait-ready: unique decoder function (d#228)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feat_min_max<'input> {
 feature_tag: u32,
@@ -4086,7 +4086,7 @@ Decoder_opentype_layout_min_max(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#227)
+/// trait-ready: unique decoder function (d#225)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_min_max<'input> {
 table_scope: View<'input>,
@@ -4115,7 +4115,7 @@ Decoder_opentype_base_base_langsys(p, table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#228)
+/// trait-ready: unique decoder function (d#226)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_base_base_langsys<'input> {
 base_lang_sys_tag: u32,
@@ -4133,7 +4133,7 @@ Decoder_opentype_layout_base_script(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#225)
+/// trait-ready: unique decoder function (d#223)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_script<'input> {
 table_scope: View<'input>,
@@ -4162,7 +4162,7 @@ Decoder_opentype_base_base_script_record(p, table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#224)
+/// trait-ready: unique decoder function (d#222)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_base_base_script_record<'input> {
 base_script_tag: u32,
@@ -4197,7 +4197,7 @@ Decoder_opentype_layout_axis_table(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#223)
+/// trait-ready: unique decoder function (d#221)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_axis_table<'input> {
 table_scope: View<'input>,
@@ -4240,7 +4240,7 @@ Decoder_opentype_common_variation_region_list(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#111)
+/// trait-ready: unique decoder function (d#109)
 #[derive(Debug, Clone)]
 pub struct opentype_common_variation_region_list {
 axis_count: u16,
@@ -4296,7 +4296,7 @@ Decoder_opentype_common_item_variation_data(p)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#112)
+/// trait-ready: unique decoder function (d#110)
 #[derive(Debug, Clone)]
 pub struct opentype_common_item_variation_data {
 item_count: u16,
@@ -4325,7 +4325,7 @@ Decoder_opentype_common_item_variation_store(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#110)
+/// trait-ready: unique decoder function (d#108)
 #[derive(Debug, Clone)]
 pub struct opentype_common_item_variation_store<'input> {
 table_scope: View<'input>,
@@ -4407,7 +4407,7 @@ Decoder_opentype_class_def(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#159)
+/// trait-ready: unique decoder function (d#157)
 #[derive(Debug, Clone)]
 pub struct opentype_class_def {
 class_format: u16,
@@ -4463,7 +4463,7 @@ Decoder_opentype_coverage_table(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#154)
+/// trait-ready: unique decoder function (d#152)
 #[derive(Debug, Clone)]
 pub struct opentype_coverage_table {
 coverage_format: u16,
@@ -4489,7 +4489,7 @@ Decoder_opentype_gdef_attach_point(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#222)
+/// trait-ready: unique decoder function (d#220)
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_attach_point {
 point_count: u16,
@@ -4515,7 +4515,7 @@ Decoder_opentype_gdef_attach_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#216)
+/// trait-ready: unique decoder function (d#214)
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_attach_list<'input> {
 list_scope: View<'input>,
@@ -4557,7 +4557,7 @@ Decoder_opentype_gdef_caret_value_data_format3(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#221)
+/// trait-ready: unique decoder function (d#219)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gdef_caret_value_data_format3<'input> {
 table_scope: View<'input>,
@@ -4581,7 +4581,7 @@ Decoder_opentype_gdef_caret_value(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#220)
+/// trait-ready: unique decoder function (d#218)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gdef_caret_value<'input> {
 format: u16,
@@ -4607,7 +4607,7 @@ Decoder_opentype_gdef_lig_glyph(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#219)
+/// trait-ready: unique decoder function (d#217)
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_lig_glyph<'input> {
 table_scope: View<'input>,
@@ -4634,7 +4634,7 @@ Decoder_opentype_gdef_lig_caret_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#217)
+/// trait-ready: unique decoder function (d#215)
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_lig_caret_list<'input> {
 list_scope: View<'input>,
@@ -4670,7 +4670,7 @@ Decoder_opentype_gdef_mark_glyph_set(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#218)
+/// trait-ready: unique decoder function (d#216)
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_mark_glyph_set<'input> {
 table_scope: View<'input>,
@@ -4742,7 +4742,7 @@ Decoder_opentype_layout_langsys(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#176)
+/// trait-ready: unique decoder function (d#174)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_langsys {
 lookup_order_offset: u16,
@@ -4770,7 +4770,7 @@ Decoder_opentype_layout_lang_sys_record(p, script_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#177)
+/// trait-ready: unique decoder function (d#175)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_lang_sys_record {
 lang_sys_tag: u32,
@@ -4788,7 +4788,7 @@ Decoder_opentype_layout_script_table(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#175)
+/// trait-ready: unique decoder function (d#173)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_script_table<'input> {
 script_scope: View<'input>,
@@ -4816,7 +4816,7 @@ Decoder_opentype_layout_script_record(p, table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#174)
+/// trait-ready: unique decoder function (d#172)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_script_record<'input> {
 script_tag: u32,
@@ -4834,7 +4834,7 @@ Decoder_opentype_layout_script_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#135)
+/// trait-ready: unique decoder function (d#133)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_script_list<'input> {
 table_scope: View<'input>,
@@ -4861,7 +4861,7 @@ Decoder_opentype_layout_feature_table(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#142)
+/// trait-ready: unique decoder function (d#140)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_table<'input> {
 table_scope: View<'input>,
@@ -4889,7 +4889,7 @@ Decoder_opentype_layout_feature_record(p, list_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#173)
+/// trait-ready: unique decoder function (d#171)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_record<'input> {
 feature_tag: u32,
@@ -4907,7 +4907,7 @@ Decoder_opentype_layout_feature_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#136)
+/// trait-ready: unique decoder function (d#134)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_list<'input> {
 list_scope: View<'input>,
@@ -4946,7 +4946,7 @@ Decoder_opentype_layout_sequence_lookup(p)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#158)
+/// trait-ready: unique decoder function (d#156)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_sequence_lookup {
 sequence_index: u16,
@@ -4964,7 +4964,7 @@ Decoder_opentype_layout_chained_sequence_rule(p)
 }
 
 /// expected size: 104
-/// trait-ready: unique decoder function (d#161)
+/// trait-ready: unique decoder function (d#159)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_rule {
 backtrack_glyph_count: u16,
@@ -4996,7 +4996,7 @@ Decoder_opentype_layout_chained_sequence_rule_set(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#160)
+/// trait-ready: unique decoder function (d#158)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_rule_set<'input> {
 table_scope: View<'input>,
@@ -5023,7 +5023,7 @@ Decoder_opentype_layout_chained_sequence_context_format1(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#155)
+/// trait-ready: unique decoder function (d#153)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context_format1<'input> {
 coverage: opentype_gdef_attach_list_coverage,
@@ -5042,7 +5042,7 @@ Decoder_opentype_layout_chained_sequence_context_format2(p, table_view)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#156)
+/// trait-ready: unique decoder function (d#154)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context_format2<'input> {
 coverage: opentype_gdef_attach_list_coverage,
@@ -5064,7 +5064,7 @@ Decoder_opentype_layout_chained_sequence_context_format3(p, table_view)
 }
 
 /// expected size: 104
-/// trait-ready: unique decoder function (d#157)
+/// trait-ready: unique decoder function (d#155)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context_format3 {
 backtrack_glyph_count: u16,
@@ -5093,7 +5093,7 @@ Decoder_opentype_layout_chained_sequence_context(p)
 }
 
 /// expected size: 144
-/// trait-ready: unique decoder function (d#152)
+/// trait-ready: unique decoder function (d#150)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context<'input> {
 table_scope: View<'input>,
@@ -5129,7 +5129,7 @@ Decoder_opentype_layout_anchor_table_format3(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#193)
+/// trait-ready: unique decoder function (d#191)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_anchor_table_format3<'input> {
 table_scope: View<'input>,
@@ -5155,7 +5155,7 @@ Decoder_opentype_layout_anchor_table(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#192)
+/// trait-ready: unique decoder function (d#190)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_anchor_table<'input> {
 anchor_format: u16,
@@ -5181,7 +5181,7 @@ Decoder_opentype_layout_entry_exit_record(p, table_view)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#201)
+/// trait-ready: unique decoder function (d#199)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_entry_exit_record<'input> {
 entry_anchor: opentype_layout_entry_exit_record_entry_anchor<'input>,
@@ -5199,7 +5199,7 @@ Decoder_opentype_layout_cursive_pos(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#185)
+/// trait-ready: unique decoder function (d#183)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_cursive_pos<'input> {
 pos_format: u16,
@@ -5220,7 +5220,7 @@ Decoder_opentype_layout_mark_record(p, array_view)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#195)
+/// trait-ready: unique decoder function (d#193)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_mark_record<'input> {
 mark_class: u16,
@@ -5238,7 +5238,7 @@ Decoder_opentype_layout_mark_array(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#189)
+/// trait-ready: unique decoder function (d#187)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_array<'input> {
 array_scope: View<'input>,
@@ -5266,7 +5266,7 @@ Decoder_opentype_layout_base_array_base_record(p, mark_class_count, _array_view)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#200)
+/// trait-ready: unique decoder function (d#198)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_array_base_record<'input> {
 base_anchor_offsets: Vec<u16>,
@@ -5284,7 +5284,7 @@ Decoder_opentype_layout_base_array(p, mark_class_count)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#199)
+/// trait-ready: unique decoder function (d#197)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_array<'input> {
 array_scope: View<'input>,
@@ -5311,7 +5311,7 @@ Decoder_opentype_layout_mark_base_pos(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#186)
+/// trait-ready: unique decoder function (d#184)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_mark_base_pos<'input> {
 format: u16,
@@ -5335,7 +5335,7 @@ Decoder_opentype_layout_ligature_attach_component_record(p, mark_class_count, ta
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#198)
+/// trait-ready: unique decoder function (d#196)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_attach_component_record<'input> {
 record_scope: View<'input>,
@@ -5354,7 +5354,7 @@ Decoder_opentype_layout_ligature_attach(p, mark_class_count)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#197)
+/// trait-ready: unique decoder function (d#195)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_attach<'input> {
 component_count: u16,
@@ -5372,7 +5372,7 @@ Decoder_opentype_layout_ligature_array(p, mark_class_count)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#196)
+/// trait-ready: unique decoder function (d#194)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_array<'input> {
 array_scope: View<'input>,
@@ -5401,7 +5401,7 @@ Decoder_opentype_layout_mark_lig_pos(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#187)
+/// trait-ready: unique decoder function (d#185)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_mark_lig_pos<'input> {
 table_scope: View<'input>,
@@ -5425,7 +5425,7 @@ Decoder_opentype_layout_mark2_array_mark2_record(p, mark_class_count, _array_vie
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#191)
+/// trait-ready: unique decoder function (d#189)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark2_array_mark2_record<'input> {
 mark2_anchor_offsets: Vec<u16>,
@@ -5443,7 +5443,7 @@ Decoder_opentype_layout_mark2_array(p, mark_class_count)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#190)
+/// trait-ready: unique decoder function (d#188)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark2_array<'input> {
 array_scope: View<'input>,
@@ -5470,7 +5470,7 @@ Decoder_opentype_layout_mark_mark_pos(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#188)
+/// trait-ready: unique decoder function (d#186)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_mark_mark_pos<'input> {
 format: u16,
@@ -5493,7 +5493,7 @@ Decoder_opentype_layout_value_format_flags(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#204)
+/// trait-ready: unique decoder function (d#202)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_value_format_flags {
 y_advance_device: bool,
@@ -5507,7 +5507,7 @@ x_placement: bool
 }
 
 /// expected size: 32
-/// trait-unready: multiple (6) decoders exist (d#{206, 207, 210, 211, 214, 215})
+/// trait-unready: multiple (6) decoders exist (d#{204, 205, 208, 209, 212, 213})
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_value_record {
 x_placement: Option<i16>,
@@ -5532,7 +5532,7 @@ Decoder_opentype_layout_pair_pos_pair_value_record(p, value_format1, value_forma
 }
 
 /// expected size: 66
-/// trait-ready: unique decoder function (d#209)
+/// trait-ready: unique decoder function (d#207)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_pair_pos_pair_value_record {
 second_glyph: u16,
@@ -5552,7 +5552,7 @@ Decoder_opentype_layout_pair_pos_pair_set(p, value_format1, value_format2)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#208)
+/// trait-ready: unique decoder function (d#206)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_pair_set<'input> {
 set_scope: View<'input>,
@@ -5579,7 +5579,7 @@ Decoder_opentype_layout_pair_pos_format1(p, table_view)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#202)
+/// trait-ready: unique decoder function (d#200)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_format1<'input> {
 table_scope: View<'input>,
@@ -5602,7 +5602,7 @@ Decoder_opentype_layout_pair_pos_class2_record(p, value_format1, value_format2, 
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#205)
+/// trait-ready: unique decoder function (d#203)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_pair_pos_class2_record {
 value_record1: Option<opentype_layout_value_record>,
@@ -5627,7 +5627,7 @@ Decoder_opentype_layout_pair_pos_format2(p, table_view)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#203)
+/// trait-ready: unique decoder function (d#201)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_format2<'input> {
 table_scope: View<'input>,
@@ -5657,7 +5657,7 @@ Decoder_opentype_layout_pair_pos(p)
 }
 
 /// expected size: 96
-/// trait-ready: unique decoder function (d#184)
+/// trait-ready: unique decoder function (d#182)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos<'input> {
 pos_format: u16,
@@ -5675,7 +5675,7 @@ Decoder_opentype_layout_sequence_context_rule(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#166)
+/// trait-ready: unique decoder function (d#164)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_sequence_context_rule {
 glyph_count: u16,
@@ -5703,7 +5703,7 @@ Decoder_opentype_layout_sequence_context_rule_set(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#165)
+/// trait-ready: unique decoder function (d#163)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_sequence_context_rule_set<'input> {
 table_scope: View<'input>,
@@ -5730,7 +5730,7 @@ Decoder_opentype_layout_sequence_context_format1(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#162)
+/// trait-ready: unique decoder function (d#160)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_sequence_context_format1<'input> {
 coverage: opentype_gdef_attach_list_coverage,
@@ -5749,7 +5749,7 @@ Decoder_opentype_layout_sequence_context_format2(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#163)
+/// trait-ready: unique decoder function (d#161)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_sequence_context_format2<'input> {
 coverage: opentype_gdef_attach_list_coverage,
@@ -5769,7 +5769,7 @@ Decoder_opentype_layout_sequence_context_format3(p, table_view)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#164)
+/// trait-ready: unique decoder function (d#162)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_sequence_context_format3 {
 glyph_count: u16,
@@ -5794,7 +5794,7 @@ Decoder_opentype_layout_sequence_context(p)
 }
 
 /// expected size: 96
-/// trait-ready: unique decoder function (d#151)
+/// trait-ready: unique decoder function (d#149)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_sequence_context<'input> {
 table_scope: View<'input>,
@@ -5813,7 +5813,7 @@ Decoder_opentype_layout_single_pos_format1(p, table_view)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#212)
+/// trait-ready: unique decoder function (d#210)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_single_pos_format1<'input> {
 table_scope: View<'input>,
@@ -5833,7 +5833,7 @@ Decoder_opentype_layout_single_pos_format2(p, table_view)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#213)
+/// trait-ready: unique decoder function (d#211)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos_format2<'input> {
 table_scope: View<'input>,
@@ -5859,7 +5859,7 @@ Decoder_opentype_layout_single_pos(p)
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#183)
+/// trait-ready: unique decoder function (d#181)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos<'input> {
 pos_format: u16,
@@ -5877,7 +5877,7 @@ Decoder_opentype_layout_ground_pos(p, lookup_type)
 }
 
 /// expected size: 152
-/// trait-ready: unique decoder function (d#182)
+/// trait-ready: unique decoder function (d#180)
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_pos<'input> { ChainedSequenceContext(opentype_layout_chained_sequence_context<'input>), CursivePos(opentype_layout_cursive_pos<'input>), MarkBasePos(opentype_layout_mark_base_pos<'input>), MarkLigPos(opentype_layout_mark_lig_pos<'input>), MarkMarkPos(opentype_layout_mark_mark_pos<'input>), PairPos(opentype_layout_pair_pos<'input>), SequenceContext(opentype_layout_sequence_context<'input>), SinglePos(opentype_layout_single_pos<'input>) }
 
@@ -5900,7 +5900,7 @@ Decoder_opentype_layout_pos_extension(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#181)
+/// trait-ready: unique decoder function (d#179)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_pos_extension<'input> {
 format: u16,
@@ -5920,7 +5920,7 @@ Decoder_opentype_gpos_lookup_subtable(p, lookup_type)
 }
 
 /// expected size: 160
-/// trait-ready: unique decoder function (d#180)
+/// trait-ready: unique decoder function (d#178)
 #[derive(Debug, Clone)]
 pub enum opentype_gpos_lookup_subtable<'input> { GroundPos(opentype_layout_ground_pos<'input>), PosExtension(opentype_layout_pos_extension<'input>) }
 
@@ -5943,7 +5943,7 @@ Decoder_opentype_gpos_lookup_table(p)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#179)
+/// trait-ready: unique decoder function (d#177)
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_lookup_table<'input> {
 table_scope: View<'input>,
@@ -5973,7 +5973,7 @@ Decoder_opentype_gpos_lookup_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#178)
+/// trait-ready: unique decoder function (d#176)
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_lookup_list<'input> {
 list_scope: View<'input>,
@@ -6028,7 +6028,7 @@ Decoder_opentype_layout_feature_table_substitution_record(p, _table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#141)
+/// trait-ready: unique decoder function (d#139)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_table_substitution_record<'input> {
 feature_index: u16,
@@ -6047,7 +6047,7 @@ Decoder_opentype_layout_feature_table_substitution(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#140)
+/// trait-ready: unique decoder function (d#138)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_table_substitution<'input> {
 table_scope: View<'input>,
@@ -6076,7 +6076,7 @@ Decoder_opentype_layout_feature_variation_record(p, table_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#139)
+/// trait-ready: unique decoder function (d#137)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_variation_record<'input> {
 condition_set: opentype_layout_feature_variation_record_condition_set<'input>,
@@ -6094,7 +6094,7 @@ Decoder_opentype_layout_feature_variations(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#138)
+/// trait-ready: unique decoder function (d#136)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations<'input> {
 table_scope: View<'input>,
@@ -6146,7 +6146,7 @@ Decoder_opentype_gsub_alternate_subst_alternate_set(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#169)
+/// trait-ready: unique decoder function (d#167)
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_alternate_subst_alternate_set {
 glyph_count: u16,
@@ -6172,7 +6172,7 @@ Decoder_opentype_gsub_alternate_subst(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#149)
+/// trait-ready: unique decoder function (d#147)
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_alternate_subst<'input> {
 table_scope: View<'input>,
@@ -6193,7 +6193,7 @@ Decoder_opentype_gsub_ligature_subst_ligature_table(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#168)
+/// trait-ready: unique decoder function (d#166)
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_ligature_subst_ligature_table {
 ligature_glyph: u16,
@@ -6220,7 +6220,7 @@ Decoder_opentype_gsub_ligature_subst_ligature_set(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#167)
+/// trait-ready: unique decoder function (d#165)
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_ligature_subst_ligature_set<'input> {
 set_scope: View<'input>,
@@ -6247,7 +6247,7 @@ Decoder_opentype_layout_ligature_subst(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#150)
+/// trait-ready: unique decoder function (d#148)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_subst<'input> {
 table_scope: View<'input>,
@@ -6268,7 +6268,7 @@ Decoder_opentype_layout_multiple_subst_sequence_table(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#170)
+/// trait-ready: unique decoder function (d#168)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_multiple_subst_sequence_table {
 glyph_count: u16,
@@ -6300,7 +6300,7 @@ Decoder_opentype_layout_multiple_subst(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#148)
+/// trait-ready: unique decoder function (d#146)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_multiple_subst<'input> {
 table_scope: View<'input>,
@@ -6320,7 +6320,7 @@ Decoder_opentype_layout_reverse_chain_single_subst(p)
 }
 
 /// expected size: 112
-/// trait-ready: unique decoder function (d#153)
+/// trait-ready: unique decoder function (d#151)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_reverse_chain_single_subst<'input> {
 subst_format: u16,
@@ -6345,7 +6345,7 @@ Decoder_opentype_layout_single_subst_format1(p, table_view)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#171)
+/// trait-ready: unique decoder function (d#169)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_single_subst_format1<'input> {
 table_scope: View<'input>,
@@ -6364,7 +6364,7 @@ Decoder_opentype_layout_single_subst_format2(p, table_view)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#172)
+/// trait-ready: unique decoder function (d#170)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst_format2<'input> {
 table_scope: View<'input>,
@@ -6389,7 +6389,7 @@ Decoder_opentype_layout_single_subst(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#147)
+/// trait-ready: unique decoder function (d#145)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst<'input> {
 subst_format: u16,
@@ -6407,7 +6407,7 @@ Decoder_opentype_layout_ground_subst(p, lookup_type)
 }
 
 /// expected size: 152
-/// trait-ready: unique decoder function (d#146)
+/// trait-ready: unique decoder function (d#144)
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_subst<'input> { AlternateSubst(opentype_gsub_alternate_subst<'input>), ChainedSequenceContext(opentype_layout_chained_sequence_context<'input>), LigatureSubst(opentype_layout_ligature_subst<'input>), MultipleSubst(opentype_layout_multiple_subst<'input>), ReverseChainSingleSubst(opentype_layout_reverse_chain_single_subst<'input>), SequenceContext(opentype_layout_sequence_context<'input>), SingleSubst(opentype_layout_single_subst<'input>) }
 
@@ -6430,7 +6430,7 @@ Decoder_opentype_layout_subst_extension(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#145)
+/// trait-ready: unique decoder function (d#143)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_subst_extension<'input> {
 format: u16,
@@ -6450,7 +6450,7 @@ Decoder_opentype_gsub_lookup_subtable(p, lookup_type)
 }
 
 /// expected size: 160
-/// trait-ready: unique decoder function (d#144)
+/// trait-ready: unique decoder function (d#142)
 #[derive(Debug, Clone)]
 pub enum opentype_gsub_lookup_subtable<'input> { GroundSubst(opentype_layout_ground_subst<'input>), SubstExtension(opentype_layout_subst_extension<'input>) }
 
@@ -6473,7 +6473,7 @@ Decoder_opentype_gsub_lookup_table(p)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#143)
+/// trait-ready: unique decoder function (d#141)
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_lookup_table<'input> {
 table_scope: View<'input>,
@@ -6503,7 +6503,7 @@ Decoder_opentype_gsub_lookup_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#137)
+/// trait-ready: unique decoder function (d#135)
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_lookup_list<'input> {
 list_scope: View<'input>,
@@ -6553,7 +6553,7 @@ Decoder_opentype_avar_axis_value_map(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#134)
+/// trait-ready: unique decoder function (d#132)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_avar_axis_value_map {
 from_coordinate: opentype_avar_axis_value_map_from_coordinate,
@@ -6571,7 +6571,7 @@ Decoder_opentype_avar_segment_maps(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#133)
+/// trait-ready: unique decoder function (d#131)
 #[derive(Debug, Clone)]
 pub struct opentype_avar_segment_maps {
 position_map_count: u16,
@@ -6616,7 +6616,7 @@ Decoder_opentype_fvar_variation_axis_record(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#130)
+/// trait-ready: unique decoder function (d#128)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_fvar_variation_axis_record {
 axis_tag: u32,
@@ -6638,7 +6638,7 @@ Decoder_opentype_fvar_user_tuple(p, axis_count)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#132)
+/// trait-ready: unique decoder function (d#130)
 #[derive(Debug, Clone)]
 pub struct opentype_fvar_user_tuple {
 coordinates: Vec<opentype_head_table_font_revision>
@@ -6656,7 +6656,7 @@ Decoder_opentype_fvar_instance_record(p, axis_count, instance_size)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#131)
+/// trait-ready: unique decoder function (d#129)
 #[derive(Debug, Clone)]
 pub struct opentype_fvar_instance_record {
 subfamily_nameid: u16,
@@ -6703,7 +6703,7 @@ Decoder_opentype_gvar_tuple_record(p, axis_count)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#123)
+/// trait-ready: unique decoder function (d#121)
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_tuple_record {
 coordinates: Vec<opentype_avar_axis_value_map_from_coordinate>
@@ -6761,7 +6761,7 @@ Decoder_opentype_gvar_tuple_variation_header(p, axis_count)
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#125)
+/// trait-ready: unique decoder function (d#123)
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_tuple_variation_header {
 variation_data_size: u16,
@@ -6794,7 +6794,7 @@ Decoder_opentype_var_packed_point_numbers_runs(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#129)
+/// trait-ready: unique decoder function (d#127)
 #[derive(Debug, Clone)]
 pub struct opentype_var_packed_point_numbers_runs {
 control: opentype_var_packed_point_numbers_run_control,
@@ -6843,7 +6843,7 @@ Decoder_opentype_gvar_serialized_data(p, shared_point_numbers, tuple_var_headers
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#126)
+/// trait-ready: unique decoder function (d#124)
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_serialized_data {
 shared_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_runs>)>,
@@ -6861,7 +6861,7 @@ Decoder_opentype_gvar_glyph_variation_data(p, axis_count)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#124)
+/// trait-ready: unique decoder function (d#122)
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_glyph_variation_data<'input> {
 data_scope: View<'input>,
@@ -6909,7 +6909,7 @@ Decoder_opentype_var_delta_set_index_map(p)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#109)
+/// trait-ready: unique decoder function (d#107)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_delta_set_index_map<'input> {
 format: u8,
@@ -6969,7 +6969,7 @@ Decoder_opentype_mvar_value_record(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#122)
+/// trait-ready: unique decoder function (d#120)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_mvar_value_record {
 value_tag: u32,
@@ -7011,7 +7011,7 @@ Decoder_opentype_colr_base_glyph_record(p)
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#104)
+/// trait-ready: unique decoder function (d#102)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_base_glyph_record {
 glyph_id: u16,
@@ -7038,7 +7038,7 @@ Decoder_opentype_colr_layer_record(p)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#105)
+/// trait-ready: unique decoder function (d#103)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_layer_record {
 glyph_id: u16,
@@ -7079,7 +7079,7 @@ Decoder_opentype_colr_paint_table(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#116)
+/// trait-ready: unique decoder function (d#114)
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_colr_paint_table<'input> { PaintColrGlyph(opentype_colr_paint_table_PaintColrGlyph), PaintColrLayers(opentype_colr_paint_table_PaintColrLayers), PaintComposite(opentype_colr_paint_table_PaintComposite<'input>), PaintGlyph(opentype_colr_paint_table_PaintGlyph<'input>), PaintLinearGradient(opentype_colr_paint_table_PaintLinearGradient<'input>), PaintRadialGradient(opentype_colr_paint_table_PaintRadialGradient<'input>), PaintRotate(opentype_colr_paint_table_PaintRotate<'input>), PaintRotateAroundCenter(opentype_colr_paint_table_PaintRotateAroundCenter<'input>), PaintScale(opentype_colr_paint_table_PaintScale<'input>), PaintScaleAroundCenter(opentype_colr_paint_table_PaintScaleAroundCenter<'input>), PaintScaleUniform(opentype_colr_paint_table_PaintScaleUniform<'input>), PaintScaleUniformAroundCenter(opentype_colr_paint_table_PaintScaleUniformAroundCenter<'input>), PaintSkew(opentype_colr_paint_table_PaintSkew<'input>), PaintSkewAroundCenter(opentype_colr_paint_table_PaintSkewAroundCenter<'input>), PaintSolid(opentype_colr_paint_table_PaintSolid), PaintSweepGradient(opentype_colr_paint_table_PaintSweepGradient<'input>), PaintTransform(opentype_colr_paint_table_PaintTransform<'input>), PaintTranslate(opentype_colr_paint_table_PaintTranslate<'input>), PaintVarLinearGradient(opentype_colr_paint_table_PaintVarLinearGradient<'input>), PaintVarRadialGradient(opentype_colr_paint_table_PaintVarRadialGradient<'input>), PaintVarRotate(opentype_colr_paint_table_PaintVarRotate<'input>), PaintVarRotateAroundCenter(opentype_colr_paint_table_PaintVarRotateAroundCenter<'input>), PaintVarScale(opentype_colr_paint_table_PaintVarScale<'input>), PaintVarScaleAroundCenter(opentype_colr_paint_table_PaintVarScaleAroundCenter<'input>), PaintVarScaleUniform(opentype_colr_paint_table_PaintVarScaleUniform<'input>), PaintVarScaleUniformAroundCenter(opentype_colr_paint_table_PaintVarScaleUniformAroundCenter<'input>), PaintVarSkew(opentype_colr_paint_table_PaintVarSkew<'input>), PaintVarSkewAroundCenter(opentype_colr_paint_table_PaintVarSkewAroundCenter<'input>), PaintVarSolid(opentype_colr_paint_table_PaintVarSolid), PaintVarSweepGradient(opentype_colr_paint_table_PaintVarSweepGradient<'input>), PaintVarTransform(opentype_colr_paint_table_PaintVarTransform<'input>), PaintVarTranslate(opentype_colr_paint_table_PaintVarTranslate<'input>) }
 
@@ -7130,7 +7130,7 @@ Decoder_opentype_colr_color_line(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#117)
+/// trait-ready: unique decoder function (d#115)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_color_line {
 extend: u8,
@@ -7289,7 +7289,7 @@ Decoder_opentype_colr_affine2x3(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#119)
+/// trait-ready: unique decoder function (d#117)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_affine2x3 {
 xx: opentype_head_table_font_revision,
@@ -7348,7 +7348,7 @@ Decoder_opentype_colr_var_color_line(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#118)
+/// trait-ready: unique decoder function (d#116)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_var_color_line {
 extend: u8,
@@ -7516,7 +7516,7 @@ Decoder_opentype_colr_var_affine2x3(p)
 }
 
 /// expected size: 52
-/// trait-ready: unique decoder function (d#120)
+/// trait-ready: unique decoder function (d#118)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_var_affine2x3 {
 xx: opentype_head_table_font_revision,
@@ -7567,7 +7567,7 @@ Decoder_opentype_colr_base_glyph_paint_record(p, list_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#121)
+/// trait-ready: unique decoder function (d#119)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_base_glyph_paint_record<'input> {
 glyph_id: u16,
@@ -7585,7 +7585,7 @@ Decoder_opentype_colr_base_glyph_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#106)
+/// trait-ready: unique decoder function (d#104)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_base_glyph_list<'input> {
 list_scope: View<'input>,
@@ -7612,7 +7612,7 @@ Decoder_opentype_colr_layer_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#107)
+/// trait-ready: unique decoder function (d#105)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_layer_list<'input> {
 list_scope: View<'input>,
@@ -7662,7 +7662,7 @@ Decoder_opentype_colr_clip_box(p)
 }
 
 /// expected size: 20
-/// trait-ready: unique decoder function (d#115)
+/// trait-ready: unique decoder function (d#113)
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_colr_clip_box { Format1(opentype_colr_clip_box_Format1), Format2(opentype_colr_clip_box_Format2) }
 
@@ -7685,7 +7685,7 @@ Decoder_opentype_colr_clip_record(p, list_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#114)
+/// trait-ready: unique decoder function (d#112)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_clip_record {
 start_glyph_id: u16,
@@ -7704,7 +7704,7 @@ Decoder_opentype_colr_clip_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#108)
+/// trait-ready: unique decoder function (d#106)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_clip_list<'input> {
 list_scope: View<'input>,
@@ -7760,32 +7760,29 @@ num_layer_records: u16,
 extra: opentype_colr_table_extra<'input>
 }
 
-impl CommonObject for opentype_cpal_color_record {
-type Args<'x> = ();
+impl ReadUnchecked for opentype_cpal_color_record {
+type HostType = opentype_cpal_color_record;
 
-type Output<'x> = opentype_cpal_color_record;
+const SIZE: usize = 4;
 
-fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
-Decoder_opentype_cpal_color_record(p)
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_cpal_color_record {
+let blue = U8::read_unchecked(ctxt);
+let green = U8::read_unchecked(ctxt);
+let red = U8::read_unchecked(ctxt);
+let alpha = U8::read_unchecked(ctxt);
+opentype_cpal_color_record { blue: blue, green: green, red: red, alpha: alpha }
 }
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#103)
+/// trait-orphaned: no decoder functions provided
+/// fixed-format: emits `ReadUnchecked` (format level 433)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_color_record {
 blue: u8,
 green: u8,
 red: u8,
 alpha: u8
-}
-
-/// expected size: 4
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_cpal_table_color_records_array {
-offset: u32,
-_data: std::marker::PhantomData<Option<Vec<opentype_cpal_color_record>>>
 }
 
 impl CommonObject for opentype_cpal_palette_type {
@@ -7799,7 +7796,7 @@ Decoder_opentype_cpal_palette_type(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#102)
+/// trait-ready: unique decoder function (d#101)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_palette_type {
 usable_with_dark_background: bool,
@@ -7815,7 +7812,7 @@ _data: std::marker::PhantomData<Option<Vec<opentype_cpal_palette_type>>>
 }
 
 /// expected size: 48
-/// trait-unready: multiple (2) decoders exist (d#{100, 101})
+/// trait-unready: multiple (2) decoders exist (d#{99, 100})
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_palette_labels_array<'input> {
 offset: u32,
@@ -7847,7 +7844,7 @@ Decoder_opentype_cpal_table(p)
 }
 }
 
-/// expected size: 176
+/// expected size: 208
 /// trait-ready: unique decoder function (d#52)
 #[derive(Debug, Clone)]
 pub struct opentype_cpal_table<'input> {
@@ -7856,7 +7853,7 @@ version: u16,
 num_palette_entries: u16,
 num_palettes: u16,
 num_color_records: u16,
-color_records_array: opentype_cpal_table_color_records_array,
+color_records_array: ReadArray<'input, opentype_cpal_color_record>,
 color_record_indices: Vec<u16>,
 extra: opentype_cpal_table_extra<'input>
 }
@@ -8481,7 +8478,7 @@ Decoder_opentype_table_directory_table_links(p, tables, font_view)
 }
 }
 
-/// expected size: 1792
+/// expected size: 1824
 /// trait-ready: unique decoder function (d#30)
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory_table_links<'input> {
@@ -8530,7 +8527,7 @@ Decoder_opentype_table_directory(p, font_view)
 }
 }
 
-/// expected size: 1832
+/// expected size: 1864
 /// trait-ready: unique decoder function (d#27)
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory<'input> {
@@ -8543,7 +8540,7 @@ table_records: Vec<opentype_table_record>,
 table_links: opentype_table_directory_table_links<'input>
 }
 
-/// expected size: 1840
+/// expected size: 1872
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1_table_directories<'input> {
@@ -8595,7 +8592,7 @@ minor_version: u16,
 header: opentype_ttc_header_header<'input>
 }
 
-/// expected size: 1840
+/// expected size: 1872
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, DirectHeap] }, Layout { size: 56, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
@@ -8611,7 +8608,7 @@ Decoder_opentype_main(p)
 }
 }
 
-/// expected size: 1848
+/// expected size: 1880
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#14)
 #[derive(Debug, Clone)]
@@ -8631,7 +8628,7 @@ Decoder_png_ihdr_data(p)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#336)
+/// trait-ready: unique decoder function (d#334)
 #[derive(Debug, Copy, Clone)]
 pub struct png_ihdr_data {
 width: u32,
@@ -8654,7 +8651,7 @@ Decoder_png_ihdr(p)
 }
 
 /// expected size: 28
-/// trait-ready: unique decoder function (d#299)
+/// trait-ready: unique decoder function (d#297)
 #[derive(Debug, Copy, Clone)]
 pub struct png_ihdr {
 length: u32,
@@ -8697,7 +8694,7 @@ Decoder_png_bkgd(p, ihdr)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#318)
+/// trait-ready: unique decoder function (d#316)
 #[derive(Debug, Copy, Clone)]
 pub enum png_bkgd { color_type_0(png_trns_color_type_0), color_type_2(png_trns_color_type_2), color_type_3(png_trns_color_type_3), color_type_4(png_trns_color_type_0), color_type_6(png_trns_color_type_2) }
 
@@ -8712,7 +8709,7 @@ Decoder_png_chrm(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#310)
+/// trait-ready: unique decoder function (d#308)
 #[derive(Debug, Copy, Clone)]
 pub struct png_chrm {
 whitepoint_x: u32,
@@ -8736,7 +8733,7 @@ Decoder_png_gama(p)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#311)
+/// trait-ready: unique decoder function (d#309)
 #[derive(Debug, Copy, Clone)]
 pub struct png_gama {
 gamma: u32
@@ -8753,7 +8750,7 @@ Decoder_png_hist(p)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#319)
+/// trait-ready: unique decoder function (d#317)
 #[derive(Debug, Clone)]
 pub struct png_hist {
 histogram: Vec<u16>
@@ -8777,7 +8774,7 @@ fcheck: u8
 }
 
 /// expected size: 96
-/// trait-unready: multiple (4) decoders exist (d#{302, 325, 329, 334})
+/// trait-unready: multiple (4) decoders exist (d#{300, 323, 327, 332})
 #[derive(Debug, Clone)]
 pub struct zlib_main {
 compression_method_flags: zlib_main_compression_method_flags,
@@ -8798,7 +8795,7 @@ Decoder_png_iccp(p)
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#312)
+/// trait-ready: unique decoder function (d#310)
 #[derive(Debug, Clone)]
 pub struct png_iccp {
 profile_name: Vec<u8>,
@@ -8827,7 +8824,7 @@ Decoder_png_itxt(p)
 }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#315)
+/// trait-ready: unique decoder function (d#313)
 #[derive(Debug, Clone)]
 pub struct png_itxt {
 keyword: Vec<u8>,
@@ -8849,7 +8846,7 @@ Decoder_png_phys(p)
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#320)
+/// trait-ready: unique decoder function (d#318)
 #[derive(Debug, Copy, Clone)]
 pub struct png_phys {
 pixels_per_unit_x: u32,
@@ -8902,7 +8899,7 @@ Decoder_png_sbit(p, ihdr)
 }
 
 /// expected size: 5
-/// trait-ready: unique decoder function (d#313)
+/// trait-ready: unique decoder function (d#311)
 #[derive(Debug, Copy, Clone)]
 pub enum png_sbit { color_type_0(png_sbit_color_type_0), color_type_2(png_sbit_color_type_2), color_type_3(png_sbit_color_type_2), color_type_4(png_sbit_color_type_4), color_type_6(png_sbit_color_type_6) }
 
@@ -8944,7 +8941,7 @@ Decoder_png_splt(p)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#321)
+/// trait-ready: unique decoder function (d#319)
 #[derive(Debug, Clone)]
 pub struct png_splt {
 palette_name: Vec<u8>,
@@ -8963,7 +8960,7 @@ Decoder_png_srgb(p)
 }
 
 /// expected size: 1
-/// trait-ready: unique decoder function (d#314)
+/// trait-ready: unique decoder function (d#312)
 #[derive(Debug, Copy, Clone)]
 pub struct png_srgb {
 rendering_intent: u8
@@ -8980,7 +8977,7 @@ Decoder_png_text(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#316)
+/// trait-ready: unique decoder function (d#314)
 #[derive(Debug, Clone)]
 pub struct png_text {
 keyword: Vec<u8>,
@@ -8998,7 +8995,7 @@ Decoder_png_time(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#322)
+/// trait-ready: unique decoder function (d#320)
 #[derive(Debug, Copy, Clone)]
 pub struct png_time {
 year: u16,
@@ -9020,7 +9017,7 @@ Decoder_png_trns(p, ihdr)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#309)
+/// trait-ready: unique decoder function (d#307)
 #[derive(Debug, Clone)]
 pub enum png_trns { color_type_0(png_trns_color_type_0), color_type_2(png_trns_color_type_2), color_type_3(Vec<png_trns_color_type_3>) }
 
@@ -9035,7 +9032,7 @@ Decoder_png_ztxt(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#317)
+/// trait-ready: unique decoder function (d#315)
 #[derive(Debug, Clone)]
 pub struct png_ztxt {
 keyword: Vec<u8>,
@@ -9059,7 +9056,7 @@ Decoder_png_chunk(p, ihdr)
 }
 
 /// expected size: 168
-/// trait-ready: unique decoder function (d#300)
+/// trait-ready: unique decoder function (d#298)
 #[derive(Debug, Clone)]
 pub struct png_chunk {
 length: u32,
@@ -9079,7 +9076,7 @@ Decoder_png_iend(p)
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#303)
+/// trait-ready: unique decoder function (d#301)
 #[derive(Debug, Copy, Clone)]
 pub struct png_iend {
 length: u32,
@@ -9120,7 +9117,7 @@ Decoder_riff_chunk(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#298)
+/// trait-ready: unique decoder function (d#296)
 #[derive(Debug, Clone)]
 pub struct riff_chunk {
 tag: (u8, u8, u8, u8),
@@ -9140,7 +9137,7 @@ Decoder_riff_subchunks(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#296)
+/// trait-ready: unique decoder function (d#294)
 #[derive(Debug, Clone)]
 pub struct riff_subchunks {
 tag: (u8, u8, u8, u8),
@@ -9237,7 +9234,7 @@ Decoder_rle_main(p)
 pub enum rle_main { new_style(rle_new_style), old_style(rle_old_style) }
 
 /// expected size: 24
-/// trait-unready: multiple (3) decoders exist (d#{288, 290, 291})
+/// trait-unready: multiple (3) decoders exist (d#{286, 288, 289})
 #[derive(Debug, Clone)]
 pub struct tar_ascii_string_opt0_nonempty {
 string: Vec<u8>
@@ -9254,7 +9251,7 @@ Decoder_tar_header(p)
 }
 
 /// expected size: 328
-/// trait-ready: unique decoder function (d#287)
+/// trait-ready: unique decoder function (d#285)
 #[derive(Debug, Clone)]
 pub struct tar_header {
 name: tar_ascii_string_opt0_nonempty,
@@ -9287,7 +9284,7 @@ Decoder_tar_header_with_data(p)
 }
 
 /// expected size: 352
-/// trait-ready: unique decoder function (d#286)
+/// trait-ready: unique decoder function (d#284)
 #[derive(Debug, Clone)]
 pub struct tar_header_with_data {
 header: tar_header,
@@ -9295,7 +9292,7 @@ file: Vec<u8>
 }
 
 /// expected size: 24
-/// trait-unready: multiple (2) decoders exist (d#{12, 474})
+/// trait-unready: multiple (2) decoders exist (d#{12, 472})
 #[derive(Debug, Clone)]
 pub struct tar_main {
 contents: Vec<tar_header_with_data>
@@ -9320,7 +9317,7 @@ noise: Vec<u8>,
 waldo: &'input [u8]
 }
 
-/// expected size: 1856
+/// expected size: 1888
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
@@ -9344,7 +9341,7 @@ Decoder_png_idat(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#301)
+/// trait-ready: unique decoder function (d#299)
 #[derive(Debug, Clone)]
 pub struct png_idat {
 length: u32,
@@ -9372,7 +9369,7 @@ Decoder_opentype_glyph_description_simple_flags_raw(p)
 }
 
 /// expected size: 7
-/// trait-ready: unique decoder function (d#236)
+/// trait-ready: unique decoder function (d#234)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_glyph_description_simple_flags_raw {
 overlap_simple: bool,
@@ -9395,7 +9392,7 @@ Decoder_opentype_var_dsim_entry_format(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#113)
+/// trait-ready: unique decoder function (d#111)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_dsim_entry_format {
 map_entry_size: u8,
@@ -9421,7 +9418,7 @@ _char: u8,
 buf: Vec<u8>
 }
 
-/// expected size: 1856
+/// expected size: 1888
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-unready: multiple (2) decoders exist (d#{0, 1})
 #[derive(Debug, Clone)]
@@ -9438,7 +9435,7 @@ expand_vertical: u8
 }
 
 /// expected size: 2
-/// trait-unready: multiple (2) decoders exist (d#{504, 509})
+/// trait-unready: multiple (2) decoders exist (d#{502, 507})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_exp_data {
 expand_horizontal_vertical: jpeg_exp_data_expand_horizontal_vertical
@@ -9455,7 +9452,7 @@ Decoder_jpeg_exp(p)
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#508)
+/// trait-ready: unique decoder function (d#506)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_exp {
 marker: jpeg_soi,
@@ -9778,7 +9775,7 @@ return Err(ParseError::InsufficientRepeats);
 break
 }
 } else {
-let next_elem = (Decoder498(_input))?;
+let next_elem = (Decoder496(_input))?;
 accum.push(next_elem)
 }
 };
@@ -9831,13 +9828,13 @@ PResult::Ok(gif_main { header, logical_screen, blocks, trailer })
 
 /// d#5
 fn Decoder5(_input: &mut Parser<'_>) -> Result<Vec<tar_main>, ParseError> {
-let gzip_raw = (Decoder473(_input))?;
+let gzip_raw = (Decoder471(_input))?;
 let mut accum = Vec::new();
 for item in gzip_raw.clone() {
 let next_elem = {
 let mut buf_parser = Parser::new(slice_all(&item.data.inflate));
 let buf_input = &mut buf_parser;
-(Decoder474(buf_input))?
+(Decoder472(buf_input))?
 };
 accum.push(next_elem)
 };
@@ -9876,12 +9873,12 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 };
 let fname = if header.file_flags.fname {
-Some((Decoder471(_input))?)
+Some((Decoder469(_input))?)
 } else {
 None
 };
 let fcomment = if header.file_flags.fcomment {
-Some((Decoder472(_input))?)
+Some((Decoder470(_input))?)
 } else {
 None
 };
@@ -9909,7 +9906,7 @@ PResult::Ok(accum)
 fn Decoder_jpeg_main(_input: &mut Parser<'_>) -> Result<jpeg_main, ParseError> {
 let soi = (Decoder_jpeg_soi(_input))?;
 let frame = (Decoder_jpeg_frame(_input))?;
-let eoi = (Decoder395(_input))?;
+let eoi = (Decoder393(_input))?;
 PResult::Ok(jpeg_main { soi, frame, eoi })
 }
 
@@ -10454,7 +10451,7 @@ x64
 }
 };
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder258(_input, header.ident.data == 2u8, header.ident.class, header.phnum))?;
+let ret = (Decoder256(_input, header.ident.data == 2u8, header.ident.class, header.phnum))?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
@@ -10471,7 +10468,7 @@ x64
 }
 };
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder259(_input, header.ident.data == 2u8, header.ident.class, header.shnum))?;
+let ret = (Decoder257(_input, header.ident.data == 2u8, header.ident.class, header.shnum))?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
@@ -10492,7 +10489,7 @@ x64
 }
 };
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder260(_input, shdr.r#type, match shdr.size {
+let ret = (Decoder258(_input, shdr.r#type, match shdr.size {
 elf_types_elf_full::Full32(x32) => {
 x32 as u64
 },
@@ -12372,8 +12369,8 @@ inner
 return Err(ParseError::FalsifiedWhere(4762692522317026931u64));
 }
 };
-let created = (Decoder243(_input))?;
-let modified = (Decoder243(_input))?;
+let created = (Decoder241(_input))?;
+let modified = (Decoder241(_input))?;
 let glyph_extents = {
 let x_min = {
 let raw = {
@@ -14178,8 +14175,7 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let _data = std::marker::PhantomData;
-opentype_cpal_table_color_records_array { offset, _data }
+table_view.offset(offset as usize)?.as_read_array::<opentype_cpal_color_record>(num_color_records as usize)?
 };
 let color_record_indices = {
 let mut accum = Vec::new();
@@ -14209,7 +14205,7 @@ let _data = std::marker::PhantomData;
 opentype_cpal_table_extra_Version1_palette_types_array { offset, _data }
 };
 let palette_labels_array = (Decoder_opentype_cpal_palette_labels_array(_input, num_palettes, table_view))?;
-let palette_entry_labels_array = (Decoder101(_input, num_palette_entries, table_view))?;
+let palette_entry_labels_array = (Decoder100(_input, num_palette_entries, table_view))?;
 opentype_cpal_table_extra_Version1 { num_palettes, palette_types_array, palette_labels_array, palette_entry_labels_array }
 };
 opentype_cpal_table_extra::Version1(inner)
@@ -17266,17 +17262,7 @@ PResult::Ok(gzip_header_file_flags { fcomment, fname, fextra, fhcrc, ftext })
 }
 
 /// d#98
-fn Decoder98(_input: &mut Parser<'_>, num_color_records: u16) -> Result<Vec<opentype_cpal_color_record>, ParseError> {
-let mut accum = Vec::new();
-for _ in 0..num_color_records {
-let next_elem = (Decoder_opentype_cpal_color_record(_input))?;
-accum.push(next_elem)
-};
-PResult::Ok(accum)
-}
-
-/// d#99
-fn Decoder99(_input: &mut Parser<'_>, num_palettes: u16) -> Result<Vec<opentype_cpal_palette_type>, ParseError> {
+fn Decoder98(_input: &mut Parser<'_>, num_palettes: u16) -> Result<Vec<opentype_cpal_palette_type>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..num_palettes {
 let next_elem = (Decoder_opentype_cpal_palette_type(_input))?;
@@ -17285,7 +17271,7 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#100
+/// d#99
 fn Decoder_opentype_cpal_palette_labels_array<'input>(_input: &mut Parser<'input>, num_palettes: u16, table_view: View<'input>) -> Result<opentype_cpal_palette_labels_array<'input>, ParseError> {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -17299,8 +17285,8 @@ None
 PResult::Ok(opentype_cpal_palette_labels_array { offset, data })
 }
 
-/// d#101
-fn Decoder101<'input>(_input: &mut Parser<'input>, num_palette_entries: u16, table_view: View<'input>) -> Result<opentype_cpal_palette_labels_array<'input>, ParseError> {
+/// d#100
+fn Decoder100<'input>(_input: &mut Parser<'input>, num_palette_entries: u16, table_view: View<'input>) -> Result<opentype_cpal_palette_labels_array<'input>, ParseError> {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -17313,7 +17299,7 @@ None
 PResult::Ok(opentype_cpal_palette_labels_array { offset, data })
 }
 
-/// d#102
+/// d#101
 fn Decoder_opentype_cpal_palette_type(_input: &mut Parser<'_>) -> Result<opentype_cpal_palette_type, ParseError> {
 let _packed_bits = {
 let inner = {
@@ -17336,16 +17322,7 @@ let usable_with_light_background = _packed_bits & 1u32 > 0u32;
 PResult::Ok(opentype_cpal_palette_type { usable_with_dark_background, usable_with_light_background })
 }
 
-/// d#103
-fn Decoder_opentype_cpal_color_record(_input: &mut Parser<'_>) -> Result<opentype_cpal_color_record, ParseError> {
-let blue = _input.read_byte()?;
-let green = _input.read_byte()?;
-let red = _input.read_byte()?;
-let alpha = _input.read_byte()?;
-PResult::Ok(opentype_cpal_color_record { blue, green, red, alpha })
-}
-
-/// d#104
+/// d#102
 fn Decoder_opentype_colr_base_glyph_record(_input: &mut Parser<'_>) -> Result<opentype_colr_base_glyph_record, ParseError> {
 let glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17362,7 +17339,7 @@ u16be(x)
 PResult::Ok(opentype_colr_base_glyph_record { glyph_id, first_layer_index, num_layers })
 }
 
-/// d#105
+/// d#103
 fn Decoder_opentype_colr_layer_record(_input: &mut Parser<'_>) -> Result<opentype_colr_layer_record, ParseError> {
 let glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17375,7 +17352,7 @@ u16be(x)
 PResult::Ok(opentype_colr_layer_record { glyph_id, palette_index })
 }
 
-/// d#106
+/// d#104
 fn Decoder_opentype_colr_base_glyph_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_base_glyph_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -17394,7 +17371,7 @@ accum
 PResult::Ok(opentype_colr_base_glyph_list { list_scope, num_base_glyph_paint_records, base_glyph_paint_records })
 }
 
-/// d#107
+/// d#105
 fn Decoder_opentype_colr_layer_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_layer_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -17420,7 +17397,7 @@ accum
 PResult::Ok(opentype_colr_layer_list { list_scope, num_layers, paint_tables })
 }
 
-/// d#108
+/// d#106
 fn Decoder_opentype_colr_clip_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_clip_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -17451,7 +17428,7 @@ accum
 PResult::Ok(opentype_colr_clip_list { list_scope, format, num_clips, clips })
 }
 
-/// d#109
+/// d#107
 fn Decoder_opentype_var_delta_set_index_map<'input>(_input: &mut Parser<'input>) -> Result<opentype_var_delta_set_index_map<'input>, ParseError> {
 let format = {
 let inner = _input.read_byte()?;
@@ -17494,7 +17471,7 @@ here_view.read_len((map_count * (entry_size as u32)) as usize)
 PResult::Ok(opentype_var_delta_set_index_map { format, entry_size, inner_index_bits, map_count, map_data })
 }
 
-/// d#110
+/// d#108
 fn Decoder_opentype_common_item_variation_store<'input>(_input: &mut Parser<'input>) -> Result<opentype_common_item_variation_store<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -17544,7 +17521,7 @@ accum
 PResult::Ok(opentype_common_item_variation_store { table_scope, format, variation_region_list, item_variation_data_count, item_variation_data_list })
 }
 
-/// d#111
+/// d#109
 fn Decoder_opentype_common_variation_region_list(_input: &mut Parser<'_>) -> Result<opentype_common_variation_region_list, ParseError> {
 let axis_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17609,7 +17586,7 @@ accum
 PResult::Ok(opentype_common_variation_region_list { axis_count, region_count, variation_regions })
 }
 
-/// d#112
+/// d#110
 fn Decoder_opentype_common_item_variation_data(_input: &mut Parser<'_>) -> Result<opentype_common_item_variation_data, ParseError> {
 let item_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17724,7 +17701,7 @@ opentype_common_item_variation_data_delta_sets::Delta16Sets(inner)
 PResult::Ok(opentype_common_item_variation_data { item_count, word_delta_count, region_index_count, region_indices, delta_sets })
 }
 
-/// d#113
+/// d#111
 fn Decoder_opentype_var_dsim_entry_format(_input: &mut Parser<'_>) -> Result<opentype_var_dsim_entry_format, ParseError> {
 let _packed_bits = {
 let inner = _input.read_byte()?;
@@ -17744,7 +17721,7 @@ let inner_index_bit_count = _packed_bits & 15u8;
 PResult::Ok(opentype_var_dsim_entry_format { map_entry_size, inner_index_bit_count })
 }
 
-/// d#114
+/// d#112
 fn Decoder_opentype_colr_clip_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_colr_clip_record, ParseError> {
 let start_glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17765,7 +17742,7 @@ opentype_colr_clip_record_clip_box { offset, _data }
 PResult::Ok(opentype_colr_clip_record { start_glyph_id, end_glyph_id, clip_box })
 }
 
-/// d#115
+/// d#113
 fn Decoder_opentype_colr_clip_box(_input: &mut Parser<'_>) -> Result<opentype_colr_clip_box, ParseError> {
 let format = {
 _input.open_peek_context();
@@ -17856,7 +17833,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#116
+/// d#114
 fn Decoder_opentype_colr_paint_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_paint_table<'input>, ParseError> {
 let table_view = _input.view();
 let tree_index = {
@@ -19358,7 +19335,7 @@ return Err(ParseError::ExcludedBranch(163858356033350300u64));
 })
 }
 
-/// d#117
+/// d#115
 fn Decoder_opentype_colr_color_line(_input: &mut Parser<'_>) -> Result<opentype_colr_color_line, ParseError> {
 let extend = _input.read_byte()?;
 let num_stops = {
@@ -19396,7 +19373,7 @@ accum
 PResult::Ok(opentype_colr_color_line { extend, num_stops, color_stops })
 }
 
-/// d#118
+/// d#116
 fn Decoder_opentype_colr_var_color_line(_input: &mut Parser<'_>) -> Result<opentype_colr_var_color_line, ParseError> {
 let extend = _input.read_byte()?;
 let num_stops = {
@@ -19438,7 +19415,7 @@ accum
 PResult::Ok(opentype_colr_var_color_line { extend, num_stops, color_stops })
 }
 
-/// d#119
+/// d#117
 fn Decoder_opentype_colr_affine2x3(_input: &mut Parser<'_>) -> Result<opentype_colr_affine2x3, ParseError> {
 let xx = {
 let inner = {
@@ -19485,7 +19462,7 @@ opentype_head_table_font_revision::Fixed32(inner)
 PResult::Ok(opentype_colr_affine2x3 { xx, yx, xy, yy, dx, dy })
 }
 
-/// d#120
+/// d#118
 fn Decoder_opentype_colr_var_affine2x3(_input: &mut Parser<'_>) -> Result<opentype_colr_var_affine2x3, ParseError> {
 let xx = {
 let inner = {
@@ -19536,7 +19513,7 @@ u32be(x)
 PResult::Ok(opentype_colr_var_affine2x3 { xx, yx, xy, yy, dx, dy, var_index_base })
 }
 
-/// d#121
+/// d#119
 fn Decoder_opentype_colr_base_glyph_paint_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_colr_base_glyph_paint_record<'input>, ParseError> {
 let glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -19553,7 +19530,7 @@ opentype_colr_base_glyph_paint_record_paint { offset, _data }
 PResult::Ok(opentype_colr_base_glyph_paint_record { glyph_id, paint })
 }
 
-/// d#122
+/// d#120
 fn Decoder_opentype_mvar_value_record(_input: &mut Parser<'_>) -> Result<opentype_mvar_value_record, ParseError> {
 let value_tag = (Decoder69(_input))?;
 let delta_set_outer_index = {
@@ -19567,7 +19544,7 @@ u16be(x)
 PResult::Ok(opentype_mvar_value_record { value_tag, delta_set_outer_index, delta_set_inner_index })
 }
 
-/// d#123
+/// d#121
 fn Decoder_opentype_gvar_tuple_record(_input: &mut Parser<'_>, axis_count: u16) -> Result<opentype_gvar_tuple_record, ParseError> {
 let coordinates = {
 let mut accum = Vec::new();
@@ -19586,7 +19563,7 @@ accum
 PResult::Ok(opentype_gvar_tuple_record { coordinates })
 }
 
-/// d#124
+/// d#122
 fn Decoder_opentype_gvar_glyph_variation_data<'input>(_input: &mut Parser<'input>, axis_count: u16) -> Result<opentype_gvar_glyph_variation_data<'input>, ParseError> {
 let data_view = _input.view();
 let data_scope = data_view;
@@ -19626,7 +19603,7 @@ let _data = std::marker::PhantomData;
 PResult::Ok(opentype_gvar_glyph_variation_data { data_scope, tuple_variation_count, data_offset, tuple_variation_headers, _data })
 }
 
-/// d#125
+/// d#123
 fn Decoder_opentype_gvar_tuple_variation_header(_input: &mut Parser<'_>, axis_count: u16) -> Result<opentype_gvar_tuple_variation_header, ParseError> {
 let variation_data_size = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -19658,10 +19635,10 @@ None
 PResult::Ok(opentype_gvar_tuple_variation_header { variation_data_size, tuple_index, peak_tuple, intermediate_tuples })
 }
 
-/// d#126
+/// d#124
 fn Decoder_opentype_gvar_serialized_data(_input: &mut Parser<'_>, shared_point_numbers: bool, tuple_var_headers: &[opentype_gvar_tuple_variation_header]) -> Result<opentype_gvar_serialized_data, ParseError> {
 let shared_point_numbers = if shared_point_numbers {
-Some((Decoder127(_input))?)
+Some((Decoder125(_input))?)
 } else {
 None
 };
@@ -19673,7 +19650,7 @@ let sz = header.variation_data_size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
 let private_point_numbers = if header.tuple_index.private_point_numbers {
-Some((Decoder127(_input))?)
+Some((Decoder125(_input))?)
 } else {
 None
 };
@@ -19785,8 +19762,8 @@ accum
 PResult::Ok(opentype_gvar_serialized_data { shared_point_numbers, per_tuple_variation_data })
 }
 
-/// d#127
-fn Decoder127(_input: &mut Parser<'_>) -> Result<(u16, Vec<opentype_var_packed_point_numbers_runs>), ParseError> {
+/// d#125
+fn Decoder125(_input: &mut Parser<'_>) -> Result<(u16, Vec<opentype_var_packed_point_numbers_runs>), ParseError> {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -19833,7 +19810,7 @@ b
 return Err(ParseError::ExcludedBranch(9976720501248819272u64));
 }
 };
-(Decoder128(_input, point_count as u16))?
+(Decoder126(_input, point_count as u16))?
 },
 
 2 => {
@@ -19846,7 +19823,7 @@ return Err(ParseError::ExcludedBranch(3595277668730903043u64));
 }
 };
 let lo = _input.read_byte()?;
-(Decoder128(_input, ((hi as u16) & 127u16) << 8u16 | (lo as u16)))?
+(Decoder126(_input, ((hi as u16) & 127u16) << 8u16 | (lo as u16)))?
 },
 
 _ => {
@@ -19855,8 +19832,8 @@ return Err(ParseError::ExcludedBranch(12530712830475607577u64));
 })
 }
 
-/// d#128
-fn Decoder128(_input: &mut Parser<'_>, point_count: u16) -> Result<(u16, Vec<opentype_var_packed_point_numbers_runs>), ParseError> {
+/// d#126
+fn Decoder126(_input: &mut Parser<'_>, point_count: u16) -> Result<(u16, Vec<opentype_var_packed_point_numbers_runs>), ParseError> {
 let mut seq: Vec<opentype_var_packed_point_numbers_runs> = Vec::new();
 let mut acc = 0u16;
 loop {
@@ -19881,7 +19858,7 @@ seq.push(elem)
 PResult::Ok((acc, seq))
 }
 
-/// d#129
+/// d#127
 fn Decoder_opentype_var_packed_point_numbers_runs(_input: &mut Parser<'_>) -> Result<opentype_var_packed_point_numbers_runs, ParseError> {
 let control = {
 let _packed_bits = _input.read_byte()?;
@@ -19923,7 +19900,7 @@ opentype_var_packed_point_numbers_run_points::Points8(inner)
 PResult::Ok(opentype_var_packed_point_numbers_runs { control, points })
 }
 
-/// d#130
+/// d#128
 fn Decoder_opentype_fvar_variation_axis_record(_input: &mut Parser<'_>) -> Result<opentype_fvar_variation_axis_record, ParseError> {
 let axis_tag = (Decoder69(_input))?;
 let min_value = {
@@ -19962,7 +19939,7 @@ u16be(x)
 PResult::Ok(opentype_fvar_variation_axis_record { axis_tag, min_value, default_value, max_value, flags, axis_name_id })
 }
 
-/// d#131
+/// d#129
 fn Decoder_opentype_fvar_instance_record(_input: &mut Parser<'_>, axis_count: u16, instance_size: u16) -> Result<opentype_fvar_instance_record, ParseError> {
 let subfamily_nameid = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -19994,7 +19971,7 @@ None
 PResult::Ok(opentype_fvar_instance_record { subfamily_nameid, flags, coordinates, postscript_nameid })
 }
 
-/// d#132
+/// d#130
 fn Decoder_opentype_fvar_user_tuple(_input: &mut Parser<'_>, axis_count: u16) -> Result<opentype_fvar_user_tuple, ParseError> {
 let coordinates = {
 let mut accum = Vec::new();
@@ -20013,7 +19990,7 @@ accum
 PResult::Ok(opentype_fvar_user_tuple { coordinates })
 }
 
-/// d#133
+/// d#131
 fn Decoder_opentype_avar_segment_maps(_input: &mut Parser<'_>) -> Result<opentype_avar_segment_maps, ParseError> {
 let position_map_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -20030,7 +20007,7 @@ accum
 PResult::Ok(opentype_avar_segment_maps { position_map_count, axis_value_maps })
 }
 
-/// d#134
+/// d#132
 fn Decoder_opentype_avar_axis_value_map(_input: &mut Parser<'_>) -> Result<opentype_avar_axis_value_map, ParseError> {
 let from_coordinate = {
 let inner = {
@@ -20049,7 +20026,7 @@ opentype_avar_axis_value_map_from_coordinate::F2Dot14(inner)
 PResult::Ok(opentype_avar_axis_value_map { from_coordinate, to_coordinate })
 }
 
-/// d#135
+/// d#133
 fn Decoder_opentype_layout_script_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_script_list<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20068,7 +20045,7 @@ accum
 PResult::Ok(opentype_layout_script_list { table_scope, script_count, script_records })
 }
 
-/// d#136
+/// d#134
 fn Decoder_opentype_layout_feature_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_feature_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -20087,7 +20064,7 @@ accum
 PResult::Ok(opentype_layout_feature_list { list_scope, feature_count, feature_records })
 }
 
-/// d#137
+/// d#135
 fn Decoder_opentype_gsub_lookup_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_gsub_lookup_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -20113,7 +20090,7 @@ accum
 PResult::Ok(opentype_gsub_lookup_list { list_scope, lookup_count, lookups })
 }
 
-/// d#138
+/// d#136
 fn Decoder_opentype_layout_feature_variations<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_feature_variations<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20164,7 +20141,7 @@ accum
 PResult::Ok(opentype_layout_feature_variations { table_scope, major_version, minor_version, feature_variation_record_count, feature_variation_records })
 }
 
-/// d#139
+/// d#137
 fn Decoder_opentype_layout_feature_variation_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_feature_variation_record<'input>, ParseError> {
 let condition_set = {
 let offset = {
@@ -20185,7 +20162,7 @@ opentype_layout_feature_variation_record_feature_table_substitution { offset, _d
 PResult::Ok(opentype_layout_feature_variation_record { condition_set, feature_table_substitution })
 }
 
-/// d#140
+/// d#138
 fn Decoder_opentype_layout_feature_table_substitution<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_feature_table_substitution<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20236,7 +20213,7 @@ accum
 PResult::Ok(opentype_layout_feature_table_substitution { table_scope, major_version, minor_version, substitution_count, substitutions })
 }
 
-/// d#141
+/// d#139
 fn Decoder_opentype_layout_feature_table_substitution_record<'input>(_input: &mut Parser<'input>, _table_view: View<'input>) -> Result<opentype_layout_feature_table_substitution_record<'input>, ParseError> {
 let feature_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -20250,7 +20227,7 @@ let alternate_feature = std::marker::PhantomData;
 PResult::Ok(opentype_layout_feature_table_substitution_record { feature_index, alternate_feature_offset, alternate_feature })
 }
 
-/// d#142
+/// d#140
 fn Decoder_opentype_layout_feature_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_feature_table<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20276,7 +20253,7 @@ accum
 PResult::Ok(opentype_layout_feature_table { table_scope, feature_params, lookup_index_count, lookup_list_indices })
 }
 
-/// d#143
+/// d#141
 fn Decoder_opentype_gsub_lookup_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_gsub_lookup_table<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20329,7 +20306,7 @@ None
 PResult::Ok(opentype_gsub_lookup_table { table_scope, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
 }
 
-/// d#144
+/// d#142
 fn Decoder_opentype_gsub_lookup_subtable<'input>(_input: &mut Parser<'input>, lookup_type: u16) -> Result<opentype_gsub_lookup_subtable<'input>, ParseError> {
 PResult::Ok(match lookup_type {
 7u16 => {
@@ -20344,7 +20321,7 @@ opentype_gsub_lookup_subtable::GroundSubst(inner)
 })
 }
 
-/// d#145
+/// d#143
 fn Decoder_opentype_layout_subst_extension<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_subst_extension<'input>, ParseError> {
 let table_view = _input.view();
 let format = {
@@ -20389,7 +20366,7 @@ opentype_layout_subst_extension_extension_offset { offset, _data }
 PResult::Ok(opentype_layout_subst_extension { format, table_scope, extension_lookup_type, extension_offset })
 }
 
-/// d#146
+/// d#144
 fn Decoder_opentype_layout_ground_subst<'input>(_input: &mut Parser<'input>, lookup_type: u16) -> Result<opentype_layout_ground_subst<'input>, ParseError> {
 PResult::Ok(match lookup_type {
 1u16 => {
@@ -20437,7 +20414,7 @@ return Err(ParseError::FailToken(3702191162545267776u64));
 })
 }
 
-/// d#147
+/// d#145
 fn Decoder_opentype_layout_single_subst<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_single_subst<'input>, ParseError> {
 let table_view = _input.view();
 let subst_format = {
@@ -20462,7 +20439,7 @@ return Err(ParseError::FailToken(14926982082392674388u64));
 PResult::Ok(opentype_layout_single_subst { subst_format, subst })
 }
 
-/// d#148
+/// d#146
 fn Decoder_opentype_layout_multiple_subst<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_multiple_subst<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20509,7 +20486,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(opentype_layout_multiple_subst { table_scope, subst_format, coverage, subst })
 }
 
-/// d#149
+/// d#147
 fn Decoder_opentype_gsub_alternate_subst<'input>(_input: &mut Parser<'input>) -> Result<opentype_gsub_alternate_subst<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20558,7 +20535,7 @@ accum
 PResult::Ok(opentype_gsub_alternate_subst { table_scope, subst_format, coverage, alternate_set_count, alternate_sets })
 }
 
-/// d#150
+/// d#148
 fn Decoder_opentype_layout_ligature_subst<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_ligature_subst<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20607,7 +20584,7 @@ accum
 PResult::Ok(opentype_layout_ligature_subst { table_scope, subst_format, coverage, ligature_set_count, ligature_sets })
 }
 
-/// d#151
+/// d#149
 fn Decoder_opentype_layout_sequence_context<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_sequence_context<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20638,7 +20615,7 @@ return Err(ParseError::FailToken(8862619478422395719u64));
 PResult::Ok(opentype_layout_sequence_context { table_scope, format, subst })
 }
 
-/// d#152
+/// d#150
 fn Decoder_opentype_layout_chained_sequence_context<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_chained_sequence_context<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -20669,7 +20646,7 @@ return Err(ParseError::FailToken(7200474585457206375u64));
 PResult::Ok(opentype_layout_chained_sequence_context { table_scope, format, subst })
 }
 
-/// d#153
+/// d#151
 fn Decoder_opentype_layout_reverse_chain_single_subst<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_reverse_chain_single_subst<'input>, ParseError> {
 let table_view = _input.view();
 let subst_format = {
@@ -20752,7 +20729,7 @@ accum
 PResult::Ok(opentype_layout_reverse_chain_single_subst { subst_format, table_scope, coverage, backtrack_glyph_count, backtrack_coverage_tables, lookahead_glyph_count, lookahead_coverage_tables, glyph_count, substitute_glyph_ids })
 }
 
-/// d#154
+/// d#152
 fn Decoder_opentype_coverage_table(_input: &mut Parser<'_>) -> Result<opentype_coverage_table, ParseError> {
 let coverage_format = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -20821,7 +20798,7 @@ return Err(ParseError::FailToken(13264741506377240721u64));
 PResult::Ok(opentype_coverage_table { coverage_format, data })
 }
 
-/// d#155
+/// d#153
 fn Decoder_opentype_layout_chained_sequence_context_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_chained_sequence_context_format1<'input>, ParseError> {
 let coverage = {
 let offset = {
@@ -20853,7 +20830,7 @@ accum
 PResult::Ok(opentype_layout_chained_sequence_context_format1 { coverage, chained_seq_rule_set_count, chained_seq_rule_sets })
 }
 
-/// d#156
+/// d#154
 fn Decoder_opentype_layout_chained_sequence_context_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_chained_sequence_context_format2<'input>, ParseError> {
 let coverage = {
 let offset = {
@@ -20909,7 +20886,7 @@ accum
 PResult::Ok(opentype_layout_chained_sequence_context_format2 { coverage, backtrack_class_def, input_class_def, lookahead_class_def, chained_class_seq_rule_set_count, chained_class_seq_rule_sets })
 }
 
-/// d#157
+/// d#155
 fn Decoder_opentype_layout_chained_sequence_context_format3<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_chained_sequence_context_format3, ParseError> {
 let backtrack_glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -20983,7 +20960,7 @@ accum
 PResult::Ok(opentype_layout_chained_sequence_context_format3 { backtrack_glyph_count, backtrack_coverages, input_glyph_count, input_coverages, lookahead_glyph_count, lookahead_coverages, seq_lookup_count, seq_lookup_records })
 }
 
-/// d#158
+/// d#156
 fn Decoder_opentype_layout_sequence_lookup(_input: &mut Parser<'_>) -> Result<opentype_layout_sequence_lookup, ParseError> {
 let sequence_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -20996,7 +20973,7 @@ u16be(x)
 PResult::Ok(opentype_layout_sequence_lookup { sequence_index, lookup_list_index })
 }
 
-/// d#159
+/// d#157
 fn Decoder_opentype_class_def(_input: &mut Parser<'_>) -> Result<opentype_class_def, ParseError> {
 let class_format = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21069,7 +21046,7 @@ return Err(ParseError::FailToken(16152968816646114000u64));
 PResult::Ok(opentype_class_def { class_format, data })
 }
 
-/// d#160
+/// d#158
 fn Decoder_opentype_layout_chained_sequence_rule_set<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_chained_sequence_rule_set<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -21095,7 +21072,7 @@ accum
 PResult::Ok(opentype_layout_chained_sequence_rule_set { table_scope, chained_seq_rule_count, chained_seq_rules })
 }
 
-/// d#161
+/// d#159
 fn Decoder_opentype_layout_chained_sequence_rule(_input: &mut Parser<'_>) -> Result<opentype_layout_chained_sequence_rule, ParseError> {
 let backtrack_glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21157,7 +21134,7 @@ accum
 PResult::Ok(opentype_layout_chained_sequence_rule { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records })
 }
 
-/// d#162
+/// d#160
 fn Decoder_opentype_layout_sequence_context_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_sequence_context_format1<'input>, ParseError> {
 let coverage = {
 let offset = {
@@ -21189,7 +21166,7 @@ accum
 PResult::Ok(opentype_layout_sequence_context_format1 { coverage, seq_rule_set_count, seq_rule_sets })
 }
 
-/// d#163
+/// d#161
 fn Decoder_opentype_layout_sequence_context_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_sequence_context_format2<'input>, ParseError> {
 let coverage = {
 let offset = {
@@ -21229,7 +21206,7 @@ accum
 PResult::Ok(opentype_layout_sequence_context_format2 { coverage, class_def, class_seq_rule_set_count, class_seq_rule_sets })
 }
 
-/// d#164
+/// d#162
 fn Decoder_opentype_layout_sequence_context_format3<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_sequence_context_format3, ParseError> {
 let glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21265,7 +21242,7 @@ accum
 PResult::Ok(opentype_layout_sequence_context_format3 { glyph_count, seq_lookup_count, coverage_tables, seq_lookup_records })
 }
 
-/// d#165
+/// d#163
 fn Decoder_opentype_layout_sequence_context_rule_set<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_sequence_context_rule_set<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -21291,7 +21268,7 @@ accum
 PResult::Ok(opentype_layout_sequence_context_rule_set { table_scope, rule_count, rules })
 }
 
-/// d#166
+/// d#164
 fn Decoder_opentype_layout_sequence_context_rule(_input: &mut Parser<'_>) -> Result<opentype_layout_sequence_context_rule, ParseError> {
 let glyph_count = {
 let inner = {
@@ -21334,7 +21311,7 @@ accum
 PResult::Ok(opentype_layout_sequence_context_rule { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records })
 }
 
-/// d#167
+/// d#165
 fn Decoder_opentype_gsub_ligature_subst_ligature_set<'input>(_input: &mut Parser<'input>) -> Result<opentype_gsub_ligature_subst_ligature_set<'input>, ParseError> {
 let set_view = _input.view();
 let set_scope = set_view;
@@ -21360,7 +21337,7 @@ accum
 PResult::Ok(opentype_gsub_ligature_subst_ligature_set { set_scope, ligature_count, ligatures })
 }
 
-/// d#168
+/// d#166
 fn Decoder_opentype_gsub_ligature_subst_ligature_table(_input: &mut Parser<'_>) -> Result<opentype_gsub_ligature_subst_ligature_table, ParseError> {
 let ligature_glyph = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21384,7 +21361,7 @@ accum
 PResult::Ok(opentype_gsub_ligature_subst_ligature_table { ligature_glyph, component_count, component_glyph_ids })
 }
 
-/// d#169
+/// d#167
 fn Decoder_opentype_gsub_alternate_subst_alternate_set(_input: &mut Parser<'_>) -> Result<opentype_gsub_alternate_subst_alternate_set, ParseError> {
 let glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21404,7 +21381,7 @@ accum
 PResult::Ok(opentype_gsub_alternate_subst_alternate_set { glyph_count, alternate_glyph_ids })
 }
 
-/// d#170
+/// d#168
 fn Decoder_opentype_layout_multiple_subst_sequence_table(_input: &mut Parser<'_>) -> Result<opentype_layout_multiple_subst_sequence_table, ParseError> {
 let glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21424,7 +21401,7 @@ accum
 PResult::Ok(opentype_layout_multiple_subst_sequence_table { glyph_count, substitute_glyph_ids })
 }
 
-/// d#171
+/// d#169
 fn Decoder_opentype_layout_single_subst_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_subst_format1<'input>, ParseError> {
 let table_scope = table_view;
 let coverage = {
@@ -21445,7 +21422,7 @@ raw as i16
 PResult::Ok(opentype_layout_single_subst_format1 { table_scope, coverage, delta_glyph_id })
 }
 
-/// d#172
+/// d#170
 fn Decoder_opentype_layout_single_subst_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_subst_format2<'input>, ParseError> {
 let table_scope = table_view;
 let coverage = {
@@ -21474,7 +21451,7 @@ accum
 PResult::Ok(opentype_layout_single_subst_format2 { table_scope, coverage, glyph_count, substitute_glyph_ids })
 }
 
-/// d#173
+/// d#171
 fn Decoder_opentype_layout_feature_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_layout_feature_record<'input>, ParseError> {
 let feature_tag = (Decoder69(_input))?;
 let feature = {
@@ -21488,7 +21465,7 @@ opentype_layout_feature_record_feature { offset, _data }
 PResult::Ok(opentype_layout_feature_record { feature_tag, feature })
 }
 
-/// d#174
+/// d#172
 fn Decoder_opentype_layout_script_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_script_record<'input>, ParseError> {
 let script_tag = (Decoder69(_input))?;
 let script = {
@@ -21502,7 +21479,7 @@ opentype_layout_script_record_script { offset, _data }
 PResult::Ok(opentype_layout_script_record { script_tag, script })
 }
 
-/// d#175
+/// d#173
 fn Decoder_opentype_layout_script_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_script_table<'input>, ParseError> {
 let script_view = _input.view();
 let script_scope = script_view;
@@ -21529,7 +21506,7 @@ accum
 PResult::Ok(opentype_layout_script_table { script_scope, default_lang_sys, lang_sys_count, lang_sys_records })
 }
 
-/// d#176
+/// d#174
 fn Decoder_opentype_layout_langsys(_input: &mut Parser<'_>) -> Result<opentype_layout_langsys, ParseError> {
 let lookup_order_offset = {
 let inner = {
@@ -21569,7 +21546,7 @@ accum
 PResult::Ok(opentype_layout_langsys { lookup_order_offset, required_feature_index, feature_index_count, feature_indices })
 }
 
-/// d#177
+/// d#175
 fn Decoder_opentype_layout_lang_sys_record<'input>(_input: &mut Parser<'input>, script_view: View<'input>) -> Result<opentype_layout_lang_sys_record, ParseError> {
 let lang_sys_tag = (Decoder69(_input))?;
 let lang_sys = {
@@ -21583,7 +21560,7 @@ opentype_layout_script_table_default_lang_sys { offset, _data }
 PResult::Ok(opentype_layout_lang_sys_record { lang_sys_tag, lang_sys })
 }
 
-/// d#178
+/// d#176
 fn Decoder_opentype_gpos_lookup_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_gpos_lookup_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -21609,7 +21586,7 @@ accum
 PResult::Ok(opentype_gpos_lookup_list { list_scope, lookup_count, lookups })
 }
 
-/// d#179
+/// d#177
 fn Decoder_opentype_gpos_lookup_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_gpos_lookup_table<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -21662,7 +21639,7 @@ None
 PResult::Ok(opentype_gpos_lookup_table { table_scope, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
 }
 
-/// d#180
+/// d#178
 fn Decoder_opentype_gpos_lookup_subtable<'input>(_input: &mut Parser<'input>, lookup_type: u16) -> Result<opentype_gpos_lookup_subtable<'input>, ParseError> {
 PResult::Ok(match lookup_type {
 9u16 => {
@@ -21677,7 +21654,7 @@ opentype_gpos_lookup_subtable::GroundPos(inner)
 })
 }
 
-/// d#181
+/// d#179
 fn Decoder_opentype_layout_pos_extension<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_pos_extension<'input>, ParseError> {
 let table_view = _input.view();
 let format = {
@@ -21722,7 +21699,7 @@ opentype_layout_pos_extension_extension_offset { offset, _data }
 PResult::Ok(opentype_layout_pos_extension { format, table_scope, extension_lookup_type, extension_offset })
 }
 
-/// d#182
+/// d#180
 fn Decoder_opentype_layout_ground_pos<'input>(_input: &mut Parser<'input>, lookup_type: u16) -> Result<opentype_layout_ground_pos<'input>, ParseError> {
 PResult::Ok(match lookup_type {
 1u16 => {
@@ -21775,7 +21752,7 @@ return Err(ParseError::FailToken(5170050512307443704u64));
 })
 }
 
-/// d#183
+/// d#181
 fn Decoder_opentype_layout_single_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_single_pos<'input>, ParseError> {
 let table_view = _input.view();
 let pos_format = {
@@ -21800,7 +21777,7 @@ return Err(ParseError::FailToken(18440348483137307888u64));
 PResult::Ok(opentype_layout_single_pos { pos_format, subtable })
 }
 
-/// d#184
+/// d#182
 fn Decoder_opentype_layout_pair_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_pair_pos<'input>, ParseError> {
 let table_view = _input.view();
 let pos_format = {
@@ -21825,7 +21802,7 @@ return Err(ParseError::FailToken(11309019127259385425u64));
 PResult::Ok(opentype_layout_pair_pos { pos_format, subtable })
 }
 
-/// d#185
+/// d#183
 fn Decoder_opentype_layout_cursive_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_cursive_pos<'input>, ParseError> {
 let table_view = _input.view();
 let pos_format = {
@@ -21867,7 +21844,7 @@ accum
 PResult::Ok(opentype_layout_cursive_pos { pos_format, table_scope, coverage, entry_exit_count, entry_exit_records })
 }
 
-/// d#186
+/// d#184
 fn Decoder_opentype_layout_mark_base_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_mark_base_pos<'input>, ParseError> {
 let table_view = _input.view();
 let format = {
@@ -21925,7 +21902,7 @@ opentype_layout_mark_base_pos_base_array { offset, _data }
 PResult::Ok(opentype_layout_mark_base_pos { format, table_scope, mark_coverage, base_coverage, mark_class_count, mark_array, base_array })
 }
 
-/// d#187
+/// d#185
 fn Decoder_opentype_layout_mark_lig_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_mark_lig_pos<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -21983,7 +21960,7 @@ opentype_layout_mark_lig_pos_ligature_array { offset, _data }
 PResult::Ok(opentype_layout_mark_lig_pos { table_scope, format, mark_coverage, ligature_coverage, mark_class_count, mark_array, ligature_array })
 }
 
-/// d#188
+/// d#186
 fn Decoder_opentype_layout_mark_mark_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_mark_mark_pos<'input>, ParseError> {
 let table_view = _input.view();
 let format = {
@@ -22041,7 +22018,7 @@ opentype_layout_mark_mark_pos_mark2_array { offset, _data }
 PResult::Ok(opentype_layout_mark_mark_pos { format, table_scope, mark1_coverage, mark2_coverage, mark_class_count, mark1_array, mark2_array })
 }
 
-/// d#189
+/// d#187
 fn Decoder_opentype_layout_mark_array<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_mark_array<'input>, ParseError> {
 let array_view = _input.view();
 let array_scope = array_view;
@@ -22060,7 +22037,7 @@ accum
 PResult::Ok(opentype_layout_mark_array { array_scope, mark_count, mark_records })
 }
 
-/// d#190
+/// d#188
 fn Decoder_opentype_layout_mark2_array<'input>(_input: &mut Parser<'input>, mark_class_count: u16) -> Result<opentype_layout_mark2_array<'input>, ParseError> {
 let array_view = _input.view();
 let array_scope = array_view;
@@ -22079,7 +22056,7 @@ accum
 PResult::Ok(opentype_layout_mark2_array { array_scope, mark2_count, mark2_records })
 }
 
-/// d#191
+/// d#189
 fn Decoder_opentype_layout_mark2_array_mark2_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, _array_view: View<'input>) -> Result<opentype_layout_mark2_array_mark2_record<'input>, ParseError> {
 let mark2_anchor_offsets = {
 let mut accum = Vec::new();
@@ -22096,7 +22073,7 @@ let _mark2_anchors = std::marker::PhantomData;
 PResult::Ok(opentype_layout_mark2_array_mark2_record { mark2_anchor_offsets, _mark2_anchors })
 }
 
-/// d#192
+/// d#190
 fn Decoder_opentype_layout_anchor_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_anchor_table<'input>, ParseError> {
 let table_view = _input.view();
 let anchor_format = {
@@ -22162,7 +22139,7 @@ return Err(ParseError::FailToken(16190528142421852545u64));
 PResult::Ok(opentype_layout_anchor_table { anchor_format, table })
 }
 
-/// d#193
+/// d#191
 fn Decoder_opentype_layout_anchor_table_format3<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_anchor_table_format3<'input>, ParseError> {
 let table_scope = table_view;
 let x_coordinate = {
@@ -22198,7 +22175,7 @@ opentype_gdef_caret_value_data_format3_table { offset, _data }
 PResult::Ok(opentype_layout_anchor_table_format3 { table_scope, x_coordinate, y_coordinate, x_device, y_device })
 }
 
-/// d#194
+/// d#192
 fn Decoder_opentype_common_device_or_variation_index_table(_input: &mut Parser<'_>) -> Result<opentype_common_device_or_variation_index_table, ParseError> {
 let delta_format = {
 _input.open_peek_context();
@@ -22340,7 +22317,7 @@ opentype_common_device_or_variation_index_table::OtherTable(inner)
 })
 }
 
-/// d#195
+/// d#193
 fn Decoder_opentype_layout_mark_record<'input>(_input: &mut Parser<'input>, array_view: View<'input>) -> Result<opentype_layout_mark_record<'input>, ParseError> {
 let mark_class = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -22357,7 +22334,7 @@ opentype_layout_entry_exit_record_entry_anchor { offset, _data }
 PResult::Ok(opentype_layout_mark_record { mark_class, mark_anchor })
 }
 
-/// d#196
+/// d#194
 fn Decoder_opentype_layout_ligature_array<'input>(_input: &mut Parser<'input>, mark_class_count: u16) -> Result<opentype_layout_ligature_array<'input>, ParseError> {
 let array_view = _input.view();
 let array_scope = array_view;
@@ -22381,7 +22358,7 @@ let _ligature_attaches = std::marker::PhantomData;
 PResult::Ok(opentype_layout_ligature_array { array_scope, mark_class_count, ligature_count, ligature_attach_offsets, _ligature_attaches })
 }
 
-/// d#197
+/// d#195
 fn Decoder_opentype_layout_ligature_attach<'input>(_input: &mut Parser<'input>, mark_class_count: u16) -> Result<opentype_layout_ligature_attach<'input>, ParseError> {
 let table_view = _input.view();
 let component_count = {
@@ -22399,7 +22376,7 @@ accum
 PResult::Ok(opentype_layout_ligature_attach { component_count, component_records })
 }
 
-/// d#198
+/// d#196
 fn Decoder_opentype_layout_ligature_attach_component_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, table_view: View<'input>) -> Result<opentype_layout_ligature_attach_component_record<'input>, ParseError> {
 let record_scope = table_view;
 let ligature_anchor_offsets = {
@@ -22417,7 +22394,7 @@ let _ligature_anchors = std::marker::PhantomData;
 PResult::Ok(opentype_layout_ligature_attach_component_record { record_scope, ligature_anchor_offsets, _ligature_anchors })
 }
 
-/// d#199
+/// d#197
 fn Decoder_opentype_layout_base_array<'input>(_input: &mut Parser<'input>, mark_class_count: u16) -> Result<opentype_layout_base_array<'input>, ParseError> {
 let array_view = _input.view();
 let array_scope = array_view;
@@ -22436,7 +22413,7 @@ accum
 PResult::Ok(opentype_layout_base_array { array_scope, base_count, base_records })
 }
 
-/// d#200
+/// d#198
 fn Decoder_opentype_layout_base_array_base_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, _array_view: View<'input>) -> Result<opentype_layout_base_array_base_record<'input>, ParseError> {
 let base_anchor_offsets = {
 let mut accum = Vec::new();
@@ -22453,7 +22430,7 @@ let _base_anchors = std::marker::PhantomData;
 PResult::Ok(opentype_layout_base_array_base_record { base_anchor_offsets, _base_anchors })
 }
 
-/// d#201
+/// d#199
 fn Decoder_opentype_layout_entry_exit_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_entry_exit_record<'input>, ParseError> {
 let entry_anchor = {
 let offset = {
@@ -22474,7 +22451,7 @@ opentype_layout_entry_exit_record_entry_anchor { offset, _data }
 PResult::Ok(opentype_layout_entry_exit_record { entry_anchor, exit_anchor })
 }
 
-/// d#202
+/// d#200
 fn Decoder_opentype_layout_pair_pos_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_pair_pos_format1<'input>, ParseError> {
 let table_scope = table_view;
 let coverage = {
@@ -22509,7 +22486,7 @@ accum
 PResult::Ok(opentype_layout_pair_pos_format1 { table_scope, coverage, value_format1, value_format2, pair_set_count, pair_sets })
 }
 
-/// d#203
+/// d#201
 fn Decoder_opentype_layout_pair_pos_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_pair_pos_format2<'input>, ParseError> {
 let table_scope = table_view;
 let coverage = {
@@ -22567,7 +22544,7 @@ accum
 PResult::Ok(opentype_layout_pair_pos_format2 { table_scope, coverage, value_format1, value_format2, class_def1, class_def2, class1_count, class2_count, class1_records })
 }
 
-/// d#204
+/// d#202
 fn Decoder_opentype_layout_value_format_flags(_input: &mut Parser<'_>) -> Result<opentype_layout_value_format_flags, ParseError> {
 let _packed_bits = {
 let inner = {
@@ -22596,7 +22573,7 @@ let x_placement = _packed_bits & 1u16 > 0u16;
 PResult::Ok(opentype_layout_value_format_flags { y_advance_device, x_advance_device, y_placement_device, x_placement_device, y_advance, x_advance, y_placement, x_placement })
 }
 
-/// d#205
+/// d#203
 fn Decoder_opentype_layout_pair_pos_class2_record<'input>(_input: &mut Parser<'input>, value_format1: opentype_layout_value_format_flags, value_format2: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_pair_pos_class2_record, ParseError> {
 let value_record1 = if value_format1.x_placement || value_format1.y_placement || value_format1.x_advance || value_format1.y_advance || value_format1.x_placement_device || value_format1.y_placement_device || value_format1.x_advance_device || value_format1.y_advance_device {
 Some((Decoder_opentype_layout_value_record(_input, value_format1, table_view))?)
@@ -22604,14 +22581,14 @@ Some((Decoder_opentype_layout_value_record(_input, value_format1, table_view))?)
 None
 };
 let value_record2 = if value_format2.x_placement || value_format2.y_placement || value_format2.x_advance || value_format2.y_advance || value_format2.x_placement_device || value_format2.y_placement_device || value_format2.x_advance_device || value_format2.y_advance_device {
-Some((Decoder207(_input, value_format2, table_view))?)
+Some((Decoder205(_input, value_format2, table_view))?)
 } else {
 None
 };
 PResult::Ok(opentype_layout_pair_pos_class2_record { value_record1, value_record2 })
 }
 
-/// d#206
+/// d#204
 fn Decoder_opentype_layout_value_record<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
 let x_placement = if flags.x_placement {
 let raw = {
@@ -22692,8 +22669,8 @@ None
 PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
 }
 
-/// d#207
-fn Decoder207<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
+/// d#205
+fn Decoder205<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
 let x_placement = if flags.x_placement {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -22773,7 +22750,7 @@ None
 PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
 }
 
-/// d#208
+/// d#206
 fn Decoder_opentype_layout_pair_pos_pair_set<'input>(_input: &mut Parser<'input>, value_format1: opentype_layout_value_format_flags, value_format2: opentype_layout_value_format_flags) -> Result<opentype_layout_pair_pos_pair_set<'input>, ParseError> {
 let set_view = _input.view();
 let set_scope = set_view;
@@ -22792,188 +22769,188 @@ accum
 PResult::Ok(opentype_layout_pair_pos_pair_set { set_scope, pair_value_count, pair_value_records })
 }
 
-/// d#209
+/// d#207
 fn Decoder_opentype_layout_pair_pos_pair_value_record<'input>(_input: &mut Parser<'input>, value_format1: opentype_layout_value_format_flags, value_format2: opentype_layout_value_format_flags, set_view: View<'input>) -> Result<opentype_layout_pair_pos_pair_value_record, ParseError> {
 let second_glyph = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let value_record1 = if value_format1.x_placement || value_format1.y_placement || value_format1.x_advance || value_format1.y_advance || value_format1.x_placement_device || value_format1.y_placement_device || value_format1.x_advance_device || value_format1.y_advance_device {
-Some((Decoder210(_input, value_format1, set_view))?)
+Some((Decoder208(_input, value_format1, set_view))?)
 } else {
 None
 };
 let value_record2 = if value_format2.x_placement || value_format2.y_placement || value_format2.x_advance || value_format2.y_advance || value_format2.x_placement_device || value_format2.y_placement_device || value_format2.x_advance_device || value_format2.y_advance_device {
-Some((Decoder211(_input, value_format2, set_view))?)
+Some((Decoder209(_input, value_format2, set_view))?)
 } else {
 None
 };
 PResult::Ok(opentype_layout_pair_pos_pair_value_record { second_glyph, value_record1, value_record2 })
 }
 
+/// d#208
+fn Decoder208<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
+let x_placement = if flags.x_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_placement = if flags.y_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_advance = if flags.x_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_advance = if flags.y_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_placement_device = if flags.x_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_placement_device = if flags.y_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let x_advance_device = if flags.x_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_advance_device = if flags.y_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
+/// d#209
+fn Decoder209<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
+let x_placement = if flags.x_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_placement = if flags.y_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_advance = if flags.x_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_advance = if flags.y_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_placement_device = if flags.x_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_placement_device = if flags.y_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let x_advance_device = if flags.x_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_advance_device = if flags.y_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
 /// d#210
-fn Decoder210<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
-let x_placement = if flags.x_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_placement = if flags.y_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_advance = if flags.x_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_advance = if flags.y_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_placement_device = if flags.x_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_placement_device = if flags.y_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let x_advance_device = if flags.x_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_advance_device = if flags.y_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
-}
-
-/// d#211
-fn Decoder211<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
-let x_placement = if flags.x_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_placement = if flags.y_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_advance = if flags.x_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_advance = if flags.y_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_placement_device = if flags.x_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_placement_device = if flags.y_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let x_advance_device = if flags.x_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_advance_device = if flags.y_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
-}
-
-/// d#212
 fn Decoder_opentype_layout_single_pos_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_pos_format1<'input>, ParseError> {
 let table_scope = table_view;
 let coverage = {
@@ -22985,11 +22962,11 @@ let _data = std::marker::PhantomData;
 opentype_gdef_attach_list_coverage { offset, _data }
 };
 let value_format = (Decoder_opentype_layout_value_format_flags(_input))?;
-let value_record = (Decoder215(_input, value_format, table_view))?;
+let value_record = (Decoder213(_input, value_format, table_view))?;
 PResult::Ok(opentype_layout_single_pos_format1 { table_scope, coverage, value_format, value_record })
 }
 
-/// d#213
+/// d#211
 fn Decoder_opentype_layout_single_pos_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_pos_format2<'input>, ParseError> {
 let table_scope = table_view;
 let coverage = {
@@ -23008,7 +22985,7 @@ u16be(x)
 let value_records = {
 let mut accum = Vec::new();
 for _ in 0..value_count {
-let next_elem = (Decoder214(_input, value_format, table_view))?;
+let next_elem = (Decoder212(_input, value_format, table_view))?;
 accum.push(next_elem)
 };
 accum
@@ -23016,169 +22993,169 @@ accum
 PResult::Ok(opentype_layout_single_pos_format2 { table_scope, coverage, value_format, value_count, value_records })
 }
 
+/// d#212
+fn Decoder212<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
+let x_placement = if flags.x_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_placement = if flags.y_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_advance = if flags.x_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_advance = if flags.y_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_placement_device = if flags.x_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_placement_device = if flags.y_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let x_advance_device = if flags.x_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_advance_device = if flags.y_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
+/// d#213
+fn Decoder213<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
+let x_placement = if flags.x_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_placement = if flags.y_placement {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_advance = if flags.x_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let y_advance = if flags.y_advance {
+let raw = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+Some(raw as i16)
+} else {
+None
+};
+let x_placement_device = if flags.x_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_placement_device = if flags.y_placement_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let x_advance_device = if flags.x_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+let y_advance_device = if flags.y_advance_device {
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _data = std::marker::PhantomData;
+Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
+} else {
+None
+};
+PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
 /// d#214
-fn Decoder214<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
-let x_placement = if flags.x_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_placement = if flags.y_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_advance = if flags.x_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_advance = if flags.y_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_placement_device = if flags.x_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_placement_device = if flags.y_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let x_advance_device = if flags.x_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_advance_device = if flags.y_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
-}
-
-/// d#215
-fn Decoder215<'input>(_input: &mut Parser<'input>, flags: opentype_layout_value_format_flags, table_view: View<'input>) -> Result<opentype_layout_value_record, ParseError> {
-let x_placement = if flags.x_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_placement = if flags.y_placement {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_advance = if flags.x_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let y_advance = if flags.y_advance {
-let raw = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-Some(raw as i16)
-} else {
-None
-};
-let x_placement_device = if flags.x_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_placement_device = if flags.y_placement_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let x_advance_device = if flags.x_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-let y_advance_device = if flags.y_advance_device {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let _data = std::marker::PhantomData;
-Some(opentype_gdef_caret_value_data_format3_table { offset, _data })
-} else {
-None
-};
-PResult::Ok(opentype_layout_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
-}
-
-/// d#216
 fn Decoder_opentype_gdef_attach_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_gdef_attach_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -23212,7 +23189,7 @@ accum
 PResult::Ok(opentype_gdef_attach_list { list_scope, coverage, glyph_count, attach_point_offsets })
 }
 
-/// d#217
+/// d#215
 fn Decoder_opentype_gdef_lig_caret_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_gdef_lig_caret_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -23246,7 +23223,7 @@ accum
 PResult::Ok(opentype_gdef_lig_caret_list { list_scope, coverage, lig_glyph_count, lig_glyph_offsets })
 }
 
-/// d#218
+/// d#216
 fn Decoder_opentype_gdef_mark_glyph_set<'input>(_input: &mut Parser<'input>) -> Result<opentype_gdef_mark_glyph_set<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23288,7 +23265,7 @@ accum
 PResult::Ok(opentype_gdef_mark_glyph_set { table_scope, format, mark_glyph_set_count, coverage })
 }
 
-/// d#219
+/// d#217
 fn Decoder_opentype_gdef_lig_glyph<'input>(_input: &mut Parser<'input>) -> Result<opentype_gdef_lig_glyph<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23314,7 +23291,7 @@ accum
 PResult::Ok(opentype_gdef_lig_glyph { table_scope, caret_count, caret_values })
 }
 
-/// d#220
+/// d#218
 fn Decoder_opentype_gdef_caret_value<'input>(_input: &mut Parser<'input>) -> Result<opentype_gdef_caret_value<'input>, ParseError> {
 let table_view = _input.view();
 let format = {
@@ -23359,7 +23336,7 @@ return Err(ParseError::FailToken(5955168674639093440u64));
 PResult::Ok(opentype_gdef_caret_value { format, data })
 }
 
-/// d#221
+/// d#219
 fn Decoder_opentype_gdef_caret_value_data_format3<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_gdef_caret_value_data_format3<'input>, ParseError> {
 let table_scope = table_view;
 let coordinate = {
@@ -23380,7 +23357,7 @@ opentype_gdef_caret_value_data_format3_table { offset, _data }
 PResult::Ok(opentype_gdef_caret_value_data_format3 { table_scope, coordinate, table })
 }
 
-/// d#222
+/// d#220
 fn Decoder_opentype_gdef_attach_point(_input: &mut Parser<'_>) -> Result<opentype_gdef_attach_point, ParseError> {
 let point_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -23400,7 +23377,7 @@ accum
 PResult::Ok(opentype_gdef_attach_point { point_count, point_indices })
 }
 
-/// d#223
+/// d#221
 fn Decoder_opentype_layout_axis_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_axis_table<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23423,7 +23400,7 @@ opentype_layout_axis_table_base_script_list_offset { offset, _data }
 PResult::Ok(opentype_layout_axis_table { table_scope, base_tag_list_offset, base_script_list_offset })
 }
 
-/// d#224
+/// d#222
 fn Decoder_opentype_base_base_script_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_base_base_script_record<'input>, ParseError> {
 let base_script_tag = (Decoder69(_input))?;
 let base_script = {
@@ -23437,7 +23414,7 @@ opentype_base_base_script_record_base_script { offset, _data }
 PResult::Ok(opentype_base_base_script_record { base_script_tag, base_script })
 }
 
-/// d#225
+/// d#223
 fn Decoder_opentype_layout_base_script<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_base_script<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23472,7 +23449,7 @@ accum
 PResult::Ok(opentype_layout_base_script { table_scope, base_values_offset, default_min_max_offset, base_lang_sys_count, base_lang_sys_records })
 }
 
-/// d#226
+/// d#224
 fn Decoder_opentype_layout_base_values<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_base_values<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23502,7 +23479,7 @@ accum
 PResult::Ok(opentype_layout_base_values { table_scope, default_baseline_index, base_coord_count, base_coord_offsets })
 }
 
-/// d#227
+/// d#225
 fn Decoder_opentype_layout_min_max<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_min_max<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23537,7 +23514,7 @@ accum
 PResult::Ok(opentype_layout_min_max { table_scope, min_coord_offset, max_coord_offset, feat_min_max_count, feat_min_max_records })
 }
 
-/// d#228
+/// d#226
 fn Decoder_opentype_base_base_langsys<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_base_base_langsys<'input>, ParseError> {
 let base_lang_sys_tag = (Decoder69(_input))?;
 let min_max = {
@@ -23551,7 +23528,7 @@ opentype_layout_base_script_default_min_max_offset { offset, _data }
 PResult::Ok(opentype_base_base_langsys { base_lang_sys_tag, min_max })
 }
 
-/// d#229
+/// d#227
 fn Decoder_opentype_layout_base_coord<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_base_coord<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -23608,7 +23585,7 @@ return Err(ParseError::FailToken(4471438437047399494u64));
 PResult::Ok(opentype_layout_base_coord { table_scope, format, coordinate, data })
 }
 
-/// d#230
+/// d#228
 fn Decoder_opentype_layout_feat_min_max<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_feat_min_max<'input>, ParseError> {
 let feature_tag = (Decoder69(_input))?;
 let min_coord_offset = {
@@ -23630,7 +23607,7 @@ opentype_layout_base_values_base_coord_offsets { offset, _data }
 PResult::Ok(opentype_layout_feat_min_max { feature_tag, min_coord_offset, max_coord_offset })
 }
 
-/// d#231
+/// d#229
 fn Decoder_opentype_gasp_gasp_record(_input: &mut Parser<'_>, version: u16) -> Result<opentype_gasp_gasp_record, ParseError> {
 let range_max_ppem = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -23672,7 +23649,7 @@ return Err(ParseError::FailToken(13319523888327217639u64));
 PResult::Ok(opentype_gasp_gasp_record { range_max_ppem, range_gasp_behavior })
 }
 
-/// d#232
+/// d#230
 fn Decoder_opentype_glyf_entry(_input: &mut Parser<'_>) -> Result<opentype_glyf_entry, ParseError> {
 let number_of_contours = {
 let raw = {
@@ -23713,7 +23690,7 @@ let description = (Decoder_opentype_glyf_description(_input, number_of_contours)
 PResult::Ok(opentype_glyf_entry { number_of_contours, x_min, y_min, x_max, y_max, description })
 }
 
-/// d#233
+/// d#231
 fn Decoder_opentype_glyf_description(_input: &mut Parser<'_>, n_contours: i16) -> Result<opentype_glyf_description, ParseError> {
 PResult::Ok(match n_contours {
 0 => {
@@ -23732,7 +23709,7 @@ opentype_glyf_description::Composite(inner)
 })
 }
 
-/// d#234
+/// d#232
 fn Decoder_opentype_glyf_simple(_input: &mut Parser<'_>, n_contours: u16) -> Result<opentype_glyf_simple, ParseError> {
 let end_points_of_contour = {
 let mut accum = Vec::new();
@@ -23883,7 +23860,7 @@ accum
 PResult::Ok(opentype_glyf_simple { end_points_of_contour, instruction_length, instructions, number_of_coordinates, flags, x_coordinates, y_coordinates })
 }
 
-/// d#235
+/// d#233
 fn Decoder_opentype_glyf_composite(_input: &mut Parser<'_>) -> Result<opentype_glyf_composite, ParseError> {
 let acc_glyphs = {
 let mut seq: Vec<opentype_glyf_composite_acc_glyphs> = Vec::new();
@@ -24137,7 +24114,7 @@ false => {
 PResult::Ok(opentype_glyf_composite { glyphs, instructions })
 }
 
-/// d#236
+/// d#234
 fn Decoder_opentype_glyph_description_simple_flags_raw(_input: &mut Parser<'_>) -> Result<opentype_glyph_description_simple_flags_raw, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let overlap_simple = _packed_bits >> 6u8 & 1u8 > 0u8;
@@ -24150,7 +24127,7 @@ let on_curve_point = _packed_bits & 1u8 > 0u8;
 PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple, y_is_same_or_positive_y_short_vector, x_is_same_or_positive_x_short_vector, repeat_flag, y_short_vector, x_short_vector, on_curve_point })
 }
 
-/// d#237
+/// d#235
 fn Decoder_opentype_post_version2<'input>(_input: &mut Parser<'input>) -> Result<opentype_post_version2<'input>, ParseError> {
 let num_glyphs = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -24208,7 +24185,7 @@ accum
 PResult::Ok(opentype_post_version2 { num_glyphs, glyph_name_index, string_data })
 }
 
-/// d#238
+/// d#236
 fn Decoder_opentype_post_pascal_string<'input>(_input: &mut Parser<'input>) -> Result<opentype_post_pascal_string<'input>, ParseError> {
 let length = _input.read_byte()?;
 let string = {
@@ -24218,7 +24195,7 @@ pascal_string_data.read_len(length as usize)
 PResult::Ok(opentype_post_pascal_string { length, string })
 }
 
-/// d#239
+/// d#237
 fn Decoder_opentype_name_name_record<'input>(_input: &mut Parser<'input>, storage_view: View<'input>) -> Result<opentype_name_name_record<'input>, ParseError> {
 let platform = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -24251,7 +24228,7 @@ opentype_name_name_record_string { offset, data }
 PResult::Ok(opentype_name_name_record { platform, encoding, language, name_id, length, string })
 }
 
-/// d#240
+/// d#238
 fn Decoder_opentype_name_name_version_1<'input>(_input: &mut Parser<'input>, storage_view: View<'input>) -> Result<opentype_name_name_version_1<'input>, ParseError> {
 let lang_tag_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -24268,7 +24245,7 @@ accum
 PResult::Ok(opentype_name_name_version_1 { lang_tag_count, lang_tag_records })
 }
 
-/// d#241
+/// d#239
 fn Decoder_opentype_name_lang_tag_record<'input>(_input: &mut Parser<'input>, storage_view: View<'input>) -> Result<opentype_name_lang_tag_record<'input>, ParseError> {
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -24285,7 +24262,7 @@ opentype_name_name_record_string { offset, data }
 PResult::Ok(opentype_name_lang_tag_record { length, lang_tag })
 }
 
-/// d#242
+/// d#240
 fn Decoder_opentype_maxp_version1(_input: &mut Parser<'_>) -> Result<opentype_maxp_version1, ParseError> {
 let max_points = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -24364,8 +24341,8 @@ return Err(ParseError::FalsifiedWhere(4649034608147552416u64));
 PResult::Ok(opentype_maxp_version1 { max_points, max_contours, max_composite_points, max_composite_contours, max_zones, max_twilight_points, max_storage, max_function_defs, max_instruction_defs, max_stack_elements, max_size_of_instructions, max_component_elements, max_component_depth })
 }
 
-/// d#243
-fn Decoder243(_input: &mut Parser<'_>) -> Result<i64, ParseError> {
+/// d#241
+fn Decoder241(_input: &mut Parser<'_>) -> Result<i64, ParseError> {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
@@ -24373,7 +24350,7 @@ u64be(x)
 PResult::Ok(raw as i64)
 }
 
-/// d#244
+/// d#242
 fn Decoder_opentype_encoding_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_encoding_record<'input>, ParseError> {
 let platform = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -24394,7 +24371,7 @@ opentype_encoding_record_subtable { offset, _data }
 PResult::Ok(opentype_encoding_record { platform, encoding, subtable })
 }
 
-/// d#245
+/// d#243
 fn Decoder_opentype_cmap_subtable<'input>(_input: &mut Parser<'input>, _platform: u16) -> Result<opentype_cmap_subtable<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -24444,7 +24421,7 @@ opentype_cmap_subtable_data::Format12(inner)
 },
 
 13u16 => {
-let inner = (Decoder253(_input, _platform))?;
+let inner = (Decoder251(_input, _platform))?;
 opentype_cmap_subtable_data::Format13(inner)
 },
 
@@ -24460,7 +24437,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(opentype_cmap_subtable { table_scope, format, data })
 }
 
-/// d#246
+/// d#244
 fn Decoder_opentype_cmap_subtable_format0(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format0, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -24528,7 +24505,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#247
+/// d#245
 fn Decoder_opentype_cmap_subtable_format2(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format2, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -24701,7 +24678,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#248
+/// d#246
 fn Decoder_opentype_cmap_subtable_format4(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format4, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -24864,7 +24841,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#249
+/// d#247
 fn Decoder_opentype_cmap_subtable_format6(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format6, ParseError> {
 let _format = {
 let inner = {
@@ -24912,7 +24889,7 @@ accum
 PResult::Ok(opentype_cmap_subtable_format6 { _format, length, language, first_code, entry_count, glyph_id_array })
 }
 
-/// d#250
+/// d#248
 fn Decoder_opentype_cmap_subtable_format8(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format8, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -25024,7 +25001,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#251
+/// d#249
 fn Decoder_opentype_cmap_subtable_format10(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format10, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -25135,7 +25112,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#252
+/// d#250
 fn Decoder_opentype_cmap_subtable_format12(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format12, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -25239,8 +25216,8 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#253
-fn Decoder253(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format12, ParseError> {
+/// d#251
+fn Decoder251(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format12, ParseError> {
 let length = {
 _input.open_peek_context();
 let ret = ((|| {
@@ -25343,7 +25320,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#254
+/// d#252
 fn Decoder_opentype_cmap_subtable_format14<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_cmap_subtable_format14, ParseError> {
 let length = {
 _input.open_peek_context();
@@ -25411,7 +25388,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#255
+/// d#253
 fn Decoder_opentype_variation_selector<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_variation_selector, ParseError> {
 let var_selector = {
 let x = (0u8, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -25436,7 +25413,7 @@ opentype_variation_selector_non_default_uvs_offset { offset, _data }
 PResult::Ok(opentype_variation_selector { var_selector, default_uvs_offset, non_default_uvs_offset })
 }
 
-/// d#256
+/// d#254
 fn Decoder_opentype_types_sequential_map_record(_input: &mut Parser<'_>) -> Result<opentype_types_sequential_map_record, ParseError> {
 let start_char_code = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -25453,7 +25430,7 @@ u32be(x)
 PResult::Ok(opentype_types_sequential_map_record { start_char_code, end_char_code, start_glyph_id })
 }
 
-/// d#257
+/// d#255
 fn Decoder_elf_header(_input: &mut Parser<'_>) -> Result<elf_header, ParseError> {
 let ident = {
 let sz = 16u32 as usize;
@@ -25462,24 +25439,24 @@ let ret = (Decoder_elf_header_ident(_input))?;
 _input.end_slice()?;
 ret
 };
-let r#type = (Decoder277(_input, ident.data == 2u8))?;
-let machine = (Decoder278(_input, ident.data == 2u8))?;
-let version = (Decoder279(_input, ident.data == 2u8))?;
+let r#type = (Decoder275(_input, ident.data == 2u8))?;
+let machine = (Decoder276(_input, ident.data == 2u8))?;
+let version = (Decoder277(_input, ident.data == 2u8))?;
 let entry = (Decoder_elf_types_elf_addr(_input, ident.data == 2u8, ident.class))?;
 let phoff = (Decoder_elf_types_elf_off(_input, ident.data == 2u8, ident.class))?;
 let shoff = (Decoder_elf_types_elf_off(_input, ident.data == 2u8, ident.class))?;
-let flags = (Decoder262(_input, ident.data == 2u8))?;
-let ehsize = (Decoder280(_input, ident.data == 2u8))?;
-let phentsize = (Decoder280(_input, ident.data == 2u8))?;
-let phnum = (Decoder280(_input, ident.data == 2u8))?;
-let shentsize = (Decoder280(_input, ident.data == 2u8))?;
-let shnum = (Decoder280(_input, ident.data == 2u8))?;
-let shstrndx = (Decoder280(_input, ident.data == 2u8))?;
+let flags = (Decoder260(_input, ident.data == 2u8))?;
+let ehsize = (Decoder278(_input, ident.data == 2u8))?;
+let phentsize = (Decoder278(_input, ident.data == 2u8))?;
+let phnum = (Decoder278(_input, ident.data == 2u8))?;
+let shentsize = (Decoder278(_input, ident.data == 2u8))?;
+let shnum = (Decoder278(_input, ident.data == 2u8))?;
+let shstrndx = (Decoder278(_input, ident.data == 2u8))?;
 PResult::Ok(elf_header { ident, r#type, machine, version, entry, phoff, shoff, flags, ehsize, phentsize, phnum, shentsize, shnum, shstrndx })
 }
 
-/// d#258
-fn Decoder258(_input: &mut Parser<'_>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr>, ParseError> {
+/// d#256
+fn Decoder256(_input: &mut Parser<'_>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..phnum {
 let next_elem = (Decoder_elf_phdr(_input, is_be, class))?;
@@ -25488,8 +25465,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#259
-fn Decoder259(_input: &mut Parser<'_>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr>, ParseError> {
+/// d#257
+fn Decoder257(_input: &mut Parser<'_>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..shnum {
 let next_elem = (Decoder_elf_shdr(_input, is_be, class))?;
@@ -25498,8 +25475,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#260
-fn Decoder260(_input: &mut Parser<'_>, r#type: u32, size: u64) -> Result<Vec<u8>, ParseError> {
+/// d#258
+fn Decoder258(_input: &mut Parser<'_>, r#type: u32, size: u64) -> Result<Vec<u8>, ParseError> {
 PResult::Ok({
 let _ = r#type;
 let mut accum = Vec::new();
@@ -25511,23 +25488,23 @@ accum
 })
 }
 
-/// d#261
+/// d#259
 fn Decoder_elf_shdr(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_shdr, ParseError> {
-let name = (Decoder262(_input, is_be))?;
-let r#type = (Decoder263(_input, is_be))?;
+let name = (Decoder260(_input, is_be))?;
+let r#type = (Decoder261(_input, is_be))?;
 let flags = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 let addr = (Decoder_elf_types_elf_addr(_input, is_be, class))?;
 let offset = (Decoder_elf_types_elf_off(_input, is_be, class))?;
 let size = (Decoder_elf_types_elf_full(_input, is_be, class))?;
-let link = (Decoder262(_input, is_be))?;
-let info = (Decoder267(_input, is_be))?;
+let link = (Decoder260(_input, is_be))?;
+let info = (Decoder265(_input, is_be))?;
 let addralign = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 let entsize = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 PResult::Ok(elf_shdr { name, r#type, flags, addr, offset, size, link, info, addralign, entsize })
 }
 
-/// d#262
-fn Decoder262(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
+/// d#260
+fn Decoder260(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
 _input.skip_align(4)?;
 PResult::Ok(match is_be {
 true => {
@@ -25542,9 +25519,9 @@ u32le(x)
 })
 }
 
-/// d#263
-fn Decoder263(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-let inner = (Decoder262(_input, is_be))?;
+/// d#261
+fn Decoder261(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
+let inner = (Decoder260(_input, is_be))?;
 let is_valid = {
 let sh_type = inner;
 matches!(sh_type, 0u32..=11u32 | 14u32..=18u32 | 1610612736u32..=4294967295u32)
@@ -25556,16 +25533,16 @@ return Err(ParseError::FalsifiedWhere(7933266403838225878u64));
 })
 }
 
-/// d#264
+/// d#262
 fn Decoder_elf_types_elf_full(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_full, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder262(_input, is_be))?;
+let inner = (Decoder260(_input, is_be))?;
 elf_types_elf_full::Full32(inner)
 },
 
 2u8 => {
-let inner = (Decoder272(_input, is_be))?;
+let inner = (Decoder270(_input, is_be))?;
 elf_types_elf_full::Full64(inner)
 },
 
@@ -25575,16 +25552,16 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#265
+/// d#263
 fn Decoder_elf_types_elf_addr(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_addr, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder270(_input, is_be))?;
+let inner = (Decoder268(_input, is_be))?;
 elf_types_elf_addr::Addr32(inner)
 },
 
 2u8 => {
-let inner = (Decoder271(_input, is_be))?;
+let inner = (Decoder269(_input, is_be))?;
 elf_types_elf_addr::Addr64(inner)
 },
 
@@ -25594,16 +25571,16 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#266
+/// d#264
 fn Decoder_elf_types_elf_off(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_off, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder268(_input, is_be))?;
+let inner = (Decoder266(_input, is_be))?;
 elf_types_elf_off::Off32(inner)
 },
 
 2u8 => {
-let inner = (Decoder269(_input, is_be))?;
+let inner = (Decoder267(_input, is_be))?;
 elf_types_elf_off::Off64(inner)
 },
 
@@ -25613,9 +25590,41 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
+/// d#265
+fn Decoder265(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
+Decoder260(_input, is_be)
+}
+
+/// d#266
+fn Decoder266(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
+_input.skip_align(4)?;
+PResult::Ok(match is_be {
+true => {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+},
+
+false => {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+}
+})
+}
+
 /// d#267
-fn Decoder267(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-Decoder262(_input, is_be)
+fn Decoder267(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
+_input.skip_align(8)?;
+PResult::Ok(match is_be {
+true => {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u64be(x)
+},
+
+false => {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u64le(x)
+}
+})
 }
 
 /// d#268
@@ -25651,86 +25660,54 @@ u64le(x)
 }
 
 /// d#270
-fn Decoder270(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-_input.skip_align(4)?;
+fn Decoder270(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
+_input.skip_align(8)?;
 PResult::Ok(match is_be {
 true => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u64be(x)
 },
 
 false => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u64le(x)
 }
 })
 }
 
 /// d#271
-fn Decoder271(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
-_input.skip_align(8)?;
-PResult::Ok(match is_be {
-true => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u64be(x)
-},
-
-false => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u64le(x)
-}
-})
-}
-
-/// d#272
-fn Decoder272(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
-_input.skip_align(8)?;
-PResult::Ok(match is_be {
-true => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u64be(x)
-},
-
-false => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u64le(x)
-}
-})
-}
-
-/// d#273
 fn Decoder_elf_phdr(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_phdr, ParseError> {
-let r#type = (Decoder262(_input, is_be))?;
-let flags64 = (Decoder274(_input, is_be, class))?;
+let r#type = (Decoder260(_input, is_be))?;
+let flags64 = (Decoder272(_input, is_be, class))?;
 let offset = (Decoder_elf_types_elf_off(_input, is_be, class))?;
 let vaddr = (Decoder_elf_types_elf_addr(_input, is_be, class))?;
 let paddr = (Decoder_elf_types_elf_addr(_input, is_be, class))?;
 let filesz = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 let memsz = (Decoder_elf_types_elf_full(_input, is_be, class))?;
-let flags32 = (Decoder275(_input, is_be, class))?;
+let flags32 = (Decoder273(_input, is_be, class))?;
 let align = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 PResult::Ok(elf_phdr { r#type, flags64, offset, vaddr, paddr, filesz, memsz, flags32, align })
 }
 
-/// d#274
-fn Decoder274(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
+/// d#272
+fn Decoder272(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
 PResult::Ok(if class == 2u8 {
-Some((Decoder262(_input, is_be))?)
+Some((Decoder260(_input, is_be))?)
 } else {
 None
 })
 }
 
-/// d#275
-fn Decoder275(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
+/// d#273
+fn Decoder273(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
 PResult::Ok(if class == 1u8 {
-Some((Decoder262(_input, is_be))?)
+Some((Decoder260(_input, is_be))?)
 } else {
 None
 })
 }
 
-/// d#276
+/// d#274
 fn Decoder_elf_header_ident(_input: &mut Parser<'_>) -> Result<elf_header_ident, ParseError> {
 {
 let arg0 = {
@@ -25767,11 +25744,11 @@ return Err(ParseError::ExcludedBranch(3810055094392728880u64));
 };
 (arg0, arg1, arg2, arg3)
 };
-let class = (Decoder281(_input))?;
-let data = (Decoder282(_input))?;
-let version = (Decoder283(_input))?;
-let os_abi = (Decoder284(_input))?;
-let abi_version = (Decoder285(_input))?;
+let class = (Decoder279(_input))?;
+let data = (Decoder280(_input))?;
+let version = (Decoder281(_input))?;
+let os_abi = (Decoder282(_input))?;
+let abi_version = (Decoder283(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25807,9 +25784,9 @@ accum
 PResult::Ok(elf_header_ident { class, data, version, os_abi, abi_version })
 }
 
-/// d#277
-fn Decoder277(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
-let inner = (Decoder280(_input, is_be))?;
+/// d#275
+fn Decoder275(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
+let inner = (Decoder278(_input, is_be))?;
 let is_valid = {
 let r#type = inner;
 matches!(r#type, 0u16..=4u16 | 65024u16..=65279u16 | 65280u16..=65535u16)
@@ -25821,14 +25798,14 @@ return Err(ParseError::FalsifiedWhere(5599331855309773603u64));
 })
 }
 
-/// d#278
-fn Decoder278(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
-Decoder280(_input, is_be)
+/// d#276
+fn Decoder276(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
+Decoder278(_input, is_be)
 }
 
-/// d#279
-fn Decoder279(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-let inner = (Decoder262(_input, is_be))?;
+/// d#277
+fn Decoder277(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
+let inner = (Decoder260(_input, is_be))?;
 let is_valid = {
 let x = inner;
 x <= 1u32
@@ -25840,8 +25817,8 @@ return Err(ParseError::FalsifiedWhere(16437491640759399344u64));
 })
 }
 
-/// d#280
-fn Decoder280(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
+/// d#278
+fn Decoder278(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
 _input.skip_align(2)?;
 PResult::Ok(match is_be {
 true => {
@@ -25856,8 +25833,8 @@ u16le(x)
 })
 }
 
-/// d#281
-fn Decoder281(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#279
+fn Decoder279(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let inner = _input.read_byte()?;
 let is_valid = {
 let x = inner;
@@ -25870,8 +25847,8 @@ return Err(ParseError::FalsifiedWhere(2988545765690796708u64));
 })
 }
 
-/// d#282
-fn Decoder282(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#280
+fn Decoder280(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let inner = _input.read_byte()?;
 let is_valid = {
 let x = inner;
@@ -25884,8 +25861,8 @@ return Err(ParseError::FalsifiedWhere(6215067399528787845u64));
 })
 }
 
-/// d#283
-fn Decoder283(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#281
+fn Decoder281(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let inner = _input.read_byte()?;
 let is_valid = {
 let x = inner;
@@ -25898,17 +25875,17 @@ return Err(ParseError::FalsifiedWhere(17176374570344757031u64));
 })
 }
 
+/// d#282
+fn Decoder282(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+_input.read_byte()
+}
+
+/// d#283
+fn Decoder283(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+_input.read_byte()
+}
+
 /// d#284
-fn Decoder284(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
-_input.read_byte()
-}
-
-/// d#285
-fn Decoder285(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
-_input.read_byte()
-}
-
-/// d#286
 fn Decoder_tar_header_with_data(_input: &mut Parser<'_>) -> Result<tar_header_with_data, ParseError> {
 let header = (Decoder_tar_header(_input))?;
 let file = {
@@ -25923,7 +25900,7 @@ _input.skip_align(512)?;
 PResult::Ok(tar_header_with_data { header, file })
 }
 
-/// d#287
+/// d#285
 fn Decoder_tar_header(_input: &mut Parser<'_>) -> Result<tar_header, ParseError> {
 let sz = 512u32 as usize;
 _input.start_slice(sz)?;
@@ -25978,7 +25955,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26059,7 +26036,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26140,7 +26117,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26301,7 +26278,7 @@ return Err(ParseError::ExcludedBranch(8785324329127396734u64));
 };
 try_sub!(bit as u8, 48u8, 14949659785259585833u64)
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 let value = (((0u8 as u32) << 3u32 | (_oA as u32)) << 6u32 | (_o9 as u32) << 3u32 | (_o8 as u32)) << 24u32 | (((_o7 as u32) << 3u32 | (_o6 as u32)) << 6u32 | (_o5 as u32) << 3u32 | (_o4 as u32)) << 12u32 | ((_o3 as u32) << 3u32 | (_o2 as u32)) << 6u32 | (_o1 as u32) << 3u32 | (_o0 as u32);
 tar_header_size_lhs { value }
 };
@@ -26350,7 +26327,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26431,7 +26408,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26473,7 +26450,7 @@ let typeflag = _input.read_byte()?;
 let linkname = {
 let sz = 100u16 as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder290(_input))?;
+let ret = (Decoder288(_input))?;
 _input.end_slice()?;
 ret
 };
@@ -26550,14 +26527,14 @@ return Err(ParseError::ExcludedBranch(6611121695530188940u64));
 let uname = {
 let sz = 32u16 as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder291(_input))?;
+let ret = (Decoder289(_input))?;
 _input.end_slice()?;
 ret
 };
 let gname = {
 let sz = 32u16 as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder291(_input))?;
+let ret = (Decoder289(_input))?;
 _input.end_slice()?;
 ret
 };
@@ -26604,7 +26581,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26685,7 +26662,7 @@ break
 };
 accum
 };
-(Decoder289(_input))?;
+(Decoder287(_input))?;
 {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26726,7 +26703,7 @@ ret
 let prefix = {
 let sz = 155u16 as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder290(_input))?;
+let ret = (Decoder288(_input))?;
 _input.end_slice()?;
 ret
 };
@@ -26751,7 +26728,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-/// d#288
+/// d#286
 fn Decoder_tar_ascii_string_opt0_nonempty(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
 let string = {
 let mut accum = Vec::new();
@@ -26831,8 +26808,8 @@ accum
 PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 }
 
-/// d#289
-fn Decoder289(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#287
+fn Decoder287(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(b) {
 b
@@ -26841,8 +26818,8 @@ return Err(ParseError::ExcludedBranch(4159150678276994707u64));
 })
 }
 
-/// d#290
-fn Decoder290(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
+/// d#288
+fn Decoder288(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
 let string = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26917,8 +26894,8 @@ accum
 PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 }
 
-/// d#291
-fn Decoder291(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
+/// d#289
+fn Decoder289(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
 let string = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26997,7 +26974,7 @@ accum
 PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 }
 
-/// d#292
+/// d#290
 fn Decoder_tiff_byte_order(_input: &mut Parser<'_>) -> Result<tiff_byte_order, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -27066,142 +27043,142 @@ return Err(ParseError::ExcludedBranch(3857251694269754536u64));
 })
 }
 
-/// d#293
+/// d#291
 fn Decoder_tiff_ifd_le(_input: &mut Parser<'_>, byte_order: tiff_byte_order) -> Result<tiff_ifd_le, ParseError> {
 PResult::Ok(match byte_order {
 tiff_byte_order::le(..) => {
-(Decoder294(_input))?
+(Decoder292(_input))?
 },
 
 tiff_byte_order::be(..) => {
-(Decoder295(_input))?
+(Decoder293(_input))?
 }
 })
 }
 
+/// d#292
+fn Decoder292(_input: &mut Parser<'_>) -> Result<tiff_ifd_le, ParseError> {
+let num_fields = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16le(x)
+};
+let fields = {
+let mut accum = Vec::new();
+for _ in 0..num_fields {
+let next_elem = {
+let tag = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16le(x)
+};
+let r#type = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16le(x)
+};
+let length = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+};
+let offset_or_data = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+};
+tiff_ifd_le_fields { tag, r#type, length, offset_or_data }
+};
+accum.push(next_elem)
+};
+accum
+};
+let next_ifd_offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+};
+let next_ifd = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+_input.read_byte()?;
+{
+let ret = 0;
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = _input.read_byte()?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+PResult::Ok(tiff_ifd_le { num_fields, fields, next_ifd_offset, next_ifd })
+}
+
+/// d#293
+fn Decoder293(_input: &mut Parser<'_>) -> Result<tiff_ifd_le, ParseError> {
+let num_fields = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let fields = {
+let mut accum = Vec::new();
+for _ in 0..num_fields {
+let next_elem = {
+let tag = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let r#type = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let length = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+let offset_or_data = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+tiff_ifd_le_fields { tag, r#type, length, offset_or_data }
+};
+accum.push(next_elem)
+};
+accum
+};
+let next_ifd_offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+let next_ifd = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+_input.read_byte()?;
+{
+let ret = 0;
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = _input.read_byte()?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+PResult::Ok(tiff_ifd_le { num_fields, fields, next_ifd_offset, next_ifd })
+}
+
 /// d#294
-fn Decoder294(_input: &mut Parser<'_>) -> Result<tiff_ifd_le, ParseError> {
-let num_fields = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16le(x)
-};
-let fields = {
-let mut accum = Vec::new();
-for _ in 0..num_fields {
-let next_elem = {
-let tag = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16le(x)
-};
-let r#type = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16le(x)
-};
-let length = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
-};
-let offset_or_data = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
-};
-tiff_ifd_le_fields { tag, r#type, length, offset_or_data }
-};
-accum.push(next_elem)
-};
-accum
-};
-let next_ifd_offset = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
-};
-let next_ifd = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-PResult::Ok(tiff_ifd_le { num_fields, fields, next_ifd_offset, next_ifd })
-}
-
-/// d#295
-fn Decoder295(_input: &mut Parser<'_>) -> Result<tiff_ifd_le, ParseError> {
-let num_fields = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let fields = {
-let mut accum = Vec::new();
-for _ in 0..num_fields {
-let next_elem = {
-let tag = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let r#type = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let length = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-};
-let offset_or_data = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-};
-tiff_ifd_le_fields { tag, r#type, length, offset_or_data }
-};
-accum.push(next_elem)
-};
-accum
-};
-let next_ifd_offset = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-};
-let next_ifd = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-PResult::Ok(tiff_ifd_le { num_fields, fields, next_ifd_offset, next_ifd })
-}
-
-/// d#296
 fn Decoder_riff_subchunks(_input: &mut Parser<'_>) -> Result<riff_subchunks, ParseError> {
-let tag = (Decoder297(_input))?;
+let tag = (Decoder295(_input))?;
 let chunks = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -27226,14 +27203,14 @@ accum
 PResult::Ok(riff_subchunks { tag, chunks })
 }
 
-/// d#297
-fn Decoder297(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#295
+fn Decoder295(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 PResult::Ok((_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?))
 }
 
-/// d#298
+/// d#296
 fn Decoder_riff_chunk(_input: &mut Parser<'_>) -> Result<riff_chunk, ParseError> {
-let tag = (Decoder297(_input))?;
+let tag = (Decoder295(_input))?;
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32le(x)
@@ -27278,7 +27255,7 @@ None
 PResult::Ok(riff_chunk { tag, length, data, pad })
 }
 
-/// d#299
+/// d#297
 fn Decoder_png_ihdr(_input: &mut Parser<'_>) -> Result<png_ihdr, ParseError> {
 let length = {
 let inner = {
@@ -27295,7 +27272,7 @@ inner
 return Err(ParseError::FalsifiedWhere(4514882359072253410u64));
 }
 };
-let tag = (Decoder335(_input))?;
+let tag = (Decoder333(_input))?;
 let data = {
 let sz = length as usize;
 _input.start_slice(sz)?;
@@ -27310,7 +27287,7 @@ u32be(x)
 PResult::Ok(png_ihdr { length, tag, data, crc })
 }
 
-/// d#300
+/// d#298
 fn Decoder_png_chunk(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_chunk, ParseError> {
 let length = {
 let inner = {
@@ -27327,13 +27304,13 @@ inner
 return Err(ParseError::FalsifiedWhere(13286112843953025473u64));
 }
 };
-let tag = (Decoder307(_input))?;
+let tag = (Decoder305(_input))?;
 let data = {
 let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = match slice_all(&tag) {
 [80u8, 76u8, 84u8, 69u8] => {
-let inner = (Decoder308(_input))?;
+let inner = (Decoder306(_input))?;
 png_chunk_data::PLTE(inner)
 },
 
@@ -27442,7 +27419,7 @@ u32be(x)
 PResult::Ok(png_chunk { length, tag, data, crc })
 }
 
-/// d#301
+/// d#299
 fn Decoder_png_idat(_input: &mut Parser<'_>) -> Result<png_idat, ParseError> {
 let length = {
 let inner = {
@@ -27459,11 +27436,11 @@ inner
 return Err(ParseError::FalsifiedWhere(15541745679144160988u64));
 }
 };
-let tag = (Decoder305(_input))?;
+let tag = (Decoder303(_input))?;
 let data = {
 let sz = length as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder306(_input))?;
+let ret = (Decoder304(_input))?;
 _input.end_slice()?;
 ret
 };
@@ -27474,7 +27451,7 @@ u32be(x)
 PResult::Ok(png_idat { length, tag, data, crc })
 }
 
-/// d#302
+/// d#300
 fn Decoder_zlib_main(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = {
 let inner = {
@@ -27519,7 +27496,7 @@ u32be(x)
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-/// d#303
+/// d#301
 fn Decoder_png_iend(_input: &mut Parser<'_>) -> Result<png_iend, ParseError> {
 let length = {
 let inner = {
@@ -27536,7 +27513,7 @@ inner
 return Err(ParseError::FalsifiedWhere(16354405091856567045u64));
 }
 };
-let tag = (Decoder304(_input))?;
+let tag = (Decoder302(_input))?;
 let crc = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -27544,8 +27521,8 @@ u32be(x)
 PResult::Ok(png_iend { length, tag, crc })
 }
 
-/// d#304
-fn Decoder304(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#302
+fn Decoder302(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 let arg0 = {
 let b = _input.read_byte()?;
 if b == 73 {
@@ -27581,8 +27558,8 @@ return Err(ParseError::ExcludedBranch(10755314521203959634u64));
 PResult::Ok((arg0, arg1, arg2, arg3))
 }
 
-/// d#305
-fn Decoder305(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#303
+fn Decoder303(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 let arg0 = {
 let b = _input.read_byte()?;
 if b == 73 {
@@ -27618,8 +27595,8 @@ return Err(ParseError::ExcludedBranch(7323683635844484191u64));
 PResult::Ok((arg0, arg1, arg2, arg3))
 }
 
-/// d#306
-fn Decoder306(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#304
+fn Decoder304(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -27641,8 +27618,8 @@ break
 PResult::Ok(accum)
 }
 
-/// d#307
-fn Decoder307(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#305
+fn Decoder305(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 {
 _input.open_peek_not_context();
 let res = (|| (|| {
@@ -27763,8 +27740,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#308
-fn Decoder308(_input: &mut Parser<'_>) -> Result<Vec<gif_color_table_entry>, ParseError> {
+/// d#306
+fn Decoder306(_input: &mut Parser<'_>) -> Result<Vec<gif_color_table_entry>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -27795,7 +27772,7 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#309
+/// d#307
 fn Decoder_png_trns(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_trns, ParseError> {
 PResult::Ok(match ihdr.data.color_type {
 0u8 => {
@@ -27862,7 +27839,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#310
+/// d#308
 fn Decoder_png_chrm(_input: &mut Parser<'_>) -> Result<png_chrm, ParseError> {
 let whitepoint_x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -27899,7 +27876,7 @@ u32be(x)
 PResult::Ok(png_chrm { whitepoint_x, whitepoint_y, red_x, red_y, green_x, green_y, blue_x, blue_y })
 }
 
-/// d#311
+/// d#309
 fn Decoder_png_gama(_input: &mut Parser<'_>) -> Result<png_gama, ParseError> {
 let gamma = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -27908,10 +27885,10 @@ u32be(x)
 PResult::Ok(png_gama { gamma })
 }
 
-/// d#312
+/// d#310
 fn Decoder_png_iccp(_input: &mut Parser<'_>) -> Result<png_iccp, ParseError> {
 let profile_name = {
-let val = (Decoder333(_input))?;
+let val = (Decoder331(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -27930,11 +27907,11 @@ b
 return Err(ParseError::ExcludedBranch(10545338643554355463u64));
 }
 };
-let compressed_profile = (Decoder334(_input))?;
+let compressed_profile = (Decoder332(_input))?;
 PResult::Ok(png_iccp { profile_name, compression_method, compressed_profile })
 }
 
-/// d#313
+/// d#311
 fn Decoder_png_sbit(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_sbit, ParseError> {
 PResult::Ok(match ihdr.data.color_type {
 0u8 => {
@@ -27991,7 +27968,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#314
+/// d#312
 fn Decoder_png_srgb(_input: &mut Parser<'_>) -> Result<png_srgb, ParseError> {
 let rendering_intent = {
 let inner = _input.read_byte()?;
@@ -28008,10 +27985,10 @@ return Err(ParseError::FalsifiedWhere(3529321240709143928u64));
 PResult::Ok(png_srgb { rendering_intent })
 }
 
-/// d#315
+/// d#313
 fn Decoder_png_itxt(_input: &mut Parser<'_>) -> Result<png_itxt, ParseError> {
 let keyword = {
-let val = (Decoder327(_input))?;
+let val = (Decoder325(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -28089,7 +28066,7 @@ return Err(ParseError::ExcludedBranch(5377488665469248769u64));
 chars.clone()
 };
 let translated_keyword = {
-let val = (Decoder328(_input))?;
+let val = (Decoder326(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -28107,10 +28084,10 @@ _input.start_alt();
 let res = (|| {
 let inner = {
 let inner = {
-let zlib = (Decoder329(_input))?;
+let zlib = (Decoder327(_input))?;
 let mut buf_parser = Parser::new(slice_all(&zlib.data.inflate));
 let buf_input = &mut buf_parser;
-(Decoder330(buf_input))?
+(Decoder328(buf_input))?
 };
 png_itxt_text_compressed::valid(inner)
 };
@@ -28165,17 +28142,17 @@ Err(_e)
 },
 
 false => {
-let inner = (Decoder331(_input))?;
+let inner = (Decoder329(_input))?;
 png_itxt_text::uncompressed(inner)
 }
 };
 PResult::Ok(png_itxt { keyword, compression_flag, compression_method, language_tag, translated_keyword, text })
 }
 
-/// d#316
+/// d#314
 fn Decoder_png_text(_input: &mut Parser<'_>) -> Result<png_text, ParseError> {
 let keyword = {
-let val = (Decoder326(_input))?;
+let val = (Decoder324(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -28210,10 +28187,10 @@ accum
 PResult::Ok(png_text { keyword, text })
 }
 
-/// d#317
+/// d#315
 fn Decoder_png_ztxt(_input: &mut Parser<'_>) -> Result<png_ztxt, ParseError> {
 let keyword = {
-let val = (Decoder324(_input))?;
+let val = (Decoder322(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -28233,7 +28210,7 @@ return Err(ParseError::ExcludedBranch(4051432836859471288u64));
 }
 };
 let compressed_text = {
-let zlib = (Decoder325(_input))?;
+let zlib = (Decoder323(_input))?;
 let mut buf_parser = Parser::new(slice_all(&zlib.data.inflate));
 let buf_input = &mut buf_parser;
 (Decoder79(buf_input))?
@@ -28241,7 +28218,7 @@ let buf_input = &mut buf_parser;
 PResult::Ok(png_ztxt { keyword, compression_method, compressed_text })
 }
 
-/// d#318
+/// d#316
 fn Decoder_png_bkgd(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_bkgd, ParseError> {
 PResult::Ok(match ihdr.data.color_type {
 0u8 => {
@@ -28318,7 +28295,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#319
+/// d#317
 fn Decoder_png_hist(_input: &mut Parser<'_>) -> Result<png_hist, ParseError> {
 let histogram = {
 let mut accum = Vec::new();
@@ -28347,7 +28324,7 @@ accum
 PResult::Ok(png_hist { histogram })
 }
 
-/// d#320
+/// d#318
 fn Decoder_png_phys(_input: &mut Parser<'_>) -> Result<png_phys, ParseError> {
 let pixels_per_unit_x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -28361,10 +28338,10 @@ let unit_specifier = _input.read_byte()?;
 PResult::Ok(png_phys { pixels_per_unit_x, pixels_per_unit_y, unit_specifier })
 }
 
-/// d#321
+/// d#319
 fn Decoder_png_splt(_input: &mut Parser<'_>) -> Result<png_splt, ParseError> {
 let palette_name = {
-let val = (Decoder323(_input))?;
+let val = (Decoder321(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -28473,7 +28450,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(png_splt { palette_name, sample_depth, palette })
 }
 
-/// d#322
+/// d#320
 fn Decoder_png_time(_input: &mut Parser<'_>) -> Result<png_time, ParseError> {
 let year = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -28487,8 +28464,8 @@ let second = _input.read_byte()?;
 PResult::Ok(png_time { year, month, day, hour, minute, second })
 }
 
-/// d#323
-fn Decoder323(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#321
+fn Decoder321(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -29464,8 +29441,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#324
-fn Decoder324(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#322
+fn Decoder322(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -30441,8 +30418,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#325
-fn Decoder325(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
+/// d#323
+fn Decoder323(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = {
 let inner = {
 let _packed_bits = _input.read_byte()?;
@@ -30486,8 +30463,8 @@ u32be(x)
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-/// d#326
-fn Decoder326(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#324
+fn Decoder324(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -31463,8 +31440,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#327
-fn Decoder327(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#325
+fn Decoder325(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -32440,8 +32417,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#328
-fn Decoder328(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+/// d#326
+fn Decoder326(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -32506,8 +32483,8 @@ break
 PResult::Ok(accum)
 }
 
-/// d#329
-fn Decoder329(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
+/// d#327
+fn Decoder327(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = {
 let inner = {
 let _packed_bits = _input.read_byte()?;
@@ -32551,8 +32528,8 @@ u32be(x)
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-/// d#330
-fn Decoder330(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+/// d#328
+fn Decoder328(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -32613,13 +32590,13 @@ break
 PResult::Ok(accum)
 }
 
-/// d#331
-fn Decoder331(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-Decoder332(_input)
+/// d#329
+fn Decoder329(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+Decoder330(_input)
 }
 
-/// d#332
-fn Decoder332(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+/// d#330
+fn Decoder330(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -32684,8 +32661,8 @@ break
 PResult::Ok(accum)
 }
 
-/// d#333
-fn Decoder333(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#331
+fn Decoder331(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -33661,8 +33638,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#334
-fn Decoder334(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
+/// d#332
+fn Decoder332(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = {
 let inner = {
 let _packed_bits = _input.read_byte()?;
@@ -33706,8 +33683,8 @@ u32be(x)
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-/// d#335
-fn Decoder335(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#333
+fn Decoder333(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 let arg0 = {
 let b = _input.read_byte()?;
 if b == 73 {
@@ -33743,7 +33720,7 @@ return Err(ParseError::ExcludedBranch(15601622509425384091u64));
 PResult::Ok((arg0, arg1, arg2, arg3))
 }
 
-/// d#336
+/// d#334
 fn Decoder_png_ihdr_data(_input: &mut Parser<'_>) -> Result<png_ihdr_data, ParseError> {
 let width = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -33761,13 +33738,13 @@ let interlace_method = _input.read_byte()?;
 PResult::Ok(png_ihdr_data { width, height, bit_depth, color_type, compression_method, filter_method, interlace_method })
 }
 
-/// d#337
+/// d#335
 fn Decoder_mpeg4_atom(_input: &mut Parser<'_>) -> Result<mpeg4_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -33887,14 +33864,14 @@ ret
 PResult::Ok(mpeg4_atom { size_field, r#type, size, data })
 }
 
-/// d#338
-fn Decoder338(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#336
+fn Decoder336(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 PResult::Ok((_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?))
 }
 
-/// d#339
+/// d#337
 fn Decoder_mpeg4_ftyp_data(_input: &mut Parser<'_>) -> Result<mpeg4_ftyp_data, ParseError> {
-let major_brand = (Decoder338(_input))?;
+let major_brand = (Decoder336(_input))?;
 let minor_version = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -33912,7 +33889,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder338(_input))?;
+let next_elem = (Decoder336(_input))?;
 accum.push(next_elem)
 } else {
 break
@@ -33923,13 +33900,13 @@ accum
 PResult::Ok(mpeg4_ftyp_data { major_brand, minor_version, compatible_brands })
 }
 
-/// d#340
+/// d#338
 fn Decoder_mpeg4_meta_atom(_input: &mut Parser<'_>) -> Result<mpeg4_meta_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -33957,13 +33934,13 @@ ret
 PResult::Ok(mpeg4_meta_atom { size_field, r#type, size, data })
 }
 
-/// d#341
+/// d#339
 fn Decoder_mpeg4_moov_atom(_input: &mut Parser<'_>) -> Result<mpeg4_moov_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -34071,7 +34048,7 @@ ret
 PResult::Ok(mpeg4_moov_atom { size_field, r#type, size, data })
 }
 
-/// d#342
+/// d#340
 fn Decoder_mpeg4_mvhd_data(_input: &mut Parser<'_>) -> Result<mpeg4_mvhd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -34178,13 +34155,13 @@ u32be(x)
 PResult::Ok(mpeg4_mvhd_data { version, flags, fields, rate, volume, reserved1, reserved2, matrix, pre_defined, next_track_ID })
 }
 
-/// d#343
+/// d#341
 fn Decoder_mpeg4_trak_atom(_input: &mut Parser<'_>) -> Result<mpeg4_trak_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -34292,13 +34269,13 @@ ret
 PResult::Ok(mpeg4_trak_atom { size_field, r#type, size, data })
 }
 
-/// d#344
+/// d#342
 fn Decoder_mpeg4_udta_atom(_input: &mut Parser<'_>) -> Result<mpeg4_udta_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -34380,7 +34357,7 @@ ret
 PResult::Ok(mpeg4_udta_atom { size_field, r#type, size, data })
 }
 
-/// d#345
+/// d#343
 fn Decoder_mpeg4_tkhd_data(_input: &mut Parser<'_>) -> Result<mpeg4_tkhd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -34492,13 +34469,13 @@ u32be(x)
 PResult::Ok(mpeg4_tkhd_data { version, flags, fields, reserved2, layer, alternate_group, volume, reserved1, matrix, width, height })
 }
 
-/// d#346
+/// d#344
 fn Decoder_mpeg4_edts_atom(_input: &mut Parser<'_>) -> Result<mpeg4_edts_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -34556,13 +34533,13 @@ ret
 PResult::Ok(mpeg4_edts_atom { size_field, r#type, size, data })
 }
 
-/// d#347
+/// d#345
 fn Decoder_mpeg4_mdia_atom(_input: &mut Parser<'_>) -> Result<mpeg4_mdia_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -34590,7 +34567,7 @@ ret
 PResult::Ok(mpeg4_mdia_atom { size_field, r#type, size, data })
 }
 
-/// d#348
+/// d#346
 fn Decoder_mpeg4_mdia_atom_data(_input: &mut Parser<'_>, r#type: (u8, u8, u8, u8)) -> Result<mpeg4_mdia_atom_data, ParseError> {
 PResult::Ok(match r#type {
 (104u8, 100u8, 108u8, 114u8) => {
@@ -34655,7 +34632,7 @@ mpeg4_mdia_atom_data::unknown(inner)
 })
 }
 
-/// d#349
+/// d#347
 fn Decoder_mpeg4_mdia_hdlr_data(_input: &mut Parser<'_>) -> Result<mpeg4_mdia_hdlr_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -34663,7 +34640,7 @@ let component_type = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let component_subtype = (Decoder338(_input))?;
+let component_subtype = (Decoder336(_input))?;
 let component_manufacturer = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -34729,7 +34706,7 @@ chars.clone()
 PResult::Ok(mpeg4_mdia_hdlr_data { version, flags, component_type, component_subtype, component_manufacturer, component_flags, component_flags_mask, component_name })
 }
 
-/// d#350
+/// d#348
 fn Decoder_mpeg4_mdhd_data(_input: &mut Parser<'_>) -> Result<mpeg4_mdhd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -34795,13 +34772,13 @@ u16be(x)
 PResult::Ok(mpeg4_mdhd_data { version, flags, fields, language, pre_defined })
 }
 
-/// d#351
+/// d#349
 fn Decoder_mpeg4_minf_atom(_input: &mut Parser<'_>) -> Result<mpeg4_minf_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -34914,7 +34891,7 @@ ret
 PResult::Ok(mpeg4_minf_atom { size_field, r#type, size, data })
 }
 
-/// d#352
+/// d#350
 fn Decoder_mpeg4_vmhd_data(_input: &mut Parser<'_>) -> Result<mpeg4_vmhd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -34936,7 +34913,7 @@ accum
 PResult::Ok(mpeg4_vmhd_data { version, flags, graphicsmode, opcolor })
 }
 
-/// d#353
+/// d#351
 fn Decoder_mpeg4_smhd_data(_input: &mut Parser<'_>) -> Result<mpeg4_smhd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -34951,13 +34928,13 @@ u16be(x)
 PResult::Ok(mpeg4_smhd_data { version, flags, balance, reserved })
 }
 
-/// d#354
+/// d#352
 fn Decoder_mpeg4_dinf_atom(_input: &mut Parser<'_>) -> Result<mpeg4_dinf_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -35015,13 +34992,13 @@ ret
 PResult::Ok(mpeg4_dinf_atom { size_field, r#type, size, data })
 }
 
-/// d#355
+/// d#353
 fn Decoder_mpeg4_stbl_atom(_input: &mut Parser<'_>) -> Result<mpeg4_stbl_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -35124,7 +35101,7 @@ ret
 PResult::Ok(mpeg4_stbl_atom { size_field, r#type, size, data })
 }
 
-/// d#356
+/// d#354
 fn Decoder_mpeg4_stsd_data(_input: &mut Parser<'_>) -> Result<mpeg4_stsd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35143,7 +35120,7 @@ accum
 PResult::Ok(mpeg4_stsd_data { version, flags, entry_count, sample_entries })
 }
 
-/// d#357
+/// d#355
 fn Decoder_mpeg4_stts_data(_input: &mut Parser<'_>) -> Result<mpeg4_stts_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35162,7 +35139,7 @@ accum
 PResult::Ok(mpeg4_stts_data { version, flags, entry_count, sample_entries })
 }
 
-/// d#358
+/// d#356
 fn Decoder_mpeg4_ctts_data(_input: &mut Parser<'_>) -> Result<mpeg4_ctts_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35181,7 +35158,7 @@ accum
 PResult::Ok(mpeg4_ctts_data { version, flags, entry_count, sample_entries })
 }
 
-/// d#359
+/// d#357
 fn Decoder_mpeg4_stss_data(_input: &mut Parser<'_>) -> Result<mpeg4_stss_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35203,7 +35180,7 @@ accum
 PResult::Ok(mpeg4_stss_data { version, flags, entry_count, sample_number })
 }
 
-/// d#360
+/// d#358
 fn Decoder_mpeg4_stsc_data(_input: &mut Parser<'_>) -> Result<mpeg4_stsc_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35236,7 +35213,7 @@ accum
 PResult::Ok(mpeg4_stsc_data { version, flags, entry_count, chunk_entries })
 }
 
-/// d#361
+/// d#359
 fn Decoder_mpeg4_stsz_data(_input: &mut Parser<'_>) -> Result<mpeg4_stsz_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35264,7 +35241,7 @@ None
 PResult::Ok(mpeg4_stsz_data { version, flags, sample_size, sample_count, entry_size })
 }
 
-/// d#362
+/// d#360
 fn Decoder_mpeg4_stco_data(_input: &mut Parser<'_>) -> Result<mpeg4_stco_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35286,7 +35263,7 @@ accum
 PResult::Ok(mpeg4_stco_data { version, flags, entry_count, chunk_offset })
 }
 
-/// d#363
+/// d#361
 fn Decoder_mpeg4_co64_data(_input: &mut Parser<'_>) -> Result<mpeg4_co64_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35308,7 +35285,7 @@ accum
 PResult::Ok(mpeg4_co64_data { version, flags, entry_count, chunk_offset })
 }
 
-/// d#364
+/// d#362
 fn Decoder_mpeg4_sgpd_data(_input: &mut Parser<'_>) -> Result<mpeg4_sgpd_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35355,7 +35332,7 @@ accum
 PResult::Ok(mpeg4_sgpd_data { version, flags, grouping_type, default_length, entry_count, sample_groups })
 }
 
-/// d#365
+/// d#363
 fn Decoder_mpeg4_sbgp_data(_input: &mut Parser<'_>) -> Result<mpeg4_sbgp_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35394,7 +35371,7 @@ accum
 PResult::Ok(mpeg4_sbgp_data { version, flags, grouping_type, grouping_type_parameter, entry_count, sample_groups })
 }
 
-/// d#366
+/// d#364
 fn Decoder_mpeg4_ctts_sample_entry(_input: &mut Parser<'_>) -> Result<mpeg4_ctts_sample_entry, ParseError> {
 let sample_count = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35407,7 +35384,7 @@ u32be(x)
 PResult::Ok(mpeg4_ctts_sample_entry { sample_count, sample_offset })
 }
 
-/// d#367
+/// d#365
 fn Decoder_mpeg4_stts_sample_entry(_input: &mut Parser<'_>) -> Result<mpeg4_stts_sample_entry, ParseError> {
 let sample_count = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35420,13 +35397,13 @@ u32be(x)
 PResult::Ok(mpeg4_stts_sample_entry { sample_count, sample_delta })
 }
 
-/// d#368
+/// d#366
 fn Decoder_mpeg4_dref_data_data(_input: &mut Parser<'_>) -> Result<mpeg4_dref_data_data, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -35474,7 +35451,7 @@ ret
 PResult::Ok(mpeg4_dref_data_data { size_field, r#type, size, data })
 }
 
-/// d#369
+/// d#367
 fn Decoder_mpeg4_dref_data(_input: &mut Parser<'_>) -> Result<mpeg4_dref_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35495,7 +35472,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder370(_input))?;
+let next_elem = (Decoder368(_input))?;
 accum.push(next_elem)
 } else {
 break
@@ -35506,13 +35483,13 @@ accum
 PResult::Ok(mpeg4_dref_data { version, flags, number_of_entries, data })
 }
 
-/// d#370
-fn Decoder370(_input: &mut Parser<'_>) -> Result<mpeg4_dref_data_data, ParseError> {
+/// d#368
+fn Decoder368(_input: &mut Parser<'_>) -> Result<mpeg4_dref_data_data, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -35560,7 +35537,7 @@ ret
 PResult::Ok(mpeg4_dref_data_data { size_field, r#type, size, data })
 }
 
-/// d#371
+/// d#369
 fn Decoder_mpeg4_elst_data(_input: &mut Parser<'_>) -> Result<mpeg4_elst_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35579,7 +35556,7 @@ accum
 PResult::Ok(mpeg4_elst_data { version, flags, number_of_entries, edit_list_table })
 }
 
-/// d#372
+/// d#370
 fn Decoder_mpeg4_elst_data_entry(_input: &mut Parser<'_>) -> Result<mpeg4_elst_data_entry, ParseError> {
 let track_duration = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35596,7 +35573,7 @@ u32be(x)
 PResult::Ok(mpeg4_elst_data_entry { track_duration, media_time, media_rate })
 }
 
-/// d#373
+/// d#371
 fn Decoder_mpeg4_meta_atom_data(_input: &mut Parser<'_>, r#type: (u8, u8, u8, u8)) -> Result<mpeg4_meta_atom_data, ParseError> {
 PResult::Ok(match r#type {
 (100u8, 105u8, 110u8, 102u8) => {
@@ -35726,7 +35703,7 @@ mpeg4_meta_atom_data::unknown(inner)
 })
 }
 
-/// d#374
+/// d#372
 fn Decoder_mpeg4_meta_hdlr_data(_input: &mut Parser<'_>) -> Result<mpeg4_meta_hdlr_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35734,7 +35711,7 @@ let predefined = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let handler_type = (Decoder338(_input))?;
+let handler_type = (Decoder336(_input))?;
 let reserved = {
 let arg0 = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35803,7 +35780,7 @@ chars.clone()
 PResult::Ok(mpeg4_meta_hdlr_data { version, flags, predefined, handler_type, reserved, name })
 }
 
-/// d#375
+/// d#373
 fn Decoder_mpeg4_pitm_atom_data(_input: &mut Parser<'_>) -> Result<mpeg4_pitm_atom_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35827,7 +35804,7 @@ mpeg4_pitm_atom_data_item_ID::Id32(inner)
 PResult::Ok(mpeg4_pitm_atom_data { version, flags, item_ID })
 }
 
-/// d#376
+/// d#374
 fn Decoder_mpeg4_iinf(_input: &mut Parser<'_>) -> Result<mpeg4_iinf, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35856,7 +35833,7 @@ accum
 PResult::Ok(mpeg4_iinf { version, flags, entry_count, item_info_entry })
 }
 
-/// d#377
+/// d#375
 fn Decoder_mpeg4_iref_data(_input: &mut Parser<'_>) -> Result<mpeg4_iref_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -35918,7 +35895,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(mpeg4_iref_data { version, flags, single_item_reference })
 }
 
-/// d#378
+/// d#376
 fn Decoder_mpeg4_iloc_atom_data(_input: &mut Parser<'_>) -> Result<mpeg4_iloc_atom_data, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -36021,13 +35998,13 @@ accum
 PResult::Ok(mpeg4_iloc_atom_data { version, flags, offset_size, length_size, base_offset_size, index_size, item_count, items })
 }
 
-/// d#379
+/// d#377
 fn Decoder_mpeg4_ilst_atom(_input: &mut Parser<'_>) -> Result<mpeg4_ilst_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -36105,13 +36082,13 @@ ret
 PResult::Ok(mpeg4_ilst_atom { size_field, r#type, size, data })
 }
 
-/// d#380
+/// d#378
 fn Decoder_mpeg4_tool_atom(_input: &mut Parser<'_>) -> Result<mpeg4_tool_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -36169,7 +36146,7 @@ ret
 PResult::Ok(mpeg4_tool_atom { size_field, r#type, size, data })
 }
 
-/// d#381
+/// d#379
 fn Decoder_mpeg4_tool_atom_data_data(_input: &mut Parser<'_>) -> Result<mpeg4_tool_atom_data_data, ParseError> {
 let type_indicator = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -36203,7 +36180,7 @@ accum
 PResult::Ok(mpeg4_tool_atom_data_data { type_indicator, locale_indicator, value })
 }
 
-/// d#382
+/// d#380
 fn Decoder_mpeg4_iloc_extent(_input: &mut Parser<'_>, offset_size: u8, length_size: u8, index_size: u8) -> Result<mpeg4_iloc_extent, ParseError> {
 let extent_index = match index_size {
 0u8 => {
@@ -36274,13 +36251,13 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(mpeg4_iloc_extent { extent_index, extent_offset, extent_length })
 }
 
-/// d#383
+/// d#381
 fn Decoder_mpeg4_iref_data_single_item_reference_small(_input: &mut Parser<'_>) -> Result<mpeg4_iref_data_single_item_reference_small, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -36329,13 +36306,13 @@ ret
 PResult::Ok(mpeg4_iref_data_single_item_reference_small { size_field, r#type, size, data })
 }
 
-/// d#384
+/// d#382
 fn Decoder_mpeg4_iref_data_single_item_reference_large(_input: &mut Parser<'_>) -> Result<mpeg4_iref_data_single_item_reference_large, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -36384,13 +36361,13 @@ ret
 PResult::Ok(mpeg4_iref_data_single_item_reference_large { size_field, r#type, size, data })
 }
 
-/// d#385
+/// d#383
 fn Decoder_mpeg4_iinf_atom(_input: &mut Parser<'_>) -> Result<mpeg4_iinf_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder338(_input))?;
+let r#type = (Decoder336(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -36448,7 +36425,7 @@ ret
 PResult::Ok(mpeg4_iinf_atom { size_field, r#type, size, data })
 }
 
-/// d#386
+/// d#384
 fn Decoder_mpeg4_iinf_atom_data_infe(_input: &mut Parser<'_>) -> Result<mpeg4_iinf_atom_data_infe, ParseError> {
 let version = _input.read_byte()?;
 let flags = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -36456,7 +36433,7 @@ let fields = (Decoder_mpeg4_infe_data_fields(_input, version))?;
 PResult::Ok(mpeg4_iinf_atom_data_infe { version, flags, fields })
 }
 
-/// d#387
+/// d#385
 fn Decoder_mpeg4_infe_data_fields(_input: &mut Parser<'_>, version: u8) -> Result<mpeg4_infe_data_fields, ParseError> {
 PResult::Ok(match version < 2u8 {
 true => {
@@ -36471,7 +36448,7 @@ mpeg4_infe_data_fields::Version2(inner)
 })
 }
 
-/// d#388
+/// d#386
 fn Decoder_mpeg4_infe_data_fields_version_lt2(_input: &mut Parser<'_>) -> Result<mpeg4_infe_data_fields_version_lt2, ParseError> {
 let item_ID = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -36634,7 +36611,7 @@ chars.clone()
 PResult::Ok(mpeg4_infe_data_fields_version_lt2 { item_ID, item_protection_index, item_name, content_type, content_encoding })
 }
 
-/// d#389
+/// d#387
 fn Decoder_mpeg4_infe_data_fields_version_gte2(_input: &mut Parser<'_>, version: u8) -> Result<mpeg4_infe_data_fields_version_gte2, ParseError> {
 let item_ID = match version == 2u8 {
 true => {
@@ -36654,7 +36631,7 @@ let item_protection_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-let item_type = (Decoder338(_input))?;
+let item_type = (Decoder336(_input))?;
 let item_name = {
 let chars = {
 let mut accum = Vec::new();
@@ -36709,7 +36686,7 @@ let extra_fields = (Decoder_mpeg4_infe_atom_data_extra_fields(_input, item_type)
 PResult::Ok(mpeg4_infe_data_fields_version_gte2 { item_ID, item_protection_index, item_type, item_name, extra_fields })
 }
 
-/// d#390
+/// d#388
 fn Decoder_mpeg4_infe_atom_data_extra_fields(_input: &mut Parser<'_>, item_type: (u8, u8, u8, u8)) -> Result<mpeg4_infe_atom_data_extra_fields, ParseError> {
 PResult::Ok(match item_type {
 (109u8, 105u8, 109u8, 101u8) => {
@@ -36728,7 +36705,7 @@ mpeg4_infe_atom_data_extra_fields::unknown
 })
 }
 
-/// d#391
+/// d#389
 fn Decoder_mpeg4_infe_atom_data_extra_fields_mime(_input: &mut Parser<'_>) -> Result<mpeg4_infe_atom_data_extra_fields_mime, ParseError> {
 let content_type = {
 let chars = {
@@ -36783,7 +36760,7 @@ chars.clone()
 PResult::Ok(mpeg4_infe_atom_data_extra_fields_mime { content_type })
 }
 
-/// d#392
+/// d#390
 fn Decoder_mpeg4_infe_atom_data_extra_fields_uri(_input: &mut Parser<'_>) -> Result<mpeg4_infe_atom_data_extra_fields_uri, ParseError> {
 let item_uri_type = {
 let chars = {
@@ -36838,7 +36815,7 @@ chars.clone()
 PResult::Ok(mpeg4_infe_atom_data_extra_fields_uri { item_uri_type })
 }
 
-/// d#393
+/// d#391
 fn Decoder_jpeg_soi(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
@@ -36859,7 +36836,7 @@ return Err(ParseError::ExcludedBranch(15032955882314050195u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#394
+/// d#392
 fn Decoder_jpeg_frame(_input: &mut Parser<'_>) -> Result<jpeg_frame, ParseError> {
 let initial_segment = (Decoder_jpeg_frame_initial_segment(_input))?;
 let segments = {
@@ -37270,7 +37247,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder401(_input))?;
+let next_elem = (Decoder399(_input))?;
 accum.push(next_elem)
 } else {
 break
@@ -37281,8 +37258,8 @@ accum
 PResult::Ok(jpeg_frame { initial_segment, segments, header, scan, dnl, scans })
 }
 
-/// d#395
-fn Decoder395(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#393
+fn Decoder393(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -37302,7 +37279,7 @@ return Err(ParseError::ExcludedBranch(5117297982688264891u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#396
+/// d#394
 fn Decoder_jpeg_frame_initial_segment(_input: &mut Parser<'_>) -> Result<jpeg_frame_initial_segment, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -37346,7 +37323,7 @@ return Err(ParseError::ExcludedBranch(13162270726566423196u64));
 })
 }
 
-/// d#397
+/// d#395
 fn Decoder_jpeg_table_or_misc(_input: &mut Parser<'_>) -> Result<jpeg_table_or_misc, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -37486,72 +37463,72 @@ jpeg_table_or_misc::app2(inner)
 },
 
 7 => {
-let inner = (Decoder442(_input))?;
+let inner = (Decoder440(_input))?;
 jpeg_table_or_misc::app3(inner)
 },
 
 8 => {
-let inner = (Decoder443(_input))?;
+let inner = (Decoder441(_input))?;
 jpeg_table_or_misc::app4(inner)
 },
 
 9 => {
-let inner = (Decoder444(_input))?;
+let inner = (Decoder442(_input))?;
 jpeg_table_or_misc::app5(inner)
 },
 
 10 => {
-let inner = (Decoder445(_input))?;
+let inner = (Decoder443(_input))?;
 jpeg_table_or_misc::app6(inner)
 },
 
 11 => {
-let inner = (Decoder446(_input))?;
+let inner = (Decoder444(_input))?;
 jpeg_table_or_misc::app7(inner)
 },
 
 12 => {
-let inner = (Decoder447(_input))?;
+let inner = (Decoder445(_input))?;
 jpeg_table_or_misc::app8(inner)
 },
 
 13 => {
-let inner = (Decoder448(_input))?;
+let inner = (Decoder446(_input))?;
 jpeg_table_or_misc::app9(inner)
 },
 
 14 => {
-let inner = (Decoder449(_input))?;
+let inner = (Decoder447(_input))?;
 jpeg_table_or_misc::app10(inner)
 },
 
 15 => {
-let inner = (Decoder450(_input))?;
+let inner = (Decoder448(_input))?;
 jpeg_table_or_misc::app11(inner)
 },
 
 16 => {
-let inner = (Decoder451(_input))?;
+let inner = (Decoder449(_input))?;
 jpeg_table_or_misc::app12(inner)
 },
 
 17 => {
-let inner = (Decoder452(_input))?;
+let inner = (Decoder450(_input))?;
 jpeg_table_or_misc::app13(inner)
 },
 
 18 => {
-let inner = (Decoder453(_input))?;
+let inner = (Decoder451(_input))?;
 jpeg_table_or_misc::app14(inner)
 },
 
 19 => {
-let inner = (Decoder454(_input))?;
+let inner = (Decoder452(_input))?;
 jpeg_table_or_misc::app15(inner)
 },
 
 20 => {
-let inner = (Decoder455(_input))?;
+let inner = (Decoder453(_input))?;
 jpeg_table_or_misc::com(inner)
 },
 
@@ -37561,7 +37538,7 @@ return Err(ParseError::ExcludedBranch(4005260763079064488u64));
 })
 }
 
-/// d#398
+/// d#396
 fn Decoder_jpeg_frame_header(_input: &mut Parser<'_>) -> Result<jpeg_frame_header, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -37639,62 +37616,62 @@ jpeg_frame_header::sof0(inner)
 },
 
 1 => {
-let inner = (Decoder421(_input))?;
+let inner = (Decoder419(_input))?;
 jpeg_frame_header::sof1(inner)
 },
 
 2 => {
-let inner = (Decoder422(_input))?;
+let inner = (Decoder420(_input))?;
 jpeg_frame_header::sof2(inner)
 },
 
 3 => {
-let inner = (Decoder423(_input))?;
+let inner = (Decoder421(_input))?;
 jpeg_frame_header::sof3(inner)
 },
 
 4 => {
-let inner = (Decoder424(_input))?;
+let inner = (Decoder422(_input))?;
 jpeg_frame_header::sof5(inner)
 },
 
 5 => {
-let inner = (Decoder425(_input))?;
+let inner = (Decoder423(_input))?;
 jpeg_frame_header::sof6(inner)
 },
 
 6 => {
-let inner = (Decoder426(_input))?;
+let inner = (Decoder424(_input))?;
 jpeg_frame_header::sof7(inner)
 },
 
 7 => {
-let inner = (Decoder427(_input))?;
+let inner = (Decoder425(_input))?;
 jpeg_frame_header::sof9(inner)
 },
 
 8 => {
-let inner = (Decoder428(_input))?;
+let inner = (Decoder426(_input))?;
 jpeg_frame_header::sof10(inner)
 },
 
 9 => {
-let inner = (Decoder429(_input))?;
+let inner = (Decoder427(_input))?;
 jpeg_frame_header::sof11(inner)
 },
 
 10 => {
-let inner = (Decoder430(_input))?;
+let inner = (Decoder428(_input))?;
 jpeg_frame_header::sof13(inner)
 },
 
 11 => {
-let inner = (Decoder431(_input))?;
+let inner = (Decoder429(_input))?;
 jpeg_frame_header::sof14(inner)
 },
 
 12 => {
-let inner = (Decoder432(_input))?;
+let inner = (Decoder430(_input))?;
 jpeg_frame_header::sof15(inner)
 },
 
@@ -37704,7 +37681,7 @@ return Err(ParseError::ExcludedBranch(5019692195244899787u64));
 })
 }
 
-/// d#399
+/// d#397
 fn Decoder_jpeg_scan(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
 let segments = {
 let mut accum = Vec::new();
@@ -37824,11 +37801,11 @@ break
 accum
 };
 let sos = (Decoder_jpeg_sos(_input))?;
-let data = (Decoder419(_input))?;
+let data = (Decoder417(_input))?;
 PResult::Ok(jpeg_scan { segments, sos, data })
 }
 
-/// d#400
+/// d#398
 fn Decoder_jpeg_dnl(_input: &mut Parser<'_>) -> Result<jpeg_dnl, ParseError> {
 let marker = {
 {
@@ -37863,8 +37840,8 @@ ret
 PResult::Ok(jpeg_dnl { marker, length, data })
 }
 
-/// d#401
-fn Decoder401(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
+/// d#399
+fn Decoder399(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
 let segments = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -37987,7 +37964,7 @@ let data = (Decoder_jpeg_scan_data(_input))?;
 PResult::Ok(jpeg_scan { segments, sos, data })
 }
 
-/// d#402
+/// d#400
 fn Decoder_jpeg_sos(_input: &mut Parser<'_>) -> Result<jpeg_sos, ParseError> {
 let marker = {
 {
@@ -38022,7 +37999,7 @@ ret
 PResult::Ok(jpeg_sos { marker, length, data })
 }
 
-/// d#403
+/// d#401
 fn Decoder_jpeg_scan_data(_input: &mut Parser<'_>) -> Result<jpeg_scan_data, ParseError> {
 let scan_data = {
 let mut accum = Vec::new();
@@ -38228,7 +38205,7 @@ jpeg_scan_data_entropy_coded_segment::rst7(..) => {
 PResult::Ok(jpeg_scan_data { scan_data, scan_data_stream })
 }
 
-/// d#404
+/// d#402
 fn Decoder_jpeg_scan_data_entropy_coded_segment(_input: &mut Parser<'_>) -> Result<jpeg_scan_data_entropy_coded_segment, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -38292,47 +38269,47 @@ ret
 };
 PResult::Ok(match tree_index {
 0 => {
-let inner = (Decoder405(_input))?;
+let inner = (Decoder403(_input))?;
 jpeg_scan_data_entropy_coded_segment::mcu(inner)
 },
 
 1 => {
-let inner = (Decoder406(_input))?;
+let inner = (Decoder404(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst0(inner)
 },
 
 2 => {
-let inner = (Decoder407(_input))?;
+let inner = (Decoder405(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst1(inner)
 },
 
 3 => {
-let inner = (Decoder408(_input))?;
+let inner = (Decoder406(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst2(inner)
 },
 
 4 => {
-let inner = (Decoder409(_input))?;
+let inner = (Decoder407(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst3(inner)
 },
 
 5 => {
-let inner = (Decoder410(_input))?;
+let inner = (Decoder408(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst4(inner)
 },
 
 6 => {
-let inner = (Decoder411(_input))?;
+let inner = (Decoder409(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst5(inner)
 },
 
 7 => {
-let inner = (Decoder412(_input))?;
+let inner = (Decoder410(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst6(inner)
 },
 
 8 => {
-let inner = (Decoder413(_input))?;
+let inner = (Decoder411(_input))?;
 jpeg_scan_data_entropy_coded_segment::rst7(inner)
 },
 
@@ -38342,8 +38319,8 @@ return Err(ParseError::ExcludedBranch(13677998342346693652u64));
 })
 }
 
-/// d#405
-fn Decoder405(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#403
+fn Decoder403(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -38403,8 +38380,8 @@ return Err(ParseError::ExcludedBranch(12955185663715491460u64));
 })
 }
 
-/// d#406
-fn Decoder406(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#404
+fn Decoder404(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38424,8 +38401,8 @@ return Err(ParseError::ExcludedBranch(4825757476091239776u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#407
-fn Decoder407(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#405
+fn Decoder405(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38445,8 +38422,8 @@ return Err(ParseError::ExcludedBranch(12525311251009778949u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#408
-fn Decoder408(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#406
+fn Decoder406(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38466,8 +38443,8 @@ return Err(ParseError::ExcludedBranch(2007599397777734421u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#409
-fn Decoder409(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#407
+fn Decoder407(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38487,8 +38464,8 @@ return Err(ParseError::ExcludedBranch(180881308211696508u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#410
-fn Decoder410(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#408
+fn Decoder408(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38508,8 +38485,8 @@ return Err(ParseError::ExcludedBranch(6110942357212830202u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#411
-fn Decoder411(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#409
+fn Decoder409(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38529,8 +38506,8 @@ return Err(ParseError::ExcludedBranch(16339654162669176472u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#412
-fn Decoder412(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#410
+fn Decoder410(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38550,8 +38527,8 @@ return Err(ParseError::ExcludedBranch(17004441093219507547u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#413
-fn Decoder413(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
+/// d#411
+fn Decoder411(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -38571,7 +38548,7 @@ return Err(ParseError::ExcludedBranch(360138127928998237u64));
 PResult::Ok(jpeg_soi { marker })
 }
 
-/// d#414
+/// d#412
 fn Decoder_jpeg_sos_data(_input: &mut Parser<'_>) -> Result<jpeg_sos_data, ParseError> {
 let num_image_components = {
 let inner = _input.read_byte()?;
@@ -38621,14 +38598,14 @@ let approximation_bit_position = (Decoder_jpeg_sos_data_approximation_bit_positi
 PResult::Ok(jpeg_sos_data { num_image_components, image_components, start_spectral_selection, end_spectral_selection, approximation_bit_position })
 }
 
-/// d#415
+/// d#413
 fn Decoder_jpeg_sos_image_component(_input: &mut Parser<'_>) -> Result<jpeg_sos_image_component, ParseError> {
 let component_selector = _input.read_byte()?;
 let entropy_coding_table_ids = (Decoder_jpeg_sos_image_component_entropy_coding_table_ids(_input))?;
 PResult::Ok(jpeg_sos_image_component { component_selector, entropy_coding_table_ids })
 }
 
-/// d#416
+/// d#414
 fn Decoder_jpeg_sos_data_approximation_bit_position(_input: &mut Parser<'_>) -> Result<jpeg_sos_data_approximation_bit_position, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let high = _packed_bits >> 4u8 & 15u8;
@@ -38636,7 +38613,7 @@ let low = _packed_bits & 15u8;
 PResult::Ok(jpeg_sos_data_approximation_bit_position { high, low })
 }
 
-/// d#417
+/// d#415
 fn Decoder_jpeg_sos_image_component_entropy_coding_table_ids(_input: &mut Parser<'_>) -> Result<jpeg_sos_image_component_entropy_coding_table_ids, ParseError> {
 let inner = {
 let _packed_bits = _input.read_byte()?;
@@ -38655,7 +38632,7 @@ return Err(ParseError::FalsifiedWhere(7546547171508918509u64));
 })
 }
 
-/// d#418
+/// d#416
 fn Decoder_jpeg_dnl_data(_input: &mut Parser<'_>) -> Result<jpeg_dnl_data, ParseError> {
 let num_lines = {
 let inner = {
@@ -38675,8 +38652,8 @@ return Err(ParseError::FalsifiedWhere(14304129837244038526u64));
 PResult::Ok(jpeg_dnl_data { num_lines })
 }
 
-/// d#419
-fn Decoder419(_input: &mut Parser<'_>) -> Result<jpeg_scan_data, ParseError> {
+/// d#417
+fn Decoder417(_input: &mut Parser<'_>) -> Result<jpeg_scan_data, ParseError> {
 let scan_data = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -38885,7 +38862,7 @@ jpeg_scan_data_entropy_coded_segment::rst7(..) => {
 PResult::Ok(jpeg_scan_data { scan_data, scan_data_stream })
 }
 
-/// d#420
+/// d#418
 fn Decoder_jpeg_sof0(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
@@ -38920,8 +38897,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#421
-fn Decoder421(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#419
+fn Decoder419(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -38955,8 +38932,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#422
-fn Decoder422(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#420
+fn Decoder420(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -38990,8 +38967,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#423
-fn Decoder423(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#421
+fn Decoder421(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39025,8 +39002,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#424
-fn Decoder424(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#422
+fn Decoder422(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39060,8 +39037,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#425
-fn Decoder425(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#423
+fn Decoder423(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39095,8 +39072,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#426
-fn Decoder426(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#424
+fn Decoder424(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39130,8 +39107,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#427
-fn Decoder427(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#425
+fn Decoder425(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39165,8 +39142,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#428
-fn Decoder428(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#426
+fn Decoder426(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39200,8 +39177,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#429
-fn Decoder429(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#427
+fn Decoder427(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39235,8 +39212,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#430
-fn Decoder430(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#428
+fn Decoder428(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39270,8 +39247,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#431
-fn Decoder431(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#429
+fn Decoder429(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39305,8 +39282,8 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#432
-fn Decoder432(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#430
+fn Decoder430(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39340,7 +39317,7 @@ ret
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#433
+/// d#431
 fn Decoder_jpeg_sof_data(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
 let sample_precision = {
 let inner = _input.read_byte()?;
@@ -39396,7 +39373,7 @@ accum
 PResult::Ok(jpeg_sof_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-/// d#434
+/// d#432
 fn Decoder_jpeg_sof_image_component(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = {
@@ -39420,7 +39397,7 @@ return Err(ParseError::FalsifiedWhere(7779176190297216638u64));
 PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
 
-/// d#435
+/// d#433
 fn Decoder_jpeg_dqt(_input: &mut Parser<'_>) -> Result<jpeg_dqt, ParseError> {
 let marker = {
 {
@@ -39479,7 +39456,7 @@ ret
 PResult::Ok(jpeg_dqt { marker, length, data })
 }
 
-/// d#436
+/// d#434
 fn Decoder_jpeg_dht(_input: &mut Parser<'_>) -> Result<jpeg_dht, ParseError> {
 let marker = {
 {
@@ -39514,7 +39491,7 @@ ret
 PResult::Ok(jpeg_dht { marker, length, data })
 }
 
-/// d#437
+/// d#435
 fn Decoder_jpeg_dac(_input: &mut Parser<'_>) -> Result<jpeg_dac, ParseError> {
 let marker = {
 {
@@ -39549,7 +39526,7 @@ ret
 PResult::Ok(jpeg_dac { marker, length, data })
 }
 
-/// d#438
+/// d#436
 fn Decoder_jpeg_dri(_input: &mut Parser<'_>) -> Result<jpeg_dri, ParseError> {
 let marker = {
 {
@@ -39584,7 +39561,7 @@ ret
 PResult::Ok(jpeg_dri { marker, length, data })
 }
 
-/// d#439
+/// d#437
 fn Decoder_jpeg_app0(_input: &mut Parser<'_>) -> Result<jpeg_app0, ParseError> {
 let marker = {
 {
@@ -39619,7 +39596,7 @@ ret
 PResult::Ok(jpeg_app0 { marker, length, data })
 }
 
-/// d#440
+/// d#438
 fn Decoder_jpeg_app1(_input: &mut Parser<'_>) -> Result<jpeg_app1, ParseError> {
 let marker = {
 {
@@ -39654,7 +39631,7 @@ ret
 PResult::Ok(jpeg_app1 { marker, length, data })
 }
 
-/// d#441
+/// d#439
 fn Decoder_jpeg_app2(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
@@ -39709,8 +39686,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#442
-fn Decoder442(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#440
+fn Decoder440(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39764,8 +39741,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#443
-fn Decoder443(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#441
+fn Decoder441(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39819,8 +39796,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#444
-fn Decoder444(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#442
+fn Decoder442(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39874,8 +39851,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#445
-fn Decoder445(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#443
+fn Decoder443(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39929,8 +39906,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#446
-fn Decoder446(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#444
+fn Decoder444(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -39984,8 +39961,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#447
-fn Decoder447(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#445
+fn Decoder445(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40039,8 +40016,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#448
-fn Decoder448(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#446
+fn Decoder446(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40094,8 +40071,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#449
-fn Decoder449(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#447
+fn Decoder447(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40149,8 +40126,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#450
-fn Decoder450(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#448
+fn Decoder448(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40204,8 +40181,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#451
-fn Decoder451(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#449
+fn Decoder449(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40259,8 +40236,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#452
-fn Decoder452(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#450
+fn Decoder450(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40314,8 +40291,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#453
-fn Decoder453(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#451
+fn Decoder451(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40369,8 +40346,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#454
-fn Decoder454(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#452
+fn Decoder452(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40424,8 +40401,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#455
-fn Decoder455(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#453
+fn Decoder453(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -40479,7 +40456,7 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#456
+/// d#454
 fn Decoder_jpeg_app1_data(_input: &mut Parser<'_>) -> Result<jpeg_app1_data, ParseError> {
 let identifier = {
 let chars = {
@@ -40535,7 +40512,7 @@ let data = (Decoder_jpeg_app1_data_data(_input, &identifier))?;
 PResult::Ok(jpeg_app1_data { identifier, data })
 }
 
-/// d#457
+/// d#455
 fn Decoder_jpeg_app1_data_data(_input: &mut Parser<'_>, identifier: &[u8]) -> Result<jpeg_app1_data_data, ParseError> {
 PResult::Ok(match slice_all(&identifier) {
 [69u8, 120u8, 105u8, 102u8] => {
@@ -40575,7 +40552,7 @@ jpeg_app1_data_data::other(inner)
 })
 }
 
-/// d#458
+/// d#456
 fn Decoder_jpeg_app1_exif(_input: &mut Parser<'_>) -> Result<jpeg_app1_exif, ParseError> {
 let padding = {
 let b = _input.read_byte()?;
@@ -40589,7 +40566,7 @@ let exif = (Decoder_tiff_main(_input))?;
 PResult::Ok(jpeg_app1_exif { padding, exif })
 }
 
-/// d#459
+/// d#457
 fn Decoder_jpeg_app1_xmp(_input: &mut Parser<'_>) -> Result<jpeg_app1_xmp, ParseError> {
 let xmp = {
 let mut accum = Vec::new();
@@ -40615,7 +40592,7 @@ accum
 PResult::Ok(jpeg_app1_xmp { xmp })
 }
 
-/// d#460
+/// d#458
 fn Decoder_jpeg_app0_data(_input: &mut Parser<'_>) -> Result<jpeg_app0_data, ParseError> {
 let identifier = {
 let chars = {
@@ -40671,7 +40648,7 @@ let data = (Decoder_jpeg_app0_data_data(_input, &identifier))?;
 PResult::Ok(jpeg_app0_data { identifier, data })
 }
 
-/// d#461
+/// d#459
 fn Decoder_jpeg_app0_data_data(_input: &mut Parser<'_>, identifier: &[u8]) -> Result<jpeg_app0_data_data, ParseError> {
 PResult::Ok(match slice_all(&identifier) {
 [74u8, 70u8, 73u8, 70u8] => {
@@ -40706,7 +40683,7 @@ jpeg_app0_data_data::other(inner)
 })
 }
 
-/// d#462
+/// d#460
 fn Decoder_jpeg_app0_jfif(_input: &mut Parser<'_>) -> Result<jpeg_app0_jfif, ParseError> {
 let version_major = _input.read_byte()?;
 let version_minor = _input.read_byte()?;
@@ -40772,7 +40749,7 @@ accum
 PResult::Ok(jpeg_app0_jfif { version_major, version_minor, density_units, density_x, density_y, thumbnail_width, thumbnail_height, thumbnail_pixels })
 }
 
-/// d#463
+/// d#461
 fn Decoder_gif_color_table_entry(_input: &mut Parser<'_>) -> Result<gif_color_table_entry, ParseError> {
 let r = _input.read_byte()?;
 let g = _input.read_byte()?;
@@ -40780,7 +40757,7 @@ let b = _input.read_byte()?;
 PResult::Ok(gif_color_table_entry { r, g, b })
 }
 
-/// d#464
+/// d#462
 fn Decoder_jpeg_dri_data(_input: &mut Parser<'_>) -> Result<jpeg_dri_data, ParseError> {
 let restart_interval = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -40789,14 +40766,14 @@ u16be(x)
 PResult::Ok(jpeg_dri_data { restart_interval })
 }
 
-/// d#465
+/// d#463
 fn Decoder_jpeg_dac_data(_input: &mut Parser<'_>) -> Result<jpeg_dac_data, ParseError> {
 let class_table_id = (Decoder_jpeg_class_table_id(_input))?;
 let value = _input.read_byte()?;
 PResult::Ok(jpeg_dac_data { class_table_id, value })
 }
 
-/// d#466
+/// d#464
 fn Decoder_jpeg_class_table_id(_input: &mut Parser<'_>) -> Result<jpeg_class_table_id, ParseError> {
 let inner = {
 let _packed_bits = _input.read_byte()?;
@@ -40815,7 +40792,7 @@ return Err(ParseError::FalsifiedWhere(6789861264798225044u64));
 })
 }
 
-/// d#467
+/// d#465
 fn Decoder_jpeg_dht_data(_input: &mut Parser<'_>) -> Result<jpeg_dht_data, ParseError> {
 let class_table_id = (Decoder_jpeg_class_table_id(_input))?;
 let num_codes = {
@@ -40844,14 +40821,14 @@ accum
 PResult::Ok(jpeg_dht_data { class_table_id, num_codes, values })
 }
 
-/// d#468
+/// d#466
 fn Decoder_jpeg_dqt_data(_input: &mut Parser<'_>) -> Result<jpeg_dqt_data, ParseError> {
 let precision_table_id = (Decoder_jpeg_precision_table_id(_input))?;
 let elements = (Decoder_jpeg_dqt_data_elements(_input, precision_table_id.precision))?;
 PResult::Ok(jpeg_dqt_data { precision_table_id, elements })
 }
 
-/// d#469
+/// d#467
 fn Decoder_jpeg_precision_table_id(_input: &mut Parser<'_>) -> Result<jpeg_precision_table_id, ParseError> {
 let inner = {
 let _packed_bits = _input.read_byte()?;
@@ -40870,7 +40847,7 @@ return Err(ParseError::FalsifiedWhere(2250992723793132616u64));
 })
 }
 
-/// d#470
+/// d#468
 fn Decoder_jpeg_dqt_data_elements(_input: &mut Parser<'_>, precision: u8) -> Result<jpeg_dqt_data_elements, ParseError> {
 PResult::Ok(match precision {
 0u8 => {
@@ -40906,8 +40883,8 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#471
-fn Decoder471(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#469
+fn Decoder469(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -40958,8 +40935,8 @@ return Err(ParseError::ExcludedBranch(12914822120096438372u64));
 PResult::Ok(chars.clone())
 }
 
-/// d#472
-fn Decoder472(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
+/// d#470
+fn Decoder470(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
 let comment = {
 let chars = {
 let mut accum = Vec::new();
@@ -41013,8 +40990,8 @@ chars.clone()
 PResult::Ok(gzip_fcomment { comment })
 }
 
-/// d#473
-fn Decoder473(_input: &mut Parser<'_>) -> Result<Vec<gzip_main>, ParseError> {
+/// d#471
+fn Decoder471(_input: &mut Parser<'_>) -> Result<Vec<gzip_main>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -41045,12 +41022,12 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 };
 let fname = if header.file_flags.fname {
-Some((Decoder475(_input))?)
+Some((Decoder473(_input))?)
 } else {
 None
 };
 let fcomment = if header.file_flags.fcomment {
-Some((Decoder476(_input))?)
+Some((Decoder474(_input))?)
 } else {
 None
 };
@@ -41074,8 +41051,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#474
-fn Decoder474(_input: &mut Parser<'_>) -> Result<tar_main, ParseError> {
+/// d#472
+fn Decoder472(_input: &mut Parser<'_>) -> Result<tar_main, ParseError> {
 let contents = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -41162,8 +41139,8 @@ accum
 PResult::Ok(tar_main { contents })
 }
 
-/// d#475
-fn Decoder475(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#473
+fn Decoder473(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -41214,8 +41191,8 @@ return Err(ParseError::ExcludedBranch(7180361712816552798u64));
 PResult::Ok(chars.clone())
 }
 
-/// d#476
-fn Decoder476(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
+/// d#474
+fn Decoder474(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
 let comment = {
 let chars = {
 let mut accum = Vec::new();
@@ -41269,7 +41246,7 @@ chars.clone()
 PResult::Ok(gzip_fcomment { comment })
 }
 
-/// d#477
+/// d#475
 fn Decoder_gif_header(_input: &mut Parser<'_>) -> Result<gif_header, ParseError> {
 let signature = {
 let arg0 = {
@@ -41302,13 +41279,13 @@ let version = vec![_input.read_byte()?, _input.read_byte()?, _input.read_byte()?
 PResult::Ok(gif_header { signature, version })
 }
 
-/// d#478
+/// d#476
 fn Decoder_gif_logical_screen(_input: &mut Parser<'_>) -> Result<gif_logical_screen, ParseError> {
 let descriptor = (Decoder_gif_logical_screen_descriptor(_input))?;
 let global_color_table = if descriptor.flags.table_flag {
 let mut accum = Vec::new();
 for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
-let next_elem = (Decoder492(_input))?;
+let next_elem = (Decoder490(_input))?;
 accum.push(next_elem)
 };
 Some(accum)
@@ -41318,7 +41295,7 @@ None
 PResult::Ok(gif_logical_screen { descriptor, global_color_table })
 }
 
-/// d#479
+/// d#477
 fn Decoder_gif_block(_input: &mut Parser<'_>) -> Result<gif_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -41377,7 +41354,7 @@ return Err(ParseError::ExcludedBranch(783530747334100044u64));
 })
 }
 
-/// d#480
+/// d#478
 fn Decoder_gif_trailer(_input: &mut Parser<'_>) -> Result<gif_trailer, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
@@ -41390,7 +41367,7 @@ return Err(ParseError::ExcludedBranch(10986984519025233593u64));
 PResult::Ok(gif_trailer { separator })
 }
 
-/// d#481
+/// d#479
 fn Decoder_gif_graphic_block(_input: &mut Parser<'_>) -> Result<gif_graphic_block, ParseError> {
 let graphic_control_extension = {
 let tree_index = {
@@ -41443,7 +41420,7 @@ let graphic_rendering_block = (Decoder_gif_graphic_rendering_block(_input))?;
 PResult::Ok(gif_graphic_block { graphic_control_extension, graphic_rendering_block })
 }
 
-/// d#482
+/// d#480
 fn Decoder_gif_special_purpose_block(_input: &mut Parser<'_>) -> Result<gif_special_purpose_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -41487,7 +41464,7 @@ return Err(ParseError::ExcludedBranch(10796441316268123402u64));
 })
 }
 
-/// d#483
+/// d#481
 fn Decoder_gif_application_extension(_input: &mut Parser<'_>) -> Result<gif_application_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
@@ -41554,11 +41531,11 @@ break
 };
 accum
 };
-let terminator = (Decoder486(_input))?;
+let terminator = (Decoder484(_input))?;
 PResult::Ok(gif_application_extension { separator, label, block_size, identifier, authentication_code, application_data, terminator })
 }
 
-/// d#484
+/// d#482
 fn Decoder_gif_comment_extension(_input: &mut Parser<'_>) -> Result<gif_comment_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
@@ -41608,11 +41585,11 @@ break
 };
 accum
 };
-let terminator = (Decoder486(_input))?;
+let terminator = (Decoder484(_input))?;
 PResult::Ok(gif_comment_extension { separator, label, comment_data, terminator })
 }
 
-/// d#485
+/// d#483
 fn Decoder_gif_subblock(_input: &mut Parser<'_>) -> Result<gif_subblock, ParseError> {
 let len_bytes = {
 let b = _input.read_byte()?;
@@ -41633,8 +41610,8 @@ accum
 PResult::Ok(gif_subblock { len_bytes, data })
 }
 
-/// d#486
-fn Decoder486(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#484
+fn Decoder484(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if b == 0 {
 b
@@ -41643,7 +41620,7 @@ return Err(ParseError::ExcludedBranch(12018148152002987023u64));
 })
 }
 
-/// d#487
+/// d#485
 fn Decoder_gif_graphic_control_extension(_input: &mut Parser<'_>) -> Result<gif_graphic_control_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
@@ -41675,11 +41652,11 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16le(x)
 };
 let transparent_color_index = _input.read_byte()?;
-let terminator = (Decoder486(_input))?;
+let terminator = (Decoder484(_input))?;
 PResult::Ok(gif_graphic_control_extension { separator, label, block_size, flags, delay_time, transparent_color_index, terminator })
 }
 
-/// d#488
+/// d#486
 fn Decoder_gif_graphic_rendering_block(_input: &mut Parser<'_>) -> Result<gif_graphic_rendering_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -41718,13 +41695,13 @@ return Err(ParseError::ExcludedBranch(11138532932579103751u64));
 })
 }
 
-/// d#489
+/// d#487
 fn Decoder_gif_table_based_image(_input: &mut Parser<'_>) -> Result<gif_table_based_image, ParseError> {
 let descriptor = (Decoder_gif_image_descriptor(_input))?;
 let local_color_table = if descriptor.flags.table_flag {
 let mut accum = Vec::new();
 for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
-let next_elem = (Decoder492(_input))?;
+let next_elem = (Decoder490(_input))?;
 accum.push(next_elem)
 };
 Some(accum)
@@ -41735,7 +41712,7 @@ let data = (Decoder_gif_table_based_image_data(_input))?;
 PResult::Ok(gif_table_based_image { descriptor, local_color_table, data })
 }
 
-/// d#490
+/// d#488
 fn Decoder_gif_plain_text_extension(_input: &mut Parser<'_>) -> Result<gif_plain_text_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
@@ -41813,11 +41790,11 @@ break
 };
 accum
 };
-let terminator = (Decoder486(_input))?;
+let terminator = (Decoder484(_input))?;
 PResult::Ok(gif_plain_text_extension { separator, label, block_size, text_grid_left_position, text_grid_top_position, text_grid_width, text_grid_height, character_cell_width, character_cell_height, text_foreground_color_index, text_background_color_index, plain_text_data, terminator })
 }
 
-/// d#491
+/// d#489
 fn Decoder_gif_image_descriptor(_input: &mut Parser<'_>) -> Result<gif_image_descriptor, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
@@ -41847,15 +41824,15 @@ let flags = (Decoder_gif_image_descriptor_flags(_input))?;
 PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
 
-/// d#492
-fn Decoder492(_input: &mut Parser<'_>) -> Result<gif_color_table_entry, ParseError> {
+/// d#490
+fn Decoder490(_input: &mut Parser<'_>) -> Result<gif_color_table_entry, ParseError> {
 let r = _input.read_byte()?;
 let g = _input.read_byte()?;
 let b = _input.read_byte()?;
 PResult::Ok(gif_color_table_entry { r, g, b })
 }
 
-/// d#493
+/// d#491
 fn Decoder_gif_table_based_image_data(_input: &mut Parser<'_>) -> Result<gif_table_based_image_data, ParseError> {
 let lzw_min_code_size = _input.read_byte()?;
 let image_data = {
@@ -41890,11 +41867,11 @@ break
 };
 accum
 };
-let terminator = (Decoder486(_input))?;
+let terminator = (Decoder484(_input))?;
 PResult::Ok(gif_table_based_image_data { lzw_min_code_size, image_data, terminator })
 }
 
-/// d#494
+/// d#492
 fn Decoder_gif_image_descriptor_flags(_input: &mut Parser<'_>) -> Result<gif_image_descriptor_flags, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let table_flag = _packed_bits >> 7u8 & 1u8 > 0u8;
@@ -41904,7 +41881,7 @@ let table_size = _packed_bits & 7u8;
 PResult::Ok(gif_image_descriptor_flags { table_flag, interlace_flag, sort_flag, table_size })
 }
 
-/// d#495
+/// d#493
 fn Decoder_gif_graphic_control_extension_flags(_input: &mut Parser<'_>) -> Result<gif_graphic_control_extension_flags, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let disposal_method = _packed_bits >> 2u8 & 7u8;
@@ -41913,7 +41890,7 @@ let transparent_color_flag = _packed_bits & 1u8 > 0u8;
 PResult::Ok(gif_graphic_control_extension_flags { disposal_method, user_input_flag, transparent_color_flag })
 }
 
-/// d#496
+/// d#494
 fn Decoder_gif_logical_screen_descriptor(_input: &mut Parser<'_>) -> Result<gif_logical_screen_descriptor, ParseError> {
 let screen_width = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -41929,7 +41906,7 @@ let pixel_aspect_ratio = _input.read_byte()?;
 PResult::Ok(gif_logical_screen_descriptor { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
 }
 
-/// d#497
+/// d#495
 fn Decoder_gif_logical_screen_descriptor_flags(_input: &mut Parser<'_>) -> Result<gif_logical_screen_descriptor_flags, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let table_flag = _packed_bits >> 7u8 & 1u8 > 0u8;
@@ -41939,8 +41916,8 @@ let table_size = _packed_bits & 7u8;
 PResult::Ok(gif_logical_screen_descriptor_flags { table_flag, color_resolution, sort_flag, table_size })
 }
 
-/// d#498
-fn Decoder498(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
+/// d#496
+fn Decoder496(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
 let tuple_var = {
 let arg0 = {
 let mut accum = Vec::new();
@@ -42093,7 +42070,7 @@ let (s, _z) = tuple_var;
 })
 }
 
-/// d#499
+/// d#497
 fn Decoder_jpeg_dhp_image_component_sampling_factor(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component_sampling_factor, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let horizontal = _packed_bits >> 4u8 & 15u8;
@@ -42101,10 +42078,10 @@ let vertical = _packed_bits & 15u8;
 PResult::Ok(jpeg_dhp_image_component_sampling_factor { horizontal, vertical })
 }
 
-/// d#500
-fn Decoder500(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
+/// d#498
+fn Decoder498(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
 let id = _input.read_byte()?;
-let sampling_factor = (Decoder501(_input))?;
+let sampling_factor = (Decoder499(_input))?;
 let quantization_table_id = {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -42116,16 +42093,16 @@ return Err(ParseError::ExcludedBranch(14247107068446105269u64));
 PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
 
-/// d#501
-fn Decoder501(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component_sampling_factor, ParseError> {
+/// d#499
+fn Decoder499(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component_sampling_factor, ParseError> {
 let _packed_bits = _input.read_byte()?;
 let horizontal = _packed_bits >> 4u8 & 15u8;
 let vertical = _packed_bits & 15u8;
 PResult::Ok(jpeg_dhp_image_component_sampling_factor { horizontal, vertical })
 }
 
-/// d#502
-fn Decoder502(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
+/// d#500
+fn Decoder500(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
 let sample_precision = _input.read_byte()?;
 let num_lines = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -42161,7 +42138,7 @@ return Err(ParseError::FalsifiedWhere(12564492979960735543u64));
 let image_components = {
 let mut accum = Vec::new();
 for _ in 0..num_image_components {
-let next_elem = (Decoder503(_input))?;
+let next_elem = (Decoder501(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -42169,10 +42146,10 @@ accum
 PResult::Ok(jpeg_sof_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-/// d#503
-fn Decoder503(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
+/// d#501
+fn Decoder501(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
 let id = _input.read_byte()?;
-let sampling_factor = (Decoder501(_input))?;
+let sampling_factor = (Decoder499(_input))?;
 let quantization_table_id = {
 let b = _input.read_byte()?;
 if b == 0 {
@@ -42184,7 +42161,7 @@ return Err(ParseError::ExcludedBranch(2458638837424585123u64));
 PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
 
-/// d#504
+/// d#502
 fn Decoder_jpeg_exp_data(_input: &mut Parser<'_>) -> Result<jpeg_exp_data, ParseError> {
 let expand_horizontal_vertical = {
 let inner = {
@@ -42206,8 +42183,8 @@ return Err(ParseError::FalsifiedWhere(15528204713822084965u64));
 PResult::Ok(jpeg_exp_data { expand_horizontal_vertical })
 }
 
-/// d#505
-fn Decoder505(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
+/// d#503
+fn Decoder503(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -42261,8 +42238,8 @@ ret
 PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
-/// d#506
-fn Decoder506(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
+/// d#504
+fn Decoder504(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -42289,15 +42266,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 11599300513837427027u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder507(_input))?;
+let ret = (Decoder505(_input))?;
 _input.end_slice()?;
 ret
 };
 PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
-/// d#507
-fn Decoder507(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
+/// d#505
+fn Decoder505(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
 let sample_precision = _input.read_byte()?;
 let num_lines = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -42333,7 +42310,7 @@ return Err(ParseError::FalsifiedWhere(17143332765592749771u64));
 let image_components = {
 let mut accum = Vec::new();
 for _ in 0..num_image_components {
-let next_elem = (Decoder503(_input))?;
+let next_elem = (Decoder501(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -42341,7 +42318,7 @@ accum
 PResult::Ok(jpeg_sof_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-/// d#508
+/// d#506
 fn Decoder_jpeg_exp(_input: &mut Parser<'_>) -> Result<jpeg_exp, ParseError> {
 let marker = {
 {
@@ -42369,15 +42346,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 950046280632689001u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder509(_input))?;
+let ret = (Decoder507(_input))?;
 _input.end_slice()?;
 ret
 };
 PResult::Ok(jpeg_exp { marker, length, data })
 }
 
-/// d#509
-fn Decoder509(_input: &mut Parser<'_>) -> Result<jpeg_exp_data, ParseError> {
+/// d#507
+fn Decoder507(_input: &mut Parser<'_>) -> Result<jpeg_exp_data, ParseError> {
 let expand_horizontal_vertical = {
 let inner = {
 let _packed_bits = _input.read_byte()?;

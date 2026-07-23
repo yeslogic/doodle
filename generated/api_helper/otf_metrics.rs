@@ -1144,26 +1144,6 @@ pub mod obj {
     proxy!(OpentypeVarDsim<'a> = Dsim);
     proxy!(OpentypeSvgDocumentList<'a> = SvgDocList);
 
-    proxy!(OpentypeCpalColorRecord => ColorRecArray);
-
-    impl CommonObject for ColorRecArray {
-        // Args: `num_color_records`
-        type Args<'a> = u16;
-
-        type Output<'a> = Vec<OpentypeCpalColorRecord>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            num_color_records: u16,
-        ) -> PResult<Self::Output<'input>> {
-            let mut accum = Vec::with_capacity(num_color_records as usize);
-            for _ in 0..num_color_records {
-                accum.push(crate::Decoder_opentype_cpal_color_record(p)?);
-            }
-            Ok(accum)
-        }
-    }
-
     proxy!(OpentypeCpalPaletteType => PalTypeArray);
 
     impl CommonObject for PalTypeArray {
@@ -2282,16 +2262,6 @@ pub mod otf_cpal {
 
     frame!(OpentypeCpal);
 
-    impl<'a> container::SingleContainer<Mandatory<obj::ColorRecArray>> for OpentypeCpal<'a> {
-        fn get_offset(&self) -> usize {
-            self.color_records_array.offset as usize
-        }
-
-        fn get_args(&self) -> u16 {
-            self.num_color_records
-        }
-    }
-
     impl<'a> container::SingleContainer<Nullable<obj::PalTypeArray>> for OpentypeCpalExtraV1<'a> {
         fn get_offset(&self) -> usize {
             self.palette_types_array.offset as usize
@@ -2376,7 +2346,7 @@ pub(crate) mod cpal {
                 num_palette_entries: orig.num_palette_entries,
                 num_palettes: orig.num_palettes,
                 num_color_records: orig.num_color_records,
-                color_records_array: reify_const(orig, Mandatory(obj::ColorRecArray)),
+                color_records_array: orig.color_records_array.to_vec(),
                 color_record_indices: orig.color_record_indices.clone(),
                 extra: match &orig.extra {
                     OpentypeCpalExtra::Version1(extra) => {

@@ -1,0 +1,14 @@
+# produces a snapshot of the clippy linting messages for `doodle_gencode` specifically
+snapclip() {
+  cd $PROJECT_ROOT/generated && cargo clippy --no-deps 2>&1 | tee ../gencode-clippy.log  && cd $PROJECT_ROOT;
+}
+
+# sorts the clippy linting warnings by descending frequency
+clipsort() {
+  grep '^warning' gencode-clippy.log | sort | uniq -c | sort -gr;
+}
+
+# counts the number of occurences of the clippy 'clone of Copy type' lint warning by the Copy type that is being cloned, sorted by descending frequency
+copysort() {
+  grep '^warning.*clone' gencode-clippy.log  | sed -E 's/^warning: using `clone` on type `(.*)` which implements the `Copy` trait/\1/g' | sort | uniq -c | sort -gr
+}
