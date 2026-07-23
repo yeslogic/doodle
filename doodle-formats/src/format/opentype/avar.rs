@@ -28,6 +28,13 @@ fn segment_maps(module: &mut FormatModule) -> FormatRef {
         "opentype.avar.segment_maps",
         record_auto([
             ("position_map_count", u16be()),
+            // readarray-eligible once `analyze_fixed_shape`/`as_base_kind_read` can see through
+            // `Format::Variant` wrapping: `axis_value_map` (both fields `f2dot14()`, i.e.
+            // `fmt_variant("F2Dot14", u16be())`) is otherwise a closed, flat, all-primitive
+            // record -- the `Format::Variant` node around each `u16be()` is the sole blocker.
+            // No new `FormatRef` needed: `axis_value_map` is already registered, reuse it
+            // directly (drop `.call()`). Not reached via any offset/view, so would need
+            // `from_here(read_array(var("position_map_count"), axis_value_map))`.
             (
                 "axis_value_maps",
                 repeat_count(var("position_map_count"), axis_value_map.call()),

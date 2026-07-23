@@ -32,6 +32,12 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
                     ),
                     (
                         "color_record_indices",
+                        // readarray-eligible: bare u16be() primitives, so `kind` is
+                        // `BaseKind::U16BE` with no FormatRef required. Parsed in-line at the
+                        // current cursor position with no pre-existing view-offset context, so
+                        // migrating needs from_here(read_array(var("num_palettes"),
+                        // BaseKind::U16BE)), mirroring the `widths` field in hdmx.rs's
+                        // device_record.
                         repeat_count(var("num_palettes"), u16be()),
                     ),
                 ],
@@ -76,6 +82,18 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
 /// CPAL Palette Types Array (Version 1)
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/cpal#palette-types-array
+///
+/// Potentially readarray-eligible - needs `bitflags` support. `palette_type` is a
+/// `bit_fields_u32` record whose only raw read is the packed-bits primitive; every exposed
+/// field is a derived `Format::Compute` bit-mask, so `analyze_fixed_shape` rejects it as-is.
+/// Also unlike `palette_labels_array`/`palette_entry_labels_array` below, this helper has no
+/// view parameter (`DepFormat<1, 0>`, via `register_format_args`) - the offset/view handling
+/// is done by the caller in `table()` via `read_phantom_view_offset32(vvar("table_view"), ..)`.
+/// If bitflags support lands, migrating would also mean switching this to
+/// `register_format_args_views` (taking `table_view`) so it can do its own
+/// offset-field + `with_view` + `read_array` construction the way the other two arrays do,
+/// at which point `palette_type` (already a bare FormatRef) would be passed directly to
+/// `read_array`, dropping the `.call()`.
 fn palette_types_array(module: &mut FormatModule) -> DepFormat<1, 0> {
     let flags = bit_fields_u32([
         BitFieldKind::Reserved {

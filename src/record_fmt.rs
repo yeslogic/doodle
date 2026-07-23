@@ -1,6 +1,6 @@
 use anyhow::{Result as AResult, anyhow};
 
-use crate::{BaseKind, CommonOp, Endian, Expr, Format, IntoLabel, Label, StyleHint};
+use crate::{Expr, Format, IntoLabel, Label, StyleHint};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum FieldLabel<Name> {
@@ -238,80 +238,5 @@ impl<'a> RecordBuilder<'a> {
             flat.push((f_label, format));
         }
         RecordFormat { flat }
-    }
-}
-
-/// The flattened, order-preserving field-layout of a `Format` that is provably fixed-size and
-/// composed entirely of base-kind (`u8`/`u16be`/`u32be`/`u64be`, ...) primitive reads.
-///
-/// This is the precondition for a `FormatRef` to be usable as the element-type of a strided
-/// `ReadArray` (i.e. a candidate for `FixedReadKind::FixedFormat`): every field must have a
-/// statically-known byte-width with no data-dependent control flow, so that `stride` can be
-/// relied on to skip to the next element regardless of what an individual element-parse consumes.
-#[derive(Debug, Clone)]
-pub(crate) struct FixedShape {
-    /// Ordered list of fields, alongside the persisted name of the field (if any -- ephemeral
-    /// and anonymous fields have no name to report but still occupy space in the layout).
-    pub(crate) fields: Vec<(Option<Label>, BaseKind<Endian>)>,
-    /// Total byte-length of one element, equal to the sum of `BaseKind::size()` over `fields`.
-    pub(crate) stride: usize,
-}
-
-/// Attempts to compute the [`FixedShape`] of `format`, for use as the element-type of a
-/// fixed-format `ReadArray`. Returns an error if the format is not a record, if
-/// any of its fields are ephemeral or anonymous, or if any of its fields have non-primitive
-/// parses.
-///
-/// # Notes
-///
-/// - Nested `FixedFormat` fields (a field that is itself a fixed-shape record) are not yet
-///   recognized as eligible; only the base case of purely primitive fields is supported.
-/// - Little-endian base-kinds are structurally recognized here (since [`as_base_kind_read`]
-///   defers to the `CommonOp::EndianParse` tag rather than re-deriving the kind from the
-///   underlying byte-parse), but downstream consumers presently reject them (see the
-///   `unimplemented!` arms in `codegen::model::read_array_from_view` and `decoder::read_base`).
-pub(crate) fn analyze_fixed_shape(format: &Format) -> AResult<FixedShape> {
-    let record =
-        RecordFormat::try_from(format).map_err(|e| anyhow!("not a record-shaped format: {e}"))?;
-    let mut fields = Vec::with_capacity(record.len());
-    let mut stride = 0usize;
-    for (ix, (field_label, field_format)) in record.iter().enumerate() {
-        // NOTE - even though anonymous and ephemeral fields do not interfere with fixed-size predictions,
-        // they fundamentally violate the one-to-one correspondence between the field-layout of a defined
-        // ad-hoc struct and what fixed-size parse operation it would require. As a result, we mandate
-        // that all parses are persisted as permanent fields.
-        let name = match field_label.to_option() {
-            Some((name, true)) => Some(name.clone()),
-            Some((name, false)) => {
-                return Err(anyhow!(
-                    "bad ephemeral-field label: ({name}: {field_format:?}) in {format:?}"
-                ));
-            }
-            None => {
-                return Err(anyhow!(
-                    "bad anonymous-field parse: (_{ix}: {field_format:?}) in {format:?}"
-                ));
-            }
-        };
-        let kind = as_base_kind_read(field_format).ok_or_else(|| {
-            anyhow!(
-                "field `{}` is not a fixed-size primitive read: {field_format:?}",
-                name.as_deref().unwrap_or("<anonymous>"),
-            )
-        })?;
-        stride += kind.size();
-        fields.push((name, kind));
-    }
-    Ok(FixedShape { fields, stride })
-}
-
-/// Recognizes the `Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), ..)` wrapper
-/// that every base-kind constructor in [`crate::helper`] produces (see `helper::u8`, and the
-/// `endian!`-macro-generated `u16be`/`u32be`/`u64be`/etc.), without needing to inspect or
-/// re-derive the kind from the byte-tuple parse it wraps.
-fn as_base_kind_read(format: &Format) -> Option<BaseKind<Endian>> {
-    match format {
-        Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), _) => Some(*kind),
-        _ => None,
     }
 }

@@ -22,6 +22,7 @@ pub mod codegen;
 pub mod decoder;
 
 pub mod dep_ref;
+pub(crate) mod fixed;
 pub use dep_ref::DepFormat;
 
 pub mod error;
@@ -1463,9 +1464,9 @@ impl FormatModule {
                             // As in `typecheck::infer_var_view_format`, a `FixedFormat`
                             // reference is only valid if the referenced format is fixed-size
                             // and composed entirely of primitive fields (see
-                            // `record_fmt::analyze_fixed_shape`); this is a precondition on
+                            // `fixed::analyze_fixed_shape`); this is a precondition on
                             // construction, not a recoverable error.
-                            record_fmt::analyze_fixed_shape(self.get_format(level))
+                            fixed::analyze_fixed_shape(self.get_format(level))
                                 .unwrap_or_else(|e| {
                                     panic!(
                                         "format `{}` is not eligible for FixedFormat ReadArray: {e}",

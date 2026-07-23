@@ -24,6 +24,11 @@ pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
             ("y_strikeout_size", i16be()),
             ("y_strikeout_position", i16be()),
             ("s_family_class", i16be()),
+            // readarray-eligible: element is the bare `u8()` primitive => `BaseKind::U8`, no
+            // `FormatRef` needed. `table`'s record is built directly (no `let_view`), so there is
+            // no `ViewExpr` already in scope; migrating would need
+            // `from_here(read_array(Expr::U8(10), BaseKind::U8))` (cf.
+            // `hdmx.rs::device_record`'s "widths" field for the pattern).
             ("panose", repeat_count(Expr::U8(10), u8())),
             ("ul_unicode_range1", u32be()),
             ("ul_unicode_range2", u32be()),

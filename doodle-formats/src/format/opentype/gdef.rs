@@ -195,7 +195,15 @@ fn attach_list(module: &mut FormatModule, coverage_table: FormatRef) -> FormatRe
         "opentype.gdef.attach_point",
         record([
             ("point_count", u16be()),
-            ("point_indices", repeat_count(var("point_count"), u16be())),
+            (
+                "point_indices",
+                // readarray-eligible: bare u16be primitive array, so `kind` would be
+                // `BaseKind::U16BE` directly (no FormatRef to register). `attach_point` is a
+                // plain record with no view of its own in scope here, so this would need
+                // `from_here(read_array(var("point_count"), BaseKind::U16BE))`, matching the
+                // pattern already used for `widths` in hdmx.rs::device_record.
+                repeat_count(var("point_count"), u16be()),
+            ),
         ]),
     );
 

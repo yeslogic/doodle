@@ -26,6 +26,15 @@ pub(crate) fn table(
                     ),
                 ),
                 // NOTE - the spec indicates that the value-record-size field must be used to determine the size of each value record, to allow for future expansion
+                // readarray-eligible once `as_base_kind_read` can resolve `FormatRef::call()`
+                // indirection: `value_record`'s `value_tag: tag.call()` field is the sole
+                // blocker (`tag` resolves to a bare `u32be()`); `delta_set_outer_index`/
+                // `delta_set_inner_index` are already bare `u16be()`. No new `FormatRef` needed
+                // -- `value_record` is already registered, reuse it directly (drop `.call()`).
+                // This field is plain sequential content after several fixed-width fields (the
+                // preceding `item_variation_store` offset field is a phantom, non-consuming
+                // read pointing elsewhere, not a pointer to this array), so it would need
+                // `from_here(read_array(var("value_record_count"), value_record))`.
                 (
                     "value_records",
                     repeat_count(var("value_record_count"), value_record.call()),

@@ -209,11 +209,19 @@ mod simple {
             record([
                 (
                     "end_points_of_contour",
+                    // readarray-eligible: element is bare `u16be()` -> BaseKind::U16BE, no
+                    // FormatRef needed. This record is only reached via the plain (non-View)
+                    // `format` argument of `util::parse_view_offset::<U32>` in `table_entry`, so
+                    // there is no local ViewExpr in scope here -- would need
+                    // `from_here(read_array(var("n_contours"), BaseKind::U16BE))`.
                     repeat_count(var("n_contours"), u16be()),
                 ),
                 ("instruction_length", u16be()),
                 (
                     "instructions",
+                    // readarray-eligible: element is bare `u8()` -> BaseKind::U8, no FormatRef
+                    // needed. Same no-local-view situation as `end_points_of_contour` above --
+                    // would need `from_here(read_array(var("instruction_length"), BaseKind::U8))`.
                     repeat_count(var("instruction_length"), u8()),
                 ),
                 (
@@ -333,6 +341,10 @@ mod composite {
                             chain(
                                 u16be(),
                                 "instructions_length",
+                                // readarray-eligible: element is bare `u8()` -> BaseKind::U8, no
+                                // FormatRef needed. Parsed sequentially with no local ViewExpr in
+                                // scope -- would need
+                                // `from_here(read_array(var("instructions_length"), BaseKind::U8))`.
                                 repeat_count(var("instructions_length"), u8()),
                             ),
                             compute(seq_empty()),

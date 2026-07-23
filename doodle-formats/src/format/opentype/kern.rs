@@ -136,6 +136,13 @@ mod format2 {
             record([
                 ("first_glyph", u16be()), // first glyph in class range
                 ("n_glyphs", u16be()),    // number of glyphs in class range
+                // readarray-eligible: bare u16be() elements; use BaseKind::U16BE (no
+                // FormatRef needed). class_table() has no ViewExpr of its own -- callers
+                // (subtable_format2) reach it via
+                // `read_phantom_view_offset16(table_view, class_table.call())`, but
+                // within this record class_values is a plain sequential read right
+                // after n_glyphs, so it would need
+                // `from_here(read_array(var("n_glyphs"), BaseKind::U16BE))`.
                 ("class_values", repeat_count(var("n_glyphs"), u16be())), // class values for each glyph in class range
             ]),
         )

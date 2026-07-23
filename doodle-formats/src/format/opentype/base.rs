@@ -76,6 +76,16 @@ pub(crate) fn table(
     );
     let base_tag_list = record([
         ("base_tag_count", u16be()),
+        // readarray-eligible once `as_base_kind_read` can resolve `FormatRef::call()`
+        // indirection: element is bare `tag.call()`, which itself resolves to a bare `u32be()`
+        // -- no other blocker, and no `FormatRef` would even be needed once fixed (would map
+        // straight to `BaseKind::U32BE`). Although `base_tag_list` is itself the target of a
+        // `read_phantom_view_offset16` in `axis_table` below, `baseline_tags` is *not* the
+        // whole target (it's preceded by the sibling `base_tag_count` field within this same
+        // record), so this can't skip straight to the `pseudo_record`+`with_view` rewrite the
+        // way `stat.rs`'s `design_axes_array` can -- it would still need
+        // `from_here(read_array(var("base_tag_count"), BaseKind::U32BE))` applied at this field,
+        // nested inside the offset-jumped-to format.
         (
             "baseline_tags",
             repeat_count(var("base_tag_count"), tag.call()),

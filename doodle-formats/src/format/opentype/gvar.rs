@@ -161,6 +161,14 @@ fn data_table_array(axis_count: Expr, offsets: Expr, data_table: DepFormat<1, 0>
 /// pairwise to determine entry-length), similar to `loca` tables.
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#glyph-variations-table-format
+///
+/// readarray-eligible (both branches): the `Offsets32` arm (`repeat_count(succ(glyph_count), u32be())`)
+/// and the `Offsets16` arm (`repeat_count(succ(glyph_count), u16be())`) each use a bare primitive
+/// element, so `kind` would be `BaseKind::U32BE` / `BaseKind::U16BE` directly -- no `FormatRef` needed.
+/// Called inline as the `glyph_variation_data_offsets` field of `table()`'s `record_auto`, at the
+/// current cursor position with no pre-existing offset-based view in scope, so migrating either arm
+/// would need `from_here(read_array(succ(glyph_count), ..))` wrapping, per the pattern applied to
+/// `color_records_array` in cpal.rs::table (commit f9835b9).
 fn offsets_array(is_long_offsets: Expr, glyph_count: Expr) -> Format {
     if_then_else(
         is_long_offsets,
@@ -382,6 +390,12 @@ fn point_number_run(module: &mut FormatModule) -> FormatRef {
                     Label::Borrowed("run_length"),
                     // Value stored in low 7 bits of control-byte is one less than the actual run-length
                     Box::new(succ(record_proj(var("control"), "point_run_count"))),
+                    // readarray-eligible (both branches): `Points16` (`repeat_count(run_length, u16be())`)
+                    // -> `BaseKind::U16BE`, `Points8` (`repeat_count(run_length, u8())`) -> `BaseKind::U8`;
+                    // both are bare primitive elements, no `FormatRef` needed. Parsed via the general
+                    // interpreter inside an `accum_until` loop (see `point_number_runs`) with no
+                    // pre-existing view in scope here, so migrating would need
+                    // `from_here(read_array(var("run_length"), ..))` wrapping, per cpal.rs::table.
                     Box::new(if_then_else(
                         record_proj(var("control"), "points_are_words"),
                         fmt_variant("Points16", repeat_count(var("run_length"), u16be())),
@@ -518,6 +532,12 @@ fn tuple_record(module: &mut FormatModule) -> DepFormat<1, 0> {
         "opentype.gvar.tuple_record",
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
+            // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
+            // wrapping: element is bare `util::f2dot14()` = `Format::Variant("F2Dot14",
+            // u16be())`, i.e. a real fixed-width 2-byte primitive read with no other blocker.
+            // No `FormatRef` needed (would map to `BaseKind::U16BE`, modulo however the
+            // "F2Dot14" tag is preserved downstream). Read sequentially with no view in scope,
+            // so would need `from_here(read_array(var("axis_count"), BaseKind::U16BE))`.
             "coordinates",
             repeat_count(var("axis_count"), util::f2dot14()),
         )]),

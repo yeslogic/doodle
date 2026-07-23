@@ -57,6 +57,11 @@ pub(crate) fn single_subst(module: &mut FormatModule, coverage_table: FormatRef)
                 util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
             ),
             ("glyph_count", u16be()),
+            // readarray-eligible: element is bare u16be (BaseKind::U16BE), no FormatRef needed.
+            // Read in-line right after `glyph_count` at the current cursor, with no pre-existing
+            // view covering this position (format2 only has `table_view`, which points at the
+            // start of the enclosing table) — would need `from_here(read_array(var("glyph_count"),
+            // BaseKind::U16BE))`.
             (
                 "substitute_glyph_ids",
                 repeat_count(var("glyph_count"), u16be()),
@@ -103,6 +108,9 @@ pub(crate) fn multiple_subst(module: &mut FormatModule, coverage_table: FormatRe
         record([
             // NOTE - formally (according to the spec) this must never be 0, but some fonts ignore this so we don't enforce it as a mandate
             ("glyph_count", u16be()),
+            // readarray-eligible: element is bare u16be (BaseKind::U16BE), no FormatRef needed.
+            // `sequence_table` is a plain (view-less) record, so there is no in-scope ViewExpr at
+            // all here — would need `from_here(read_array(var("glyph_count"), BaseKind::U16BE))`.
             (
                 "substitute_glyph_ids",
                 repeat_count(var("glyph_count"), u16be()),
@@ -126,6 +134,10 @@ pub(crate) fn multiple_subst(module: &mut FormatModule, coverage_table: FormatRe
                 [
                     ("sequence_count", u16be()),
                     // REVIEW[epic=many-offsets-design-pattern] - for-each style
+                    // readarray-eligible: element is bare u16be (BaseKind::U16BE), no FormatRef
+                    // needed. Read in-line at the current cursor; `table_view` in scope points at
+                    // the start of the enclosing table, not here — would need
+                    // `from_here(read_array(var("sequence_count"), BaseKind::U16BE))`.
                     (
                         "sequence_offsets",
                         repeat_count(var("sequence_count"), u16be()),
@@ -160,6 +172,9 @@ pub(crate) fn alternate_subst(module: &mut FormatModule, coverage_table: FormatR
         "opentype.gsub.alternate_subst.alternate_set",
         record([
             ("glyph_count", u16be()),
+            // readarray-eligible: element is bare u16be (BaseKind::U16BE), no FormatRef needed.
+            // `alternate_set` is a plain (view-less) record, so there is no in-scope ViewExpr —
+            // would need `from_here(read_array(var("glyph_count"), BaseKind::U16BE))`.
             (
                 "alternate_glyph_ids",
                 repeat_count(var("glyph_count"), u16be()),
@@ -211,6 +226,10 @@ pub(crate) fn ligature_subst(module: &mut FormatModule, coverage_table: FormatRe
         record([
             ("ligature_glyph", u16be()),
             ("component_count", u16be()),
+            // readarray-eligible: element is bare u16be (BaseKind::U16BE), no FormatRef needed.
+            // `ligature_table` is a plain (view-less) record, so there is no in-scope ViewExpr —
+            // would need `from_here(read_array(pred(var("component_count")), BaseKind::U16BE))`;
+            // the len expr (`pred(...)`) carries over unchanged.
             (
                 "component_glyph_ids",
                 repeat_count(pred(var("component_count")), u16be()),
@@ -313,6 +332,10 @@ pub(crate) fn reverse_chain_single_subst(
                         ),
                     ),
                     ("glyph_count", u16be()),
+                    // readarray-eligible: element is bare u16be (BaseKind::U16BE), no FormatRef
+                    // needed. Read in-line at the current cursor; `table_view` in scope points at
+                    // the start of the enclosing table, not here — would need
+                    // `from_here(read_array(var("glyph_count"), BaseKind::U16BE))`.
                     (
                         "substitute_glyph_ids",
                         repeat_count(var("glyph_count"), u16be()),

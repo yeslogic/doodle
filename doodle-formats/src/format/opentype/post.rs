@@ -50,6 +50,11 @@ fn version2(module: &mut FormatModule) -> FormatRef {
         "opentype.post.version2",
         record([
             ("num_glyphs", u16be()),
+            // readarray-eligible: element is the bare `u16be()` primitive => `BaseKind::U16BE`,
+            // no `FormatRef` needed. `version2`'s record has no enclosing `let_view`/`ViewExpr`
+            // in scope, so migrating would need
+            // `from_here(read_array(var("num_glyphs"), BaseKind::U16BE))` (cf.
+            // `hdmx.rs::device_record`'s "widths" field for the pattern).
             ("glyph_name_index", repeat_count(var("num_glyphs"), u16be())),
             (
                 "string_data",

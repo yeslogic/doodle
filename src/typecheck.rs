@@ -3,8 +3,6 @@ use std::{
     rc::Rc,
 };
 
-use crate::record_fmt;
-use crate::util::ErrTrace as _;
 use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
@@ -19,6 +17,7 @@ use crate::{
         elaborator::{IntType, PrimInt},
     },
 };
+use crate::{fixed::analyze_fixed_shape, util::ErrTrace as _};
 
 pub mod base_set;
 use base_set::{BaseSet, IntSet, UintSet};
@@ -1047,7 +1046,7 @@ impl TypeChecker {
                         // constructing a `FixedReadKind::FixedFormat` around an ineligible
                         // `FormatRef` directly (`helper::read_array` cannot check this itself,
                         // as it has no `&FormatModule` access).
-                        record_fmt::analyze_fixed_shape(format).unwrap_or_else(|e| {
+                        analyze_fixed_shape(format).unwrap_or_else(|e| {
                             panic!(
                                 "format `{}` is not eligible for FixedFormat ReadArray: {e}",
                                 ctxt.module.get_name(level),

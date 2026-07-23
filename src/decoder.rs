@@ -6,8 +6,8 @@ use anyhow::{Result as AResult, anyhow};
 
 use crate::byte_set::ByteSet;
 use crate::error::{DecodeErrorKind, DecodeResult, EDecodeResult};
+use crate::fixed::analyze_fixed_shape;
 use crate::read::ReadCtxt;
-use crate::record_fmt;
 use crate::util::WithErr;
 use crate::util::{ErrTrace as _, downgrade_error_with};
 use crate::validation::Condition;
@@ -943,7 +943,7 @@ impl<'a> Compiler<'a> {
                     // `typecheck::infer_var_view_format` -- cheap and pure over `&Format`, so
                     // recomputing here (rather than threading it through the AST) keeps this
                     // as the single source of truth for the field layout.
-                    let shape = record_fmt::analyze_fixed_shape(format).unwrap_or_else(|e| {
+                    let shape = analyze_fixed_shape(format).unwrap_or_else(|e| {
                         panic!(
                             "format `{}` is not eligible for FixedFormat ReadArray: {e}",
                             self.module.get_name(level),
