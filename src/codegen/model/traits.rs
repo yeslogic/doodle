@@ -237,7 +237,7 @@ pub mod object_api {
 
 pub mod smallsorts {
     use super::*;
-    use crate::record_fmt;
+    use crate::fixed;
     use crate::{FormatModule, FormatRef};
     use intmap::IntMap;
 
@@ -275,7 +275,7 @@ pub mod smallsorts {
                 unreachable!("no FixedFormat source was recorded for type index {ix}: {on_type:?}")
             };
             let format = type_info.module.get_format(format_ref.get_level());
-            let shape = record_fmt::analyze_fixed_shape(format).unwrap_or_else(|e| {
+            let shape = fixed::analyze_fixed_shape(format).unwrap_or_else(|e| {
                 unreachable!(
                     "type index {ix} was recorded as a FixedFormat target but is no longer a valid fixed-shape record: {e}"
                 )

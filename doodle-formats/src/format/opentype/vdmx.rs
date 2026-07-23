@@ -17,7 +17,15 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
                 // REVIEW[epic=validation] - we do not expect num_recs and num_ratios to ever differ
                 ("num_recs", u16be()),
                 ("num_ratios", expect_eq(u16be(), var("num_recs"))),
-                // TODO - RatioRange is a fixed 32-bit record so it ought to be compatible with ReadArray, eventually
+                // readarray-eligible: `ratio_range` is a flat record of four bare u8 fields
+                // (b_char_set, x_ratio, y_start_ratio, y_end_ratio) via record_repeat(..., u8()),
+                // the same shape as cpal.rs::color_record. It's only a local Format value here,
+                // not a registered FormatRef, so one would need to be registered (e.g. via
+                // module.define_format) to use as the FixedReadKind::FixedFormat element. It's
+                // parsed in-line in `table_view`'s record with no offset indirection, so this
+                // would need `from_here(read_array(var("num_ratios"), <new_ratio_range_ref>))`,
+                // matching the pattern used for `widths` in hdmx.rs::device_record.
+                // TODO[epic=adhoc-readarray]
                 ("ratio_range", repeat_count(var("num_ratios"), ratio_range)),
                 (
                     "vdmx_group_offsets",

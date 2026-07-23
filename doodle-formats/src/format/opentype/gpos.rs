@@ -445,6 +445,11 @@ pub(crate) fn mark_base_pos(
         record_auto([
             (
                 "base_anchor_offsets",
+                // readarray-eligible: bare-primitive array, use BaseKind::U16BE directly
+                // (no FormatRef needed). Parsed inline at the current cursor within this
+                // `base_record` (the `_array_view` param is only used later, by the phantom
+                // for-each, to resolve each offset into an anchor table) — needs `from_here(...)`
+                // to obtain a ViewExpr for `read_array`.
                 repeat_count(var("mark_class_count"), u16be()),
             ),
             (
@@ -538,7 +543,11 @@ mod mark_lig {
                 // REVIEW[epic=many-offsets-design-pattern] - for-each style
                 (
                     "ligature_anchor_offsets",
-                    // REVIEW[epic=read-fixedwidth-array] - does ReadArray work better here?
+                    // readarray-eligible: bare-primitive array, use BaseKind::U16BE directly
+                    // (no FormatRef needed). Parsed inline at the current cursor within this
+                    // `component_record` (`table_view` is only consulted later, by the phantom
+                    // for-each, to resolve each offset into an anchor table) — needs
+                    // `from_here(...)` to obtain a ViewExpr for `read_array`.
                     repeat_count(var("mark_class_count"), u16be()),
                 ),
                 (
@@ -606,6 +615,12 @@ mod mark_lig {
                     // REVIEW[epic=many-offsets-design-pattern] - for-each style
                     (
                         "ligature_attach_offsets",
+                        // readarray-eligible: bare-primitive array, use BaseKind::U16BE directly
+                        // (no FormatRef needed). Although `array_view` is in scope (via the
+                        // enclosing `let_view`), it anchors the start of this record, not this
+                        // field's position (`ligature_count` is read first) — this is a plain
+                        // inline read, not an offset-table dereference, so still needs
+                        // `from_here(...)` rather than `array_view.offset(...)`.
                         repeat_count(var("ligature_count"), u16be()),
                     ),
                     (
@@ -694,6 +709,11 @@ mod mark_mark {
                 // REVIEW[epic=many-offsets-design-pattern] - for-each style
                 (
                     "mark2_anchor_offsets",
+                    // readarray-eligible: bare-primitive array, use BaseKind::U16BE directly
+                    // (no FormatRef needed). Parsed inline at the current cursor within this
+                    // `mark2_record` (`_array_view` is only used later, by the phantom for-each,
+                    // to resolve each offset into an anchor table) — needs `from_here(...)` to
+                    // obtain a ViewExpr for `read_array`.
                     repeat_count(var("mark_class_count"), u16be()),
                 ),
                 // REVIEW - eliminate foreach and fold phantom offsetting into repeat_count ?

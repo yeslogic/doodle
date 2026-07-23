@@ -134,6 +134,13 @@ mod paint_table {
             record([
                 ("extend", u8()),
                 ("num_stops", u16be()),
+                // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
+                // wrapping: `color_stop()`'s `stop_offset`/`alpha` fields are `util::f2dot14()`
+                // (`Format::Variant("F2Dot14", u16be())`); `palette_index` is already a bare
+                // `u16be()`. No other blocker. `color_stop()` is currently an inline (unregistered)
+                // record -- a new `FormatRef` (e.g. `opentype.colr.color_stop`) would need to be
+                // defined for it. Not reached via any offset/view here, so would need
+                // `from_here(read_array(var("num_stops"), color_stop_ref))`.
                 ("color_stops", repeat_count(var("num_stops"), color_stop())),
             ]),
         )
@@ -147,6 +154,13 @@ mod paint_table {
             record([
                 ("extend", u8()),
                 ("num_stops", u16be()),
+                // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
+                // wrapping: `var_color_stop()`'s `stop_offset`/`alpha` fields are `util::f2dot14()`;
+                // `palette_index`/`var_index_base` are already bare `u16be()`/`u32be()`. No other
+                // blocker. `var_color_stop()` is currently an inline (unregistered) record -- a new
+                // `FormatRef` (e.g. `opentype.colr.var_color_stop`) would need to be defined for it.
+                // Not reached via any offset/view here, so would need
+                // `from_here(read_array(var("num_stops"), var_color_stop_ref))`.
                 (
                     "color_stops",
                     repeat_count(var("num_stops"), var_color_stop()),

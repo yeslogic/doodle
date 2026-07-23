@@ -134,6 +134,10 @@ pub(crate) fn item_variation_data(module: &mut FormatModule) -> FormatRef {
             ("region_index_count", u16be()),
             (
                 "region_indices",
+                // readarray-eligible: element is bare u16be() -> BaseKind::U16BE, no FormatRef
+                // needed. `item_variation_data` binds no view of its own, so this would need
+                // `from_here(read_array(var("region_index_count"), BaseKind::U16BE))`
+                // (cf. `widths` field in hdmx.rs::device_record for the from_here pattern).
                 repeat_count(var("region_index_count"), u16be()),
             ),
             (
@@ -226,6 +230,10 @@ pub(crate) fn device_table() -> Format {
         ("delta_format", u16be()),
         (
             "delta_values",
+            // readarray-eligible: element is bare u16be() -> BaseKind::U16BE, no FormatRef
+            // needed. `device_table` is inlined into `device_or_variation_index_table`, which
+            // binds no view, so this would need
+            // `from_here(read_array(<len>, BaseKind::U16BE))` (cf. hdmx.rs::device_record).
             repeat_count(
                 packed_array_length(
                     var("delta_format"),
@@ -241,7 +249,13 @@ pub(crate) fn coverage_table(module: &mut FormatModule) -> FormatRef {
     // REVIEW - should this be a module definition (to shorten type-name)?
     let coverage_format_1 = record([
         ("glyph_count", u16be()),
-        ("glyph_array", repeat_count(var("glyph_count"), u16be())),
+        (
+            "glyph_array",
+            // readarray-eligible: element is bare u16be() -> BaseKind::U16BE, no FormatRef
+            // needed. `coverage_table` binds no view, so this would need
+            // `from_here(read_array(var("glyph_count"), BaseKind::U16BE))`.
+            repeat_count(var("glyph_count"), u16be()),
+        ),
     ]);
 
     // REVIEW - should this be a module definition (to shorten type-name)?
@@ -257,6 +271,12 @@ pub(crate) fn coverage_table(module: &mut FormatModule) -> FormatRef {
             ("range_count", u16be()),
             (
                 "range_records",
+                // readarray-eligible: `range_record` is an inline record of 3 bare u16be()
+                // fields (start_glyph_id, end_glyph_id, start_coverage_index), all permanent
+                // -> satisfies analyze_fixed_shape. Needs a new FormatRef registered (e.g.
+                // "opentype.common.coverage_range_record") to call
+                // read_array(var("range_count"), <ref>). `coverage_table` binds no view, so
+                // wrap with from_here(...) (cf. hdmx.rs::device_record pattern).
                 repeat_count(var("range_count"), range_record),
             ),
         ])
@@ -299,6 +319,9 @@ pub(crate) fn class_def(module: &mut FormatModule) -> FormatRef {
         ("glyph_count", u16be()),
         (
             "class_value_array",
+            // readarray-eligible: element is bare u16be() -> BaseKind::U16BE, no FormatRef
+            // needed. `class_def` binds no view, so this would need
+            // `from_here(read_array(var("glyph_count"), BaseKind::U16BE))`.
             repeat_count(var("glyph_count"), u16be()),
         ),
     ]);
@@ -314,6 +337,12 @@ pub(crate) fn class_def(module: &mut FormatModule) -> FormatRef {
             ("class_range_count", u16be()),
             (
                 "class_range_records",
+                // readarray-eligible: `class_range_record` is an inline record of 3 bare
+                // u16be() fields (start_glyph_id, end_glyph_id, class), all permanent ->
+                // satisfies analyze_fixed_shape. Needs a new FormatRef registered (e.g.
+                // "opentype.common.class_range_record") to call
+                // read_array(var("class_range_count"), <ref>). `class_def` binds no view, so
+                // wrap with from_here(...) (cf. hdmx.rs::device_record pattern).
                 repeat_count(var("class_range_count"), class_range_record),
             ),
         ])

@@ -1179,6 +1179,14 @@ pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
             ("search_range", u16be()), // TODO[epic=validation] - should be (maximum power of 2 <= num_tables) x 16
             ("entry_selector", u16be()), // TODO[epic=validation] - should be Log2(maximum power of 2 <= num_tables)
             ("range_shift", u16be()), // TODO[epic=validation] - should be (NumTables x 16) - searchRange
+            // readarray-eligible once `as_base_kind_read` can resolve `FormatRef::call()`
+            // indirection: `table_record`'s `table_id: tag.call()` field is the sole blocker
+            // (`tag` = `opentype_tag`, which resolves to a bare `u32be()`); `checksum`/
+            // `offset`/`length` are already bare `u32be()`. No new `FormatRef` needed --
+            // `table_record` is already registered, reuse it directly (drop `.call()`). This is
+            // a plain sequential field within `table_directory` (parameterized by `FONTVIEW_LBL`
+            // but not itself behind any offset/pointer), so it would need
+            // `from_here(read_array(var("num_tables"), table_record))`.
             (
                 "table_records",
                 repeat_count(var("num_tables"), table_record.call()),

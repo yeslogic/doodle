@@ -141,6 +141,10 @@ fn subtable_format0(module: &mut FormatModule) -> FormatRef {
                 ("_format", expect_u16be(0)), // == 0
                 ("length", u16be()),
                 ("language", cmap_language_id(var("_platform"))),
+                // readarray-eligible: `small_glyph_id()` is bare u8(); use BaseKind::U8
+                // (no FormatRef needed). Sequential in-line read (no ViewExpr in scope
+                // here), so migration would need
+                // `from_here(read_array(Expr::U16(256), BaseKind::U8))`.
                 (
                     "glyph_id_array",
                     repeat_count(Expr::U16(256), small_glyph_id()),
@@ -180,6 +184,9 @@ fn subtable_format2(module: &mut FormatModule) -> FormatRef {
                     ),
                 ),
                 ("language", cmap_language_id(var("_platform"))),
+                // readarray-eligible: bare u16be() elements; use BaseKind::U16BE (no
+                // FormatRef needed). Sequential in-line read (no ViewExpr in scope), so
+                // would need `from_here(read_array(Expr::U16(256), BaseKind::U16BE))`.
                 ("sub_header_keys", repeat_count(Expr::U16(256), u16be())),
                 (
                     "sub_headers",
@@ -215,6 +222,11 @@ fn subtable_format4(module: &mut FormatModule) -> FormatRef {
                 ("search_range", u16be()), // := 2x the maximum power of 2 <= seg_count
                 ("entry_selector", u16be()), // := ilog2(seg_count)
                 ("range_shift", u16be()),  // := seg_count * 2 - search_range
+                // readarray-eligible (end_code, and start_code/id_delta/id_range_offset
+                // below): each is a bare u16be() array over `seg_count`; use
+                // BaseKind::U16BE (no FormatRef needed). All four are sequential in-line
+                // reads (no ViewExpr in scope), so each would need its own
+                // `from_here(read_array(var("seg_count"), BaseKind::U16BE))`.
                 ("end_code", repeat_count(var("seg_count"), u16be())), // end character-code for each seg, last is 0xFFFF
                 ("__reserved_pad", util::expect_u16be(0)),
                 ("start_code", repeat_count(var("seg_count"), u16be())),
@@ -240,6 +252,10 @@ fn subtable_format6(module: &mut FormatModule) -> FormatRef {
             ("language", cmap_language_id(var("_platform"))),
             ("first_code", u16be()),
             ("entry_count", u16be()),
+            // readarray-eligible: bare u16be() elements; use BaseKind::U16BE (no
+            // FormatRef needed). This record has no let_view/ViewExpr, so it's a
+            // sequential in-line read and would need
+            // `from_here(read_array(var("entry_count"), BaseKind::U16BE))`.
             ("glyph_id_array", repeat_count(var("entry_count"), u16be())),
         ]),
     )
@@ -257,8 +273,18 @@ fn subtable_format8(module: &mut FormatModule, sequential_map_group: FormatRef) 
                 ("length", u32be()),
                 ("language", cmap_language_id32(var("_platform"))),
                 // REVIEW - should this be 8x as long and consist of bits?
+                // readarray-eligible: bare u8() elements; use BaseKind::U8 (no FormatRef
+                // needed). Sequential in-line read inside slice_record (no ViewExpr in
+                // scope), so would need
+                // `from_here(read_array(Expr::U16(8192), BaseKind::U8))`.
                 ("is32", repeat_count(Expr::U16(8192), u8())), // packed bit-array where a bit at index `i` signals whether the 16-bit value index `i` is the start of a 32-bit character code
                 ("num_groups", u32be()),
+                // readarray-eligible: element is `sequential_map_group.call()`, already
+                // a closed zero-arg FormatRef (defined above in table() as
+                // "opentype.types.sequential_map_record", all-u32be fields) -- reuse
+                // `sequential_map_group` directly, dropping `.call()`. Sequential
+                // in-line read (no ViewExpr in scope), so would need
+                // `from_here(read_array(var("num_groups"), sequential_map_group))`.
                 (
                     "groups",
                     repeat_count(var("num_groups"), sequential_map_group.call()),
@@ -281,6 +307,9 @@ fn subtable_format10(module: &mut FormatModule) -> FormatRef {
                 ("language", cmap_language_id32(var("_platform"))),
                 ("start_char_code", u32be()),
                 ("num_chars", u32be()),
+                // readarray-eligible: bare u16be() elements; use BaseKind::U16BE (no
+                // FormatRef needed). In-line sequential read (no ViewExpr in scope), so
+                // would need `from_here(read_array(var("num_chars"), BaseKind::U16BE))`.
                 ("glyph_id_array", repeat_count(var("num_chars"), u16be())),
             ],
         ),
@@ -299,6 +328,11 @@ fn subtable_format12(module: &mut FormatModule, sequential_map_group: FormatRef)
                 ("length", u32be()),
                 ("language", cmap_language_id32(var("_platform"))),
                 ("num_groups", u32be()),
+                // readarray-eligible: element is `sequential_map_group.call()`, the
+                // same closed zero-arg FormatRef used by format8/format13 -- reuse
+                // `sequential_map_group` directly, dropping `.call()`. Sequential
+                // in-line read (no ViewExpr in scope), so would need
+                // `from_here(read_array(var("num_groups"), sequential_map_group))`.
                 (
                     "groups",
                     repeat_count(var("num_groups"), sequential_map_group.call()),
@@ -322,6 +356,11 @@ fn subtable_format13(module: &mut FormatModule, sequential_map_group: FormatRef)
                 ("length", u32be()),
                 ("language", cmap_language_id32(var("_platform"))),
                 ("num_groups", u32be()),
+                // readarray-eligible: `constant_map_group` is just
+                // `sequential_map_group.call()` (see format8/format12) -- reuse
+                // `sequential_map_group` directly instead of binding/calling it.
+                // Sequential in-line read (no ViewExpr in scope), so would need
+                // `from_here(read_array(var("num_groups"), sequential_map_group))`.
                 (
                     "groups",
                     repeat_count(var("num_groups"), constant_map_group),

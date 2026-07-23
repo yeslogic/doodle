@@ -119,21 +119,35 @@ mod chained_sequence {
                 ("backtrack_glyph_count", u16be()),
                 (
                     "backtrack_sequence",
+                    // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
+                    // `chained_sequence_rule` is a plain (non-view-bound) record parsed in-line at the
+                    // cursor, so this would need `from_here(read_array(var("backtrack_glyph_count"), BaseKind::U16BE))`.
                     repeat_count(var("backtrack_glyph_count"), u16be()), // GlyphId (format1) or ClassId (format2)
                 ),
                 ("input_glyph_count", u16be()),
                 (
                     "input_sequence",
+                    // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
+                    // Same in-line/non-view-bound context as `backtrack_sequence`; would need
+                    // `from_here(read_array(pred(var("input_glyph_count")), BaseKind::U16BE))`.
                     repeat_count(pred(var("input_glyph_count")), u16be()), // GlyphId (format1) or ClassId (format2)
                 ),
                 ("lookahead_glyph_count", u16be()),
                 (
                     "lookahead_sequence",
+                    // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
+                    // Same in-line/non-view-bound context; would need
+                    // `from_here(read_array(var("lookahead_glyph_count"), BaseKind::U16BE))`.
                     repeat_count(var("lookahead_glyph_count"), u16be()), // GlyphId (format1) or ClassId (format2)
                 ),
                 ("seq_lookup_count", u16be()),
                 (
                     "seq_lookup_records",
+                    // readarray-eligible: `sequence_lookup_record` (defined above, this file) is a
+                    // closed zero-arg FormatRef whose record is two bare u16be fields, satisfying
+                    // `analyze_fixed_shape`. Reuse `sequence_lookup_record` directly (drop `.call()`)
+                    // as the FixedReadKind::FixedFormat. In-line/non-view-bound context -> would need
+                    // `from_here(read_array(var("seq_lookup_count"), sequence_lookup_record))`.
                     repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
                 ),
             ]),
@@ -251,6 +265,11 @@ mod chained_sequence {
                 ("seq_lookup_count", u16be()),
                 (
                     "seq_lookup_records",
+                    // readarray-eligible: `sequence_lookup_record` (top of file) is a closed zero-arg
+                    // FormatRef with two bare u16be fields, satisfying `analyze_fixed_shape`. Reuse
+                    // `sequence_lookup_record` directly (drop `.call()`) as the FixedReadKind::FixedFormat.
+                    // This field is read sequentially at the cursor (not via a `table_view` offset), so it
+                    // would need `from_here(read_array(var("seq_lookup_count"), sequence_lookup_record))`.
                     repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
                 ),
             ]),
@@ -317,10 +336,18 @@ mod sequence {
                 ("seq_lookup_count", u16be()),
                 (
                     "input_sequence",
+                    // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
+                    // `rule` is a plain (non-view-bound) record parsed in-line at the cursor, so this
+                    // would need `from_here(read_array(pred(var("glyph_count")), BaseKind::U16BE))`.
                     repeat_count(pred(var("glyph_count")), u16be()),
                 ),
                 (
                     "seq_lookup_records",
+                    // readarray-eligible: `sequence_lookup_record` (top of file) is a closed zero-arg
+                    // FormatRef with two bare u16be fields, satisfying `analyze_fixed_shape`. Reuse
+                    // `sequence_lookup_record` directly (drop `.call()`) as the FixedReadKind::FixedFormat.
+                    // In-line/non-view-bound context -> would need
+                    // `from_here(read_array(var("seq_lookup_count"), sequence_lookup_record))`.
                     repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
                 ),
             ]),
@@ -426,6 +453,11 @@ mod sequence {
                 ),
                 (
                     "seq_lookup_records",
+                    // readarray-eligible: `sequence_lookup_record` (top of file) is a closed zero-arg
+                    // FormatRef with two bare u16be fields, satisfying `analyze_fixed_shape`. Reuse
+                    // `sequence_lookup_record` directly (drop `.call()`) as the FixedReadKind::FixedFormat.
+                    // Read sequentially at the cursor (not via a `table_view` offset), so it would need
+                    // `from_here(read_array(var("seq_lookup_count"), sequence_lookup_record))`.
                     repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
                 ),
             ]),
@@ -498,6 +530,10 @@ pub(crate) fn feature_table(module: &mut FormatModule) -> FormatRef {
                 // Array of 0-based indices into LookupList (first lookup at LookupListIndex = 0)
                 (
                     "lookup_list_indices",
+                    // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
+                    // Read sequentially at the cursor inside the `table_view`-scoped record (no offset
+                    // arithmetic for this field itself), so it would need
+                    // `from_here(read_array(var("lookup_index_count"), BaseKind::U16BE))`.
                     repeat_count(var("lookup_index_count"), u16be()),
                 ),
             ]),
@@ -723,6 +759,9 @@ pub(crate) fn lang_sys(module: &mut FormatModule) -> FormatRef {
             ("feature_index_count", u16be()),
             (
                 "feature_indices",
+                // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
+                // `lang_sys` is a plain (non-view-bound) record parsed in-line at the cursor, so this
+                // would need `from_here(read_array(var("feature_index_count"), BaseKind::U16BE))`.
                 repeat_count(var("feature_index_count"), u16be()),
             ),
         ]),
@@ -815,6 +854,10 @@ fn feature_variation_record(module: &mut FormatModule, feature_table: FormatRef)
             // REVIEW[epic=many-offsets-design-pattern] - for-each style
             (
                 "condition_offsets",
+                // readarray-eligible: bare u32be element -> BaseKind::U32BE, no FormatRef needed.
+                // Read sequentially at the cursor inside the `set_view`-scoped record (the offsets
+                // are only dereferenced afterward, via the `#_conditions` for_each below), so it
+                // would need `from_here(read_array(var("condition_count"), BaseKind::U32BE))`.
                 repeat_count(var("condition_count"), u32be()),
             ),
             (
