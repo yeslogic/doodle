@@ -4,7 +4,7 @@ use super::*;
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/cpal
 pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-    let color_record_array = color_record_array(module);
+    let color_record = color_record(module);
     let palette_types_array = palette_types_array(module);
     let palette_labels_array = palette_labels_array(module);
     let palette_entry_labels_array = palette_entry_labels_array(module);
@@ -22,9 +22,12 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
                     ("num_color_records", expect_nonzero::<U16>(u16be())),
                     (
                         "color_records_array",
-                        util::read_phantom_view_offset32(
-                            vvar("table_view"),
-                            color_record_array.invoke_args([var("num_color_records")]),
+                        pseudo_record(
+                            [("offset", u32be())],
+                            with_view(
+                                vvar("table_view").offset(var("offset")),
+                                read_array(var("num_color_records"), color_record),
+                            ),
                         ),
                     ),
                     (
@@ -116,16 +119,6 @@ fn palette_entry_labels_array(module: &mut FormatModule) -> DepFormat<1, 1> {
             var("num_palette_entries"),
             BaseKind::U16BE,
         ),
-    )
-}
-
-fn color_record_array(module: &mut FormatModule) -> DepFormat<1, 0> {
-    let color_record = color_record(module);
-    module.register_format_args(
-        "opentype.cpal.color_record_array",
-        [(Label::Borrowed("num_color_records"), ValueType::U16)],
-        // TODO[epic=adhoc-readarray] - we ideally want this to be a ReadArray of ColorRecord, but the required machinery isn't yet implemented
-        repeat_count(var("num_color_records"), color_record.call()),
     )
 }
 

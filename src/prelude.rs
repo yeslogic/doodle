@@ -10,7 +10,10 @@ pub use crate::parser::{
 };
 pub use smallsorts::{
     self as allsorts,
-    binary::{U8, U16Be, U32Be, U64Be, read::ReadArray},
+    binary::{
+        U8, U16Be, U32Be, U64Be,
+        read::{ReadArray, ReadCtxt, ReadUnchecked},
+    },
 };
 
 /// Trait implemented over marker-type proxies that implement the most natural parse for their
