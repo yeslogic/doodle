@@ -6,6 +6,7 @@ pub(crate) mod analysis;
 pub(crate) mod rebind;
 pub(crate) mod resolve;
 
+use crate::fixed::SpineElem;
 use crate::numeric::elaborator::IntType as ExtIntType;
 use crate::numeric::elaborator::PrimInt as ExtPrimInt;
 
@@ -734,6 +735,25 @@ impl RustTypeDef {
 pub enum FixedSizeType {
     Marker(MarkerType),
     Adhoc(LocalType),
+}
+
+impl FixedSizeType {
+    pub(crate) fn from_spine_elem(spine_elem: &SpineElem) -> Option<Self> {
+        match spine_elem {
+            SpineElem::Raw(base_kind) => {
+                Some(Self::Marker(MarkerType::from_base_kind_endian(*base_kind)))
+            }
+            // FIXME - currently we would need something like FixedTypeInfo for this case but that might not even be enough....
+            SpineElem::Indirect(_fref) => todo!(),
+        }
+    }
+
+    pub(crate) fn type_name(&self) -> Label {
+        match self {
+            FixedSizeType::Marker(mt) => Label::Borrowed(mt.name()),
+            FixedSizeType::Adhoc(lt) => Label::Owned(lt.to_fragment().to_string()),
+        }
+    }
 }
 
 impl ToFragment for FixedSizeType {

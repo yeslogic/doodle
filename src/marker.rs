@@ -36,6 +36,7 @@ impl Endian {
 /// with support for generic decoration with either `()` or [`Endian`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub enum BaseKind<X: Copy = ()> {
+    // FIXME - add support for U24, as well as signed integer types
     U8,
     U16Ext(X),
     U32Ext(X),

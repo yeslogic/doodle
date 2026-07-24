@@ -1046,7 +1046,7 @@ impl TypeChecker {
                         // constructing a `FixedReadKind::FixedFormat` around an ineligible
                         // `FormatRef` directly (`helper::read_array` cannot check this itself,
                         // as it has no `&FormatModule` access).
-                        analyze_fixed_shape(format).unwrap_or_else(|e| {
+                        analyze_fixed_shape(ctxt.module, format).unwrap_or_else(|e| {
                             panic!(
                                 "format `{}` is not eligible for FixedFormat ReadArray: {e}",
                                 ctxt.module.get_name(level),

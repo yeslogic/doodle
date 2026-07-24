@@ -1466,7 +1466,7 @@ impl FormatModule {
                             // and composed entirely of primitive fields (see
                             // `fixed::analyze_fixed_shape`); this is a precondition on
                             // construction, not a recoverable error.
-                            fixed::analyze_fixed_shape(self.get_format(level))
+                            fixed::analyze_fixed_shape(self, self.get_format(level))
                                 .unwrap_or_else(|e| {
                                     panic!(
                                         "format `{}` is not eligible for FixedFormat ReadArray: {e}",

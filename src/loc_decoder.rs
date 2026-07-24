@@ -8,8 +8,8 @@ use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
-    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, UnknownVarError, Value,
-    ValueSeq, cow_map, cow_remap, extract_pair,
+    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, SpineDecoder, UnknownVarError,
+    Value, ValueSeq, cow_map, cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
 };
@@ -1869,7 +1869,7 @@ impl Decoder {
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
                 for _ in 0..len {
-                    let (val, new_buf) = read_array_elem(buf, kind)?;
+                    let (val, new_buf) = read_array_elem(program, buf, kind)?;
                     accum.push(val);
                     buf = new_buf;
                 }
@@ -1936,12 +1936,32 @@ impl Decoder {
 }
 
 fn read_array_elem<'a>(
+    program: &'a Program,
     buf: ReadCtxt<'a>,
     kind: &ReadArrayKind,
 ) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
     match kind {
         ReadArrayKind::Base(kind) => read_base(buf, *kind),
-        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(buf, fields),
+        ReadArrayKind::Single { elem, .. } => read_spine_elem(program, buf, elem),
+        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(program, buf, fields),
+    }
+}
+
+/// Location-tracking counterpart of `decoder::read_spine_elem`: reads a single `SpineDecoder`,
+/// either directly (`Raw`) or by recursively invoking the compiled sub-decoder for a
+/// `FormatRef`-indirected primitive (`Indirect`). Non-fatal errors accumulated by the recursive
+/// `parse_with_loc` call are logged and discarded, matching the `extract_warn` boundary used
+/// elsewhere when a plain `Result` needs to be recovered from a `WithErr`-wrapped one.
+fn read_spine_elem<'a>(
+    program: &'a Program,
+    buf: ReadCtxt<'a>,
+    elem: &SpineDecoder,
+) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
+    match elem {
+        SpineDecoder::Raw(kind) => read_base(buf, *kind),
+        SpineDecoder::Indirect { dec } => Ok(dec
+            .parse_with_loc(program, &LocScope::Empty, buf)?
+            .extract_warn()),
     }
 }
 
@@ -1949,14 +1969,15 @@ fn read_array_elem<'a>(
 /// in order, building a `ParsedValue::Record` spanning the whole element out of the persisted
 /// (named) fields. Anonymous/ephemeral fields (`None`) are read but discarded.
 fn read_fixed_record<'a>(
+    program: &'a Program,
     buf: ReadCtxt<'a>,
-    fields: &[(Option<Label>, BaseKind<Endian>)],
+    fields: &[(Option<Label>, SpineDecoder)],
 ) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
     let start = buf.offset;
     let mut buf = buf;
     let mut captured = Vec::with_capacity(fields.len());
-    for (name, kind) in fields {
-        let (v, new_buf) = read_base(buf, *kind)?;
+    for (name, elem) in fields {
+        let (v, new_buf) = read_spine_elem(program, buf, elem)?;
         if let Some(name) = name {
             captured.push((name.clone(), v));
         }

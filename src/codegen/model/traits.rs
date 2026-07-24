@@ -259,6 +259,7 @@ pub mod smallsorts {
     pub struct ReadUnchecked;
 
     impl TraitObject for ReadUnchecked {
+        // FIXME - at the moemnt, we do not capture enough information to generate the `ReadUnchecked` for SpineShape::Indirect cases
         type TypeInfo<'a> = FixedFormatInfo<'a>;
 
         fn get_name() -> &'static str {
@@ -275,76 +276,81 @@ pub mod smallsorts {
                 unreachable!("no FixedFormat source was recorded for type index {ix}: {on_type:?}")
             };
             let format = type_info.module.get_format(format_ref.get_level());
-            let shape = fixed::analyze_fixed_shape(format).unwrap_or_else(|e| {
+            let shape = fixed::analyze_fixed_shape(type_info.module, format).unwrap_or_else(|e| {
                 unreachable!(
                     "type index {ix} was recorded as a FixedFormat target but is no longer a valid fixed-shape record: {e}"
                 )
             });
 
-            let body = {
-                let host_type = on_type.clone();
-                let size_const = RustExpr::num_lit(shape.stride);
-                let read_unchecked_method = {
-                    let method_lt = Label::Borrowed("'a");
-                    let body = {
-                        let mut stmts = Vec::with_capacity(shape.fields.len() + 1);
-                        let mut field_inits = Vec::with_capacity(shape.fields.len());
-                        for (field_name, kind) in &shape.fields {
-                            let marker = MarkerType::from_base_kind_endian(*kind);
-                            let read_expr = RustExpr::FunctionCall(
-                                Box::new(RustExpr::Entity(RustEntity::Scoped(
-                                    vec![Label::from(marker.name())],
-                                    lbl("read_unchecked"),
-                                ))),
-                                vec![RustExpr::local("ctxt")],
-                            );
-                            match field_name {
-                                Some(field_name) => {
-                                    stmts.push(RustStmt::assign(field_name.clone(), read_expr));
-                                    field_inits.push((
-                                        field_name.clone(),
-                                        Some(RustExpr::local(field_name.clone())),
-                                    ));
+            let body = match shape {
+                fixed::FixedShape::Record { fields, stride } => {
+                    let host_type = on_type.clone();
+                    let size_const = RustExpr::num_lit(stride);
+                    let read_unchecked_method = {
+                        let method_lt = Label::Borrowed("'a");
+                        let body = {
+                            let mut stmts = Vec::with_capacity(fields.len() + 1);
+                            let mut field_inits = Vec::with_capacity(fields.len());
+                            for (field_name, elem) in &fields {
+                                // FIXME - from_spine_elem isn't yet implemented for Indirect
+                                let marker = FixedSizeType::from_spine_elem(elem).unwrap();
+                                let read_expr = RustExpr::FunctionCall(
+                                    Box::new(RustExpr::Entity(RustEntity::Scoped(
+                                        vec![marker.type_name()],
+                                        lbl("read_unchecked"),
+                                    ))),
+                                    vec![RustExpr::local("ctxt")],
+                                );
+                                match field_name {
+                                    Some(field_name) => {
+                                        stmts.push(RustStmt::assign(field_name.clone(), read_expr));
+                                        field_inits.push((
+                                            field_name.clone(),
+                                            Some(RustExpr::local(field_name.clone())),
+                                        ));
+                                    }
+                                    None => stmts.push(RustStmt::Expr(read_expr)),
                                 }
-                                None => stmts.push(RustStmt::Expr(read_expr)),
                             }
-                        }
-                        let construct = RustExpr::Struct(
-                            Constructor::Simple(name.clone()),
-                            StructExpr::Record(field_inits),
-                        );
-                        stmts.push(RustStmt::Return(ReturnKind::Implicit, construct));
-                        stmts
+                            let construct = RustExpr::Struct(
+                                Constructor::Simple(name.clone()),
+                                StructExpr::Record(field_inits),
+                            );
+                            stmts.push(RustStmt::Return(ReturnKind::Implicit, construct));
+                            stmts
+                        };
+                        let sig = {
+                            let arg_type = RustType::borrow_of(
+                                None,
+                                Mut::Mutable,
+                                RustType::Verbatim(
+                                    Label::Borrowed("ReadCtxt"),
+                                    Some(Box::new(UseParams::from_lt(lt(method_lt.clone())))),
+                                ),
+                            );
+                            let ret = on_type.clone();
+                            FnSig::new(vec![(lbl("ctxt"), arg_type)], Some(ret))
+                        };
+                        RustFn::new_unsafe(
+                            "read_unchecked",
+                            Some(DefParams::from_lt(method_lt)),
+                            sig,
+                            body,
+                        )
                     };
-                    let sig = {
-                        let arg_type = RustType::borrow_of(
-                            None,
-                            Mut::Mutable,
-                            RustType::Verbatim(
-                                Label::Borrowed("ReadCtxt"),
-                                Some(Box::new(UseParams::from_lt(lt(method_lt.clone())))),
-                            ),
-                        );
-                        let ret = on_type.clone();
-                        FnSig::new(vec![(lbl("ctxt"), arg_type)], Some(ret))
-                    };
-                    RustFn::new_unsafe(
-                        "read_unchecked",
-                        Some(DefParams::from_lt(method_lt)),
-                        sig,
-                        body,
-                    )
-                };
-                vec![
-                    TraitItem::AssocType(Label::Borrowed("HostType"), None, host_type),
-                    TraitItem::Const(
-                        Label::Borrowed("SIZE"),
-                        Box::new(RustType::from(PrimType::Usize)),
-                        size_const,
-                    ),
-                    TraitItem::Method(read_unchecked_method),
-                ]
+                    vec![
+                        TraitItem::AssocType(Label::Borrowed("HostType"), None, host_type),
+                        TraitItem::Const(
+                            Label::Borrowed("SIZE"),
+                            Box::new(RustType::from(PrimType::Usize)),
+                            size_const,
+                        ),
+                        TraitItem::Method(read_unchecked_method),
+                    ]
+                }
+                fixed::FixedShape::Single { format, stride } => todo!(),
             };
+
             RustTraitImpl {
                 param_bindings: None,
                 trait_params: None,
