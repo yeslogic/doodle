@@ -6,7 +6,7 @@ use anyhow::{Result as AResult, anyhow};
 
 use crate::byte_set::ByteSet;
 use crate::error::{DecodeErrorKind, DecodeResult, EDecodeResult};
-use crate::fixed::analyze_fixed_shape;
+use crate::fixed::{SpineElem, analyze_fixed_shape};
 use crate::read::ReadCtxt;
 use crate::util::WithErr;
 use crate::util::{ErrTrace as _, downgrade_error_with};
@@ -486,6 +486,12 @@ pub(crate) mod search;
 #[derive(Clone, Debug)]
 pub enum ReadArrayKind {
     Base(BaseKind<Endian>),
+    /// A single `SpineElem` (see [`crate::fixed::FixedShape::Single`]), read directly as the
+    /// element value with no record-wrapping.
+    Single {
+        elem: SpineDecoder,
+        stride: usize,
+    },
     /// A struct-shaped element made up purely of primitive fields. Persisted (named) fields
     /// become entries of the resulting `Value::Record`; anonymous/ephemeral fields (`None`)
     /// are still read -- and so still contribute to `stride` -- but are not persisted.
@@ -494,15 +500,26 @@ pub enum ReadArrayKind {
     /// (see codegen) requires no change here: this variant already carries the complete field
     /// layout regardless of which structs end up with a generated Rust-side impl.
     FixedFormat {
-        fields: Rc<[(Option<Label>, BaseKind<Endian>)]>,
+        fields: Vec<(Option<Label>, SpineDecoder)>,
         stride: usize,
     },
+}
+
+/// Compiled (interpreter-ready) form of [`crate::fixed::SpineElem`]: either a direct base-kind
+/// read, or a self-contained sub-`Decoder` compiled from the target of a `SpineElem::Indirect`'s
+/// `FormatRef` (which is restricted to a single `CommonOp` read, possibly `Variant`-wrapped, so
+/// the compiled `Decoder` never contains a `Decoder::Call` of its own and can be parsed standalone).
+#[derive(Debug, Clone)]
+pub enum SpineDecoder {
+    Raw(BaseKind<Endian>),
+    Indirect { dec: Rc<Decoder> },
 }
 
 impl ReadArrayKind {
     pub(crate) fn stride(&self) -> usize {
         match self {
             ReadArrayKind::Base(kind) => kind.size(),
+            ReadArrayKind::Single { stride, .. } => *stride,
             ReadArrayKind::FixedFormat { stride, .. } => *stride,
         }
     }
@@ -624,6 +641,22 @@ impl<'a> Compiler<'a> {
         let module = FormatModule::new();
         let mut compiler = Compiler::new(&module);
         compiler.compile_format(format, Rc::new(Next::Empty))
+    }
+
+    /// Compiles a [`crate::fixed::SpineElem`] into its interpreter-ready [`SpineDecoder`]
+    /// counterpart. `Raw` needs no compilation; `Indirect` compiles the (validated, single-hop)
+    /// target of the `FormatRef` into a self-contained `Decoder`, which never emits its own
+    /// `Decoder::Call` since `SpineElem::Indirect` only ever refers to a target that performs
+    /// exactly one `CommonOp` read (optionally `Variant`-wrapped) with no further indirection.
+    fn compile_spine_elem(&mut self, elem: &SpineElem) -> AResult<SpineDecoder> {
+        match elem {
+            SpineElem::Raw(kind) => Ok(SpineDecoder::Raw(*kind)),
+            SpineElem::Indirect(format_ref) => {
+                let target = self.module.get_format(format_ref.get_level());
+                let dec = self.compile_format(target, Rc::new(Next::Empty))?;
+                Ok(SpineDecoder::Indirect { dec: Rc::new(dec) })
+            }
+        }
     }
 
     /// Extracted helper to construct the inner `next` value to be used for
@@ -943,19 +976,33 @@ impl<'a> Compiler<'a> {
                     // `typecheck::infer_var_view_format` -- cheap and pure over `&Format`, so
                     // recomputing here (rather than threading it through the AST) keeps this
                     // as the single source of truth for the field layout.
-                    let shape = analyze_fixed_shape(format).unwrap_or_else(|e| {
+                    let shape = analyze_fixed_shape(self.module, format).unwrap_or_else(|e| {
                         panic!(
                             "format `{}` is not eligible for FixedFormat ReadArray: {e}",
                             self.module.get_name(level),
                         )
                     });
+                    let read_array_kind = match shape {
+                        crate::fixed::FixedShape::Single { format, stride } => {
+                            let elem = self.compile_spine_elem(&format)?;
+                            ReadArrayKind::Single { elem, stride }
+                        }
+                        crate::fixed::FixedShape::Record { fields, stride } => {
+                            let mut accum = Vec::with_capacity(fields.len());
+                            for (name, field) in fields.iter() {
+                                let dec = self.compile_spine_elem(field)?;
+                                accum.push((name.clone(), dec));
+                            }
+                            ReadArrayKind::FixedFormat {
+                                fields: accum,
+                                stride,
+                            }
+                        }
+                    };
                     Ok(Decoder::ReadArray(
                         v_expr.clone(),
                         len.clone(),
-                        ReadArrayKind::FixedFormat {
-                            fields: shape.fields.into(),
-                            stride: shape.stride,
-                        },
+                        read_array_kind,
                     ))
                 }
                 ViewFormat::ReifyView => Ok(Decoder::ReifyView(v_expr.clone())),
@@ -1714,15 +1761,18 @@ impl Decoder {
                 let view_window = Self::eval_view_expr(scope, v_expr)?;
 
                 // REVIEW - hardcoded big-endianness
-                let mut accum = Vec::with_capacity(len);
-                let mut buf = view_window;
-                for ix in 0..len {
-                    let (val, new_buf) = try_with!(read_array_elem(buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}")));
-                    accum.push(val);
-                    buf = new_buf;
-                }
 
-                Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
+                let folded = WithErr::fold(
+                    (Vec::with_capacity(len), view_window),
+                    0..len,
+                    |(mut accum, buf), ix| {
+                        Ok(try_with!(read_array_elem(program, buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}"))).map(|(val, new_buf)| {
+                            accum.push(val);
+                            (accum, new_buf)
+                        }))
+                    },
+                )?;
+                Ok(folded.map(|(accum, _buf)| (Value::Seq(SeqKind::Strict(accum)), input)))
             }
             Decoder::ReifyView(v_expr) => {
                 let view = try_with!(Self::eval_view_expr(scope, v_expr) => ("ReifyView", format!("view: {v_expr:?}")));
@@ -1779,12 +1829,27 @@ impl Decoder {
 }
 
 fn read_array_elem<'a>(
+    program: &'a Program,
     buf: ReadCtxt<'a>,
     kind: &ReadArrayKind,
-) -> Result<(Value, ReadCtxt<'a>), DecodeErrorKind> {
+) -> EDecodeResult<(Value, ReadCtxt<'a>)> {
     match kind {
-        ReadArrayKind::Base(kind) => read_base(buf, *kind),
-        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(buf, fields),
+        ReadArrayKind::Base(kind) => Ok(WithErr::new(read_base(buf, *kind)?)),
+        ReadArrayKind::Single { elem, .. } => read_spine_elem(program, buf, elem),
+        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(program, buf, fields),
+    }
+}
+
+/// Reads a single `SpineDecoder`-kinded parse-directive: either a direct base-kind read, or a
+/// recursive invocation of the compiled sub-`Decoder` for a `SpineElem::Indirect`'s `FormatRef`.
+fn read_spine_elem<'a>(
+    program: &'a Program,
+    buf: ReadCtxt<'a>,
+    elem: &SpineDecoder,
+) -> EDecodeResult<(Value, ReadCtxt<'a>)> {
+    match elem {
+        SpineDecoder::Raw(kind) => Ok(WithErr::new(read_base(buf, *kind)?)),
+        SpineDecoder::Indirect { dec } => dec.parse(program, &Scope::Empty, buf),
     }
 }
 
@@ -1793,19 +1858,23 @@ fn read_array_elem<'a>(
 /// Anonymous/ephemeral fields (`None`) are read -- consuming their share of bytes -- but
 /// discarded rather than included in the resulting record, matching `record_fmt::analyze_fixed_shape`.
 fn read_fixed_record<'a>(
+    program: &'a Program,
     buf: ReadCtxt<'a>,
-    fields: &[(Option<Label>, BaseKind<Endian>)],
-) -> Result<(Value, ReadCtxt<'a>), DecodeErrorKind> {
-    let mut buf = buf;
-    let mut captured = Vec::with_capacity(fields.len());
-    for (name, kind) in fields {
-        let (v, new_buf) = read_base(buf, *kind)?;
-        if let Some(name) = name {
-            captured.push((name.clone(), v));
-        }
-        buf = new_buf;
-    }
-    Ok((Value::Record(captured), buf))
+    fields: &[(Option<Label>, SpineDecoder)],
+) -> EDecodeResult<(Value, ReadCtxt<'a>)> {
+    let folded = WithErr::fold(
+        (Vec::with_capacity(fields.len()), buf),
+        fields,
+        |(mut captured, input), (name, elem)| {
+            Ok(try_with!(read_spine_elem(program, input, elem) => ("FixedFormat field", format!("name: {name:?}"))).map(|(v, new_buf)| {
+                if let Some(name) = name {
+                    captured.push((name.clone(), v));
+                }
+                (captured, new_buf)
+            }))
+        },
+    )?;
+    Ok(folded.map(|(captured, buf)| (Value::Record(captured), buf)))
 }
 
 fn read_base(

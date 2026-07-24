@@ -1,32 +1,55 @@
 //! Fixed-shape analysis for `Format`s for [`crate::marker::FixedReadKind::FixedFormat`] validation and subsequent processing
 
 use crate::record_fmt::RecordFormat;
-use crate::{BaseKind, CommonOp, Endian, Format, Label, StyleHint};
+use crate::{BaseKind, CommonOp, Endian, Format, FormatModule, FormatRef, Label, StyleHint};
 use anyhow::{Result as AResult, anyhow};
 
 // REVIEW - currently we are only able to compute the fixed-shape of a `Format` if it is record-shaped and uses raw commonops without any FormatRef indirection calls
 // REVIEW - cases that are unhandled: tuples, formatref calls, bit-flags records, nested fixedformats, variant-wrappers around commmonops
 
-/// The flattened, order-preserving field-layout of a `Format` that is provably fixed-size and
-/// composed entirely of base-kind (`u8`/`u16be`/`u32be`/`u64be`, ...) primitive reads.
+impl From<BaseKind<Endian>> for SpineElem {
+    fn from(kind: BaseKind<Endian>) -> Self {
+        SpineElem::Raw(kind)
+    }
+}
+
+// NOTE - because FormatRefs need to be validated, we deliberately do not implement `From<FormatRef>`
+
+/// An 'atomic' fixed-size parse operation that consumes only one element of some `BaseKind<Endian>`, whether directly or through some indirection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SpineElem {
+    /// Simple base-kind parse via `Format::Hint(StyleHint::CommonOp(_), _)``
+    Raw(BaseKind<Endian>),
+    /// Indirect implicit base-kind parse that is performed but potentially wrapped in a Variant or mapped to a computed object (e.g. `bit_fields_u16`)
+    Indirect(FormatRef),
+}
+
 ///
 /// This is the precondition for a `FormatRef` to be usable as the element-type of a strided
 /// `ReadArray` (i.e. a candidate for `FixedReadKind::FixedFormat`): every field must have a
 /// statically-known byte-width with no data-dependent control flow, so that `stride` can be
 /// relied on to skip to the next element regardless of what an individual element-parse consumes.
 #[derive(Debug, Clone)]
-pub(crate) struct FixedShape {
-    /// Ordered list of fields, alongside the persisted name of the field (if any -- ephemeral
-    /// and anonymous fields have no name to report but still occupy space in the layout).
-    pub(crate) fields: Vec<(Option<Label>, BaseKind<Endian>)>,
-    /// Total byte-length of one element, equal to the sum of `BaseKind::size()` over `fields`.
-    pub(crate) stride: usize,
+pub(crate) enum FixedShape {
+    /// Single SpineElem with a statically-known stride
+    ///
+    /// We are not forced to store which `BaseKind<Endian>` it amounts to, but we at least store its stride so that we do not need to thread in `FormatModule` to determine how wide it is.
+    Single { format: SpineElem, stride: usize },
+    /// The flattened, order-preserving field-layout of a `Format` that is provably fixed-size and
+    /// composed entirely of base-kind (`u8`/`u16be`/`u32be`/`u64be`, ...) primitive reads.
+    Record {
+        /// Ordered list of fields, alongside the persisted name of the field (if any -- ephemeral
+        /// and anonymous fields have no name to report but still occupy space in the layout).
+        fields: Vec<(Option<Label>, SpineElem)>,
+        /// Total byte-length of one element, equal to the sum of `BaseKind::size()` over `fields`.
+        stride: usize,
+    },
 }
 
 /// Attempts to compute the [`FixedShape`] of `format`, for use as the element-type of a
-/// fixed-format `ReadArray`. Returns an error if the format is not a record, if
-/// any of its fields are ephemeral or anonymous, or if any of its fields have non-primitive
-/// parses.
+/// fixed-format `ReadArray`.
+///
+/// Will return an error if `format` does not satisfy the requirements of a fixed-shape parse.
 ///
 /// # Notes
 ///
@@ -36,11 +59,30 @@ pub(crate) struct FixedShape {
 ///   defers to the `CommonOp::EndianParse` tag rather than re-deriving the kind from the
 ///   underlying byte-parse), but downstream consumers presently reject them (see the
 ///   `unimplemented!` arms in `codegen::model::read_array_from_view` and `decoder::read_base`).
-/// - Certain fixed-shape parses are not yet supported, such as [`crate::helper::bit_fields_u16`] and tuple-shape
-///   formats whose constituents nevertheless satisfy the requirement of primitive CommonOp parses.
-pub(crate) fn analyze_fixed_shape(format: &Format) -> AResult<FixedShape> {
-    let record =
-        RecordFormat::try_from(format).map_err(|e| anyhow!("not a record-shaped format: {e}"))?;
+/// - Because arbitrary tuple-formats do not end up with adhoc type bindings, we cannot predictably
+///   use ReadArray over anonymous tuples and therefore tuple-types are rejected.
+pub(crate) fn analyze_fixed_shape(module: &FormatModule, format: &Format) -> AResult<FixedShape> {
+    match RecordFormat::try_from(format) {
+        Ok(record) => analyze_record(module, record, format),
+        Err(_) => analyze_single(module, format),
+    }
+}
+
+fn analyze_single(module: &FormatModule, format: &Format) -> AResult<FixedShape> {
+    let Some((spine, size)) = as_spine_elem(module, format) else {
+        return Err(anyhow!("unsupported spine-elem format: {format:?}"));
+    };
+    Ok(FixedShape::Single {
+        format: spine,
+        stride: size,
+    })
+}
+
+fn analyze_record<'a>(
+    module: &FormatModule,
+    record: RecordFormat<'a>,
+    _format: &'a Format,
+) -> AResult<FixedShape> {
     let mut fields = Vec::with_capacity(record.len());
     let mut stride = 0usize;
     for (ix, (field_label, field_format)) in record.iter().enumerate() {
@@ -52,48 +94,81 @@ pub(crate) fn analyze_fixed_shape(format: &Format) -> AResult<FixedShape> {
             Some((name, true)) => Some(name.clone()),
             Some((name, false)) => {
                 return Err(anyhow!(
-                    "bad ephemeral-field label: ({name}: {field_format:?}) in {format:?}"
+                    "bad ephemeral-field label: ({name}: {field_format:?}) in {_format:?}"
                 ));
             }
             None => {
                 return Err(anyhow!(
-                    "bad anonymous-field parse: (_{ix}: {field_format:?}) in {format:?}"
+                    "bad anonymous-field parse: (_{ix}: {field_format:?}) in {_format:?}"
                 ));
             }
         };
-        let kind = as_base_kind_read(field_format).ok_or_else(|| {
+        let (kind, size) = as_spine_elem(module, field_format).ok_or_else(|| {
             anyhow!(
                 "field `{}` is not a fixed-size primitive read: {field_format:?}",
                 name.as_deref().unwrap_or("<anonymous>"),
             )
         })?;
-        stride += kind.size();
+        stride += size;
         fields.push((name, kind));
     }
-    Ok(FixedShape { fields, stride })
+    Ok(FixedShape::Record { fields, stride })
+}
+
+/// Given a `format` and a `ForamtModule` to resolve `ItemVar`, determine if `format` can be
+/// expressed as a `SpineElem`, returning `Some` if so and `None` otherwise.
+///
+/// Returns the `SpineElem` and the number of bytes it consumes from the buffer when being parsed.
+fn as_spine_elem(module: &FormatModule, format: &Format) -> Option<(SpineElem, usize)> {
+    match format {
+        &Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), _) => {
+            Some((kind.into(), kind.size()))
+        }
+        Format::ItemVar(level, exprs, views) if exprs.is_empty() && views.is_empty() => {
+            let target = module.get_format(*level);
+            let size = as_indirect(target)?;
+            Some((SpineElem::Indirect(FormatRef(*level)), size))
+        }
+        Format::Variant(_, inner) => {
+            log::warn!(
+                "as_spine_elem: Variant(_, {inner:?}) cannot be used as a spine-elem without FormatRef indirection"
+            );
+            None
+        }
+        _ => None,
+    }
+}
+
+/// Non-recursive analysis for a leaf-format to determine whether it is a valid target of
+/// `FormatRef` indirection (i.e. a legal referent of `SpineElem::Indirect`).
+///
+/// It must only consume a static number of bytes one time, as a CommonOp, and should not have any dependent
+/// or speculative buffer operations.
+///
+/// Returns the number of bytes it consumes from the buffer when being parsed.
+fn as_indirect(format: &Format) -> Option<usize> {
+    match format {
+        Format::Variant(_, inner) => Some(as_base_kind_read(inner)?.size()),
+        // TODO - figure out how to recognize `bit_fields_u16` reliably, ergonomically, and without false-positives
+        other => {
+            // fallthrough: all special cases are handled above and anything besides CommonOp will be rejected at this point
+            Some(as_base_kind_read(other)?.size())
+        }
+    }
 }
 
 /// Recognizes the `Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), ..)` wrapper
 /// that every base-kind constructor in [`crate::helper`] produces (see `helper::u8`, and the
 /// `endian!`-macro-generated `u16be`/`u32be`/`u64be`/etc.), without needing to inspect or
 /// re-derive the kind from the byte-tuple parse it wraps.
+///
+/// # Notes
+///
+/// Currently does not work properly for signed-integer types, as well as atypical endian-reads
+/// like `U24Be`.
 fn as_base_kind_read(format: &Format) -> Option<BaseKind<Endian>> {
     match format {
         Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), _) => Some(*kind),
-        Format::ItemVar(level, exprs, views) if exprs.is_empty() && views.is_empty() => {
-            log::info!(
-                "as_base_kind_read: found ItemVar({level}, [], []), which should be handled but isn't yet"
-            );
-            // FIXME - include module argument and do proper recursive analysis
-            None
-        }
-        Format::Variant(_, inner) => {
-            log::info!(
-                "as_base_kind_read: found Variant(_, {inner:?}), which should be handled but isn't yet"
-            );
-            // FIXME - do proper recursive analysis after we have the means to report the variant-wrapping appropriately
-            None
-        }
         _ => None,
     }
 }
@@ -105,59 +180,80 @@ mod tests {
 
     /// Regression-test: are records correctly analyzed?
     #[test]
-    fn fixed_regression_record_correct() {
-        let f0 = Format::Record(vec![]);
-        let fix_f0 = analyze_fixed_shape(&f0).unwrap();
-        assert!(fix_f0.fields.is_empty());
-        assert_eq!(fix_f0.stride as u8, 0);
+    fn analyze_fixed_shape_accepts_record() {
+        let f0 = Format::Compute(Box::new(crate::Expr::Record(vec![])));
+        let FixedShape::Record { fields, stride } =
+            analyze_fixed_shape(&FormatModule::new(), &f0).unwrap()
+        else {
+            panic!("expected FixedShape::Record");
+        };
+        assert!(fields.is_empty());
+        assert_eq!(stride, 0);
 
         // STUB - add more meaningful cases
-        let f1 = Format::Record(vec![
-            ("a", u8()),
-            ("b", u16be()),
-            ("c", u32le()),
-            ("d", u64be()),
+        let f1 = record([
+            ("x8", u8()),
+            ("x16be", u16be()),
+            ("x32le", u32le()),
+            ("x64be", u64be()),
         ]);
-        let fix_f1 = analyze_fixed_shape(&f1).unwrap();
+        let FixedShape::Record { fields, stride } =
+            analyze_fixed_shape(&FormatModule::new(), &f1).unwrap()
+        else {
+            panic!("expected FixedShape::Record");
+        };
         assert_eq!(
-            fix_f1.fields.as_slice(),
+            fields.as_slice(),
             &[
-                (Some("a"), BaseKind::U8),
-                (Some("b"), BaseKind::U16(Endian::BE)),
-                (Some("c"), BaseKind::U32(Endian::LE)),
-                (Some("d"), BaseKind::U64(Endian::BE))
+                (Some(Label::Borrowed("x8")), SpineElem::Raw(BaseKind::U8)),
+                (
+                    Some(Label::Borrowed("x16be")),
+                    SpineElem::Raw(BaseKind::U16BE)
+                ),
+                (
+                    Some(Label::Borrowed("x32le")),
+                    SpineElem::Raw(BaseKind::U32LE)
+                ),
+                (
+                    Some(Label::Borrowed("x64be")),
+                    SpineElem::Raw(BaseKind::U64BE)
+                ),
             ]
         );
-        assert_eq!(fix_f1.stride as u8, 15);
+        assert_eq!(stride, 15);
     }
 
     #[test]
-    #[should_panic]
-    fn fixed_regresision_tuple_incorrect() {
-        let f0 = tuple([u8(), u32(), u32()]);
-        assert!(analyze_fixed_shape(&f0).is_ok());
+    fn analyze_fixed_shape_rejects_tuple() {
+        let f0 = tuple([u8(), u32be(), u32be()]);
+        assert!(analyze_fixed_shape(&FormatModule::new(), &f0).is_err());
     }
 
     #[test]
-    #[should_panic]
-    fn base_regression_itemvar_incorrect() {
+    fn analyze_fixed_shape_accepts_itemvar() {
         let mut module = FormatModule::new();
         let word = module.define_format("word", u32be());
         let f = word.call();
-        assert!(as_base_kind_read(&f).is_some());
+        assert!(analyze_fixed_shape(&module, &f).is_ok());
     }
 
     #[test]
-    #[should_panic]
-    fn base_regression_variant_incorrect() {
+    fn analyze_fixed_shape_accepts_variant() {
         let mut module = FormatModule::new();
-        let f = fmt_variant("Word", u32be());
-        assert!(as_base_kind_read(&f).is_some());
+        let word_variant = module.define_format("word_variant", fmt_variant("Word", u32be()));
+        let f = word_variant.call();
+        let shape = analyze_fixed_shape(&module, &f).unwrap();
+        let FixedShape::Single { format, stride } = shape else {
+            panic!("expected FixedShape::Single");
+        };
+        assert_eq!(format, SpineElem::Indirect(word_variant));
+        assert_eq!(stride, 4);
     }
 
     #[test]
+    // NOTE - This is a regression so the panic is documenting the current behavior - the eventual goal is for this to pass
     #[should_panic]
-    fn base_regression_signed_incorrect() {
+    fn analyze_fixed_shape_accepts_signed() {
         let f = i32be();
         assert!(as_base_kind_read(&f).is_some());
     }
