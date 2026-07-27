@@ -7786,7 +7786,7 @@ opentype_cpal_color_record { blue: blue, green: green, red: red, alpha: alpha }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
-/// fixed-format: emits `ReadUnchecked` (format level 436)
+/// fixed-format: emits 1 `ReadUnchecked` impl(s) (format level 436)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_color_record {
 blue: u8,

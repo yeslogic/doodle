@@ -651,7 +651,7 @@ impl<'a> Compiler<'a> {
     fn compile_spine_elem(&mut self, elem: &SpineElem) -> AResult<SpineDecoder> {
         match elem {
             SpineElem::Raw(kind) => Ok(SpineDecoder::Raw(*kind)),
-            SpineElem::Indirect(format_ref) => {
+            SpineElem::Indirect(format_ref, _kind) => {
                 let target = self.module.get_format(format_ref.get_level());
                 let dec = self.compile_format(target, Rc::new(Next::Empty))?;
                 Ok(SpineDecoder::Indirect { dec: Rc::new(dec) })
@@ -971,12 +971,11 @@ impl<'a> Compiler<'a> {
                 )),
                 ViewFormat::ReadArray(len, FixedReadKind::FixedFormat(format_ref)) => {
                     let level = format_ref.get_level();
-                    let format = self.module.get_format(level);
                     // Re-derives the same `FixedShape` already validated by
                     // `typecheck::infer_var_view_format` -- cheap and pure over `&Format`, so
                     // recomputing here (rather than threading it through the AST) keeps this
                     // as the single source of truth for the field layout.
-                    let shape = analyze_fixed_shape(self.module, format).unwrap_or_else(|e| {
+                    let shape = analyze_fixed_shape(self.module, *format_ref).unwrap_or_else(|e| {
                         panic!(
                             "format `{}` is not eligible for FixedFormat ReadArray: {e}",
                             self.module.get_name(level),

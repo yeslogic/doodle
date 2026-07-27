@@ -14,7 +14,7 @@ use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY}
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{Precedence, cond_paren};
-use crate::{BaseKind, BaseType, Endian, IntoLabel, Label, ValueType};
+use crate::{BaseKind, BaseType, Endian, FormatRef, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -306,7 +306,7 @@ impl RustItem {
     ///
     /// Attaches the specified set of derive-traits `traits` to the declaration if it is a type definition.
     ///
-    /// Currently, this argument is ignored for functions.
+    /// Equivalent to `from_decl` when called on function declarations or trait impl blocks.
     pub fn from_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
         let attrs = Self::generate_attrs(&decl, traits);
         Self::from_parts_no_doc(decl, Default::default(), attrs)
@@ -322,7 +322,8 @@ impl RustItem {
         Self::from_parts_no_doc(decl, Visibility::Public, attrs)
     }
 
-    /// Promotes a standalone declaration to a top-level item with the specified visibility and attributes.
+    /// Promotes a standalone declaration to a top-level item with the specified visibility and attributes,
+    /// without any accompanying doc-comments.
     fn from_parts_no_doc(decl: RustDecl, vis: Visibility, attrs: Vec<RustAttr>) -> Self {
         Self {
             attrs,
@@ -332,13 +333,19 @@ impl RustItem {
         }
     }
 
-    /// Promotes a type declaration to a top-level item with implicit 'pub(self)' visibility and the default set of derive-traits
-    /// (currently, `Debug` and `Clone`).
+    /// Promotes a type/function declaration or trait-impl to a top-level item with implicit 'pub(self)' visibility.
     ///
-    /// For more fine-control over the traits that are derived, use [`from_decl_with_traits`](Self::from_decl_with_traits).
+    /// For type declarations in particular, attaches the default set of derive-traits (currently, `Debug` and `Clone`).
+    ///
+    /// For more fine-control over the traits that are derived for type-declarations, use [`from_decl_with_traits`](Self::from_decl_with_traits).
     #[inline]
     pub fn from_decl(decl: RustDecl) -> Self {
         Self::from_decl_with_traits(decl, TraitSet::default())
+    }
+
+    /// Given an iterable container of `RustDecl`s, returns an iterable container of `RustItem`s produced via [`from_decl`](Self::from_decl).
+    pub fn from_decls(decls: impl IntoIterator<Item = RustDecl>) -> impl Iterator<Item = Self> {
+        decls.into_iter().map(Self::from_decl)
     }
 
     /// Promotes a type declaration to a top-level item with implicit 'pub(self)' visibility and the default set of derive-traits
@@ -351,6 +358,11 @@ impl RustItem {
         Self::pub_decl_with_traits(decl, TraitSet::default())
     }
 
+    /// Given an existing `RustItem`, returns a new `RustItem` with the specified doc-comment.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the `RustItem` already has a doc-comment.
     pub fn with_comment<Text: IntoLabel>(
         mut self,
         comment: impl IntoIterator<Item = Text>,
@@ -490,6 +502,13 @@ impl RustDecl {
     #[expect(dead_code)]
     pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
         Self::TypeDef(lab.into(), RustTypeDecl { def, lt: None })
+    }
+
+    /// Lifts an iterable container of `RUs`
+    pub fn trait_blocks(
+        trait_impls: impl IntoIterator<Item = RustTraitImpl>,
+    ) -> impl Iterator<Item = RustDecl> {
+        trait_impls.into_iter().map(RustDecl::TraitImpl)
     }
 }
 
@@ -738,13 +757,21 @@ pub enum FixedSizeType {
 }
 
 impl FixedSizeType {
-    pub(crate) fn from_spine_elem(spine_elem: &SpineElem) -> Option<Self> {
+    /// `resolve_indirect` resolves the `FormatRef` inside a `SpineElem::Indirect` to the
+    /// `(defined_types index, type name, lifetime params)` of the ad-hoc Rust type its target
+    /// format was elaborated into (see `codegen::model::traits::smallsorts::FixedFormatInfo`).
+    pub(crate) fn from_spine_elem(
+        spine_elem: &SpineElem,
+        resolve_indirect: impl FnOnce(FormatRef) -> Option<(usize, Label, Option<Box<UseParams>>)>,
+    ) -> Option<Self> {
         match spine_elem {
             SpineElem::Raw(base_kind) => {
                 Some(Self::Marker(MarkerType::from_base_kind_endian(*base_kind)))
             }
-            // FIXME - currently we would need something like FixedTypeInfo for this case but that might not even be enough....
-            SpineElem::Indirect(_fref) => todo!(),
+            SpineElem::Indirect(fref, _kind) => {
+                let (ix, name, params) = resolve_indirect(*fref)?;
+                Some(Self::Adhoc(LocalType::LocalDef(ix, name, params)))
+            }
         }
     }
 

@@ -20,8 +20,12 @@ impl From<BaseKind<Endian>> for SpineElem {
 pub(crate) enum SpineElem {
     /// Simple base-kind parse via `Format::Hint(StyleHint::CommonOp(_), _)``
     Raw(BaseKind<Endian>),
-    /// Indirect implicit base-kind parse that is performed but potentially wrapped in a Variant or mapped to a computed object (e.g. `bit_fields_u16`)
-    Indirect(FormatRef),
+    /// Indirect implicit base-kind parse that is performed but potentially wrapped in a Variant or mapped to a computed object (e.g. `bit_fields_u16`).
+    ///
+    /// The `BaseKind<Endian>` is the kind of the underlying primitive read, carried alongside the
+    /// `FormatRef` because it is not recoverable from `RustType`/codegen state downstream (a
+    /// `u32` field looks the same whether it was parsed as `u32be` or `u32le`).
+    Indirect(FormatRef, BaseKind<Endian>),
 }
 
 ///
@@ -61,15 +65,23 @@ pub(crate) enum FixedShape {
 ///   `unimplemented!` arms in `codegen::model::read_array_from_view` and `decoder::read_base`).
 /// - Because arbitrary tuple-formats do not end up with adhoc type bindings, we cannot predictably
 ///   use ReadArray over anonymous tuples and therefore tuple-types are rejected.
-pub(crate) fn analyze_fixed_shape(module: &FormatModule, format: &Format) -> AResult<FixedShape> {
+pub(crate) fn analyze_fixed_shape(
+    module: &FormatModule,
+    format_ref: FormatRef,
+) -> AResult<FixedShape> {
+    let format = module.get_format(format_ref.get_level());
     match RecordFormat::try_from(format) {
         Ok(record) => analyze_record(module, record, format),
-        Err(_) => analyze_single(module, format),
+        Err(_) => analyze_single(module, format_ref, format),
     }
 }
 
-fn analyze_single(module: &FormatModule, format: &Format) -> AResult<FixedShape> {
-    let Some((spine, size)) = as_spine_elem(module, format) else {
+fn analyze_single(
+    module: &FormatModule,
+    format_ref: FormatRef,
+    format: &Format,
+) -> AResult<FixedShape> {
+    let Some((spine, size)) = as_spine_elem(module, Some(format_ref), format) else {
         return Err(anyhow!("unsupported spine-elem format: {format:?}"));
     };
     Ok(FixedShape::Single {
@@ -103,7 +115,7 @@ fn analyze_record<'a>(
                 ));
             }
         };
-        let (kind, size) = as_spine_elem(module, field_format).ok_or_else(|| {
+        let (kind, size) = as_spine_elem(module, None, field_format).ok_or_else(|| {
             anyhow!(
                 "field `{}` is not a fixed-size primitive read: {field_format:?}",
                 name.as_deref().unwrap_or("<anonymous>"),
@@ -115,25 +127,36 @@ fn analyze_record<'a>(
     Ok(FixedShape::Record { fields, stride })
 }
 
-/// Given a `format` and a `ForamtModule` to resolve `ItemVar`, determine if `format` can be
+/// Given a `format` and a `FormatModule` to resolve `ItemVar`, determine if `format` can be
 /// expressed as a `SpineElem`, returning `Some` if so and `None` otherwise.
 ///
+/// `self_ref`, if provided, is the `FormatRef` that `format` itself is the (raw, unwrapped) body
+/// of -- i.e. `module.get_format(self_ref.get_level()) == format`. This is only meaningful (and
+/// only ever `Some`) when analyzing the top-level format passed to [`analyze_fixed_shape`]
+/// itself (via [`analyze_single`]): a bare `Format::Variant` has no `FormatRef` of its own to
+/// indirect through unless it *is* the very format a `FormatRef` was already resolved to by the
+/// caller, so record fields (which have no such anchor) always pass `None` and any bare
+/// `Format::Variant` found there is correctly rejected.
+///
 /// Returns the `SpineElem` and the number of bytes it consumes from the buffer when being parsed.
-fn as_spine_elem(module: &FormatModule, format: &Format) -> Option<(SpineElem, usize)> {
+fn as_spine_elem(
+    module: &FormatModule,
+    self_ref: Option<FormatRef>,
+    format: &Format,
+) -> Option<(SpineElem, usize)> {
     match format {
         &Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), _) => {
             Some((kind.into(), kind.size()))
         }
         Format::ItemVar(level, exprs, views) if exprs.is_empty() && views.is_empty() => {
             let target = module.get_format(*level);
-            let size = as_indirect(target)?;
-            Some((SpineElem::Indirect(FormatRef(*level)), size))
+            let kind = as_indirect(target)?;
+            Some((SpineElem::Indirect(FormatRef(*level), kind), kind.size()))
         }
-        Format::Variant(_, inner) => {
-            log::warn!(
-                "as_spine_elem: Variant(_, {inner:?}) cannot be used as a spine-elem without FormatRef indirection"
-            );
-            None
+        Format::Variant(..) => {
+            let self_ref = self_ref?;
+            let kind = as_indirect(format)?;
+            Some((SpineElem::Indirect(self_ref, kind), kind.size()))
         }
         _ => None,
     }
@@ -145,14 +168,14 @@ fn as_spine_elem(module: &FormatModule, format: &Format) -> Option<(SpineElem, u
 /// It must only consume a static number of bytes one time, as a CommonOp, and should not have any dependent
 /// or speculative buffer operations.
 ///
-/// Returns the number of bytes it consumes from the buffer when being parsed.
-fn as_indirect(format: &Format) -> Option<usize> {
+/// Returns the `BaseKind<Endian>` of the underlying primitive read.
+fn as_indirect(format: &Format) -> Option<BaseKind<Endian>> {
     match format {
-        Format::Variant(_, inner) => Some(as_base_kind_read(inner)?.size()),
+        Format::Variant(_, inner) => as_base_kind_read(inner),
         // TODO - figure out how to recognize `bit_fields_u16` reliably, ergonomically, and without false-positives
         other => {
             // fallthrough: all special cases are handled above and anything besides CommonOp will be rejected at this point
-            Some(as_base_kind_read(other)?.size())
+            as_base_kind_read(other)
         }
     }
 }
@@ -181,9 +204,12 @@ mod tests {
     /// Regression-test: are records correctly analyzed?
     #[test]
     fn analyze_fixed_shape_accepts_record() {
-        let f0 = Format::Compute(Box::new(crate::Expr::Record(vec![])));
-        let FixedShape::Record { fields, stride } =
-            analyze_fixed_shape(&FormatModule::new(), &f0).unwrap()
+        let mut module = FormatModule::new();
+        let empty = module.define_format(
+            "empty",
+            Format::Compute(Box::new(crate::Expr::Record(vec![]))),
+        );
+        let FixedShape::Record { fields, stride } = analyze_fixed_shape(&module, empty).unwrap()
         else {
             panic!("expected FixedShape::Record");
         };
@@ -191,14 +217,16 @@ mod tests {
         assert_eq!(stride, 0);
 
         // STUB - add more meaningful cases
-        let f1 = record([
-            ("x8", u8()),
-            ("x16be", u16be()),
-            ("x32le", u32le()),
-            ("x64be", u64be()),
-        ]);
-        let FixedShape::Record { fields, stride } =
-            analyze_fixed_shape(&FormatModule::new(), &f1).unwrap()
+        let rec = module.define_format(
+            "rec",
+            record([
+                ("x8", u8()),
+                ("x16be", u16be()),
+                ("x32le", u32le()),
+                ("x64be", u64be()),
+            ]),
+        );
+        let FixedShape::Record { fields, stride } = analyze_fixed_shape(&module, rec).unwrap()
         else {
             panic!("expected FixedShape::Record");
         };
@@ -225,29 +253,62 @@ mod tests {
 
     #[test]
     fn analyze_fixed_shape_rejects_tuple() {
-        let f0 = tuple([u8(), u32be(), u32be()]);
-        assert!(analyze_fixed_shape(&FormatModule::new(), &f0).is_err());
+        let mut module = FormatModule::new();
+        let tup = module.define_format("tup", tuple([u8(), u32be(), u32be()]));
+        assert!(analyze_fixed_shape(&module, tup).is_err());
     }
 
     #[test]
     fn analyze_fixed_shape_accepts_itemvar() {
         let mut module = FormatModule::new();
         let word = module.define_format("word", u32be());
-        let f = word.call();
-        assert!(analyze_fixed_shape(&module, &f).is_ok());
+        // `alias`'s own body is `Format::ItemVar(word.level(), ..)`, exercising the
+        // ItemVar-indirection arm of `as_spine_elem` (as opposed to the self-referencing arm,
+        // covered by `analyze_fixed_shape_accepts_variant` below).
+        let alias = module.define_format("alias", word.call());
+        let FixedShape::Single { format, stride } = analyze_fixed_shape(&module, alias).unwrap()
+        else {
+            panic!("expected FixedShape::Single");
+        };
+        assert_eq!(format, SpineElem::Indirect(word, BaseKind::U32BE));
+        assert_eq!(stride, 4);
     }
 
     #[test]
     fn analyze_fixed_shape_accepts_variant() {
         let mut module = FormatModule::new();
+        // `word_variant`'s own body *is* `Format::Variant(..)` directly (the natural, expected
+        // usage of `FixedReadKind::FixedFormat` for a Variant-wrapped primitive read) -- this
+        // exercises the self-referencing arm of `as_spine_elem`.
         let word_variant = module.define_format("word_variant", fmt_variant("Word", u32be()));
-        let f = word_variant.call();
-        let shape = analyze_fixed_shape(&module, &f).unwrap();
+        let shape = analyze_fixed_shape(&module, word_variant).unwrap();
         let FixedShape::Single { format, stride } = shape else {
             panic!("expected FixedShape::Single");
         };
-        assert_eq!(format, SpineElem::Indirect(word_variant));
+        assert_eq!(format, SpineElem::Indirect(word_variant, BaseKind::U32BE));
         assert_eq!(stride, 4);
+    }
+
+    #[test]
+    fn analyze_fixed_shape_accepts_record_with_indirect_field() {
+        let mut module = FormatModule::new();
+        let word_variant = module.define_format("word_variant", fmt_variant("Word", u32be()));
+        let rec = module.define_format("rec", record([("x", u8()), ("w", word_variant.call())]));
+        let FixedShape::Record { fields, stride } = analyze_fixed_shape(&module, rec).unwrap()
+        else {
+            panic!("expected FixedShape::Record");
+        };
+        assert_eq!(
+            fields.as_slice(),
+            &[
+                (Some(Label::Borrowed("x")), SpineElem::Raw(BaseKind::U8)),
+                (
+                    Some(Label::Borrowed("w")),
+                    SpineElem::Indirect(word_variant, BaseKind::U32BE)
+                ),
+            ]
+        );
+        assert_eq!(stride, 5);
     }
 
     #[test]
