@@ -1,8 +1,8 @@
 use doodle::numeric::core::MachineRep;
 use doodle::numeric::helper as num;
 use doodle::{
-    bounds::Bounds, helper::*, BaseType, DepFormat, Expr, Format, FormatModule, FormatRef, Label,
-    Pattern, ValueType, ViewExpr,
+    BaseType, DepFormat, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType,
+    ViewExpr, bounds::Bounds, helper::*,
 };
 
 mod util {

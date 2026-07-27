@@ -4030,7 +4030,14 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     let fixed_format_info = model::traits::smallsorts::FixedFormatInfo {
         module,
         targets: &elaborator.codegen.fixed_format_defs,
+        t_formats: &elaborator.t_formats,
+        defined_types: type_context,
     };
+    // Tracks which `defined_types` indices already have a `ReadUnchecked` impl emitted, so that a
+    // `SpineElem::Indirect` target reachable from more than one array (directly, or recursively
+    // through a `Record` field -- see `ReadUnchecked::generate_impls_for`) only gets one impl in
+    // the final output.
+    let mut read_unchecked_emitted = BTreeSet::<usize>::new();
 
     for (type_decl, (ix, path)) in type_decls.into_iter() {
         let name = elaborator
@@ -4068,8 +4075,8 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
                     0 => format!("trait-orphaned: no decoder functions provided"),
                     1 => {
                         // TODO - decide on a better scheme but this should work for testing purposes
-                        items.push(RustItem::from_decl(RustDecl::TraitImpl(
-                            model::traits::object_api::CommonObject::generate_impl(
+                        items.extend(RustItem::from_decls(RustDecl::trait_blocks(
+                            model::traits::object_api::CommonObject::generate_impls(
                                 Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
                                     *ix,
                                     name.clone(),
@@ -4080,7 +4087,6 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
                                 type_parse_info,
                             ),
                         )));
-
                         format!(
                             "trait-ready: unique decoder function (d#{})",
                             dec_ixs.as_ref()[0]
@@ -4094,20 +4100,34 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             };
             tmp.push(trait_comment);
             if let Some(format_ref) = elaborator.codegen.fixed_format_defs.get(*ix) {
-                items.push(RustItem::from_decl(
-                    model::traits::impl_standalone_read_unchecked(
-                        Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
-                            *ix,
-                            name.clone(),
-                            type_decl
-                                .lt_param()
-                                .map(|lt| Box::new(UseParams::from_lt(lt.clone()))),
-                        )))),
-                        fixed_format_info,
-                    ),
-                ));
+                let decls = model::traits::impl_standalone_read_unchecked(
+                    Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                        *ix,
+                        name.clone(),
+                        type_decl
+                            .lt_param()
+                            .map(|lt| Box::new(UseParams::from_lt(lt.clone()))),
+                    )))),
+                    fixed_format_info,
+                );
+                // `decls` may include impls for other types reached via a nested
+                // `SpineElem::Indirect` (see `ReadUnchecked::generate_impls_for`); dedupe by the
+                // `defined_types` index each impl is `on_type`'d for, since the same dependency
+                // may be reached from more than one array (directly, or through more than one
+                // `Record` field) across separate iterations of this loop.
+                let mut n_emitted = 0usize;
+                for decl in decls {
+                    let target_ix = match &decl {
+                        RustDecl::TraitImpl(imp) => imp.on_type.as_decl_index(),
+                        _ => None,
+                    };
+                    if target_ix.is_none_or(|t_ix| read_unchecked_emitted.insert(t_ix)) {
+                        items.push(RustItem::from_decl(decl));
+                        n_emitted += 1;
+                    }
+                }
                 tmp.push(format!(
-                    "fixed-format: emits `ReadUnchecked` (format level {})",
+                    "fixed-format: emits {n_emitted} `ReadUnchecked` impl(s) (format level {})",
                     format_ref.get_level()
                 ));
             }
@@ -6268,9 +6288,18 @@ mod tests {
 
         let mut targets = IntMap::new();
         targets.insert(0usize, point);
+        // `point`'s fields are both `Raw`, so `t_formats`/`defined_types` are never actually
+        // consulted here -- left empty rather than threading a real `Elaborator` through.
+        let t_formats: std::collections::BTreeMap<
+            usize,
+            Rc<typed_format::TypedFormat<typed_format::GenType>>,
+        > = std::collections::BTreeMap::new();
+        let defined_types: Vec<RustTypeDecl> = Vec::new();
         let info = FixedFormatInfo {
             module: &module,
             targets: &targets,
+            t_formats: &t_formats,
+            defined_types: &defined_types,
         };
 
         let on_type = Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
@@ -6279,8 +6308,12 @@ mod tests {
             None,
         ))));
 
-        let impl_block = ReadUnchecked::generate_impl(on_type, info);
-        let output = impl_block.to_fragment().to_string();
+        let impl_block = ReadUnchecked::generate_impls(on_type, info);
+        let output = impl_block
+            .iter()
+            .map(|imp| imp.to_fragment().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
         println!("{output}");
         assert!(
             output.contains("impl ReadUnchecked for Point"),
