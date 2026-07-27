@@ -1,8 +1,8 @@
 use doodle::numeric::core::MachineRep;
 use doodle::numeric::helper as num;
 use doodle::{
-    BaseType, DepFormat, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType,
-    ViewExpr, bounds::Bounds, helper::*,
+    bounds::Bounds, helper::*, BaseType, DepFormat, Expr, Format, FormatModule, FormatRef, Label,
+    Pattern, ValueType, ViewExpr,
 };
 
 mod util {
@@ -281,13 +281,13 @@ mod util {
     }
 
     /// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
-    pub(crate) fn fixed32be() -> Format {
-        fmt_variant("Fixed32", u32be())
+    pub(crate) fn fixed32be(module: &mut FormatModule) -> FormatRef {
+        module.define_format("opentype.types.fixed32", fmt_variant("Fixed32", u32be()))
     }
 
     // Custom type for fixed-point values that are interpreted as (2bits . 14bits) within a u16be raw-parse
-    pub(crate) fn f2dot14() -> Format {
-        fmt_variant("F2Dot14", u16be())
+    pub(crate) fn f2dot14(module: &mut FormatModule) -> FormatRef {
+        module.define_format("opentype.types.f2dot14", fmt_variant("F2Dot14", u16be()))
     }
 
     /// Helper function for parsing a big-endian u24 (3-byte) as a 32-bit Value
@@ -648,98 +648,74 @@ const SHORT_OFFSET16: u16 = 0;
 const LONG_OFFSET32: u16 = 1;
 
 pub(crate) fn table_links(
-    module: &mut FormatModule,
-    tag: FormatRef,
+    om: &mut OpentypeModule<'_>,
     table_type: ValueType,
     text_or_ztext: FormatRef,
 ) -> FormatRef {
     // SECTION - required tables (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#required-tables)
-    let cmap_table = cmap::table(module);
-    let head_table = head::table(module);
-    let hhea_table = hhea::table(module);
-    let hmtx_table = hmtx::table(module);
-    let maxp_table = maxp::table(module);
-    let name_table = name::table(module);
-    let os2_table = os2::table(module, tag);
-    let post_table = post::table(module);
+    let cmap_table = cmap::table(om.module());
+    let head_table = head::table(om);
+    let hhea_table = hhea::table(om.module());
+    let hmtx_table = hmtx::table(om.module());
+    let maxp_table = maxp::table(om.module());
+    let name_table = name::table(om.module());
+    let os2_table = os2::table(om);
+    let post_table = post::table(om);
     // !SECTION
 
     // SECTION - truetype outlines (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-truetype-outlines)
-    let cvt_table = cvt::table(module);
-    let fpgm_table = fpgm::table(module);
-    let glyf_table = glyf::table(module);
-    let loca_table = loca::table(module);
-    let prep_table = prep::table(module);
-    let gasp_table = gasp::table(module);
+    let cvt_table = cvt::table(om.module());
+    let fpgm_table = fpgm::table(om.module());
+    let glyf_table = glyf::table(om);
+    let loca_table = loca::table(om.module());
+    let prep_table = prep::table(om.module());
+    let gasp_table = gasp::table(om.module());
     // !SECTION
 
     // STUB - omitted section for CFF outlines (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-cff-outlines)
     // STUB - omitted section for bitmap glyphs (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-bitmap-glyphs)
 
     // SECTION - advanced typography (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#advanced-typographic-tables)
-    // SECTION - common definitions used primarily in layout tables
-    let class_def = common::class_def(module);
-    let coverage_table = common::coverage_table(module);
-    let device_or_variation_index_table = common::device_or_variation_index_table(module);
-    // NOTE - also used in variable font tables
-    let item_variation_store = common::item_variation_store(module);
-    // !SECTION
-    let base_table = base::table(
-        module,
-        tag,
-        device_or_variation_index_table,
-        item_variation_store,
-    );
-    let gdef_table = gdef::table(
-        module,
-        class_def,
-        coverage_table,
-        device_or_variation_index_table,
-        item_variation_store,
-    );
+    // NOTE - `class_def`, `coverage_table`, `device_or_variation_index_table`, and
+    // `item_variation_store` are dictionary-tracked FormatRefs; each consuming factory below
+    // fetches them on demand via `OpentypeModule`, so no eager local bindings are needed here.
+    let base_table = base::table(om);
+    let gdef_table = gdef::table(om);
     // SECTION - bulk common definitions for GSUB and GPOS
-    let value_format_flags = layout::value_format_flags(module);
-    let vf_flags_type = module
+    let value_format_flags = layout::value_format_flags(om.module());
+    let vf_flags_type = om
+        .module()
         .get_format_type(value_format_flags.get_level())
         .clone();
-    let value_record = layout::value_record(module, device_or_variation_index_table, vf_flags_type);
-    let anchor_table = layout::anchor_table(module, device_or_variation_index_table);
-    let lang_sys = layout::lang_sys(module);
-    let script_table = layout::script_table(module, tag, lang_sys);
-    let script_list = layout::script_list(module, tag, script_table);
-    let feature_table = layout::feature_table(module);
-    let feature_list = layout::feature_list(module, tag, feature_table);
-    let sequence_lookup_record = layout::sequence_lookup_record(module);
+    let value_record = layout::value_record(om, vf_flags_type);
+    let anchor_table = layout::anchor_table(om);
+    let lang_sys = layout::lang_sys(om.module());
+    let script_table = layout::script_table(om, lang_sys);
+    let script_list = layout::script_list(om, script_table);
+    let feature_table = layout::feature_table(om.module());
+    let feature_list = layout::feature_list(om, feature_table);
+    let sequence_lookup_record = layout::sequence_lookup_record(om.module());
     // Sub-tables used by both GSUB and GPOS
-    let sequence_context =
-        layout::sequence_context(module, class_def, coverage_table, sequence_lookup_record);
-    let chained_sequence_context =
-        layout::chained_sequence_context(module, class_def, coverage_table, sequence_lookup_record);
+    let sequence_context = layout::sequence_context(om, sequence_lookup_record);
+    let chained_sequence_context = layout::chained_sequence_context(om, sequence_lookup_record);
     // !SECTION
     // SECTION - high-level definitions to support GSUB and GPOS
-    let ground_subst = gsub::ground_subst(
-        module,
-        coverage_table,
-        sequence_context,
-        chained_sequence_context,
-    );
-    let subst_extension = gsub::subst_extension(module, ground_subst);
+    let ground_subst = gsub::ground_subst(om, sequence_context, chained_sequence_context);
+    let subst_extension = gsub::subst_extension(om.module(), ground_subst);
     let ground_pos = gpos::ground_pos(
-        module,
-        class_def,
-        coverage_table,
+        om,
         value_format_flags,
         value_record,
         anchor_table,
         sequence_context,
         chained_sequence_context,
     );
-    let pos_extension = gpos::pos_extension(module, ground_pos);
-    let feature_variations = layout::feature_variations(module, feature_table);
+    let pos_extension = gpos::pos_extension(om.module(), ground_pos);
+    let feature_variations = layout::feature_variations(om, feature_table);
     // !SECTION
     // REVIEW - we might consider rewriting `layout::table` to spin off `gpos::table` and `gsub::table` more easily (self-contained)
     let gpos_table = gpos::table(
-        module,
+        om.module(),
         script_list,
         feature_list,
         ground_pos,
@@ -747,7 +723,7 @@ pub(crate) fn table_links(
         feature_variations,
     );
     let gsub_table = gsub::table(
-        module,
+        om.module(),
         script_list,
         feature_list,
         ground_subst,
@@ -757,31 +733,31 @@ pub(crate) fn table_links(
     // !SECTION
 
     // SECTION - variable fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-used-for-opentype-font-variations)
-    let delta_set_index_map = var_common::delta_set_index_map(module);
-    let avar_table = avar::table(module);
-    let fvar_table = fvar::table(module, tag);
-    let gvar_table = gvar::table(module);
-    let hvar_table = hvar::table(module, item_variation_store, delta_set_index_map);
-    let mvar_table = mvar::table(module, tag, item_variation_store);
-    let stat_table = stat::table(module, tag);
+    let delta_set_index_map = var_common::delta_set_index_map(om.module());
+    let avar_table = avar::table(om);
+    let fvar_table = fvar::table(om);
+    let gvar_table = gvar::table(om);
+    let hvar_table = hvar::table(om, delta_set_index_map);
+    let mvar_table = mvar::table(om);
+    let stat_table = stat::table(om);
     // !SECTION
 
     // SECTION - color fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-color-fonts)
-    let cpal_table = cpal::table(module);
-    let colr_table = colr::table(module, item_variation_store, delta_set_index_map);
-    let svg_table = svg::table(module, text_or_ztext);
+    let cpal_table = cpal::table(om.module());
+    let colr_table = colr::table(om, delta_set_index_map);
+    let svg_table = svg::table(om.module(), text_or_ztext);
     // !SECTION
 
     // SECTION - other opentyupe tables (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#other-opentype-tables)
-    let dsig_table = dsig::table(module);
-    let hdmx_table = hdmx::table(module);
-    let kern_table = kern::table(module);
-    let vdmx_table = vdmx::table(module);
-    let vhea_table = vhea::table(module);
-    let vmtx_table = vmtx::table(module);
+    let dsig_table = dsig::table(om.module());
+    let hdmx_table = hdmx::table(om.module());
+    let kern_table = kern::table(om.module());
+    let vdmx_table = vdmx::table(om.module());
+    let vhea_table = vhea::table(om.module());
+    let vmtx_table = vmtx::table(om.module());
     // !SECTION
 
-    module.define_format_args_views(
+    om.module().define_format_args_views(
         "opentype.table_directory.table_links",
         vec![(
             Label::Borrowed("tables"),
@@ -1136,10 +1112,11 @@ pub(crate) fn table_links(
 
 // ANCHOR[epic=main-fn]
 pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
+    let mut om = OpentypeModule::new(module);
     // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
-    let tag = opentype_tag(module);
+    let tag = om.tag();
 
-    let table_record = module.define_format(
+    let table_record = om.module().define_format(
         "opentype.table_record",
         record([
             ("table_id", tag.call()), // should be ascending within the repetition "table_records" field in table_directory
@@ -1149,13 +1126,16 @@ pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
         ]),
     );
 
-    let table_type = module.get_format_type(table_record.get_level()).clone();
+    let table_type = om
+        .module()
+        .get_format_type(table_record.get_level())
+        .clone();
 
     // let stub_table = module.define_format("opentype.table_stub", Format::EMPTY);
 
-    let table_links = table_links(module, tag, table_type, text_or_ztext);
+    let table_links = table_links(&mut om, table_type, text_or_ztext);
 
-    let table_directory = module.define_format_views(
+    let table_directory = om.module().define_format_views(
         "opentype.table_directory",
         vec![FONTVIEW_LBL],
         record([
@@ -1240,7 +1220,7 @@ pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
             ])
         };
 
-        module.define_format_views(
+        om.module().define_format_views(
             "opentype.ttc_header",
             vec![FONTVIEW_LBL],
             record_auto([
@@ -1274,7 +1254,7 @@ pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
     // NOTE - we have to fail to let text have its chance to parse
     let unknown_table = Format::Fail;
 
-    module.define_format(
+    om.module().define_format(
         "opentype.main",
         let_view(
             FONTVIEW_LBL,
@@ -1434,6 +1414,110 @@ pub(crate) mod table {
     }
 }
 use table::{optional_table, required_table, required_table_with_len};
+
+/// Memoized cache of frequently-reused [`FormatRef`]s and singleton [`Format`]-producing
+/// helpers, so factory functions no longer need one parameter per shared sub-format.
+///
+/// Each field is populated lazily, on first access, via its `get_or_init_*` method; a
+/// [`Format`] value produced by a bare helper function (e.g. `f2dot14`) is registered into
+/// the module the first time it is requested, so all call-sites share one [`FormatRef`]
+/// instead of re-embedding a fresh, unregistered `Format` per call.
+#[derive(Default)]
+pub(crate) struct OpentypeDictionary {
+    tag: std::cell::OnceCell<FormatRef>,
+    class_def: std::cell::OnceCell<FormatRef>,
+    coverage_table: std::cell::OnceCell<FormatRef>,
+    item_variation_store: std::cell::OnceCell<FormatRef>,
+    device_or_variation_index_table: std::cell::OnceCell<FormatRef>,
+    f2dot14: std::cell::OnceCell<FormatRef>,
+    fixed32be: std::cell::OnceCell<FormatRef>,
+}
+
+impl OpentypeDictionary {
+    fn get_or_init_tag(&self, module: &mut FormatModule) -> FormatRef {
+        *self.tag.get_or_init(|| opentype_tag(module))
+    }
+
+    fn get_or_init_class_def(&self, module: &mut FormatModule) -> FormatRef {
+        *self.class_def.get_or_init(|| common::class_def(module))
+    }
+
+    fn get_or_init_coverage_table(&self, module: &mut FormatModule) -> FormatRef {
+        *self
+            .coverage_table
+            .get_or_init(|| common::coverage_table(module))
+    }
+
+    fn get_or_init_item_variation_store(&self, module: &mut FormatModule) -> FormatRef {
+        *self
+            .item_variation_store
+            .get_or_init(|| common::item_variation_store(module))
+    }
+
+    fn get_or_init_device_or_variation_index_table(&self, module: &mut FormatModule) -> FormatRef {
+        *self
+            .device_or_variation_index_table
+            .get_or_init(|| common::device_or_variation_index_table(module))
+    }
+
+    fn get_or_init_f2dot14(&self, module: &mut FormatModule) -> FormatRef {
+        *self.f2dot14.get_or_init(|| util::f2dot14(module))
+    }
+
+    fn get_or_init_fixed32be(&self, module: &mut FormatModule) -> FormatRef {
+        *self.fixed32be.get_or_init(|| util::fixed32be(module))
+    }
+}
+
+/// Wraps a [`FormatModule`] together with an [`OpentypeDictionary`] of commonly-reused
+/// sub-formats, so factory functions can pull shared [`FormatRef`]s on demand instead of
+/// threading them through every call.
+pub(crate) struct OpentypeModule<'a> {
+    module: &'a mut FormatModule,
+    dict: OpentypeDictionary,
+}
+
+impl<'a> OpentypeModule<'a> {
+    pub(crate) fn new(module: &'a mut FormatModule) -> Self {
+        Self {
+            module,
+            dict: OpentypeDictionary::default(),
+        }
+    }
+
+    pub(crate) fn module(&mut self) -> &mut FormatModule {
+        self.module
+    }
+
+    pub(crate) fn tag(&mut self) -> FormatRef {
+        self.dict.get_or_init_tag(self.module)
+    }
+
+    pub(crate) fn class_def(&mut self) -> FormatRef {
+        self.dict.get_or_init_class_def(self.module)
+    }
+
+    pub(crate) fn coverage_table(&mut self) -> FormatRef {
+        self.dict.get_or_init_coverage_table(self.module)
+    }
+
+    pub(crate) fn item_variation_store(&mut self) -> FormatRef {
+        self.dict.get_or_init_item_variation_store(self.module)
+    }
+
+    pub(crate) fn device_or_variation_index_table(&mut self) -> FormatRef {
+        self.dict
+            .get_or_init_device_or_variation_index_table(self.module)
+    }
+
+    pub(crate) fn f2dot14(&mut self) -> FormatRef {
+        self.dict.get_or_init_f2dot14(self.module)
+    }
+
+    pub(crate) fn fixed32be(&mut self) -> FormatRef {
+        self.dict.get_or_init_fixed32be(self.module)
+    }
+}
 
 pub(crate) fn opentype_tag(module: &mut FormatModule) -> FormatRef {
     module.define_format("opentype.types.tag", u32be())

@@ -67,7 +67,9 @@ fn version2(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let fixed32be = om.fixed32be();
+    let module = om.module();
     let version2 = version2(module);
 
     let postv2dot5 = record([
@@ -80,7 +82,7 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
         "opentype.post.table",
         record([
             ("version", util::version16_16()),
-            ("italic_angle", util::fixed32be()),
+            ("italic_angle", fixed32be.call()),
             ("underline_position", i16be()),
             ("underline_thickness", i16be()),
             ("is_fixed_pitch", u32be()), // nonzero <=> fixed pitch

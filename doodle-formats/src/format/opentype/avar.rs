@@ -1,7 +1,9 @@
 use super::*;
 
-pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-    let segment_maps = segment_maps(module);
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let f2dot14 = om.f2dot14();
+    let module = om.module();
+    let segment_maps = segment_maps(module, f2dot14);
 
     module.define_format(
         "opentype.avar.table",
@@ -18,10 +20,10 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-fn segment_maps(module: &mut FormatModule) -> FormatRef {
+fn segment_maps(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
     let axis_value_map = module.define_format(
         "opentype.avar.axis_value_map",
-        record_repeat(["from_coordinate", "to_coordinate"], f2dot14()),
+        record_repeat(["from_coordinate", "to_coordinate"], f2dot14.call()),
     );
 
     module.define_format(

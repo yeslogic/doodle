@@ -1,9 +1,12 @@
 use super::*;
 use doodle::numeric::BasicUnaryOp;
 
-pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let f2dot14 = om.f2dot14();
+    let module = om.module();
+
     let simple_glyf_table = simple::table(module);
-    let composite_glyf_table = composite::table(module);
+    let composite_glyf_table = composite::table(module, f2dot14);
     let glyf_description = glyf_description(module, simple_glyf_table, composite_glyf_table);
     let glyf_entry = glyf_entry(module, glyf_description);
 
@@ -249,7 +252,7 @@ mod composite {
     use super::*;
     use BitFieldKind::*;
 
-    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+    pub(crate) fn table(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
         let glyf_arg = |are_words: Expr, are_xy_values: Expr| -> Format {
             if_then_else(
                 are_words,
@@ -269,18 +272,18 @@ mod composite {
         let glyf_scale = |flags: Expr| -> Format {
             if_then_else(
                 record_proj(flags.clone(), "we_have_a_scale"),
-                fmt_some(fmt_variant("Scale", util::f2dot14())),
+                fmt_some(fmt_variant("Scale", f2dot14.call())),
                 if_then_else(
                     record_proj(flags.clone(), "we_have_an_x_and_y_scale"),
                     fmt_some(fmt_variant(
                         "XY",
-                        record_repeat(["x_scale", "y_scale"], util::f2dot14()),
+                        record_repeat(["x_scale", "y_scale"], f2dot14.call()),
                     )),
                     if_then_else(
                         record_proj(flags, "we_have_a_two_by_two"),
                         fmt_some(fmt_variant(
                             "Matrix",
-                            tuple_repeat(2, tuple_repeat(2, util::f2dot14())),
+                            tuple_repeat(2, tuple_repeat(2, f2dot14.call())),
                         )),
                         fmt_none(),
                     ),

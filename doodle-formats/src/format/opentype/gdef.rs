@@ -1,13 +1,12 @@
 use super::*;
 
-pub(crate) fn table(
-    module: &mut FormatModule,
-    class_def: FormatRef,
-    coverage_table: FormatRef,
-    device_or_variation_index_table: FormatRef,
-    item_variation_store: FormatRef,
-) -> FormatRef {
-    let mark_glyph_set = mark_glyph_set(module, coverage_table);
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let class_def = om.class_def();
+    let coverage_table = om.coverage_table();
+    let device_or_variation_index_table = om.device_or_variation_index_table();
+    let item_variation_store = om.item_variation_store();
+
+    let mark_glyph_set = mark_glyph_set(om.module(), coverage_table);
     let gdef_header_version_1_2 = |table_view: ViewExpr| {
         record([(
             "mark_glyph_sets_def",
@@ -26,9 +25,10 @@ pub(crate) fn table(
             ),
         ])
     };
-    let attach_list = attach_list(module, coverage_table);
-    let lig_caret_list = lig_caret_list(module, coverage_table, device_or_variation_index_table);
-    module.define_format(
+    let attach_list = attach_list(om.module(), coverage_table);
+    let lig_caret_list =
+        lig_caret_list(om.module(), coverage_table, device_or_variation_index_table);
+    om.module().define_format(
         "opentype.gdef.table",
         let_view(
             "table_view",

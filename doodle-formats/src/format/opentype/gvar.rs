@@ -180,9 +180,11 @@ fn offsets_array(is_long_offsets: Expr, glyph_count: Expr) -> Format {
     )
 }
 
-pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let f2dot14 = om.f2dot14();
+    let module = om.module();
     let gvar_flags = header_flags();
-    let tuple_record = tuple_record(module);
+    let tuple_record = tuple_record(module, f2dot14);
     let glyph_variation_data_table = glyph_variation_data(module, tuple_record);
 
     // NOTE - can only appear in font files with fvar and glyf tables also present
@@ -527,19 +529,19 @@ fn tuple_variation_header(
 ///
 /// Parametric over `axis_count :~ U16`.
 // TODO - change namespace from `gvar` to `var`, move to common submodule for multi-table sub-formats
-fn tuple_record(module: &mut FormatModule) -> DepFormat<1, 0> {
+fn tuple_record(module: &mut FormatModule, f2dot14: FormatRef) -> DepFormat<1, 0> {
     module.register_format_args(
         "opentype.gvar.tuple_record",
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
             // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-            // wrapping: element is bare `util::f2dot14()` = `Format::Variant("F2Dot14",
+            // wrapping: element is bare `f2dot14.call()` = `Format::Variant("F2Dot14",
             // u16be())`, i.e. a real fixed-width 2-byte primitive read with no other blocker.
             // No `FormatRef` needed (would map to `BaseKind::U16BE`, modulo however the
             // "F2Dot14" tag is preserved downstream). Read sequentially with no view in scope,
             // so would need `from_here(read_array(var("axis_count"), BaseKind::U16BE))`.
             "coordinates",
-            repeat_count(var("axis_count"), util::f2dot14()),
+            repeat_count(var("axis_count"), f2dot14.call()),
         )]),
     )
 }

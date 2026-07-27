@@ -3,7 +3,10 @@ use super::*;
 /// Opentype `head` table format definition
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/head
-pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let fixed32be = om.fixed32be();
+    let module = om.module();
+
     // FIXME - replace with bit_fields_u16 if appropriate
     let head_table_flags = u16be();
 
@@ -58,7 +61,7 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
         record([
             ("major_version", util::expect_u16be(1)),
             ("minor_version", util::expect_u16be(0)),
-            ("font_revision", util::fixed32be()),
+            ("font_revision", fixed32be.call()),
             ("checksum_adjustment", u32be()),
             ("magic_number", is_bytes(&[0x5F, 0x0F, 0x3C, 0xF5])),
             ("flags", head_table_flags),

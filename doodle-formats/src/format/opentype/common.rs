@@ -35,8 +35,13 @@ pub(crate) fn item_variation_store(module: &mut FormatModule) -> FormatRef {
 
 fn variation_region_list(module: &mut FormatModule) -> FormatRef {
     // NOTE - all coordinates should be in range [-1.0, +1.0], and start <= peak <= end; must either all be non-positive or non-negative, or else peak must be 0 for negative start and non-negative end.
+    // NOTE - this is a dict-field factory itself (invoked with only `&mut FormatModule` via
+    // `OpentypeDictionary::get_or_init_item_variation_store`), so it cannot reach the shared
+    // `OpentypeModule` dictionary to obtain a memoized `f2dot14` FormatRef; it registers its own
+    // here, which may duplicate the dictionary's own `opentype.types.f2dot14` entry.
+    let f2dot14 = util::f2dot14(module);
     let region_axis_coordinates =
-        record_repeat(["start_coord", "peak_coord", "end_coord"], util::f2dot14());
+        record_repeat(["start_coord", "peak_coord", "end_coord"], f2dot14.call());
     let variation_region = |axis_count: Expr| {
         record([(
             "region_axes",

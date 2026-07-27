@@ -1,12 +1,10 @@
 use super::*;
 
-pub(crate) fn table(
-    module: &mut FormatModule,
-    tag: FormatRef,
-    item_variation_store: FormatRef,
-) -> FormatRef {
-    let value_record = value_record(module, tag);
-    module.define_format(
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let tag = om.tag();
+    let item_variation_store = om.item_variation_store();
+    let value_record = value_record(om.module(), tag);
+    om.module().define_format(
         "opentype.mvar.table",
         let_view(
             "table_view",

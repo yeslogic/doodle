@@ -819,30 +819,36 @@ pub(crate) fn mark_mark_pos(
 ///
 /// Parametric over `lookup_type :~ U16`
 pub(crate) fn ground_pos(
-    module: &mut FormatModule,
-    class_def: FormatRef,
-    coverage_table: FormatRef,
+    om: &mut OpentypeModule<'_>,
     value_format_flags: FormatRef,
     value_record: FormatRef,
     anchor_table: FormatRef,
     sequence_context: FormatRef,
     chained_sequence_context: FormatRef,
 ) -> DepFormat<1, 0> {
-    let single_pos = single_pos(module, coverage_table, value_format_flags, value_record);
+    let class_def = om.class_def();
+    let coverage_table = om.coverage_table();
+
+    let single_pos = single_pos(
+        om.module(),
+        coverage_table,
+        value_format_flags,
+        value_record,
+    );
     let pair_pos = pair_pos(
-        module,
+        om.module(),
         class_def,
         coverage_table,
         value_format_flags,
         value_record,
     );
-    let cursive_pos = cursive_pos(module, coverage_table, anchor_table);
-    let mark_array = mark_array(module, anchor_table);
-    let mark_base_pos = mark_base_pos(module, coverage_table, anchor_table, mark_array);
-    let mark_lig_pos = mark_lig_pos(module, coverage_table, anchor_table, mark_array);
-    let mark_mark_pos = mark_mark_pos(module, coverage_table, anchor_table, mark_array);
+    let cursive_pos = cursive_pos(om.module(), coverage_table, anchor_table);
+    let mark_array = mark_array(om.module(), anchor_table);
+    let mark_base_pos = mark_base_pos(om.module(), coverage_table, anchor_table, mark_array);
+    let mark_lig_pos = mark_lig_pos(om.module(), coverage_table, anchor_table, mark_array);
+    let mark_mark_pos = mark_mark_pos(om.module(), coverage_table, anchor_table, mark_array);
 
-    module.register_format_args(
+    om.module().register_format_args(
         "opentype.layout.ground_pos",
         [(Label::from("lookup_type"), ValueType::U16)],
         match_variant(

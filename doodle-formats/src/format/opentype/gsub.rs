@@ -351,17 +351,18 @@ pub(crate) fn reverse_chain_single_subst(
 
 /// Ground (non-recursive) GSUB lookup subtable type enumeration
 pub(crate) fn ground_subst(
-    module: &mut FormatModule,
-    coverage_table: FormatRef,
+    om: &mut OpentypeModule<'_>,
     sequence_context: FormatRef,
     chained_sequence_context: FormatRef,
 ) -> DepFormat<1, 0> {
-    let single_subst = single_subst(module, coverage_table);
-    let multiple_subst = multiple_subst(module, coverage_table);
-    let alternate_subst = alternate_subst(module, coverage_table);
-    let ligature_subst = ligature_subst(module, coverage_table);
-    let reverse_chain_single_subst = reverse_chain_single_subst(module, coverage_table);
-    module.register_format_args(
+    let coverage_table = om.coverage_table();
+
+    let single_subst = single_subst(om.module(), coverage_table);
+    let multiple_subst = multiple_subst(om.module(), coverage_table);
+    let alternate_subst = alternate_subst(om.module(), coverage_table);
+    let ligature_subst = ligature_subst(om.module(), coverage_table);
+    let reverse_chain_single_subst = reverse_chain_single_subst(om.module(), coverage_table);
+    om.module().register_format_args(
         "opentype.layout.ground_subst",
         [(Label::from("lookup_type"), ValueType::U16)],
         match_variant(
