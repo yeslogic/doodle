@@ -1,10 +1,12 @@
 use super::*;
 
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
-pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-    let design_axes_array = design_axes_array(module, tag);
-    let axis_value_array = axis_value_array(module);
-    module.define_format(
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let tag = om.tag();
+    let fixed32be = om.fixed32be();
+    let design_axes_array = design_axes_array(om.module(), tag);
+    let axis_value_array = axis_value_array(om.module(), fixed32be);
+    om.module().define_format(
         "opentype.stat.table",
         let_view(
             "table_view",
@@ -62,8 +64,8 @@ fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
     )
 }
 
-fn axis_value_array(module: &mut FormatModule) -> FormatRef {
-    let axis_value_table = axis_value_table(module);
+fn axis_value_array(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRef {
+    let axis_value_table = axis_value_table(module, fixed32be);
     module.define_format_args(
         "opentype.stat.axis_value_array",
         vec![(Label::Borrowed("axis_value_count"), ValueType::U16)],
@@ -86,7 +88,7 @@ fn axis_value_array(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-fn axis_value_table(module: &mut FormatModule) -> FormatRef {
+fn axis_value_table(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRef {
     use BitFieldKind::*;
     let axis_flags = bit_fields_u16([
         Reserved {
@@ -96,34 +98,34 @@ fn axis_value_table(module: &mut FormatModule) -> FormatRef {
         FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
         FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
     ]);
-    let axis_value_record = record([("axis_index", u16be()), ("value", util::fixed32be())]);
+    let axis_value_record = record([("axis_index", u16be()), ("value", fixed32be.call())]);
     let f1_fields = vec![
         ("axis_index", u16be()),
         ("flags", axis_flags.clone()),
         ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-        ("value", fixed32be()),
+        ("value", fixed32be.call()),
     ];
     let f2_fields = vec![
         ("axis_index", u16be()),
         ("flags", axis_flags.clone()),
         ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-        ("nominal_value", fixed32be()),
-        ("range_min_value", fixed32be()),
-        ("range_max_value", fixed32be()),
+        ("nominal_value", fixed32be.call()),
+        ("range_min_value", fixed32be.call()),
+        ("range_max_value", fixed32be.call()),
     ];
     let f3_fields = vec![
         ("axis_index", u16be()),
         ("flags", axis_flags.clone()),
         ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-        ("value", fixed32be()),
-        ("linked_value", fixed32be()),
+        ("value", fixed32be.call()),
+        ("linked_value", fixed32be.call()),
     ];
     let f4_fields = vec![
         ("axis_count", u16be()),
         ("flags", axis_flags.clone()),
         ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
         // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-        // wrapping: `axis_value_record`'s `value` field is `util::fixed32be()`; `axis_index` is
+        // wrapping: `axis_value_record`'s `value` field is `fixed32be.call()`; `axis_index` is
         // already a bare `u16be()`. No other blocker. `axis_value_record` is currently an
         // inline (unregistered) record -- a new `FormatRef` (e.g.
         // `opentype.stat.axis_value_record`) would need to be defined for it. `axis_value_table`

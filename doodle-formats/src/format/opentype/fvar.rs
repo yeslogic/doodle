@@ -2,9 +2,11 @@ use doodle::DepFormat;
 
 use super::*;
 
-pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-    let variation_axis_record = variation_axis_record(module, tag);
-    let instance_record = instance_record(module);
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let tag = om.tag();
+    let fixed32be = om.fixed32be();
+    let variation_axis_record = variation_axis_record(om.module(), tag, fixed32be);
+    let instance_record = instance_record(om.module(), fixed32be);
 
     // First half of `fvar` table: fixed-size header
     let fvar_header = record_auto([
@@ -62,7 +64,7 @@ pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
         ),
     ]);
     let scope_field = record([("table_scope", reify_view(vvar("table_view")))]);
-    module.define_format(
+    om.module().define_format(
         "opentype.fvar.table",
         let_view(
             "table_view",
@@ -76,8 +78,8 @@ pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
 ///
 /// Parametric over `axis_count :~ U16` and `instance_size :~ U16`.
-fn instance_record(module: &mut FormatModule) -> DepFormat<2, 0> {
-    let user_tuple = user_tuple(module);
+fn instance_record(module: &mut FormatModule, fixed32be: FormatRef) -> DepFormat<2, 0> {
+    let user_tuple = user_tuple(module, fixed32be);
     module.register_format_args(
         "opentype.fvar.instance_record",
         [
@@ -105,24 +107,28 @@ fn instance_record(module: &mut FormatModule) -> DepFormat<2, 0> {
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
 ///
 /// Parametric over `axis_count :~ U16`.
-fn user_tuple(module: &mut FormatModule) -> DepFormat<1, 0> {
+fn user_tuple(module: &mut FormatModule, fixed32be: FormatRef) -> DepFormat<1, 0> {
     module.register_format_args(
         "opentype.fvar.user_tuple",
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
             // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-            // wrapping: element is bare `util::fixed32be()` = `Format::Variant("Fixed32",
+            // wrapping: element is bare `fixed32be.call()` = `Format::Variant("Fixed32",
             // u32be())`, i.e. a real fixed-width 4-byte primitive read with no other blocker.
             // No `FormatRef` needed (would map to `BaseKind::U32BE`, modulo however the
             // "Fixed32" tag is preserved downstream). Read sequentially with no view in scope,
             // so would need `from_here(read_array(var("axis_count"), BaseKind::U32BE))`.
             "coordinates",
-            repeat_count(var("axis_count"), util::fixed32be()),
+            repeat_count(var("axis_count"), fixed32be.call()),
         )]),
     )
 }
 
-fn variation_axis_record(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+fn variation_axis_record(
+    module: &mut FormatModule,
+    tag: FormatRef,
+    fixed32be: FormatRef,
+) -> FormatRef {
     use BitFieldKind::*;
     let axis_qual_flags = bit_fields_u16([
         Reserved {
@@ -134,12 +140,12 @@ fn variation_axis_record(module: &mut FormatModule, tag: FormatRef) -> FormatRef
     module.define_format(
         "opentype.fvar.variation_axis_record",
         record([
-            ("axis_tag", tag.call()),             // 4 bytes
-            ("min_value", util::fixed32be()),     // + 4 = 8 bytes
-            ("default_value", util::fixed32be()), // + 4 = 12 bytes
-            ("max_value", util::fixed32be()),     // +4 = 16 bytes
-            ("flags", axis_qual_flags),           // + 2 = 18 bytes
-            ("axis_name_id", u16be()),            // + 2 = 20 bytes
+            ("axis_tag", tag.call()),            // 4 bytes
+            ("min_value", fixed32be.call()),     // + 4 = 8 bytes
+            ("default_value", fixed32be.call()), // + 4 = 12 bytes
+            ("max_value", fixed32be.call()),     // +4 = 16 bytes
+            ("flags", axis_qual_flags),          // + 2 = 18 bytes
+            ("axis_name_id", u16be()),           // + 2 = 20 bytes
         ]),
     )
 }

@@ -16,16 +16,17 @@ pub(crate) fn sequence_lookup_record(module: &mut FormatModule) -> FormatRef {
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#common-formats-for-contextual-lookup-subtables
 pub(crate) fn chained_sequence_context(
-    module: &mut FormatModule,
-    class_def: FormatRef,
-    coverage_table: FormatRef,
+    om: &mut OpentypeModule<'_>,
     sequence_lookup_record: FormatRef,
 ) -> FormatRef {
-    let rule_set = chained_sequence::rule_set(module, sequence_lookup_record);
-    let format1 = chained_sequence::format1(module, coverage_table, rule_set);
-    let format2 = chained_sequence::format2(module, class_def, coverage_table, rule_set);
-    let format3 = chained_sequence::format3(module, coverage_table, sequence_lookup_record);
-    module.define_format(
+    let class_def = om.class_def();
+    let coverage_table = om.coverage_table();
+
+    let rule_set = chained_sequence::rule_set(om.module(), sequence_lookup_record);
+    let format1 = chained_sequence::format1(om.module(), coverage_table, rule_set);
+    let format2 = chained_sequence::format2(om.module(), class_def, coverage_table, rule_set);
+    let format3 = chained_sequence::format3(om.module(), coverage_table, sequence_lookup_record);
+    om.module().define_format(
         "opentype.layout.chained_sequence_context",
         let_view(
             "table_view",
@@ -278,16 +279,17 @@ mod chained_sequence {
 }
 
 pub(crate) fn sequence_context(
-    module: &mut FormatModule,
-    class_def: FormatRef,
-    coverage_table: FormatRef,
+    om: &mut OpentypeModule<'_>,
     sequence_lookup_record: FormatRef,
 ) -> FormatRef {
-    let rule_set = sequence::rule_set(module, sequence_lookup_record);
-    let format1 = sequence::format1(module, coverage_table, rule_set);
-    let format2 = sequence::format2(module, class_def, coverage_table, rule_set);
-    let format3 = sequence::format3(module, coverage_table, sequence_lookup_record);
-    module.define_format(
+    let class_def = om.class_def();
+    let coverage_table = om.coverage_table();
+
+    let rule_set = sequence::rule_set(om.module(), sequence_lookup_record);
+    let format1 = sequence::format1(om.module(), coverage_table, rule_set);
+    let format2 = sequence::format2(om.module(), class_def, coverage_table, rule_set);
+    let format3 = sequence::format3(om.module(), coverage_table, sequence_lookup_record);
+    om.module().define_format(
         "opentype.layout.sequence_context",
         let_view(
             "table_view",
@@ -468,13 +470,10 @@ mod sequence {
 /// Format definition for `FeatureList` table
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#featurelist-table
-pub(crate) fn feature_list(
-    module: &mut FormatModule,
-    tag: FormatRef,
-    feature_table: FormatRef,
-) -> FormatRef {
-    let feature_record = feature_record(module, tag, feature_table);
-    module.define_format(
+pub(crate) fn feature_list(om: &mut OpentypeModule<'_>, feature_table: FormatRef) -> FormatRef {
+    let tag = om.tag();
+    let feature_record = feature_record(om.module(), tag, feature_table);
+    om.module().define_format(
         "opentype.layout.feature_list",
         let_view(
             "list_view",
@@ -561,13 +560,10 @@ fn script_record(module: &mut FormatModule, tag: FormatRef, script_table: Format
 /// Format definition for a ScriptList
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#scriptlist-table
-pub(crate) fn script_list(
-    module: &mut FormatModule,
-    tag: FormatRef,
-    script_table: FormatRef,
-) -> FormatRef {
-    let script_record = script_record(module, tag, script_table);
-    module.define_format(
+pub(crate) fn script_list(om: &mut OpentypeModule<'_>, script_table: FormatRef) -> FormatRef {
+    let tag = om.tag();
+    let script_record = script_record(om.module(), tag, script_table);
+    om.module().define_format(
         "opentype.layout.script_list",
         let_view(
             "table_view",
@@ -589,13 +585,10 @@ pub(crate) fn script_list(
 /// Format definition for the Script-tables (elemments of a ScriptList)
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table
-pub(crate) fn script_table(
-    module: &mut FormatModule,
-    tag: FormatRef,
-    lang_sys: FormatRef,
-) -> FormatRef {
-    let lang_sys_record = lang_sys_record(module, tag, lang_sys);
-    module.define_format(
+pub(crate) fn script_table(om: &mut OpentypeModule<'_>, lang_sys: FormatRef) -> FormatRef {
+    let tag = om.tag();
+    let lang_sys_record = lang_sys_record(om.module(), tag, lang_sys);
+    om.module().define_format(
         "opentype.layout.script_table",
         let_view(
             "script_view",
@@ -673,18 +666,15 @@ pub(crate) fn value_format_flags(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-pub(crate) fn value_record(
-    module: &mut FormatModule,
-    device_or_variation_index_table: FormatRef,
-    vf_flags_type: ValueType,
-) -> FormatRef {
+pub(crate) fn value_record(om: &mut OpentypeModule<'_>, vf_flags_type: ValueType) -> FormatRef {
+    let device_or_variation_index_table = om.device_or_variation_index_table();
     let opt_field = |field_name: &'static str, format: Format| {
         (
             field_name,
             cond_maybe(record_proj(var("flags"), field_name), format),
         )
     };
-    module.define_format_args_views(
+    om.module().define_format_args_views(
         "opentype.layout.value_record",
         vec![(Label::Borrowed("flags"), vf_flags_type.clone())],
         vec![Label::Borrowed("table_view")],
@@ -768,10 +758,8 @@ pub(crate) fn lang_sys(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-pub(crate) fn anchor_table(
-    module: &mut FormatModule,
-    device_or_variation_index_table: FormatRef,
-) -> FormatRef {
+pub(crate) fn anchor_table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let device_or_variation_index_table = om.device_or_variation_index_table();
     // REVIEW - should formats 1 and 2 be defined as well?
     let anchor_format1 = record([("x_coordinate", i16be()), ("y_coordinate", i16be())]);
     let anchor_format2 = record([
@@ -780,7 +768,7 @@ pub(crate) fn anchor_table(
         ("anchor_point", u16be()),
     ]);
     // REVIEW[epic=closure-dep-formats] - should this be a Dep-Format registration (module.define_format_args) instead?
-    let anchor_format3 = module.define_format_views(
+    let anchor_format3 = om.module().define_format_views(
         "opentype.layout.anchor_table.format3",
         vec![Label::Borrowed("table_view")],
         record_auto([
@@ -804,7 +792,7 @@ pub(crate) fn anchor_table(
             ),
         ]),
     );
-    module.define_format(
+    om.module().define_format(
         "opentype.layout.anchor_table",
         let_view(
             "table_view",
@@ -833,14 +821,18 @@ pub(crate) fn anchor_table(
 }
 
 /// Feature Variation Record
-fn feature_variation_record(module: &mut FormatModule, feature_table: FormatRef) -> FormatRef {
+fn feature_variation_record(
+    module: &mut FormatModule,
+    feature_table: FormatRef,
+    f2dot14: FormatRef,
+) -> FormatRef {
     let condition_table = util::embedded_singleton_alternation(
         [("format", u16be())],
         ("format", 1),
         [
             ("axis_index", u16be()),
-            ("filter_range_min_value", util::f2dot14()),
-            ("filter_range_max_value", util::f2dot14()),
+            ("filter_range_min_value", f2dot14.call()),
+            ("filter_range_max_value", f2dot14.call()),
         ],
         "cond",
         "Format1",
@@ -932,8 +924,13 @@ fn feature_variation_record(module: &mut FormatModule, feature_table: FormatRef)
 /// FeatureVariations table
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#featVarTbl
-pub(crate) fn feature_variations(module: &mut FormatModule, feature_table: FormatRef) -> FormatRef {
-    let feature_variation_record = feature_variation_record(module, feature_table);
+pub(crate) fn feature_variations(
+    om: &mut OpentypeModule<'_>,
+    feature_table: FormatRef,
+) -> FormatRef {
+    let f2dot14 = om.f2dot14();
+    let module = om.module();
+    let feature_variation_record = feature_variation_record(module, feature_table, f2dot14);
 
     module.define_format(
         "opentype.layout.feature_variations",

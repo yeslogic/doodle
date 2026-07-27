@@ -3,17 +3,16 @@ use super::*;
 /// BASE table format definition
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base
-pub(crate) fn table(
-    module: &mut FormatModule,
-    tag: FormatRef,
-    device_or_variation_index_table: FormatRef,
-    item_variation_store: FormatRef,
-) -> FormatRef {
-    let base_coord = base_coord(module, device_or_variation_index_table);
-    let min_max = min_max(module, tag, base_coord);
-    let base_values = base_values(module, base_coord);
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let tag = om.tag();
+    let device_or_variation_index_table = om.device_or_variation_index_table();
+    let item_variation_store = om.item_variation_store();
 
-    let base_lang_sys = module.define_format_views(
+    let base_coord = base_coord(om.module(), device_or_variation_index_table);
+    let min_max = min_max(om.module(), tag, base_coord);
+    let base_values = base_values(om.module(), base_coord);
+
+    let base_lang_sys = om.module().define_format_views(
         "opentype.base.base-langsys",
         vec![Label::Borrowed("table_view")],
         record([
@@ -24,7 +23,7 @@ pub(crate) fn table(
             ),
         ]),
     );
-    let base_script = module.define_format(
+    let base_script = om.module().define_format(
         "opentype.layout.base_script",
         let_view(
             "table_view",
@@ -49,7 +48,7 @@ pub(crate) fn table(
             ]),
         ),
     );
-    let base_script_record = module.define_format_views(
+    let base_script_record = om.module().define_format_views(
         "opentype.base.base-script-record",
         vec![Label::Borrowed("table_view")],
         record([
@@ -91,7 +90,7 @@ pub(crate) fn table(
             repeat_count(var("base_tag_count"), tag.call()),
         ), // TODO[epic=sorting-validation] - must appear in alphabetical order (not enforced locally)
     ]);
-    let axis_table = module.define_format(
+    let axis_table = om.module().define_format(
         "opentype.layout.axis_table",
         let_view(
             "table_view",
@@ -108,7 +107,7 @@ pub(crate) fn table(
             ]),
         ),
     );
-    module.define_format(
+    om.module().define_format(
         "opentype.base.table",
         let_view(
             "table_view",

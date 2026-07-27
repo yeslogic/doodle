@@ -5,18 +5,15 @@ use super::*;
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colr-header
 ///
 /// Reuses the `item_variation_store` and `delta_set_index_map` formats
-pub(crate) fn table(
-    module: &mut FormatModule,
-    item_variation_store: FormatRef,
-    delta_set_index_map: FormatRef,
-) -> FormatRef {
-    let paint_table = paint_table(module);
-    let base_glyph_record: FormatRef = base_glyph_record(module);
-    let layer_record: FormatRef = layer_record(module);
-    let base_glyph_list: FormatRef = base_glyph_list(module, paint_table);
-    let layer_list: FormatRef = layer_list(module, paint_table);
-    let clip_list: FormatRef = clip_list(module);
-    module.define_format(
+pub(crate) fn table(om: &mut OpentypeModule<'_>, delta_set_index_map: FormatRef) -> FormatRef {
+    let item_variation_store = om.item_variation_store();
+    let paint_table = paint_table(om);
+    let base_glyph_record: FormatRef = base_glyph_record(om.module());
+    let layer_record: FormatRef = layer_record(om.module());
+    let base_glyph_list: FormatRef = base_glyph_list(om.module(), paint_table);
+    let layer_list: FormatRef = layer_list(om.module(), paint_table);
+    let clip_list: FormatRef = clip_list(om.module());
+    om.module().define_format(
         "opentype.colr.table",
         let_view(
             "table_view",
@@ -107,55 +104,58 @@ mod paint_table {
 
     /// ColorStop record
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorstop-record
-    fn color_stop() -> Format {
+    fn color_stop(f2dot14: FormatRef) -> Format {
         record([
-            ("stop_offset", util::f2dot14()),
+            ("stop_offset", f2dot14.call()),
             ("palette_index", u16be()),
-            ("alpha", util::f2dot14()),
+            ("alpha", f2dot14.call()),
         ])
     }
 
     /// VarColorStop record
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorstop-record
-    fn var_color_stop() -> Format {
+    fn var_color_stop(f2dot14: FormatRef) -> Format {
         record([
-            ("stop_offset", util::f2dot14()),
+            ("stop_offset", f2dot14.call()),
             ("palette_index", u16be()),
-            ("alpha", util::f2dot14()),
+            ("alpha", f2dot14.call()),
             ("var_index_base", u32be()),
         ])
     }
 
     /// ColorLine table (non-var)
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorline-table
-    fn color_line(module: &mut FormatModule) -> FormatRef {
+    fn color_line(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.colr.color_line",
             record([
                 ("extend", u8()),
                 ("num_stops", u16be()),
                 // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-                // wrapping: `color_stop()`'s `stop_offset`/`alpha` fields are `util::f2dot14()`
+                // wrapping: `color_stop()`'s `stop_offset`/`alpha` fields are `f2dot14.call()`
                 // (`Format::Variant("F2Dot14", u16be())`); `palette_index` is already a bare
                 // `u16be()`. No other blocker. `color_stop()` is currently an inline (unregistered)
                 // record -- a new `FormatRef` (e.g. `opentype.colr.color_stop`) would need to be
                 // defined for it. Not reached via any offset/view here, so would need
                 // `from_here(read_array(var("num_stops"), color_stop_ref))`.
-                ("color_stops", repeat_count(var("num_stops"), color_stop())),
+                (
+                    "color_stops",
+                    repeat_count(var("num_stops"), color_stop(f2dot14)),
+                ),
             ]),
         )
     }
 
     /// VarColorLine table
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorline-table
-    fn var_color_line(module: &mut FormatModule) -> FormatRef {
+    fn var_color_line(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.colr.var_color_line",
             record([
                 ("extend", u8()),
                 ("num_stops", u16be()),
                 // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-                // wrapping: `var_color_stop()`'s `stop_offset`/`alpha` fields are `util::f2dot14()`;
+                // wrapping: `var_color_stop()`'s `stop_offset`/`alpha` fields are `f2dot14.call()`;
                 // `palette_index`/`var_index_base` are already bare `u16be()`/`u32be()`. No other
                 // blocker. `var_color_stop()` is currently an inline (unregistered) record -- a new
                 // `FormatRef` (e.g. `opentype.colr.var_color_stop`) would need to be defined for it.
@@ -163,7 +163,7 @@ mod paint_table {
                 // `from_here(read_array(var("num_stops"), var_color_stop_ref))`.
                 (
                     "color_stops",
-                    repeat_count(var("num_stops"), var_color_stop()),
+                    repeat_count(var("num_stops"), var_color_stop(f2dot14)),
                 ),
             ]),
         )
@@ -171,32 +171,32 @@ mod paint_table {
 
     /// Affine2x3 record (non-var)
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#affine2x3-record
-    fn affine2x3(module: &mut FormatModule) -> FormatRef {
+    fn affine2x3(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.colr.affine2x3",
             record([
-                ("xx", util::fixed32be()), // Fixed 16.16
-                ("yx", util::fixed32be()),
-                ("xy", util::fixed32be()),
-                ("yy", util::fixed32be()),
-                ("dx", util::fixed32be()),
-                ("dy", util::fixed32be()),
+                ("xx", fixed32be.call()), // Fixed 16.16
+                ("yx", fixed32be.call()),
+                ("xy", fixed32be.call()),
+                ("yy", fixed32be.call()),
+                ("dx", fixed32be.call()),
+                ("dy", fixed32be.call()),
             ]),
         )
     }
 
     /// VarAffine2x3 record
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#affine2x3-record
-    fn var_affine2x3(module: &mut FormatModule) -> FormatRef {
+    fn var_affine2x3(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.colr.var_affine2x3",
             record([
-                ("xx", util::fixed32be()),
-                ("yx", util::fixed32be()),
-                ("xy", util::fixed32be()),
-                ("yy", util::fixed32be()),
-                ("dx", util::fixed32be()),
-                ("dy", util::fixed32be()),
+                ("xx", fixed32be.call()),
+                ("yx", fixed32be.call()),
+                ("xy", fixed32be.call()),
+                ("yy", fixed32be.call()),
+                ("dx", fixed32be.call()),
+                ("dy", fixed32be.call()),
                 ("var_index_base", u32be()),
             ]),
         )
@@ -216,20 +216,20 @@ mod paint_table {
 
     /// Format 2: PaintSolid
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-2-and-3-paintsolid-paintvarsolid
-    fn paint_solid() -> Format {
+    fn paint_solid(f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(2)),
             ("palette_index", u16be()),
-            ("alpha", util::f2dot14()),
+            ("alpha", f2dot14.call()),
         ])
     }
 
     /// Format 3: PaintVarSolid
-    fn paint_var_solid() -> Format {
+    fn paint_var_solid(f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(3)),
             ("palette_index", u16be()),
-            ("alpha", util::f2dot14()),
+            ("alpha", f2dot14.call()),
             ("var_index_base", u32be()),
         ])
     }
@@ -318,7 +318,7 @@ mod paint_table {
 
     /// Format 8: PaintSweepGradient
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-8-and-9-paintsweepgradient-paintvarsweepgradient
-    fn paint_sweep_gradient(view: ViewExpr, color_line: FormatRef) -> Format {
+    fn paint_sweep_gradient(view: ViewExpr, color_line: FormatRef, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(8)),
             ("table_scope", reify_view(view.clone())),
@@ -328,13 +328,17 @@ mod paint_table {
             ),
             ("center_x", i16be()),
             ("center_y", i16be()),
-            ("start_angle", util::f2dot14()),
-            ("end_angle", util::f2dot14()),
+            ("start_angle", f2dot14.call()),
+            ("end_angle", f2dot14.call()),
         ])
     }
 
     /// Format 9: PaintVarSweepGradient
-    fn paint_var_sweep_gradient(view: ViewExpr, var_color_line: FormatRef) -> Format {
+    fn paint_var_sweep_gradient(
+        view: ViewExpr,
+        var_color_line: FormatRef,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(9)),
             ("table_scope", reify_view(view.clone())),
@@ -344,8 +348,8 @@ mod paint_table {
             ),
             ("center_x", i16be()),
             ("center_y", i16be()),
-            ("start_angle", util::f2dot14()),
-            ("end_angle", util::f2dot14()),
+            ("start_angle", f2dot14.call()),
+            ("end_angle", f2dot14.call()),
         ])
     }
 
@@ -440,7 +444,7 @@ mod paint_table {
 
     /// Format 16: PaintScale
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-16-to-23-paintscale-and-variant-paint-scale-formats
-    fn paint_scale(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_scale(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(16)),
             ("table_scope", reify_view(view)),
@@ -448,13 +452,13 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale_x", util::f2dot14()),
-            ("scale_y", util::f2dot14()),
+            ("scale_x", f2dot14.call()),
+            ("scale_y", f2dot14.call()),
         ])
     }
 
     /// Format 17: PaintVarScale
-    fn paint_var_scale(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_scale(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(17)),
             ("table_scope", reify_view(view)),
@@ -462,14 +466,18 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale_x", util::f2dot14()),
-            ("scale_y", util::f2dot14()),
+            ("scale_x", f2dot14.call()),
+            ("scale_y", f2dot14.call()),
             ("var_index_base", u32be()),
         ])
     }
 
     /// Format 18: PaintScaleAroundCenter
-    fn paint_scale_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_scale_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(18)),
             ("table_scope", reify_view(view)),
@@ -477,15 +485,19 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale_x", util::f2dot14()),
-            ("scale_y", util::f2dot14()),
+            ("scale_x", f2dot14.call()),
+            ("scale_y", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
         ])
     }
 
     /// Format 19: PaintVarScaleAroundCenter
-    fn paint_var_scale_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_scale_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(19)),
             ("table_scope", reify_view(view)),
@@ -493,8 +505,8 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale_x", util::f2dot14()),
-            ("scale_y", util::f2dot14()),
+            ("scale_x", f2dot14.call()),
+            ("scale_y", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
             ("var_index_base", u32be()),
@@ -502,7 +514,7 @@ mod paint_table {
     }
 
     /// Format 20: PaintScaleUniform
-    fn paint_scale_uniform(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_scale_uniform(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(20)),
             ("table_scope", reify_view(view)),
@@ -510,12 +522,16 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale", util::f2dot14()),
+            ("scale", f2dot14.call()),
         ])
     }
 
     /// Format 21: PaintVarScaleUniform
-    fn paint_var_scale_uniform(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_scale_uniform(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(21)),
             ("table_scope", reify_view(view)),
@@ -523,13 +539,17 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale", util::f2dot14()),
+            ("scale", f2dot14.call()),
             ("var_index_base", u32be()),
         ])
     }
 
     /// Format 22: PaintScaleUniformAroundCenter
-    fn paint_scale_uniform_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_scale_uniform_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(22)),
             ("table_scope", reify_view(view)),
@@ -537,14 +557,18 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale", util::f2dot14()),
+            ("scale", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
         ])
     }
 
     /// Format 23: PaintVarScaleUniformAroundCenter
-    fn paint_var_scale_uniform_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_scale_uniform_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(23)),
             ("table_scope", reify_view(view)),
@@ -552,7 +576,7 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("scale", util::f2dot14()),
+            ("scale", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
             ("var_index_base", u32be()),
@@ -561,7 +585,7 @@ mod paint_table {
 
     /// Format 24: PaintRotate
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-24-to-27-paintrotate-and-variant-paint-rotate-formats
-    fn paint_rotate(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_rotate(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(24)),
             ("table_scope", reify_view(view)),
@@ -569,12 +593,12 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("angle", util::f2dot14()),
+            ("angle", f2dot14.call()),
         ])
     }
 
     /// Format 25: PaintVarRotate
-    fn paint_var_rotate(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_rotate(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(25)),
             ("table_scope", reify_view(view)),
@@ -582,13 +606,17 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("angle", util::f2dot14()),
+            ("angle", f2dot14.call()),
             ("var_index_base", u32be()),
         ])
     }
 
     /// Format 26: PaintRotateAroundCenter
-    fn paint_rotate_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_rotate_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(26)),
             ("table_scope", reify_view(view)),
@@ -596,14 +624,18 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("angle", util::f2dot14()),
+            ("angle", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
         ])
     }
 
     /// Format 27: PaintVarRotateAroundCenter
-    fn paint_var_rotate_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_rotate_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(27)),
             ("table_scope", reify_view(view)),
@@ -611,7 +643,7 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("angle", util::f2dot14()),
+            ("angle", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
             ("var_index_base", u32be()),
@@ -620,7 +652,7 @@ mod paint_table {
 
     /// Format 28: PaintSkew
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#formats-28-to-31-paintskew-and-variant-paint-skew-formats
-    fn paint_skew(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_skew(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(28)),
             ("table_scope", reify_view(view)),
@@ -628,13 +660,13 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("x_skew_angle", util::f2dot14()),
-            ("y_skew_angle", util::f2dot14()),
+            ("x_skew_angle", f2dot14.call()),
+            ("y_skew_angle", f2dot14.call()),
         ])
     }
 
     /// Format 29: PaintVarSkew
-    fn paint_var_skew(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_skew(view: ViewExpr, phantom_embed: Format, f2dot14: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(29)),
             ("table_scope", reify_view(view)),
@@ -642,14 +674,18 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("x_skew_angle", util::f2dot14()),
-            ("y_skew_angle", util::f2dot14()),
+            ("x_skew_angle", f2dot14.call()),
+            ("y_skew_angle", f2dot14.call()),
             ("var_index_base", u32be()),
         ])
     }
 
     /// Format 30: PaintSkewAroundCenter
-    fn paint_skew_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_skew_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(30)),
             ("table_scope", reify_view(view)),
@@ -657,15 +693,19 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("x_skew_angle", util::f2dot14()),
-            ("y_skew_angle", util::f2dot14()),
+            ("x_skew_angle", f2dot14.call()),
+            ("y_skew_angle", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
         ])
     }
 
     /// Format 31: PaintVarSkewAroundCenter
-    fn paint_var_skew_around_center(view: ViewExpr, phantom_embed: Format) -> Format {
+    fn paint_var_skew_around_center(
+        view: ViewExpr,
+        phantom_embed: Format,
+        f2dot14: FormatRef,
+    ) -> Format {
         record_auto([
             ("_format", is_byte(31)),
             ("table_scope", reify_view(view)),
@@ -673,8 +713,8 @@ mod paint_table {
                 "paint",
                 record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
             ),
-            ("x_skew_angle", util::f2dot14()),
-            ("y_skew_angle", util::f2dot14()),
+            ("x_skew_angle", f2dot14.call()),
+            ("y_skew_angle", f2dot14.call()),
             ("center_x", i16be()),
             ("center_y", i16be()),
             ("var_index_base", u32be()),
@@ -702,19 +742,22 @@ mod paint_table {
     /// Paint table format definition — a self-referential union of all 32 COLRv1 PaintFormat variants.
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#paint-tables
-    pub(super) fn paint_table(module: &mut FormatModule) -> FormatRef {
-        let color_line_ref = color_line(module);
-        let var_color_line_ref = var_color_line(module);
-        let affine2x3_ref = affine2x3(module);
-        let var_affine2x3_ref = var_affine2x3(module);
+    pub(super) fn paint_table(om: &mut OpentypeModule<'_>) -> FormatRef {
+        let f2dot14 = om.f2dot14();
+        let fixed32be = om.fixed32be();
+
+        let color_line_ref = color_line(om.module(), f2dot14);
+        let var_color_line_ref = var_color_line(om.module(), f2dot14);
+        let affine2x3_ref = affine2x3(om.module(), fixed32be);
+        let var_affine2x3_ref = var_affine2x3(om.module(), fixed32be);
 
         let mk_table = move |phantom_embed: Format| -> Format {
             let_view(
                 "table_view",
                 alts([
-                    ("PaintColrLayers", paint_colr_layers()), // Format  1
-                    ("PaintSolid", paint_solid()),            // Format  2
-                    ("PaintVarSolid", paint_var_solid()),     // Format  3
+                    ("PaintColrLayers", paint_colr_layers()),    // Format  1
+                    ("PaintSolid", paint_solid(f2dot14)),        // Format  2
+                    ("PaintVarSolid", paint_var_solid(f2dot14)), // Format  3
                     (
                         "PaintLinearGradient",
                         paint_linear_gradient(vvar("table_view"), color_line_ref),
@@ -733,17 +776,17 @@ mod paint_table {
                     ), // Format  7
                     (
                         "PaintSweepGradient",
-                        paint_sweep_gradient(vvar("table_view"), color_line_ref),
+                        paint_sweep_gradient(vvar("table_view"), color_line_ref, f2dot14),
                     ), // Format  8
                     (
                         "PaintVarSweepGradient",
-                        paint_var_sweep_gradient(vvar("table_view"), var_color_line_ref),
+                        paint_var_sweep_gradient(vvar("table_view"), var_color_line_ref, f2dot14),
                     ), // Format  9
                     (
                         "PaintGlyph",
                         paint_glyph(vvar("table_view"), phantom_embed.clone()),
                     ), // Format 10
-                    ("PaintColrGlyph", paint_colr_glyph()),   // Format 11
+                    ("PaintColrGlyph", paint_colr_glyph()),      // Format 11
                     (
                         "PaintTransform",
                         paint_transform(
@@ -770,33 +813,42 @@ mod paint_table {
                     ), // Format 15
                     (
                         "PaintScale",
-                        paint_scale(vvar("table_view"), phantom_embed.clone()),
+                        paint_scale(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 16
                     (
                         "PaintVarScale",
-                        paint_var_scale(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_scale(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 17
                     (
                         "PaintScaleAroundCenter",
-                        paint_scale_around_center(vvar("table_view"), phantom_embed.clone()),
+                        paint_scale_around_center(
+                            vvar("table_view"),
+                            phantom_embed.clone(),
+                            f2dot14,
+                        ),
                     ), // Format 18
                     (
                         "PaintVarScaleAroundCenter",
-                        paint_var_scale_around_center(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_scale_around_center(
+                            vvar("table_view"),
+                            phantom_embed.clone(),
+                            f2dot14,
+                        ),
                     ), // Format 19
                     (
                         "PaintScaleUniform",
-                        paint_scale_uniform(vvar("table_view"), phantom_embed.clone()),
+                        paint_scale_uniform(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 20
                     (
                         "PaintVarScaleUniform",
-                        paint_var_scale_uniform(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_scale_uniform(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 21
                     (
                         "PaintScaleUniformAroundCenter",
                         paint_scale_uniform_around_center(
                             vvar("table_view"),
                             phantom_embed.clone(),
+                            f2dot14,
                         ),
                     ), // Format 22
                     (
@@ -804,39 +856,56 @@ mod paint_table {
                         paint_var_scale_uniform_around_center(
                             vvar("table_view"),
                             phantom_embed.clone(),
+                            f2dot14,
                         ),
                     ), // Format 23
                     (
                         "PaintRotate",
-                        paint_rotate(vvar("table_view"), phantom_embed.clone()),
+                        paint_rotate(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 24
                     (
                         "PaintVarRotate",
-                        paint_var_rotate(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_rotate(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 25
                     (
                         "PaintRotateAroundCenter",
-                        paint_rotate_around_center(vvar("table_view"), phantom_embed.clone()),
+                        paint_rotate_around_center(
+                            vvar("table_view"),
+                            phantom_embed.clone(),
+                            f2dot14,
+                        ),
                     ), // Format 26
                     (
                         "PaintVarRotateAroundCenter",
-                        paint_var_rotate_around_center(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_rotate_around_center(
+                            vvar("table_view"),
+                            phantom_embed.clone(),
+                            f2dot14,
+                        ),
                     ), // Format 27
                     (
                         "PaintSkew",
-                        paint_skew(vvar("table_view"), phantom_embed.clone()),
+                        paint_skew(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 28
                     (
                         "PaintVarSkew",
-                        paint_var_skew(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_skew(vvar("table_view"), phantom_embed.clone(), f2dot14),
                     ), // Format 29
                     (
                         "PaintSkewAroundCenter",
-                        paint_skew_around_center(vvar("table_view"), phantom_embed.clone()),
+                        paint_skew_around_center(
+                            vvar("table_view"),
+                            phantom_embed.clone(),
+                            f2dot14,
+                        ),
                     ), // Format 30
                     (
                         "PaintVarSkewAroundCenter",
-                        paint_var_skew_around_center(vvar("table_view"), phantom_embed.clone()),
+                        paint_var_skew_around_center(
+                            vvar("table_view"),
+                            phantom_embed.clone(),
+                            f2dot14,
+                        ),
                     ), // Format 31
                     (
                         "PaintComposite",
@@ -851,7 +920,7 @@ mod paint_table {
                 parse_view_offset::<U32>(view, var("offset"), self_ref.call())
             }
         };
-        module.define_format_phantom_rec(
+        om.module().define_format_phantom_rec(
             "opentype.colr.paint_table",
             mk_table,
             embed(vvar("table_view")),

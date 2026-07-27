@@ -6,12 +6,9 @@ use super::*;
 ///
 /// Only appears if `hmtx` is present, and like all variable-font tables,
 /// requires `fvar` and `STAT` to be present.
-pub(crate) fn table(
-    module: &mut FormatModule,
-    item_variation_store: FormatRef,
-    delta_set_index_map: FormatRef,
-) -> FormatRef {
-    module.define_format(
+pub(crate) fn table(om: &mut OpentypeModule<'_>, delta_set_index_map: FormatRef) -> FormatRef {
+    let item_variation_store = om.item_variation_store();
+    om.module().define_format(
         "opentype.hvar.table",
         let_view(
             "table_view",

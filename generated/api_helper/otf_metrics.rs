@@ -145,8 +145,7 @@ pub mod otf_types {
     use crate::*;
     use fixed::types::{I2F14, I16F16};
 
-    // REVIEW - 16.16 fixed-point type has no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
-    pub type OpentypeFixed = opentype_head_table_font_revision;
+    pub type OpentypeFixed = opentype_types_fixed32;
 
     pub type Fixed = I16F16;
 
@@ -158,9 +157,7 @@ pub mod otf_types {
         }
     }
 
-    // REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
-    // FIXME - lock in a stable definition for F2Dot14 in `opentype.rs` to avoid name-drift
-    pub type OpentypeF2Dot14 = opentype_avar_axis_value_map_from_coordinate;
+    pub type OpentypeF2Dot14 = opentype_types_f2dot14;
 
     pub type F2Dot14 = I2F14;
 

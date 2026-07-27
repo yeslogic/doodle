@@ -3,8 +3,9 @@ use super::*;
 /// Opentype OS/2 table format definition
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/os2
-pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-    module.define_format_args(
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let tag = om.tag();
+    om.module().define_format_args(
         "opentype.os2.table",
         vec![(Label::Borrowed("table_length"), ValueType::U32)],
         record([
