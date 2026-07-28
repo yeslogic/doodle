@@ -757,6 +757,30 @@ mod fn_reify {
             )
         })
     }
+
+    /// Variant of [`reify`] for cases where `frame` is a short-lived local binding (e.g. produced
+    /// by matching on an owned by-value enum) rather than something that lives as long as the
+    /// underlying `'input` data. Only usable when `Obj::Args` does not actually depend on its
+    /// lifetime parameter (most commonly `Args<'_> = ()`), since `frame`'s own (short) borrow is
+    /// the only lifetime available to read `Args` out of `frame`.
+    pub(super) fn reify_local<'call, 'input, Frame, Obj, ArgsTy>(
+        frame: &'call Frame,
+        _proxy: Obj,
+    ) -> Obj::Output<'input>
+    where
+        Frame: container::ViewFrame<'input> + container::SingleContainer<Obj>,
+        Obj: for<'x> container::CommonObject<Args<'x> = ArgsTy>,
+    {
+        let args = frame.get_args();
+        let offset = frame.get_offset();
+        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_local::<{}, {}>): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
+    }
     pub(super) fn reify_const<'call, 'input, Frame, Obj, ArgsTy, Out>(
         frame: &'call Frame,
         _proxy: Obj,
@@ -790,6 +814,29 @@ mod fn_reify {
         Obj::parse_offset(frame.scope(), offset, tmp[ix].clone()).unwrap_or_else(|e| {
             panic!(
                 "failed to parse (reify_index::<{}, {}>(.., {ix}): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>(),
+            )
+        })
+    }
+
+    /// Variant of [`reify_index`] for `frame` bindings that are short-lived locals (see
+    /// [`reify_local`]); only usable when `Obj::Args` does not depend on its lifetime parameter.
+    pub(super) fn reify_index_local<'call, 'input, Frame, Obj, ArgsTy, const N: usize>(
+        frame: &'call Frame,
+        _proxy: Obj,
+        ix: usize,
+    ) -> Obj::Output<'input>
+    where
+        Frame: container::ViewFrame<'input> + container::MultiContainer<Obj, N>,
+        Obj: for<'x> container::CommonObject<Args<'x> = ArgsTy>,
+        ArgsTy: Clone,
+    {
+        let tmp = frame.get_args_array();
+        let offset = frame.get_offset_array()[ix];
+        Obj::parse_offset(frame.scope(), offset, tmp[ix].clone()).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_index_local::<{}, {}>(.., {ix}): {e}",
                 std::any::type_name::<Frame>(),
                 std::any::type_name::<Obj>(),
             )
@@ -833,6 +880,30 @@ mod fn_reify {
             Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
                 panic!(
                     "failed to parse (reify_all::<{}, {}>): {e}",
+                    std::any::type_name::<Frame>(),
+                    std::any::type_name::<Obj>()
+                )
+            })
+        })
+    }
+
+    /// Variant of [`reify_all`] for `frame` bindings that are short-lived locals (see
+    /// [`reify_local`]); only usable when `Obj::Args` does not depend on its lifetime parameter.
+    pub(super) fn reify_all_local<'call, 'input, Frame, Obj, ArgsTy>(
+        frame: &'call Frame,
+        _proxy: Obj,
+    ) -> impl Iterator<Item = Obj::Output<'input>> + 'call
+    where
+        Frame: container::ViewFrame<'input> + container::DynContainer<Obj>,
+        Obj: for<'x> container::CommonObject<Args<'x> = ArgsTy> + 'static,
+        ArgsTy: Clone,
+        'input: 'call,
+    {
+        let view = frame.scope();
+        Iterator::zip(frame.iter_offsets(), frame.iter_args()).map(move |(offset, args)| {
+            Obj::parse_offset(view, offset, args).unwrap_or_else(|e| {
+                panic!(
+                    "failed to parse (reify_all_local::<{}, {}>): {e}",
                     std::any::type_name::<Frame>(),
                     std::any::type_name::<Obj>()
                 )
@@ -971,8 +1042,9 @@ mod fn_reify {
     }
 }
 use fn_reify::{
-    reify, reify_all, reify_all_dep, reify_all_index, reify_all_index_dep, reify_const, reify_dep,
-    reify_index, reify_index_dep, reify_opt, reify_opt_dep, reify_opt_index_dep,
+    reify, reify_all, reify_all_dep, reify_all_index, reify_all_index_dep, reify_all_local,
+    reify_const, reify_dep, reify_index, reify_index_dep, reify_index_local, reify_local,
+    reify_opt, reify_opt_dep, reify_opt_index_dep,
 };
 
 pub mod obj {
@@ -1105,9 +1177,9 @@ pub mod obj {
     proxy!(OpentypeAttachPoint = AttPoint);
     proxy!(OpentypeItemVariationStore<'a> = ItemVarStore);
     proxy!(OpentypeMarkGlyphSet<'a> = MarkGlSet);
-    proxy!(OpentypeAxisValue = AxisValTbl);
+    proxy!(OpentypeAxisValue<'a> = AxisValTbl);
     proxy!(OpentypeAxisValueArray<'a> = AxisValueArr);
-    proxy!(OpentypeDesignAxesArray = DAxisArray);
+    proxy!(OpentypeDesignAxesArray<'a> = DAxisArray);
     proxy!(OpentypeCmapSubtable<'a> = CmapSub);
     proxy!(OpentypeItemVariationData = ItemVarData);
     proxy!(OpentypeVariationRegionList = VarRegList);
@@ -1205,8 +1277,8 @@ pub mod obj {
 
     proxy!(OpentypePaintTable<'input> = PaintTbl);
 
-    proxy!(OpentypeColrColorLine = ColorLine);
-    proxy!(OpentypeVarColorLine = VarColorLine);
+    proxy!(OpentypeColorLine<'a> = ColorLine);
+    proxy!(OpentypeVarColorLine<'a> = VarColorLine);
 
     proxy!(OpentypeAffine2x3 = Affine2x3);
     proxy!(OpentypeVarAffine2x3 = VarAffine2x3);
@@ -2391,11 +2463,11 @@ pub mod otf_colr {
         pub type OpentypePaintTransform = opentype_colr_paint_table_PaintTransform<'input>;
         pub type OpentypePaintVarTransform = opentype_colr_paint_table_PaintVarTransform<'input>;
 
-        pub type OpentypeColrColorLine = opentype_colr_color_line;
-        pub type OpentypeColorStop = opentype_colr_color_line_color_stops;
+        pub type OpentypeColorLine = opentype_colr_color_line<'input>;
+        pub type OpentypeColorStop = opentype_colr_color_stop;
 
-        pub type OpentypeVarColorLine = opentype_colr_var_color_line;
-        pub type OpentypeVarColorStop = opentype_colr_var_color_line_color_stops;
+        pub type OpentypeVarColorLine = opentype_colr_var_color_line<'input>;
+        pub type OpentypeVarColorStop = opentype_colr_var_color_stop;
 
         pub type OpentypeAffine2x3 = opentype_colr_affine2x3;
         pub type OpentypeVarAffine2x3 = opentype_colr_var_affine2x3;
@@ -2817,12 +2889,12 @@ pub(crate) mod colr {
             pub(crate) color_stops: Vec<ColorStop>,
         }
 
-        impl Promote<OpentypeColrColorLine> for ColorLine {
-            fn promote(orig: &OpentypeColrColorLine) -> Self {
+        impl<'a> Promote<OpentypeColorLine<'a>> for ColorLine {
+            fn promote(orig: &OpentypeColorLine<'a>) -> Self {
                 ColorLine {
                     extend: orig.extend,
                     num_stops: orig.num_stops,
-                    color_stops: orig.color_stops.iter().map(ColorStop::promote).collect(),
+                    color_stops: promote_all(&orig.color_stops),
                 }
             }
         }
@@ -2870,12 +2942,12 @@ pub(crate) mod colr {
             pub(crate) color_stops: Vec<VarColorStop>,
         }
 
-        impl Promote<OpentypeVarColorLine> for VarColorLine {
-            fn promote(orig: &OpentypeVarColorLine) -> Self {
+        impl<'a> Promote<OpentypeVarColorLine<'a>> for VarColorLine {
+            fn promote(orig: &OpentypeVarColorLine<'a>) -> Self {
                 VarColorLine {
                     extend: orig.extend,
                     num_stops: orig.num_stops,
-                    color_stops: orig.color_stops.iter().map(VarColorStop::promote).collect(),
+                    color_stops: promote_all(&orig.color_stops),
                 }
             }
         }
@@ -3147,7 +3219,11 @@ pub(crate) mod colr {
         }
 
         impl PaintTable {
-            pub fn lift<'a>(map: &mut PaintMap, orig: &OpentypePaintTable<'a>) -> Self {
+            pub fn lift_outer<'a>(map: &mut PaintMap, orig: &OpentypePaintTable<'a>) -> Self {
+                Self::lift(map, orig.clone())
+            }
+
+            pub fn lift(map: &mut PaintMap, orig: OpentypePaintTable<'_>) -> Self {
                 match orig {
                     OpentypePaintTable::PaintColrGlyph(inner) => PaintTable::PaintColrGlyph {
                         glyph_id: inner.glyph_id,
@@ -3161,8 +3237,9 @@ pub(crate) mod colr {
                             let offs = inner.source_paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let source_paint = reify_index(inner, Mandatory(obj::PaintTbl), 0);
-                                let lifted = PaintTable::lift(map, &source_paint);
+                                let source_paint =
+                                    reify_index_local(&inner, Mandatory(obj::PaintTbl), 0);
+                                let lifted = PaintTable::lift(map, source_paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3172,8 +3249,8 @@ pub(crate) mod colr {
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
                                 let backdrop_paint =
-                                    reify_index(inner, Mandatory(obj::PaintTbl), 1);
-                                let lifted = PaintTable::lift(map, &backdrop_paint);
+                                    reify_index_local(&inner, Mandatory(obj::PaintTbl), 1);
+                                let lifted = PaintTable::lift(map, backdrop_paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3189,8 +3266,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify_index(inner, Mandatory(obj::PaintTbl), 0);
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_index_local(&inner, Mandatory(obj::PaintTbl), 0);
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3202,8 +3279,8 @@ pub(crate) mod colr {
                     }
                     OpentypePaintTable::PaintLinearGradient(inner) => {
                         PaintTable::PaintLinearGradient {
-                            color_line: ColorLine::promote(&reify(
-                                inner,
+                            color_line: ColorLine::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::ColorLine),
                             )),
                             x0: inner.x0,
@@ -3216,8 +3293,8 @@ pub(crate) mod colr {
                     }
                     OpentypePaintTable::PaintRadialGradient(inner) => {
                         PaintTable::PaintRadialGradient {
-                            color_line: ColorLine::promote(&reify(
-                                inner,
+                            color_line: ColorLine::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::ColorLine),
                             )),
                             x0: inner.x0,
@@ -3233,8 +3310,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3249,8 +3326,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3267,8 +3344,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3284,8 +3361,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3303,8 +3380,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3319,8 +3396,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3337,8 +3414,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3354,8 +3431,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3374,8 +3451,8 @@ pub(crate) mod colr {
                     },
                     OpentypePaintTable::PaintSweepGradient(inner) => {
                         PaintTable::PaintSweepGradient {
-                            color_line: ColorLine::promote(&reify(
-                                inner,
+                            color_line: ColorLine::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::ColorLine),
                             )),
                             center_x: inner.center_x,
@@ -3389,15 +3466,18 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
                         };
                         PaintTable::PaintTransform {
                             paint,
-                            transform: Affine2x3::promote(&reify(inner, Mandatory(obj::Affine2x3))),
+                            transform: Affine2x3::promote(&reify_local(
+                                &inner,
+                                Mandatory(obj::Affine2x3),
+                            )),
                         }
                     }
                     OpentypePaintTable::PaintTranslate(inner) => {
@@ -3405,8 +3485,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3419,8 +3499,8 @@ pub(crate) mod colr {
                     }
                     OpentypePaintTable::PaintVarLinearGradient(inner) => {
                         PaintTable::PaintVarLinearGradient {
-                            color_line: VarColorLine::promote(&reify(
-                                inner,
+                            color_line: VarColorLine::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::VarColorLine),
                             )),
                             x0: inner.x0,
@@ -3433,8 +3513,8 @@ pub(crate) mod colr {
                     }
                     OpentypePaintTable::PaintVarRadialGradient(inner) => {
                         PaintTable::PaintVarRadialGradient {
-                            color_line: VarColorLine::promote(&reify(
-                                inner,
+                            color_line: VarColorLine::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::VarColorLine),
                             )),
                             x0: inner.x0,
@@ -3450,8 +3530,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3467,8 +3547,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3486,8 +3566,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3504,8 +3584,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3524,8 +3604,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3541,8 +3621,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3560,8 +3640,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3578,8 +3658,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3600,8 +3680,8 @@ pub(crate) mod colr {
                     },
                     OpentypePaintTable::PaintVarSweepGradient(inner) => {
                         PaintTable::PaintVarSweepGradient {
-                            color_line: VarColorLine::promote(&reify(
-                                inner,
+                            color_line: VarColorLine::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::VarColorLine),
                             )),
                             center_x: inner.center_x,
@@ -3615,16 +3695,16 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
                         };
                         PaintTable::PaintVarTransform {
                             paint,
-                            transform: VarAffine2x3::promote(&reify(
-                                inner,
+                            transform: VarAffine2x3::promote(&reify_local(
+                                &inner,
                                 Mandatory(obj::VarAffine2x3),
                             )),
                         }
@@ -3634,8 +3714,8 @@ pub(crate) mod colr {
                             let offs = inner.paint.offset as usize;
                             let key = inner.table_scope.relative_to_absolute(offs);
                             if !map.contains_key(&key) {
-                                let paint = reify(inner, Mandatory(obj::PaintTbl));
-                                let lifted = PaintTable::lift(map, &paint);
+                                let paint = reify_local(&inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, paint);
                                 map.insert(key, Rc::new(lifted));
                             };
                             key
@@ -3687,7 +3767,7 @@ pub(crate) mod colr {
                 if !paint_map.contains_key(&key) {
                     let table = reify_dep(orig.list_scope, orig_record, Mandatory(obj::PaintTbl))
                         .expect("bad parse");
-                    let tbl = PaintTable::lift(paint_map, &table);
+                    let tbl = PaintTable::lift(paint_map, table);
                     paint_map.insert(key, Rc::new(tbl));
                 };
                 record.paint_offset = key;
@@ -3713,7 +3793,7 @@ pub(crate) mod colr {
                 if !paint_map.contains_key(&key) {
                     let raw = OpentypePaintTable::parse_offset(orig.list_scope, offs, ())
                         .expect("bad parse");
-                    let table = PaintTable::lift(paint_map, &raw);
+                    let table = PaintTable::lift(paint_map, raw);
                     paint_map.insert(key, Rc::new(table));
                 }
                 paint_tables.push(key);
@@ -3881,8 +3961,8 @@ pub(crate) mod colr {
             ColrMetrics {
                 version: orig.version,
                 paint_map,
-                base_glyph_records: reify(orig, Nullable(obj::BaseGlyphRecArray)),
-                layer_records: reify(orig, Nullable(obj::LayerRecArray)),
+                base_glyph_records: reify_const(orig, Nullable(obj::BaseGlyphRecArray)),
+                layer_records: reify_const(orig, Nullable(obj::LayerRecArray)),
                 extra,
             }
         }
@@ -4190,7 +4270,7 @@ pub mod otf_gvar {
             self.data_offset as usize
         }
 
-        fn get_args(&self) -> <obj::GvarSerData as container::CommonObject>::Args<'_> {
+        fn get_args(&self) -> (bool, &[OpentypeGvarTupleVariationHeader]) {
             (
                 self.tuple_variation_count.shared_point_numbers,
                 &self.tuple_variation_headers,
@@ -4807,8 +4887,9 @@ pub(crate) mod otf_fvar {
     use super::*;
 
     alias! {
-        pub type OpentypeUserTuple = opentype_fvar_user_tuple;
         pub type OpentypeInstanceRecord = opentype_fvar_instance_record;
+        pub type OpentypeUserTuple = opentype_fvar_user_tuple;
+
         pub type OpentypeVariationAxisRecord = opentype_fvar_variation_axis_record;
         pub type OpentypeVariationAxisRecordFlags = opentype_fvar_variation_axis_record_flags;
     }
@@ -4853,13 +4934,13 @@ use otf_fvar::*;
 pub(crate) mod fvar {
     use super::*;
 
+    pub type UserTuple = Vec<otf_types::Fixed>;
+
     impl Promote<OpentypeUserTuple> for UserTuple {
         fn promote(orig: &OpentypeUserTuple) -> Self {
             promote_vec(&orig.coordinates)
         }
     }
-
-    pub type UserTuple = Vec<otf_types::Fixed>;
 
     // REVIEW - currently not implemented in the OpentypeLayoutScriptList => ScrList spec;
     type InstanceFlags = ();
@@ -4919,9 +5000,9 @@ pub(crate) mod fvar {
     }
 
     impl<'input> Promote<OpentypeFvar<'input>> for FvarMetrics {
-        fn promote(orig: &OpentypeFvar) -> Self {
-            let axes = promote_all(reify_all(orig, obj::AxisRec));
-            let instances = promote_all(reify_all(orig, obj::InstanceRec));
+        fn promote(orig: &OpentypeFvar<'input>) -> Self {
+            let axes = promote_all(reify_all_local(orig, obj::AxisRec));
+            let instances = promote_all(reify_all_local(orig, obj::InstanceRec));
             FvarMetrics {
                 major_version: orig.major_version,
                 minor_version: orig.minor_version,
@@ -4945,17 +5026,17 @@ pub mod otf_stat {
     use super::{Mandatory, Nullable, container, obj};
 
     alias! {
-        pub type OpentypeAxisValue = opentype_stat_axis_value_table;
-        pub type OpentypeAxisValueData = opentype_stat_axis_value_table_data;
+        pub type OpentypeAxisValue = opentype_stat_axis_value_table<'input>;
+        pub type OpentypeAxisValueData = opentype_stat_axis_value_table_data<'input>;
         pub type OpentypeAxisValueFormat1 = opentype_stat_axis_value_table_data_Format1;
         pub type OpentypeAxisValueFormat2 = opentype_stat_axis_value_table_data_Format2;
         pub type OpentypeAxisValueFormat3 = opentype_stat_axis_value_table_data_Format3;
-        pub type OpentypeAxisValueFormat4 = opentype_stat_axis_value_table_data_Format4;
-        pub type OpentypeAxisValueRecord = opentype_stat_axis_value_table_data_Format4_axis_values;
+        pub type OpentypeAxisValueFormat4 = opentype_stat_axis_value_table_data_Format4<'input>;
+        pub type OpentypeAxisValueRecord = opentype_stat_axis_value_record;
         pub type OpentypeAxisValueFlags = opentype_stat_axis_value_table_data_Format1_flags;
-        pub type OpentypeAxisValueArray = opentype_stat_axis_value_array<'a>;
-        pub type OpentypeDesignAxesArray = opentype_stat_design_axes_array;
-        pub type OpentypeDesignAxis = opentype_stat_design_axes_array_design_axes;
+        pub type OpentypeAxisValueArray = opentype_stat_axis_value_array<'input>;
+        pub type OpentypeDesignAxesArray = opentype_stat_design_axes_array<'input>;
+        pub type OpentypeAxisRecord = opentype_stat_axis_record;
     }
 
     frame!(OpentypeAxisValueArray.array_scope);
@@ -4990,11 +5071,12 @@ pub mod stat {
     }
 
     impl<'a> Promote<otf_types::OpentypeStat<'a>> for StatMetrics {
-        fn promote(orig: &otf_types::OpentypeStat) -> Self {
-            let design_axes = <Vec<DesignAxis>>::promote(&fn_reify::reify(orig, obj::DAxisArray));
+        fn promote(orig: &otf_types::OpentypeStat<'a>) -> Self {
+            let design_axes =
+                <Vec<DesignAxis>>::promote(&fn_reify::reify_local(orig, obj::DAxisArray));
             let axis_values = {
-                let axis_value_array = fn_reify::reify(orig, obj::AxisValueArr);
-                fn_reify::reify_all(&axis_value_array, obj::AxisValTbl)
+                let axis_value_array = fn_reify::reify_local(orig, obj::AxisValueArr);
+                fn_reify::reify_all_local(&axis_value_array, obj::AxisValTbl)
                     .map(|raw| AxisValue::promote(&raw))
                     .collect()
             };
@@ -5031,14 +5113,14 @@ pub mod stat {
         Format4(AxisValueFormat4),
     }
 
-    impl Promote<OpentypeAxisValue> for AxisValue {
-        fn promote(orig: &OpentypeAxisValue) -> Self {
+    impl<'a> Promote<OpentypeAxisValue<'a>> for AxisValue {
+        fn promote(orig: &OpentypeAxisValue<'a>) -> Self {
             Self::promote(&orig.data)
         }
     }
 
-    impl Promote<OpentypeAxisValueData> for AxisValue {
-        fn promote(orig: &OpentypeAxisValueData) -> Self {
+    impl<'a> Promote<OpentypeAxisValueData<'a>> for AxisValue {
+        fn promote(orig: &OpentypeAxisValueData<'a>) -> Self {
             match orig {
                 OpentypeAxisValueData::Format1(f1) => {
                     AxisValue::Format1(AxisValueFormat1::promote(f1))
@@ -5126,12 +5208,12 @@ pub mod stat {
         pub(crate) axis_values: Vec<AxisValueRecord>,
     }
 
-    impl Promote<OpentypeAxisValueFormat4> for AxisValueFormat4 {
-        fn promote(orig: &OpentypeAxisValueFormat4) -> Self {
+    impl<'a> Promote<OpentypeAxisValueFormat4<'a>> for AxisValueFormat4 {
+        fn promote(orig: &OpentypeAxisValueFormat4<'a>) -> Self {
             AxisValueFormat4 {
                 flags: AxisValueFlags::promote(&orig.flags),
                 value_name_id: NameId::from(orig.value_name_id),
-                axis_values: promote_vec(&orig.axis_values),
+                axis_values: promote_all(&orig.axis_values),
             }
         }
     }
@@ -5158,8 +5240,8 @@ pub mod stat {
         pub(crate) axis_ordering: u16,
     }
 
-    impl Promote<OpentypeDesignAxis> for DesignAxis {
-        fn promote(orig: &OpentypeDesignAxis) -> Self {
+    impl Promote<OpentypeAxisRecord> for DesignAxis {
+        fn promote(orig: &OpentypeAxisRecord) -> Self {
             DesignAxis {
                 axis_tag: Tag(orig.axis_tag),
                 axis_name_id: NameId::from(orig.axis_name_id),
@@ -5168,9 +5250,9 @@ pub mod stat {
         }
     }
 
-    impl Promote<OpentypeDesignAxesArray> for Vec<DesignAxis> {
-        fn promote(orig: &OpentypeDesignAxesArray) -> Self {
-            promote_vec(&orig.design_axes)
+    impl<'a> Promote<OpentypeDesignAxesArray<'a>> for Vec<DesignAxis> {
+        fn promote(orig: &OpentypeDesignAxesArray<'a>) -> Self {
+            promote_all(&orig.design_axes)
         }
     }
 }

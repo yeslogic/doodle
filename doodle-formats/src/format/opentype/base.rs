@@ -8,13 +8,15 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
     let device_or_variation_index_table = om.device_or_variation_index_table();
     let item_variation_store = om.item_variation_store();
 
-    let base_coord = base_coord(om.module(), device_or_variation_index_table);
-    let min_max = min_max(om.module(), tag, base_coord);
-    let base_values = base_values(om.module(), base_coord);
+    let module = om.module();
 
-    let base_lang_sys = om.module().define_format_views(
+    let base_coord = base_coord(module, device_or_variation_index_table);
+    let min_max = min_max(module, tag, base_coord);
+    let base_values = base_values(module, base_coord);
+
+    let base_lang_sys = module.register_format_view(
         "opentype.base.base-langsys",
-        vec![Label::Borrowed("table_view")],
+        Label::Borrowed("table_view"),
         record([
             ("base_lang_sys_tag", tag.call()),
             (
@@ -42,7 +44,7 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
                     "base_lang_sys_records",
                     repeat_count(
                         var("base_lang_sys_count"),
-                        base_lang_sys.call_views(vec![vvar("table_view")]),
+                        base_lang_sys.invoke_view(vvar("table_view")),
                     ),
                 ),
             ]),
@@ -87,7 +89,7 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
         // nested inside the offset-jumped-to format.
         (
             "baseline_tags",
-            repeat_count(var("base_tag_count"), tag.call()),
+            from_here(read_array(var("base_tag_count"), tag)),
         ), // TODO[epic=sorting-validation] - must appear in alphabetical order (not enforced locally)
     ]);
     let axis_table = om.module().define_format(

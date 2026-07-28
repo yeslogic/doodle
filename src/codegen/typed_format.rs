@@ -509,6 +509,19 @@ impl TypedFormat<GenType> {
         TypedFormat::Tuple(gt, elts)
     }
 
+    /// Provided that no structurally significant Formats intervene, extracts the outermost [`StyleHint`]
+    /// attached to `self`.
+    ///
+    /// If no `StyleHint` is attached to any non-child element of `self`, returns `None`.
+    pub(crate) fn get_hint(&self) -> Option<&StyleHint> {
+        match self {
+            TypedFormat::Hint(_, hint, _) => Some(hint),
+            // STUB - there may be cases we simply haven't thought about yet, so this catch-all isn't necessarily final
+            // FIXME - figure out which cases are truly None and which might be Some
+            _ => None,
+        }
+    }
+
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
             TypedFormat::Fail => None,

@@ -6,7 +6,6 @@ pub(crate) mod analysis;
 pub(crate) mod rebind;
 pub(crate) mod resolve;
 
-use crate::fixed::SpineElem;
 use crate::numeric::elaborator::IntType as ExtIntType;
 use crate::numeric::elaborator::PrimInt as ExtPrimInt;
 
@@ -14,7 +13,7 @@ use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY}
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{Precedence, cond_paren};
-use crate::{BaseKind, BaseType, Endian, FormatRef, IntoLabel, Label, ValueType};
+use crate::{BaseKind, BaseType, Endian, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -757,24 +756,6 @@ pub enum FixedSizeType {
 }
 
 impl FixedSizeType {
-    /// `resolve_indirect` resolves the `FormatRef` inside a `SpineElem::Indirect` to the
-    /// `(defined_types index, type name, lifetime params)` of the ad-hoc Rust type its target
-    /// format was elaborated into (see `codegen::model::traits::smallsorts::FixedFormatInfo`).
-    pub(crate) fn from_spine_elem(
-        spine_elem: &SpineElem,
-        resolve_indirect: impl FnOnce(FormatRef) -> Option<(usize, Label, Option<Box<UseParams>>)>,
-    ) -> Option<Self> {
-        match spine_elem {
-            SpineElem::Raw(base_kind) => {
-                Some(Self::Marker(MarkerType::from_base_kind_endian(*base_kind)))
-            }
-            SpineElem::Indirect(fref, _kind) => {
-                let (ix, name, params) = resolve_indirect(*fref)?;
-                Some(Self::Adhoc(LocalType::LocalDef(ix, name, params)))
-            }
-        }
-    }
-
     pub(crate) fn type_name(&self) -> Label {
         match self {
             FixedSizeType::Marker(mt) => Label::Borrowed(mt.name()),

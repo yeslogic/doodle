@@ -49,17 +49,20 @@ fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
     // `pseudo_record([("offset", u32be())], with_view(table_view.offset(var("offset")),
     // read_array(var("design_axis_count"), axis_record_ref)))`, following the migrated
     // `cpal.rs::table` pattern exactly (commit f9835b9).
-    let axis_record = record([
-        ("axis_tag", tag.call()),
-        ("axis_name_id", u16be()),
-        ("axis_ordering", u16be()),
-    ]);
+    let axis_record = module.define_format(
+        "opentype.stat.axis_record",
+        record([
+            ("axis_tag", tag.call()),
+            ("axis_name_id", u16be()),
+            ("axis_ordering", u16be()),
+        ]),
+    );
     module.define_format_args(
         "opentype.stat.design_axes_array",
         vec![(Label::Borrowed("design_axis_count"), ValueType::U16)],
         record([(
             "design_axes",
-            repeat_count(var("design_axis_count"), axis_record),
+            from_here(read_array(var("design_axis_count"), axis_record)),
         )]),
     )
 }
@@ -98,7 +101,10 @@ fn axis_value_table(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRe
         FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
         FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
     ]);
-    let axis_value_record = record([("axis_index", u16be()), ("value", fixed32be.call())]);
+    let axis_value_record = module.define_format(
+        "opentype.stat.axis_value_record",
+        record([("axis_index", u16be()), ("value", fixed32be.call())]),
+    );
     let f1_fields = vec![
         ("axis_index", u16be()),
         ("flags", axis_flags.clone()),
@@ -134,7 +140,7 @@ fn axis_value_table(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRe
         // need `from_here(read_array(var("axis_count"), axis_value_record_ref))`.
         (
             "axis_values",
-            repeat_count(var("axis_count"), axis_value_record),
+            from_here(read_array(var("axis_count"), axis_value_record)),
         ),
     ];
     module.define_format(

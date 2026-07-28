@@ -534,12 +534,6 @@ fn tuple_record(module: &mut FormatModule, f2dot14: FormatRef) -> DepFormat<1, 0
         "opentype.gvar.tuple_record",
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
-            // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-            // wrapping: element is bare `f2dot14.call()` = `Format::Variant("F2Dot14",
-            // u16be())`, i.e. a real fixed-width 2-byte primitive read with no other blocker.
-            // No `FormatRef` needed (would map to `BaseKind::U16BE`, modulo however the
-            // "F2Dot14" tag is preserved downstream). Read sequentially with no view in scope,
-            // so would need `from_here(read_array(var("axis_count"), BaseKind::U16BE))`.
             "coordinates",
             repeat_count(var("axis_count"), f2dot14.call()),
         )]),

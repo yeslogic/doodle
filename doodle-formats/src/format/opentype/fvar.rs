@@ -112,12 +112,6 @@ fn user_tuple(module: &mut FormatModule, fixed32be: FormatRef) -> DepFormat<1, 0
         "opentype.fvar.user_tuple",
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
-            // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-            // wrapping: element is bare `fixed32be.call()` = `Format::Variant("Fixed32",
-            // u32be())`, i.e. a real fixed-width 4-byte primitive read with no other blocker.
-            // No `FormatRef` needed (would map to `BaseKind::U32BE`, modulo however the
-            // "Fixed32" tag is preserved downstream). Read sequentially with no view in scope,
-            // so would need `from_here(read_array(var("axis_count"), BaseKind::U32BE))`.
             "coordinates",
             repeat_count(var("axis_count"), fixed32be.call()),
         )]),

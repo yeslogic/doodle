@@ -314,7 +314,19 @@ mod tests {
     #[test]
     // NOTE - This is a regression so the panic is documenting the current behavior - the eventual goal is for this to pass
     #[should_panic]
-    fn analyze_fixed_shape_accepts_signed() {
+    fn analyze_fixed_shape_accepts_record_with_record_field() {
+        let mut module = FormatModule::new();
+        let inner = module.define_format("inner", record([("x", u8()), ("y", u8())]));
+        let outer = module.define_format("outer", record([("x", u8()), ("y", inner.call())]));
+        let outcome = analyze_fixed_shape(&module, outer);
+        // outcome will be Err because we don't have recursive support for fixed-record fields within prospective fixed-records.
+        assert!(outcome.is_ok());
+    }
+
+    #[test]
+    // NOTE - This is a regression so the panic is documenting the current behavior - the eventual goal is for this to pass
+    #[should_panic]
+    fn as_base_kind_read_accepts_signed() {
         let f = i32be();
         assert!(as_base_kind_read(&f).is_some());
     }

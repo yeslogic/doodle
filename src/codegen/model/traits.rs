@@ -243,7 +243,7 @@ pub mod smallsorts {
     use super::*;
     use crate::codegen::typed_format::{GenType, TypedFormat};
     use crate::codegen::util::{BTree, StableMap};
-    use crate::fixed;
+    use crate::fixed::{self, SpineElem};
     use crate::{FormatModule, FormatRef};
     use intmap::IntMap;
     use std::collections::BTreeSet;
@@ -273,6 +273,15 @@ pub mod smallsorts {
         pub defined_types: &'a [RustTypeDecl],
     }
 
+    /// Possible types that can occur as a fixed-size spine-element of a `FixedReadKind::FixedFormat`
+    ///
+    /// Specifically, encapsulates `MarkerType` and `LocalType` (which in turn must be a fixed-size struct).
+    #[derive(Debug, Clone)]
+    enum SpineType {
+        Adhoc((usize, Label, Option<Box<UseParams>>)),
+        Marker(MarkerType),
+    }
+
     impl<'a> FixedFormatInfo<'a> {
         /// Resolves the `FormatRef` inside a `SpineElem::Indirect` to the `(defined_types index,
         /// type name, lifetime params)` of the ad-hoc Rust type its target format was elaborated
@@ -280,11 +289,47 @@ pub mod smallsorts {
         /// with some enclosing `on_type`'s own index), so this is correct even for a `fref` that
         /// is reached through a chain of `ItemVar` aliases whose final target differs from
         /// whatever format registered the enclosing type in `targets`.
-        fn resolve_adhoc(&self, fref: FormatRef) -> Option<(usize, Label, Option<Box<UseParams>>)> {
+        fn try_resolve_adhoc(
+            &self,
+            fref: FormatRef,
+        ) -> Option<(usize, Label, Option<Box<UseParams>>)> {
             let t_inner = self.t_formats.get(&fref.get_level())?;
             let gt = t_inner.get_type()?;
             let (ix, name, params) = gt.try_as_adhoc()?;
             Some((ix, name.clone(), params))
+        }
+
+        /// Given a `SpineElem`, infallibly induces the corresponding `FixedSizeType`,
+        /// panicking if any of the requisite operations fail for any reason.
+        fn spine_to_fixed(&self, elem: &SpineElem) -> FixedSizeType {
+            match elem {
+                SpineElem::Raw(base_kind) => {
+                    FixedSizeType::Marker(MarkerType::from_base_kind_endian(*base_kind))
+                }
+                &SpineElem::Indirect(fref, _kind) => match self.to_marker_or_adhoc(fref).unwrap() {
+                    SpineType::Adhoc((ix, name, params)) => {
+                        FixedSizeType::Adhoc(LocalType::LocalDef(ix, name, params))
+                    }
+                    SpineType::Marker(mt) => FixedSizeType::Marker(mt),
+                },
+            }
+        }
+
+        /// Given a `FormatRef` pointing to a proposed fixed-size type, extract the type it associates to,
+        /// whether an adhoc LocalType or a primitive MarkerType
+        fn to_marker_or_adhoc(&self, fref: FormatRef) -> Option<SpineType> {
+            let t_inner = self.t_formats.get(&fref.get_level())?;
+            if let Some(hint) = t_inner.get_hint() {
+                match hint {
+                    &crate::StyleHint::Common(crate::CommonOp::EndianParse(k)) => {
+                        return Some(SpineType::Marker(MarkerType::from_base_kind_endian(k)));
+                    }
+                    _ => (),
+                }
+            }
+            let gt = t_inner.get_type()?;
+            let (ix, name, params) = gt.try_as_adhoc()?;
+            Some(SpineType::Adhoc((ix, name.clone(), params)))
         }
     }
 
@@ -316,7 +361,6 @@ pub mod smallsorts {
                     "ReadUnchecked can only be generated for a locally-defined type: {on_type:?}"
                 )
             };
-            let format = type_info.module.get_format(format_ref.get_level());
             let shape = fixed::analyze_fixed_shape(type_info.module, format_ref).unwrap_or_else(|e| {
                 unreachable!(
                     "type index {ix} was recorded as a FixedFormat target but is no longer a valid fixed-shape record: {e}"
@@ -335,17 +379,9 @@ pub mod smallsorts {
                             let mut stmts = Vec::with_capacity(fields.len() + 1);
                             let mut field_inits = Vec::with_capacity(fields.len());
                             for (field_name, elem) in &fields {
-                                let marker = FixedSizeType::from_spine_elem(elem, |fref| {
-                                    type_info.resolve_adhoc(fref)
-                                })
-                                .unwrap_or_else(|| {
-                                    unreachable!(
-                                        "spine-elem {elem:?} (field `{}` of {format:?}) has no resolvable Rust type",
-                                        field_name.as_ref().map_or("<anonymous>", |n| n.as_ref()),
-                                    )
-                                });
+                                let marker = type_info.spine_to_fixed(elem);
                                 if let (
-                                    fixed::SpineElem::Indirect(fref, _),
+                                    SpineElem::Indirect(fref, _),
                                     FixedSizeType::Adhoc(LocalType::LocalDef(
                                         dep_ix,
                                         dep_name,
@@ -434,12 +470,12 @@ pub mod smallsorts {
                     format: elem,
                     stride,
                 } => match elem {
-                    fixed::SpineElem::Raw(_) => {
+                    SpineElem::Raw(_) => {
                         // NOTE - Raw BaseKinds will already have a trait impl, so we generate nothing
                         Vec::new()
                     }
-                    fixed::SpineElem::Indirect(fref, kind) => {
-                        let Some((dep_ix, ..)) = type_info.resolve_adhoc(fref) else {
+                    SpineElem::Indirect(fref, kind) => {
+                        let Some((dep_ix, ..)) = type_info.try_resolve_adhoc(fref) else {
                             unreachable!(
                                 "indirect spine-elem target {fref:?} has no resolvable ad-hoc Rust type"
                             )
