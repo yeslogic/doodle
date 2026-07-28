@@ -592,7 +592,7 @@ Decoder_gzip_header_file_flags(p)
 }
 
 /// expected size: 5
-/// trait-ready: unique decoder function (d#98)
+/// trait-ready: unique decoder function (d#97)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_header_file_flags {
 fcomment: bool,
@@ -613,7 +613,7 @@ Decoder_gzip_header(p)
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#83)
+/// trait-ready: unique decoder function (d#82)
 #[derive(Debug, Clone)]
 pub struct gzip_header {
 magic: Vec<u8>,
@@ -635,7 +635,7 @@ Decoder_gzip_fextra_subfield(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#97)
+/// trait-ready: unique decoder function (d#96)
 #[derive(Debug, Clone)]
 pub struct gzip_fextra_subfield {
 si1: u8,
@@ -655,7 +655,7 @@ Decoder_gzip_fextra(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#84)
+/// trait-ready: unique decoder function (d#83)
 #[derive(Debug, Clone)]
 pub struct gzip_fextra {
 xlen: u16,
@@ -663,7 +663,7 @@ subfields: Vec<gzip_fextra_subfield>
 }
 
 /// expected size: 24
-/// trait-unready: multiple (3) decoders exist (d#{86, 473, 477})
+/// trait-unready: multiple (3) decoders exist (d#{85, 473, 477})
 #[derive(Debug, Clone)]
 pub struct gzip_fcomment {
 comment: Vec<u8>
@@ -680,7 +680,7 @@ Decoder_gzip_fhcrc(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#87)
+/// trait-ready: unique decoder function (d#86)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_fhcrc {
 crc: u16
@@ -695,7 +695,7 @@ extra: u8
 }
 
 /// expected size: 4
-/// trait-unready: multiple (2) decoders exist (d#{95, 96})
+/// trait-unready: multiple (2) decoders exist (d#{94, 95})
 #[derive(Debug, Copy, Clone)]
 pub struct deflate_distance_record0 {
 distance_extra_bits: u16,
@@ -744,7 +744,7 @@ Decoder_deflate_dynamic_huffman(p)
 }
 
 /// expected size: 176
-/// trait-ready: unique decoder function (d#93)
+/// trait-ready: unique decoder function (d#92)
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
 hlit: u8,
@@ -788,7 +788,7 @@ Decoder_deflate_fixed_huffman(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#92)
+/// trait-ready: unique decoder function (d#91)
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
@@ -806,7 +806,7 @@ Decoder_deflate_uncompressed(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#91)
+/// trait-ready: unique decoder function (d#90)
 #[derive(Debug, Clone)]
 pub struct deflate_uncompressed {
 len: u16,
@@ -833,7 +833,7 @@ Decoder_deflate_block(p)
 
 /// expected size: 192
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop, Noop] })] }, Layout { size: 64, align: 8 (1 << 3) })
-/// trait-ready: unique decoder function (d#90)
+/// trait-ready: unique decoder function (d#89)
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
@@ -852,7 +852,7 @@ Decoder_deflate_main(p)
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#88)
+/// trait-ready: unique decoder function (d#87)
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
@@ -871,7 +871,7 @@ Decoder_gzip_footer(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#89)
+/// trait-ready: unique decoder function (d#88)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_footer {
 crc: u32,
@@ -3712,7 +3712,7 @@ arg_1_and_2_are_words: bool
 pub enum opentype_glyf_composite_acc_glyphs_argument1 { Int16(i16), Int8(i8), Uint16(u16), Uint8(u8) }
 
 /// expected size: 4
-/// trait-unready: multiple (2) decoders exist (d#{112, 117})
+/// trait-unready: multiple (2) decoders exist (d#{111, 116})
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_types_f2dot14 { F2Dot14(u16) }
 
@@ -3923,20 +3923,20 @@ num_ranges: u16,
 gasp_ranges: Vec<opentype_gasp_gasp_record>
 }
 
-/// expected size: 32
+/// expected size: 48
 /// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_layout_axis_table_base_tag_list_offset__data {
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_axis_table_base_tag_list_offset__data<'input> {
 base_tag_count: u16,
-baseline_tags: Vec<u32>
+baseline_tags: ReadArray<'input, U32Be>
 }
 
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_axis_table_base_tag_list_offset {
+pub struct opentype_layout_axis_table_base_tag_list_offset<'input> {
 offset: u16,
-_data: std::marker::PhantomData<Option<opentype_layout_axis_table_base_tag_list_offset__data>>
+_data: std::marker::PhantomData<Option<opentype_layout_axis_table_base_tag_list_offset__data<'input>>>
 }
 
 /// expected size: 32
@@ -4211,7 +4211,7 @@ Decoder_opentype_layout_axis_table(p)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_axis_table<'input> {
 table_scope: View<'input>,
-base_tag_list_offset: opentype_layout_axis_table_base_tag_list_offset,
+base_tag_list_offset: opentype_layout_axis_table_base_tag_list_offset<'input>,
 base_script_list_offset: opentype_layout_axis_table_base_script_list_offset<'input>
 }
 
@@ -4250,7 +4250,7 @@ Decoder_opentype_common_variation_region_list(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#110)
+/// trait-ready: unique decoder function (d#109)
 #[derive(Debug, Clone)]
 pub struct opentype_common_variation_region_list {
 axis_count: u16,
@@ -4306,7 +4306,7 @@ Decoder_opentype_common_item_variation_data(p)
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#111)
+/// trait-ready: unique decoder function (d#110)
 #[derive(Debug, Clone)]
 pub struct opentype_common_item_variation_data {
 item_count: u16,
@@ -4335,7 +4335,7 @@ Decoder_opentype_common_item_variation_store(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#109)
+/// trait-ready: unique decoder function (d#108)
 #[derive(Debug, Clone)]
 pub struct opentype_common_item_variation_store<'input> {
 table_scope: View<'input>,
@@ -6919,7 +6919,7 @@ Decoder_opentype_var_delta_set_index_map(p)
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#108)
+/// trait-ready: unique decoder function (d#107)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_delta_set_index_map<'input> {
 format: u8,
@@ -6979,7 +6979,7 @@ Decoder_opentype_mvar_value_record(p)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#123)
+/// trait-ready: unique decoder function (d#122)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_mvar_value_record {
 value_tag: u32,
@@ -7021,7 +7021,7 @@ Decoder_opentype_colr_base_glyph_record(p)
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#103)
+/// trait-ready: unique decoder function (d#102)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_base_glyph_record {
 glyph_id: u16,
@@ -7048,7 +7048,7 @@ Decoder_opentype_colr_layer_record(p)
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#104)
+/// trait-ready: unique decoder function (d#103)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_layer_record {
 glyph_id: u16,
@@ -7089,7 +7089,7 @@ Decoder_opentype_colr_paint_table(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#116)
+/// trait-ready: unique decoder function (d#115)
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_colr_paint_table<'input> { PaintColrGlyph(opentype_colr_paint_table_PaintColrGlyph), PaintColrLayers(opentype_colr_paint_table_PaintColrLayers), PaintComposite(opentype_colr_paint_table_PaintComposite<'input>), PaintGlyph(opentype_colr_paint_table_PaintGlyph<'input>), PaintLinearGradient(opentype_colr_paint_table_PaintLinearGradient<'input>), PaintRadialGradient(opentype_colr_paint_table_PaintRadialGradient<'input>), PaintRotate(opentype_colr_paint_table_PaintRotate<'input>), PaintRotateAroundCenter(opentype_colr_paint_table_PaintRotateAroundCenter<'input>), PaintScale(opentype_colr_paint_table_PaintScale<'input>), PaintScaleAroundCenter(opentype_colr_paint_table_PaintScaleAroundCenter<'input>), PaintScaleUniform(opentype_colr_paint_table_PaintScaleUniform<'input>), PaintScaleUniformAroundCenter(opentype_colr_paint_table_PaintScaleUniformAroundCenter<'input>), PaintSkew(opentype_colr_paint_table_PaintSkew<'input>), PaintSkewAroundCenter(opentype_colr_paint_table_PaintSkewAroundCenter<'input>), PaintSolid(opentype_colr_paint_table_PaintSolid), PaintSweepGradient(opentype_colr_paint_table_PaintSweepGradient<'input>), PaintTransform(opentype_colr_paint_table_PaintTransform<'input>), PaintTranslate(opentype_colr_paint_table_PaintTranslate<'input>), PaintVarLinearGradient(opentype_colr_paint_table_PaintVarLinearGradient<'input>), PaintVarRadialGradient(opentype_colr_paint_table_PaintVarRadialGradient<'input>), PaintVarRotate(opentype_colr_paint_table_PaintVarRotate<'input>), PaintVarRotateAroundCenter(opentype_colr_paint_table_PaintVarRotateAroundCenter<'input>), PaintVarScale(opentype_colr_paint_table_PaintVarScale<'input>), PaintVarScaleAroundCenter(opentype_colr_paint_table_PaintVarScaleAroundCenter<'input>), PaintVarScaleUniform(opentype_colr_paint_table_PaintVarScaleUniform<'input>), PaintVarScaleUniformAroundCenter(opentype_colr_paint_table_PaintVarScaleUniformAroundCenter<'input>), PaintVarSkew(opentype_colr_paint_table_PaintVarSkew<'input>), PaintVarSkewAroundCenter(opentype_colr_paint_table_PaintVarSkewAroundCenter<'input>), PaintVarSolid(opentype_colr_paint_table_PaintVarSolid), PaintVarSweepGradient(opentype_colr_paint_table_PaintVarSweepGradient<'input>), PaintVarTransform(opentype_colr_paint_table_PaintVarTransform<'input>), PaintVarTranslate(opentype_colr_paint_table_PaintVarTranslate<'input>) }
 
@@ -7120,40 +7120,64 @@ paint: opentype_colr_base_glyph_paint_record_paint<'input>,
 glyph_id: u16
 }
 
+impl ReadUnchecked for opentype_types_f2dot14 {
+type HostType = opentype_types_f2dot14;
+
+const SIZE: usize = 2;
+
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_types_f2dot14 {
+opentype_types_f2dot14::F2Dot14(U16Be::read_unchecked(ctxt))
+}
+}
+
+impl ReadUnchecked for opentype_colr_color_stop {
+type HostType = opentype_colr_color_stop;
+
+const SIZE: usize = 6;
+
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_colr_color_stop {
+let stop_offset = opentype_types_f2dot14::read_unchecked(ctxt);
+let palette_index = U16Be::read_unchecked(ctxt);
+let alpha = opentype_types_f2dot14::read_unchecked(ctxt);
+opentype_colr_color_stop { stop_offset: stop_offset, palette_index: palette_index, alpha: alpha }
+}
+}
+
 /// expected size: 10
 /// trait-orphaned: no decoder functions provided
+/// fixed-format: emits 2 `ReadUnchecked` impl(s) (format level 444)
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_colr_color_line_color_stops {
+pub struct opentype_colr_color_stop {
 stop_offset: opentype_types_f2dot14,
 palette_index: u16,
 alpha: opentype_types_f2dot14
 }
 
-impl CommonObject for opentype_colr_color_line {
+impl<'a> CommonObject for opentype_colr_color_line<'a> {
 type Args<'x> = ();
 
-type Output<'x> = opentype_colr_color_line;
+type Output<'x> = opentype_colr_color_line<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_colr_color_line(p)
 }
 }
 
-/// expected size: 32
-/// trait-ready: unique decoder function (d#118)
-#[derive(Debug, Clone)]
-pub struct opentype_colr_color_line {
+/// expected size: 48
+/// trait-ready: unique decoder function (d#117)
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_colr_color_line<'input> {
 extend: u8,
 num_stops: u16,
-color_stops: Vec<opentype_colr_color_line_color_stops>
+color_stops: ReadArray<'input, opentype_colr_color_stop>
 }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_colr_paint_table_PaintLinearGradient_color_line {
+pub struct opentype_colr_paint_table_PaintLinearGradient_color_line<'input> {
 offset: u32,
-_data: std::marker::PhantomData<Option<opentype_colr_color_line>>
+_data: std::marker::PhantomData<Option<opentype_colr_color_line<'input>>>
 }
 
 /// expected size: 40
@@ -7161,7 +7185,7 @@ _data: std::marker::PhantomData<Option<opentype_colr_color_line>>
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_paint_table_PaintLinearGradient<'input> {
 table_scope: View<'input>,
-color_line: opentype_colr_paint_table_PaintLinearGradient_color_line,
+color_line: opentype_colr_paint_table_PaintLinearGradient_color_line<'input>,
 x0: i16,
 y0: i16,
 x1: i16,
@@ -7175,7 +7199,7 @@ y2: i16
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_paint_table_PaintRadialGradient<'input> {
 table_scope: View<'input>,
-color_line: opentype_colr_paint_table_PaintLinearGradient_color_line,
+color_line: opentype_colr_paint_table_PaintLinearGradient_color_line<'input>,
 x0: i16,
 y0: i16,
 radius0: u16,
@@ -7281,7 +7305,7 @@ alpha: opentype_types_f2dot14
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_paint_table_PaintSweepGradient<'input> {
 table_scope: View<'input>,
-color_line: opentype_colr_paint_table_PaintLinearGradient_color_line,
+color_line: opentype_colr_paint_table_PaintLinearGradient_color_line<'input>,
 center_x: i16,
 center_y: i16,
 start_angle: opentype_types_f2dot14,
@@ -7299,7 +7323,7 @@ Decoder_opentype_colr_affine2x3(p)
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#120)
+/// trait-ready: unique decoder function (d#119)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_affine2x3 {
 xx: opentype_types_fixed32,
@@ -7337,41 +7361,56 @@ dx: i16,
 dy: i16
 }
 
+impl ReadUnchecked for opentype_colr_var_color_stop {
+type HostType = opentype_colr_var_color_stop;
+
+const SIZE: usize = 10;
+
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_colr_var_color_stop {
+let stop_offset = opentype_types_f2dot14::read_unchecked(ctxt);
+let palette_index = U16Be::read_unchecked(ctxt);
+let alpha = opentype_types_f2dot14::read_unchecked(ctxt);
+let var_index_base = U32Be::read_unchecked(ctxt);
+opentype_colr_var_color_stop { stop_offset: stop_offset, palette_index: palette_index, alpha: alpha, var_index_base: var_index_base }
+}
+}
+
 /// expected size: 16
 /// trait-orphaned: no decoder functions provided
+/// fixed-format: emits 1 `ReadUnchecked` impl(s) (format level 446)
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_colr_var_color_line_color_stops {
+pub struct opentype_colr_var_color_stop {
 stop_offset: opentype_types_f2dot14,
 palette_index: u16,
 alpha: opentype_types_f2dot14,
 var_index_base: u32
 }
 
-impl CommonObject for opentype_colr_var_color_line {
+impl<'a> CommonObject for opentype_colr_var_color_line<'a> {
 type Args<'x> = ();
 
-type Output<'x> = opentype_colr_var_color_line;
+type Output<'x> = opentype_colr_var_color_line<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_colr_var_color_line(p)
 }
 }
 
-/// expected size: 32
-/// trait-ready: unique decoder function (d#119)
-#[derive(Debug, Clone)]
-pub struct opentype_colr_var_color_line {
+/// expected size: 48
+/// trait-ready: unique decoder function (d#118)
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_colr_var_color_line<'input> {
 extend: u8,
 num_stops: u16,
-color_stops: Vec<opentype_colr_var_color_line_color_stops>
+color_stops: ReadArray<'input, opentype_colr_var_color_stop>
 }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_colr_paint_table_PaintVarLinearGradient_color_line {
+pub struct opentype_colr_paint_table_PaintVarLinearGradient_color_line<'input> {
 offset: u32,
-_data: std::marker::PhantomData<Option<opentype_colr_var_color_line>>
+_data: std::marker::PhantomData<Option<opentype_colr_var_color_line<'input>>>
 }
 
 /// expected size: 40
@@ -7379,7 +7418,7 @@ _data: std::marker::PhantomData<Option<opentype_colr_var_color_line>>
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_paint_table_PaintVarLinearGradient<'input> {
 table_scope: View<'input>,
-color_line: opentype_colr_paint_table_PaintVarLinearGradient_color_line,
+color_line: opentype_colr_paint_table_PaintVarLinearGradient_color_line<'input>,
 x0: i16,
 y0: i16,
 x1: i16,
@@ -7393,7 +7432,7 @@ y2: i16
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_paint_table_PaintVarRadialGradient<'input> {
 table_scope: View<'input>,
-color_line: opentype_colr_paint_table_PaintVarLinearGradient_color_line,
+color_line: opentype_colr_paint_table_PaintVarLinearGradient_color_line<'input>,
 x0: i16,
 y0: i16,
 radius0: u16,
@@ -7508,7 +7547,7 @@ var_index_base: u32
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_paint_table_PaintVarSweepGradient<'input> {
 table_scope: View<'input>,
-color_line: opentype_colr_paint_table_PaintVarLinearGradient_color_line,
+color_line: opentype_colr_paint_table_PaintVarLinearGradient_color_line<'input>,
 center_x: i16,
 center_y: i16,
 start_angle: opentype_types_f2dot14,
@@ -7526,7 +7565,7 @@ Decoder_opentype_colr_var_affine2x3(p)
 }
 
 /// expected size: 52
-/// trait-ready: unique decoder function (d#121)
+/// trait-ready: unique decoder function (d#120)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_var_affine2x3 {
 xx: opentype_types_fixed32,
@@ -7577,7 +7616,7 @@ Decoder_opentype_colr_base_glyph_paint_record(p, list_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#122)
+/// trait-ready: unique decoder function (d#121)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_base_glyph_paint_record<'input> {
 glyph_id: u16,
@@ -7595,7 +7634,7 @@ Decoder_opentype_colr_base_glyph_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#105)
+/// trait-ready: unique decoder function (d#104)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_base_glyph_list<'input> {
 list_scope: View<'input>,
@@ -7622,7 +7661,7 @@ Decoder_opentype_colr_layer_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#106)
+/// trait-ready: unique decoder function (d#105)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_layer_list<'input> {
 list_scope: View<'input>,
@@ -7672,7 +7711,7 @@ Decoder_opentype_colr_clip_box(p)
 }
 
 /// expected size: 20
-/// trait-ready: unique decoder function (d#115)
+/// trait-ready: unique decoder function (d#114)
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_colr_clip_box { Format1(opentype_colr_clip_box_Format1), Format2(opentype_colr_clip_box_Format2) }
 
@@ -7695,7 +7734,7 @@ Decoder_opentype_colr_clip_record(p, list_view)
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#114)
+/// trait-ready: unique decoder function (d#113)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_colr_clip_record {
 start_glyph_id: u16,
@@ -7714,7 +7753,7 @@ Decoder_opentype_colr_clip_list(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#107)
+/// trait-ready: unique decoder function (d#106)
 #[derive(Debug, Clone)]
 pub struct opentype_colr_clip_list<'input> {
 list_scope: View<'input>,
@@ -7786,7 +7825,7 @@ opentype_cpal_color_record { blue: blue, green: green, red: red, alpha: alpha }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
-/// fixed-format: emits 1 `ReadUnchecked` impl(s) (format level 436)
+/// fixed-format: emits 1 `ReadUnchecked` impl(s) (format level 438)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_color_record {
 blue: u8,
@@ -7806,7 +7845,7 @@ Decoder_opentype_cpal_palette_type(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#102)
+/// trait-ready: unique decoder function (d#101)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_palette_type {
 usable_with_dark_background: bool,
@@ -7822,7 +7861,7 @@ _data: std::marker::PhantomData<Option<Vec<opentype_cpal_palette_type>>>
 }
 
 /// expected size: 48
-/// trait-unready: multiple (2) decoders exist (d#{100, 101})
+/// trait-unready: multiple (2) decoders exist (d#{99, 100})
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cpal_palette_labels_array<'input> {
 offset: u32,
@@ -7879,7 +7918,7 @@ Decoder_text_maybe_gzip(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#78)
+/// trait-ready: unique decoder function (d#77)
 #[derive(Debug, Clone)]
 pub enum text_maybe_gzip { compressed(Vec<Vec<char>>), plain(Vec<char>) }
 
@@ -7894,7 +7933,7 @@ Decoder_opentype_svg_document_record(p, list_view)
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#77)
+/// trait-ready: unique decoder function (d#76)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_svg_document_record<'input> {
 start_glyph_id: u16,
@@ -7916,7 +7955,7 @@ Decoder_opentype_svg_document_list(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#76)
+/// trait-ready: unique decoder function (d#75)
 #[derive(Debug, Clone)]
 pub struct opentype_svg_document_list<'input> {
 num_entries: u16,
@@ -7981,7 +8020,7 @@ Decoder_opentype_kern_subtable_format0(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#72)
+/// trait-ready: unique decoder function (d#71)
 #[derive(Debug, Clone)]
 pub struct opentype_kern_subtable_format0 {
 n_pairs: u16,
@@ -8002,7 +8041,7 @@ Decoder_opentype_kern_class_table(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#74)
+/// trait-ready: unique decoder function (d#73)
 #[derive(Debug, Clone)]
 pub struct opentype_kern_class_table {
 first_glyph: u16,
@@ -8030,7 +8069,7 @@ Decoder_opentype_kern_kerning_array(p, left_glyph_count, right_glyph_count)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#75)
+/// trait-ready: unique decoder function (d#74)
 #[derive(Debug, Clone)]
 pub struct opentype_kern_kerning_array {
 left_glyph_count: u16,
@@ -8057,7 +8096,7 @@ Decoder_opentype_kern_subtable_format2(p)
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#73)
+/// trait-ready: unique decoder function (d#72)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_kern_subtable_format2<'input> {
 table_scope: View<'input>,
@@ -8083,7 +8122,7 @@ Decoder_opentype_kern_kern_subtable(p)
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#71)
+/// trait-ready: unique decoder function (d#70)
 #[derive(Debug, Clone)]
 pub struct opentype_kern_kern_subtable<'input> {
 version: u16,
@@ -8111,38 +8150,52 @@ n_tables: u16,
 subtables: Vec<opentype_kern_kern_subtable<'input>>
 }
 
+impl ReadUnchecked for opentype_stat_axis_record {
+type HostType = opentype_stat_axis_record;
+
+const SIZE: usize = 8;
+
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_stat_axis_record {
+let axis_tag = U32Be::read_unchecked(ctxt);
+let axis_name_id = U16Be::read_unchecked(ctxt);
+let axis_ordering = U16Be::read_unchecked(ctxt);
+opentype_stat_axis_record { axis_tag: axis_tag, axis_name_id: axis_name_id, axis_ordering: axis_ordering }
+}
+}
+
 /// expected size: 8
 /// trait-orphaned: no decoder functions provided
+/// fixed-format: emits 1 `ReadUnchecked` impl(s) (format level 432)
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_design_axes_array_design_axes {
+pub struct opentype_stat_axis_record {
 axis_tag: u32,
 axis_name_id: u16,
 axis_ordering: u16
 }
 
-impl CommonObject for opentype_stat_design_axes_array {
+impl<'a> CommonObject for opentype_stat_design_axes_array<'a> {
 type Args<'x> = u16;
 
-type Output<'x> = opentype_stat_design_axes_array;
+type Output<'x> = opentype_stat_design_axes_array<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, design_axis_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_stat_design_axes_array(p, design_axis_count)
 }
 }
 
-/// expected size: 24
+/// expected size: 40
 /// trait-ready: unique decoder function (d#66)
-#[derive(Debug, Clone)]
-pub struct opentype_stat_design_axes_array {
-design_axes: Vec<opentype_stat_design_axes_array_design_axes>
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_stat_design_axes_array<'input> {
+design_axes: ReadArray<'input, opentype_stat_axis_record>
 }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_table_design_axes {
+pub struct opentype_stat_table_design_axes<'input> {
 offset: u32,
-_data: std::marker::PhantomData<Option<opentype_stat_design_axes_array>>
+_data: std::marker::PhantomData<Option<opentype_stat_design_axes_array<'input>>>
 }
 
 /// expected size: 2
@@ -8186,53 +8239,76 @@ value: opentype_types_fixed32,
 linked_value: opentype_types_fixed32
 }
 
+impl ReadUnchecked for opentype_types_fixed32 {
+type HostType = opentype_types_fixed32;
+
+const SIZE: usize = 4;
+
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_types_fixed32 {
+opentype_types_fixed32::Fixed32(U32Be::read_unchecked(ctxt))
+}
+}
+
+impl ReadUnchecked for opentype_stat_axis_value_record {
+type HostType = opentype_stat_axis_value_record;
+
+const SIZE: usize = 6;
+
+unsafe fn read_unchecked<'a>(ctxt: &mut ReadCtxt<'a>) -> opentype_stat_axis_value_record {
+let axis_index = U16Be::read_unchecked(ctxt);
+let value = opentype_types_fixed32::read_unchecked(ctxt);
+opentype_stat_axis_value_record { axis_index: axis_index, value: value }
+}
+}
+
 /// expected size: 12
 /// trait-orphaned: no decoder functions provided
+/// fixed-format: emits 2 `ReadUnchecked` impl(s) (format level 434)
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_axis_value_table_data_Format4_axis_values {
+pub struct opentype_stat_axis_value_record {
 axis_index: u16,
 value: opentype_types_fixed32
 }
 
-/// expected size: 32
+/// expected size: 48
 /// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_stat_axis_value_table_data_Format4 {
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_stat_axis_value_table_data_Format4<'input> {
 axis_count: u16,
 flags: opentype_stat_axis_value_table_data_Format1_flags,
 value_name_id: u16,
-axis_values: Vec<opentype_stat_axis_value_table_data_Format4_axis_values>
+axis_values: ReadArray<'input, opentype_stat_axis_value_record>
 }
 
-/// expected size: 40
+/// expected size: 56
 /// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub enum opentype_stat_axis_value_table_data { Format1(opentype_stat_axis_value_table_data_Format1), Format2(opentype_stat_axis_value_table_data_Format2), Format3(opentype_stat_axis_value_table_data_Format3), Format4(opentype_stat_axis_value_table_data_Format4) }
+#[derive(Debug, Copy, Clone)]
+pub enum opentype_stat_axis_value_table_data<'input> { Format1(opentype_stat_axis_value_table_data_Format1), Format2(opentype_stat_axis_value_table_data_Format2), Format3(opentype_stat_axis_value_table_data_Format3), Format4(opentype_stat_axis_value_table_data_Format4<'input>) }
 
-impl CommonObject for opentype_stat_axis_value_table {
+impl<'a> CommonObject for opentype_stat_axis_value_table<'a> {
 type Args<'x> = ();
 
-type Output<'x> = opentype_stat_axis_value_table;
+type Output<'x> = opentype_stat_axis_value_table<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_stat_axis_value_table(p)
 }
 }
 
-/// expected size: 48
+/// expected size: 64
 /// trait-ready: unique decoder function (d#68)
-#[derive(Debug, Clone)]
-pub struct opentype_stat_axis_value_table {
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_stat_axis_value_table<'input> {
 format: u16,
-data: opentype_stat_axis_value_table_data
+data: opentype_stat_axis_value_table_data<'input>
 }
 
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_axis_value_array_axis_values {
+pub struct opentype_stat_axis_value_array_axis_values<'input> {
 offset: u16,
-_data: std::marker::PhantomData<Option<opentype_stat_axis_value_table>>
+_data: std::marker::PhantomData<Option<opentype_stat_axis_value_table<'input>>>
 }
 
 impl<'a> CommonObject for opentype_stat_axis_value_array<'a> {
@@ -8250,7 +8326,7 @@ Decoder_opentype_stat_axis_value_array(p, axis_value_count)
 #[derive(Debug, Clone)]
 pub struct opentype_stat_axis_value_array<'input> {
 array_scope: View<'input>,
-axis_values: Vec<opentype_stat_axis_value_array_axis_values>
+axis_values: Vec<opentype_stat_axis_value_array_axis_values<'input>>
 }
 
 /// expected size: 4
@@ -8280,7 +8356,7 @@ major_version: u16,
 minor_version: u16,
 design_axis_size: u16,
 design_axis_count: u16,
-design_axes: opentype_stat_table_design_axes,
+design_axes: opentype_stat_table_design_axes<'input>,
 axis_value_count: u16,
 axis_value_offsets: opentype_stat_table_axis_value_offsets<'input>,
 elided_fallback_name_id: u16
@@ -9402,7 +9478,7 @@ Decoder_opentype_var_dsim_entry_format(p)
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#113)
+/// trait-ready: unique decoder function (d#112)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_dsim_entry_format {
 map_entry_size: u8,
@@ -11645,7 +11721,7 @@ PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header 
 
 /// d#29
 fn Decoder_opentype_table_record(_input: &mut Parser<'_>) -> Result<opentype_table_record, ParseError> {
-let table_id = (Decoder70(_input))?;
+let table_id = (Decoder123(_input))?;
 let checksum = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -12937,7 +13013,7 @@ let ul_unicode_range4 = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let ach_vend_id = (Decoder70(_input))?;
+let ach_vend_id = (Decoder123(_input))?;
 let fs_selection = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -14203,7 +14279,7 @@ let _data = std::marker::PhantomData;
 opentype_cpal_table_extra_Version1_palette_types_array { offset, _data }
 };
 let palette_labels_array = (Decoder_opentype_cpal_palette_labels_array(_input, num_palettes, table_view))?;
-let palette_entry_labels_array = (Decoder101(_input, num_palette_entries, table_view))?;
+let palette_entry_labels_array = (Decoder100(_input, num_palette_entries, table_view))?;
 opentype_cpal_table_extra_Version1 { num_palettes, palette_types_array, palette_labels_array, palette_entry_labels_array }
 };
 opentype_cpal_table_extra::Version1(inner)
@@ -14901,25 +14977,10 @@ PResult::Ok(opentype_dsig_sig_format1 { signature_length, signature })
 }
 
 /// d#66
-fn Decoder_opentype_stat_design_axes_array(_input: &mut Parser<'_>, design_axis_count: u16) -> Result<opentype_stat_design_axes_array, ParseError> {
+fn Decoder_opentype_stat_design_axes_array<'input>(_input: &mut Parser<'input>, design_axis_count: u16) -> Result<opentype_stat_design_axes_array<'input>, ParseError> {
 let design_axes = {
-let mut accum = Vec::new();
-for _ in 0..design_axis_count {
-let next_elem = {
-let axis_tag = (Decoder70(_input))?;
-let axis_name_id = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let axis_ordering = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-opentype_stat_design_axes_array_design_axes { axis_tag, axis_name_id, axis_ordering }
-};
-accum.push(next_elem)
-};
-accum
+let here_view = _input.view();
+here_view.as_read_array::<opentype_stat_axis_record>(design_axis_count as usize)?
 };
 PResult::Ok(opentype_stat_design_axes_array { design_axes })
 }
@@ -14947,7 +15008,7 @@ PResult::Ok(opentype_stat_axis_value_array { array_scope, axis_values })
 }
 
 /// d#68
-fn Decoder_opentype_stat_axis_value_table(_input: &mut Parser<'_>) -> Result<opentype_stat_axis_value_table, ParseError> {
+fn Decoder_opentype_stat_axis_value_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_stat_axis_value_table<'input>, ParseError> {
 let format = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15062,19 +15123,8 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let axis_values = {
-let mut accum = Vec::new();
-for _ in 0..axis_count {
-let next_elem = {
-let axis_index = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let value = (Decoder_opentype_types_fixed32(_input))?;
-opentype_stat_axis_value_table_data_Format4_axis_values { axis_index, value }
-};
-accum.push(next_elem)
-};
-accum
+let here_view = _input.view();
+here_view.as_read_array::<opentype_stat_axis_value_record>(axis_count as usize)?
 };
 opentype_stat_axis_value_table_data_Format4 { axis_count, flags, value_name_id, axis_values }
 };
@@ -15098,12 +15148,6 @@ PResult::Ok(opentype_types_fixed32::Fixed32(inner))
 }
 
 /// d#70
-fn Decoder70(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-PResult::Ok(u32be(x))
-}
-
-/// d#71
 fn Decoder_opentype_kern_kern_subtable<'input>(_input: &mut Parser<'input>) -> Result<opentype_kern_kern_subtable<'input>, ParseError> {
 let version = {
 let inner = {
@@ -15155,7 +15199,7 @@ return Err(ParseError::FailToken(5733880678136728614u64));
 PResult::Ok(opentype_kern_kern_subtable { version, length, coverage, data })
 }
 
-/// d#72
+/// d#71
 fn Decoder_opentype_kern_subtable_format0(_input: &mut Parser<'_>) -> Result<opentype_kern_subtable_format0, ParseError> {
 let n_pairs = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15201,7 +15245,7 @@ accum
 PResult::Ok(opentype_kern_subtable_format0 { n_pairs, search_range, entry_selector, range_shift, kern_pairs })
 }
 
-/// d#73
+/// d#72
 fn Decoder_opentype_kern_subtable_format2<'input>(_input: &mut Parser<'input>) -> Result<opentype_kern_subtable_format2<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -15236,7 +15280,7 @@ opentype_kern_subtable_format2_kerning_array_offset { offset, _data }
 PResult::Ok(opentype_kern_subtable_format2 { table_scope, row_width, left_class_offset, right_class_offset, kerning_array_offset })
 }
 
-/// d#74
+/// d#73
 fn Decoder_opentype_kern_class_table(_input: &mut Parser<'_>) -> Result<opentype_kern_class_table, ParseError> {
 let first_glyph = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15260,7 +15304,7 @@ accum
 PResult::Ok(opentype_kern_class_table { first_glyph, n_glyphs, class_values })
 }
 
-/// d#75
+/// d#74
 fn Decoder_opentype_kern_kerning_array(_input: &mut Parser<'_>, left_glyph_count: u16, right_glyph_count: u16) -> Result<opentype_kern_kerning_array, ParseError> {
 let left_glyph_count = left_glyph_count;
 let right_glyph_count = right_glyph_count;
@@ -15288,7 +15332,7 @@ accum
 PResult::Ok(opentype_kern_kerning_array { left_glyph_count, right_glyph_count, kerning_values })
 }
 
-/// d#76
+/// d#75
 fn Decoder_opentype_svg_document_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_svg_document_list<'input>, ParseError> {
 let list_view = _input.view();
 let num_entries = {
@@ -15318,7 +15362,7 @@ accum
 PResult::Ok(opentype_svg_document_list { num_entries, document_records })
 }
 
-/// d#77
+/// d#76
 fn Decoder_opentype_svg_document_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_svg_document_record<'input>, ParseError> {
 let start_glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15353,12 +15397,12 @@ let _svg_document_utf8 = std::marker::PhantomData;
 PResult::Ok(opentype_svg_document_record { start_glyph_id, end_glyph_id, svg_document_offset, svg_document_length, _svg_document, _svg_document_utf8 })
 }
 
-/// d#78
+/// d#77
 fn Decoder_text_maybe_gzip(_input: &mut Parser<'_>) -> Result<text_maybe_gzip, ParseError> {
 (|| {
 _input.start_alt();
 let res = (|| {
-let inner = (Decoder79(_input))?;
+let inner = (Decoder78(_input))?;
 PResult::Ok(text_maybe_gzip::compressed(inner))
 })();
 match res {
@@ -15371,7 +15415,7 @@ _input.next_alt(true)?;
 }
 };
 let res = (|| {
-let inner = (Decoder80(_input))?;
+let inner = (Decoder79(_input))?;
 PResult::Ok(text_maybe_gzip::plain(inner))
 })();
 match res {
@@ -15386,28 +15430,28 @@ Err(_e)
 })()
 }
 
-/// d#79
-fn Decoder79(_input: &mut Parser<'_>) -> Result<Vec<Vec<char>>, ParseError> {
-let gzip_raw = (Decoder82(_input))?;
+/// d#78
+fn Decoder78(_input: &mut Parser<'_>) -> Result<Vec<Vec<char>>, ParseError> {
+let gzip_raw = (Decoder81(_input))?;
 let mut accum = Vec::new();
 for item in gzip_raw.clone() {
 let next_elem = {
 let mut buf_parser = Parser::new(slice_all(&item.data.inflate));
 let buf_input = &mut buf_parser;
-(Decoder80(buf_input))?
+(Decoder79(buf_input))?
 };
 accum.push(next_elem)
 };
 PResult::Ok(accum)
 }
 
-/// d#80
-fn Decoder80(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-Decoder81(_input)
+/// d#79
+fn Decoder79(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+Decoder80(_input)
 }
 
-/// d#81
-fn Decoder81(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+/// d#80
+fn Decoder80(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -15472,8 +15516,8 @@ break
 PResult::Ok(accum)
 }
 
-/// d#82
-fn Decoder82(_input: &mut Parser<'_>) -> Result<Vec<gzip_main>, ParseError> {
+/// d#81
+fn Decoder81(_input: &mut Parser<'_>) -> Result<Vec<gzip_main>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -15504,7 +15548,7 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 };
 let fname = if header.file_flags.fname {
-Some((Decoder85(_input))?)
+Some((Decoder84(_input))?)
 } else {
 None
 };
@@ -15533,7 +15577,7 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#83
+/// d#82
 fn Decoder_gzip_header(_input: &mut Parser<'_>) -> Result<gzip_header, ParseError> {
 let magic = {
 let ix0 = {
@@ -15565,7 +15609,7 @@ let os_id = _input.read_byte()?;
 PResult::Ok(gzip_header { magic, method, file_flags, timestamp, compression_flags, os_id })
 }
 
-/// d#84
+/// d#83
 fn Decoder_gzip_fextra(_input: &mut Parser<'_>) -> Result<gzip_fextra, ParseError> {
 let xlen = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15601,8 +15645,8 @@ ret
 PResult::Ok(gzip_fextra { xlen, subfields })
 }
 
-/// d#85
-fn Decoder85(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+/// d#84
+fn Decoder84(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -15653,7 +15697,7 @@ return Err(ParseError::ExcludedBranch(8390724546948265409u64));
 PResult::Ok(chars.clone())
 }
 
-/// d#86
+/// d#85
 fn Decoder_gzip_fcomment(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
 let comment = {
 let chars = {
@@ -15708,7 +15752,7 @@ chars.clone()
 PResult::Ok(gzip_fcomment { comment })
 }
 
-/// d#87
+/// d#86
 fn Decoder_gzip_fhcrc(_input: &mut Parser<'_>) -> Result<gzip_fhcrc, ParseError> {
 let crc = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15717,7 +15761,7 @@ u16le(x)
 PResult::Ok(gzip_fhcrc { crc })
 }
 
-/// d#88
+/// d#87
 fn Decoder_deflate_main(_input: &mut Parser<'_>) -> Result<deflate_main, ParseError> {
 let blocks = {
 let mut accum = Vec::new();
@@ -15770,7 +15814,7 @@ let ix = (try_sub!((buffer.len()) as u32, r.distance as u32, 1827009113509334962
 PResult::Ok(deflate_main { blocks, codes, inflate })
 }
 
-/// d#89
+/// d#88
 fn Decoder_gzip_footer(_input: &mut Parser<'_>) -> Result<gzip_footer, ParseError> {
 let crc = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -15783,7 +15827,7 @@ u32le(x)
 PResult::Ok(gzip_footer { crc, length })
 }
 
-/// d#90
+/// d#89
 fn Decoder_deflate_block(_input: &mut Parser<'_>) -> Result<deflate_block, ParseError> {
 let r#final = _input.read_byte()?;
 let r#type = {
@@ -15813,7 +15857,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(deflate_block { r#final, r#type, data })
 }
 
-/// d#91
+/// d#90
 fn Decoder_deflate_uncompressed(_input: &mut Parser<'_>) -> Result<deflate_uncompressed, ParseError> {
 _input.skip_align(8)?;
 let len = {
@@ -15839,7 +15883,7 @@ let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok(
 PResult::Ok(deflate_uncompressed { len, nlen, bytes, codes_values })
 }
 
-/// d#92
+/// d#91
 fn Decoder_deflate_fixed_huffman(_input: &mut Parser<'_>) -> Result<deflate_fixed_huffman, ParseError> {
 let codes = {
 let format = parse_huffman([8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8].to_vec(), None);
@@ -16484,7 +16528,7 @@ _ => {
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
 }
 
-/// d#93
+/// d#92
 fn Decoder_deflate_dynamic_huffman(_input: &mut Parser<'_>) -> Result<deflate_dynamic_huffman, ParseError> {
 let hlit = {
 let bits = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -16509,7 +16553,7 @@ accum.push(next_elem)
 };
 accum
 };
-let literal_length_distance_alphabet_code_lengths = (Decoder94(_input, hlit, hdist, &code_length_alphabet_code_lengths))?;
+let literal_length_distance_alphabet_code_lengths = (Decoder93(_input, hlit, hdist, &code_length_alphabet_code_lengths))?;
 let literal_length_distance_alphabet_code_lengths_value = (try_fold_map_curried(literal_length_distance_alphabet_code_lengths.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
 let (last_symbol, cl_code_extra) = tuple_var;
 match cl_code_extra.code as u8 {
@@ -16900,8 +16944,8 @@ _ => {
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
 }
 
-/// d#94
-fn Decoder94(_input: &mut Parser<'_>, hlit: u8, hdist: u8, code_length_alphabet_code_lengths: &[u8]) -> Result<Vec<deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths>, ParseError> {
+/// d#93
+fn Decoder93(_input: &mut Parser<'_>, hlit: u8, hdist: u8, code_length_alphabet_code_lengths: &[u8]) -> Result<Vec<deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths>, ParseError> {
 let code_length_alphabet_format = parse_huffman(code_length_alphabet_code_lengths.clone(), Some([16u8, 17u8, 18u8, 0u8, 8u8, 7u8, 9u8, 6u8, 10u8, 5u8, 11u8, 4u8, 12u8, 3u8, 13u8, 2u8, 14u8, 1u8, 15u8].to_vec()));
 let mut accum = Vec::new();
 loop {
@@ -16971,127 +17015,127 @@ break
 PResult::Ok(accum)
 }
 
-/// d#95
+/// d#94
 fn Decoder_deflate_distance_record0(_input: &mut Parser<'_>, distance_code: u16) -> Result<deflate_distance_record0, ParseError> {
 PResult::Ok(match distance_code as u8 {
 0u8 => {
-(Decoder96(_input, 0u8, 1u16))?
+(Decoder95(_input, 0u8, 1u16))?
 },
 
 1u8 => {
-(Decoder96(_input, 0u8, 2u16))?
+(Decoder95(_input, 0u8, 2u16))?
 },
 
 2u8 => {
-(Decoder96(_input, 0u8, 3u16))?
+(Decoder95(_input, 0u8, 3u16))?
 },
 
 3u8 => {
-(Decoder96(_input, 0u8, 4u16))?
+(Decoder95(_input, 0u8, 4u16))?
 },
 
 4u8 => {
-(Decoder96(_input, 1u8, 5u16))?
+(Decoder95(_input, 1u8, 5u16))?
 },
 
 5u8 => {
-(Decoder96(_input, 1u8, 7u16))?
+(Decoder95(_input, 1u8, 7u16))?
 },
 
 6u8 => {
-(Decoder96(_input, 2u8, 9u16))?
+(Decoder95(_input, 2u8, 9u16))?
 },
 
 7u8 => {
-(Decoder96(_input, 2u8, 13u16))?
+(Decoder95(_input, 2u8, 13u16))?
 },
 
 8u8 => {
-(Decoder96(_input, 3u8, 17u16))?
+(Decoder95(_input, 3u8, 17u16))?
 },
 
 9u8 => {
-(Decoder96(_input, 3u8, 25u16))?
+(Decoder95(_input, 3u8, 25u16))?
 },
 
 10u8 => {
-(Decoder96(_input, 4u8, 33u16))?
+(Decoder95(_input, 4u8, 33u16))?
 },
 
 11u8 => {
-(Decoder96(_input, 4u8, 49u16))?
+(Decoder95(_input, 4u8, 49u16))?
 },
 
 12u8 => {
-(Decoder96(_input, 5u8, 65u16))?
+(Decoder95(_input, 5u8, 65u16))?
 },
 
 13u8 => {
-(Decoder96(_input, 5u8, 97u16))?
+(Decoder95(_input, 5u8, 97u16))?
 },
 
 14u8 => {
-(Decoder96(_input, 6u8, 129u16))?
+(Decoder95(_input, 6u8, 129u16))?
 },
 
 15u8 => {
-(Decoder96(_input, 6u8, 193u16))?
+(Decoder95(_input, 6u8, 193u16))?
 },
 
 16u8 => {
-(Decoder96(_input, 7u8, 257u16))?
+(Decoder95(_input, 7u8, 257u16))?
 },
 
 17u8 => {
-(Decoder96(_input, 7u8, 385u16))?
+(Decoder95(_input, 7u8, 385u16))?
 },
 
 18u8 => {
-(Decoder96(_input, 8u8, 513u16))?
+(Decoder95(_input, 8u8, 513u16))?
 },
 
 19u8 => {
-(Decoder96(_input, 8u8, 769u16))?
+(Decoder95(_input, 8u8, 769u16))?
 },
 
 20u8 => {
-(Decoder96(_input, 9u8, 1025u16))?
+(Decoder95(_input, 9u8, 1025u16))?
 },
 
 21u8 => {
-(Decoder96(_input, 9u8, 1537u16))?
+(Decoder95(_input, 9u8, 1537u16))?
 },
 
 22u8 => {
-(Decoder96(_input, 10u8, 2049u16))?
+(Decoder95(_input, 10u8, 2049u16))?
 },
 
 23u8 => {
-(Decoder96(_input, 10u8, 3073u16))?
+(Decoder95(_input, 10u8, 3073u16))?
 },
 
 24u8 => {
-(Decoder96(_input, 11u8, 4097u16))?
+(Decoder95(_input, 11u8, 4097u16))?
 },
 
 25u8 => {
-(Decoder96(_input, 11u8, 6145u16))?
+(Decoder95(_input, 11u8, 6145u16))?
 },
 
 26u8 => {
-(Decoder96(_input, 12u8, 8193u16))?
+(Decoder95(_input, 12u8, 8193u16))?
 },
 
 27u8 => {
-(Decoder96(_input, 12u8, 12289u16))?
+(Decoder95(_input, 12u8, 12289u16))?
 },
 
 28u8 => {
-(Decoder96(_input, 13u8, 16385u16))?
+(Decoder95(_input, 13u8, 16385u16))?
 },
 
 29u8 => {
-(Decoder96(_input, 13u8, 24577u16))?
+(Decoder95(_input, 13u8, 24577u16))?
 },
 
 30u8..=31u8 => {
@@ -17104,8 +17148,8 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#96
-fn Decoder96(_input: &mut Parser<'_>, extra_bits: u8, start: u16) -> Result<deflate_distance_record0, ParseError> {
+/// d#95
+fn Decoder95(_input: &mut Parser<'_>, extra_bits: u8, start: u16) -> Result<deflate_distance_record0, ParseError> {
 let distance_extra_bits = match extra_bits {
 0u8 => {
 0u16
@@ -17184,7 +17228,7 @@ let distance = start + distance_extra_bits;
 PResult::Ok(deflate_distance_record0 { distance_extra_bits, distance })
 }
 
-/// d#97
+/// d#96
 fn Decoder_gzip_fextra_subfield(_input: &mut Parser<'_>) -> Result<gzip_fextra_subfield, ParseError> {
 let si1 = _input.read_byte()?;
 let si2 = _input.read_byte()?;
@@ -17203,7 +17247,7 @@ accum
 PResult::Ok(gzip_fextra_subfield { si1, si2, len, data })
 }
 
-/// d#98
+/// d#97
 fn Decoder_gzip_header_file_flags(_input: &mut Parser<'_>) -> Result<gzip_header_file_flags, ParseError> {
 let _packed_bits = {
 let inner = _input.read_byte()?;
@@ -17226,8 +17270,8 @@ let ftext = _packed_bits & 1u8 > 0u8;
 PResult::Ok(gzip_header_file_flags { fcomment, fname, fextra, fhcrc, ftext })
 }
 
-/// d#99
-fn Decoder99(_input: &mut Parser<'_>, num_palettes: u16) -> Result<Vec<opentype_cpal_palette_type>, ParseError> {
+/// d#98
+fn Decoder98(_input: &mut Parser<'_>, num_palettes: u16) -> Result<Vec<opentype_cpal_palette_type>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..num_palettes {
 let next_elem = (Decoder_opentype_cpal_palette_type(_input))?;
@@ -17236,7 +17280,7 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#100
+/// d#99
 fn Decoder_opentype_cpal_palette_labels_array<'input>(_input: &mut Parser<'input>, num_palettes: u16, table_view: View<'input>) -> Result<opentype_cpal_palette_labels_array<'input>, ParseError> {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -17250,8 +17294,8 @@ None
 PResult::Ok(opentype_cpal_palette_labels_array { offset, data })
 }
 
-/// d#101
-fn Decoder101<'input>(_input: &mut Parser<'input>, num_palette_entries: u16, table_view: View<'input>) -> Result<opentype_cpal_palette_labels_array<'input>, ParseError> {
+/// d#100
+fn Decoder100<'input>(_input: &mut Parser<'input>, num_palette_entries: u16, table_view: View<'input>) -> Result<opentype_cpal_palette_labels_array<'input>, ParseError> {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -17264,7 +17308,7 @@ None
 PResult::Ok(opentype_cpal_palette_labels_array { offset, data })
 }
 
-/// d#102
+/// d#101
 fn Decoder_opentype_cpal_palette_type(_input: &mut Parser<'_>) -> Result<opentype_cpal_palette_type, ParseError> {
 let _packed_bits = {
 let inner = {
@@ -17287,7 +17331,7 @@ let usable_with_light_background = _packed_bits & 1u32 > 0u32;
 PResult::Ok(opentype_cpal_palette_type { usable_with_dark_background, usable_with_light_background })
 }
 
-/// d#103
+/// d#102
 fn Decoder_opentype_colr_base_glyph_record(_input: &mut Parser<'_>) -> Result<opentype_colr_base_glyph_record, ParseError> {
 let glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17304,7 +17348,7 @@ u16be(x)
 PResult::Ok(opentype_colr_base_glyph_record { glyph_id, first_layer_index, num_layers })
 }
 
-/// d#104
+/// d#103
 fn Decoder_opentype_colr_layer_record(_input: &mut Parser<'_>) -> Result<opentype_colr_layer_record, ParseError> {
 let glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17317,7 +17361,7 @@ u16be(x)
 PResult::Ok(opentype_colr_layer_record { glyph_id, palette_index })
 }
 
-/// d#105
+/// d#104
 fn Decoder_opentype_colr_base_glyph_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_base_glyph_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -17336,7 +17380,7 @@ accum
 PResult::Ok(opentype_colr_base_glyph_list { list_scope, num_base_glyph_paint_records, base_glyph_paint_records })
 }
 
-/// d#106
+/// d#105
 fn Decoder_opentype_colr_layer_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_layer_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -17362,7 +17406,7 @@ accum
 PResult::Ok(opentype_colr_layer_list { list_scope, num_layers, paint_tables })
 }
 
-/// d#107
+/// d#106
 fn Decoder_opentype_colr_clip_list<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_clip_list<'input>, ParseError> {
 let list_view = _input.view();
 let list_scope = list_view;
@@ -17393,7 +17437,7 @@ accum
 PResult::Ok(opentype_colr_clip_list { list_scope, format, num_clips, clips })
 }
 
-/// d#108
+/// d#107
 fn Decoder_opentype_var_delta_set_index_map<'input>(_input: &mut Parser<'input>) -> Result<opentype_var_delta_set_index_map<'input>, ParseError> {
 let format = {
 let inner = _input.read_byte()?;
@@ -17436,7 +17480,7 @@ here_view.read_len((map_count * (entry_size as u32)) as usize)
 PResult::Ok(opentype_var_delta_set_index_map { format, entry_size, inner_index_bits, map_count, map_data })
 }
 
-/// d#109
+/// d#108
 fn Decoder_opentype_common_item_variation_store<'input>(_input: &mut Parser<'input>) -> Result<opentype_common_item_variation_store<'input>, ParseError> {
 let table_view = _input.view();
 let table_scope = table_view;
@@ -17486,7 +17530,7 @@ accum
 PResult::Ok(opentype_common_item_variation_store { table_scope, format, variation_region_list, item_variation_data_count, item_variation_data_list })
 }
 
-/// d#110
+/// d#109
 fn Decoder_opentype_common_variation_region_list(_input: &mut Parser<'_>) -> Result<opentype_common_variation_region_list, ParseError> {
 let axis_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17533,7 +17577,7 @@ accum
 PResult::Ok(opentype_common_variation_region_list { axis_count, region_count, variation_regions })
 }
 
-/// d#111
+/// d#110
 fn Decoder_opentype_common_item_variation_data(_input: &mut Parser<'_>) -> Result<opentype_common_item_variation_data, ParseError> {
 let item_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17648,7 +17692,7 @@ opentype_common_item_variation_data_delta_sets::Delta16Sets(inner)
 PResult::Ok(opentype_common_item_variation_data { item_count, word_delta_count, region_index_count, region_indices, delta_sets })
 }
 
-/// d#112
+/// d#111
 fn Decoder_opentype_types_f2dot14(_input: &mut Parser<'_>) -> Result<opentype_types_f2dot14, ParseError> {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17657,7 +17701,7 @@ u16be(x)
 PResult::Ok(opentype_types_f2dot14::F2Dot14(inner))
 }
 
-/// d#113
+/// d#112
 fn Decoder_opentype_var_dsim_entry_format(_input: &mut Parser<'_>) -> Result<opentype_var_dsim_entry_format, ParseError> {
 let _packed_bits = {
 let inner = _input.read_byte()?;
@@ -17677,7 +17721,7 @@ let inner_index_bit_count = _packed_bits & 15u8;
 PResult::Ok(opentype_var_dsim_entry_format { map_entry_size, inner_index_bit_count })
 }
 
-/// d#114
+/// d#113
 fn Decoder_opentype_colr_clip_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_colr_clip_record, ParseError> {
 let start_glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -17698,7 +17742,7 @@ opentype_colr_clip_record_clip_box { offset, _data }
 PResult::Ok(opentype_colr_clip_record { start_glyph_id, end_glyph_id, clip_box })
 }
 
-/// d#115
+/// d#114
 fn Decoder_opentype_colr_clip_box(_input: &mut Parser<'_>) -> Result<opentype_colr_clip_box, ParseError> {
 let format = {
 _input.open_peek_context();
@@ -17789,7 +17833,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#116
+/// d#115
 fn Decoder_opentype_colr_paint_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_paint_table<'input>, ParseError> {
 let table_view = _input.view();
 let tree_index = {
@@ -17967,7 +18011,7 @@ let palette_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-let alpha = (Decoder117(_input))?;
+let alpha = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintSolid { palette_index, alpha }
 };
 opentype_colr_paint_table::PaintSolid(inner)
@@ -17987,7 +18031,7 @@ let palette_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-let alpha = (Decoder117(_input))?;
+let alpha = (Decoder116(_input))?;
 let var_index_base = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -18282,8 +18326,8 @@ u16be(x)
 };
 raw as i16
 };
-let start_angle = (Decoder117(_input))?;
-let end_angle = (Decoder117(_input))?;
+let start_angle = (Decoder116(_input))?;
+let end_angle = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintSweepGradient { table_scope, color_line, center_x, center_y, start_angle, end_angle }
 };
 opentype_colr_paint_table::PaintSweepGradient(inner)
@@ -18322,8 +18366,8 @@ u16be(x)
 };
 raw as i16
 };
-let start_angle = (Decoder117(_input))?;
-let end_angle = (Decoder117(_input))?;
+let start_angle = (Decoder116(_input))?;
+let end_angle = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintVarSweepGradient { table_scope, color_line, center_x, center_y, start_angle, end_angle }
 };
 opentype_colr_paint_table::PaintVarSweepGradient(inner)
@@ -18539,8 +18583,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale_x = (Decoder117(_input))?;
-let scale_y = (Decoder117(_input))?;
+let scale_x = (Decoder116(_input))?;
+let scale_y = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintScale { table_scope, paint, scale_x, scale_y }
 };
 opentype_colr_paint_table::PaintScale(inner)
@@ -18565,8 +18609,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale_x = (Decoder117(_input))?;
-let scale_y = (Decoder117(_input))?;
+let scale_x = (Decoder116(_input))?;
+let scale_y = (Decoder116(_input))?;
 let var_index_base = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -18595,8 +18639,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale_x = (Decoder117(_input))?;
-let scale_y = (Decoder117(_input))?;
+let scale_x = (Decoder116(_input))?;
+let scale_y = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -18635,8 +18679,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale_x = (Decoder117(_input))?;
-let scale_y = (Decoder117(_input))?;
+let scale_x = (Decoder116(_input))?;
+let scale_y = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -18679,7 +18723,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale = (Decoder117(_input))?;
+let scale = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintScaleUniform { table_scope, paint, scale }
 };
 opentype_colr_paint_table::PaintScaleUniform(inner)
@@ -18704,7 +18748,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale = (Decoder117(_input))?;
+let scale = (Decoder116(_input))?;
 let var_index_base = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -18733,7 +18777,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale = (Decoder117(_input))?;
+let scale = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -18772,7 +18816,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let scale = (Decoder117(_input))?;
+let scale = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -18815,7 +18859,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let angle = (Decoder117(_input))?;
+let angle = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintRotate { table_scope, paint, angle }
 };
 opentype_colr_paint_table::PaintRotate(inner)
@@ -18840,7 +18884,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let angle = (Decoder117(_input))?;
+let angle = (Decoder116(_input))?;
 let var_index_base = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -18869,7 +18913,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let angle = (Decoder117(_input))?;
+let angle = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -18908,7 +18952,7 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let angle = (Decoder117(_input))?;
+let angle = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -18951,8 +18995,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let x_skew_angle = (Decoder117(_input))?;
-let y_skew_angle = (Decoder117(_input))?;
+let x_skew_angle = (Decoder116(_input))?;
+let y_skew_angle = (Decoder116(_input))?;
 opentype_colr_paint_table_PaintSkew { table_scope, paint, x_skew_angle, y_skew_angle }
 };
 opentype_colr_paint_table::PaintSkew(inner)
@@ -18977,8 +19021,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let x_skew_angle = (Decoder117(_input))?;
-let y_skew_angle = (Decoder117(_input))?;
+let x_skew_angle = (Decoder116(_input))?;
+let y_skew_angle = (Decoder116(_input))?;
 let var_index_base = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -19007,8 +19051,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let x_skew_angle = (Decoder117(_input))?;
-let y_skew_angle = (Decoder117(_input))?;
+let x_skew_angle = (Decoder116(_input))?;
+let y_skew_angle = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -19047,8 +19091,8 @@ u32be(x)
 let _data = std::marker::PhantomData;
 opentype_colr_base_glyph_paint_record_paint { offset, _data }
 };
-let x_skew_angle = (Decoder117(_input))?;
-let y_skew_angle = (Decoder117(_input))?;
+let x_skew_angle = (Decoder116(_input))?;
+let y_skew_angle = (Decoder116(_input))?;
 let center_x = {
 let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -19111,8 +19155,8 @@ return Err(ParseError::ExcludedBranch(163858356033350300u64));
 })
 }
 
-/// d#117
-fn Decoder117(_input: &mut Parser<'_>) -> Result<opentype_types_f2dot14, ParseError> {
+/// d#116
+fn Decoder116(_input: &mut Parser<'_>) -> Result<opentype_types_f2dot14, ParseError> {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -19120,63 +19164,35 @@ u16be(x)
 PResult::Ok(opentype_types_f2dot14::F2Dot14(inner))
 }
 
-/// d#118
-fn Decoder_opentype_colr_color_line(_input: &mut Parser<'_>) -> Result<opentype_colr_color_line, ParseError> {
+/// d#117
+fn Decoder_opentype_colr_color_line<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_color_line<'input>, ParseError> {
 let extend = _input.read_byte()?;
 let num_stops = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let color_stops = {
-let mut accum = Vec::new();
-for _ in 0..num_stops {
-let next_elem = {
-let stop_offset = (Decoder117(_input))?;
-let palette_index = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let alpha = (Decoder117(_input))?;
-opentype_colr_color_line_color_stops { stop_offset, palette_index, alpha }
-};
-accum.push(next_elem)
-};
-accum
+let here_view = _input.view();
+here_view.as_read_array::<opentype_colr_color_stop>(num_stops as usize)?
 };
 PResult::Ok(opentype_colr_color_line { extend, num_stops, color_stops })
 }
 
-/// d#119
-fn Decoder_opentype_colr_var_color_line(_input: &mut Parser<'_>) -> Result<opentype_colr_var_color_line, ParseError> {
+/// d#118
+fn Decoder_opentype_colr_var_color_line<'input>(_input: &mut Parser<'input>) -> Result<opentype_colr_var_color_line<'input>, ParseError> {
 let extend = _input.read_byte()?;
 let num_stops = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let color_stops = {
-let mut accum = Vec::new();
-for _ in 0..num_stops {
-let next_elem = {
-let stop_offset = (Decoder117(_input))?;
-let palette_index = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let alpha = (Decoder117(_input))?;
-let var_index_base = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-};
-opentype_colr_var_color_line_color_stops { stop_offset, palette_index, alpha, var_index_base }
-};
-accum.push(next_elem)
-};
-accum
+let here_view = _input.view();
+here_view.as_read_array::<opentype_colr_var_color_stop>(num_stops as usize)?
 };
 PResult::Ok(opentype_colr_var_color_line { extend, num_stops, color_stops })
 }
 
-/// d#120
+/// d#119
 fn Decoder_opentype_colr_affine2x3(_input: &mut Parser<'_>) -> Result<opentype_colr_affine2x3, ParseError> {
 let xx = (Decoder_opentype_types_fixed32(_input))?;
 let yx = (Decoder_opentype_types_fixed32(_input))?;
@@ -19187,7 +19203,7 @@ let dy = (Decoder_opentype_types_fixed32(_input))?;
 PResult::Ok(opentype_colr_affine2x3 { xx, yx, xy, yy, dx, dy })
 }
 
-/// d#121
+/// d#120
 fn Decoder_opentype_colr_var_affine2x3(_input: &mut Parser<'_>) -> Result<opentype_colr_var_affine2x3, ParseError> {
 let xx = (Decoder_opentype_types_fixed32(_input))?;
 let yx = (Decoder_opentype_types_fixed32(_input))?;
@@ -19202,7 +19218,7 @@ u32be(x)
 PResult::Ok(opentype_colr_var_affine2x3 { xx, yx, xy, yy, dx, dy, var_index_base })
 }
 
-/// d#122
+/// d#121
 fn Decoder_opentype_colr_base_glyph_paint_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_colr_base_glyph_paint_record<'input>, ParseError> {
 let glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -19219,9 +19235,9 @@ opentype_colr_base_glyph_paint_record_paint { offset, _data }
 PResult::Ok(opentype_colr_base_glyph_paint_record { glyph_id, paint })
 }
 
-/// d#123
+/// d#122
 fn Decoder_opentype_mvar_value_record(_input: &mut Parser<'_>) -> Result<opentype_mvar_value_record, ParseError> {
-let value_tag = (Decoder70(_input))?;
+let value_tag = (Decoder123(_input))?;
 let delta_set_outer_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -19233,12 +19249,18 @@ u16be(x)
 PResult::Ok(opentype_mvar_value_record { value_tag, delta_set_outer_index, delta_set_inner_index })
 }
 
+/// d#123
+fn Decoder123(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+PResult::Ok(u32be(x))
+}
+
 /// d#124
 fn Decoder_opentype_gvar_tuple_record(_input: &mut Parser<'_>, axis_count: u16) -> Result<opentype_gvar_tuple_record, ParseError> {
 let coordinates = {
 let mut accum = Vec::new();
 for _ in 0..axis_count {
-let next_elem = (Decoder117(_input))?;
+let next_elem = (Decoder116(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -19585,7 +19607,7 @@ PResult::Ok(opentype_var_packed_point_numbers_runs { control, points })
 
 /// d#131
 fn Decoder_opentype_fvar_variation_axis_record(_input: &mut Parser<'_>) -> Result<opentype_fvar_variation_axis_record, ParseError> {
-let axis_tag = (Decoder70(_input))?;
+let axis_tag = (Decoder123(_input))?;
 let min_value = (Decoder_opentype_types_fixed32(_input))?;
 let default_value = (Decoder_opentype_types_fixed32(_input))?;
 let max_value = (Decoder_opentype_types_fixed32(_input))?;
@@ -19668,8 +19690,8 @@ PResult::Ok(opentype_avar_segment_maps { position_map_count, axis_value_maps })
 
 /// d#135
 fn Decoder_opentype_avar_axis_value_map(_input: &mut Parser<'_>) -> Result<opentype_avar_axis_value_map, ParseError> {
-let from_coordinate = (Decoder117(_input))?;
-let to_coordinate = (Decoder117(_input))?;
+let from_coordinate = (Decoder116(_input))?;
+let to_coordinate = (Decoder116(_input))?;
 PResult::Ok(opentype_avar_axis_value_map { from_coordinate, to_coordinate })
 }
 
@@ -21100,7 +21122,7 @@ PResult::Ok(opentype_layout_single_subst_format2 { table_scope, coverage, glyph_
 
 /// d#174
 fn Decoder_opentype_layout_feature_record<'input>(_input: &mut Parser<'input>, list_view: View<'input>) -> Result<opentype_layout_feature_record<'input>, ParseError> {
-let feature_tag = (Decoder70(_input))?;
+let feature_tag = (Decoder123(_input))?;
 let feature = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21114,7 +21136,7 @@ PResult::Ok(opentype_layout_feature_record { feature_tag, feature })
 
 /// d#175
 fn Decoder_opentype_layout_script_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_script_record<'input>, ParseError> {
-let script_tag = (Decoder70(_input))?;
+let script_tag = (Decoder123(_input))?;
 let script = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -21195,7 +21217,7 @@ PResult::Ok(opentype_layout_langsys { lookup_order_offset, required_feature_inde
 
 /// d#178
 fn Decoder_opentype_layout_lang_sys_record<'input>(_input: &mut Parser<'input>, script_view: View<'input>) -> Result<opentype_layout_lang_sys_record, ParseError> {
-let lang_sys_tag = (Decoder70(_input))?;
+let lang_sys_tag = (Decoder123(_input))?;
 let lang_sys = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -23049,7 +23071,7 @@ PResult::Ok(opentype_layout_axis_table { table_scope, base_tag_list_offset, base
 
 /// d#225
 fn Decoder_opentype_base_base_script_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_base_base_script_record<'input>, ParseError> {
-let base_script_tag = (Decoder70(_input))?;
+let base_script_tag = (Decoder123(_input))?;
 let base_script = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -23163,7 +23185,7 @@ PResult::Ok(opentype_layout_min_max { table_scope, min_coord_offset, max_coord_o
 
 /// d#229
 fn Decoder_opentype_base_base_langsys<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_base_base_langsys<'input>, ParseError> {
-let base_lang_sys_tag = (Decoder70(_input))?;
+let base_lang_sys_tag = (Decoder123(_input))?;
 let min_max = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -23234,7 +23256,7 @@ PResult::Ok(opentype_layout_base_coord { table_scope, format, coordinate, data }
 
 /// d#231
 fn Decoder_opentype_layout_feat_min_max<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_feat_min_max<'input>, ParseError> {
-let feature_tag = (Decoder70(_input))?;
+let feature_tag = (Decoder123(_input))?;
 let min_coord_offset = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -23647,7 +23669,7 @@ opentype_glyf_composite_acc_glyphs_argument1::Uint8(inner)
 };
 let scale = match flags.we_have_a_scale {
 true => {
-let inner = (Decoder117(_input))?;
+let inner = (Decoder116(_input))?;
 Some(opentype_glyf_composite_acc_glyphs_scale::Scale(inner))
 },
 
@@ -23655,8 +23677,8 @@ false => {
 match flags.we_have_an_x_and_y_scale {
 true => {
 let inner = {
-let x_scale = (Decoder117(_input))?;
-let y_scale = (Decoder117(_input))?;
+let x_scale = (Decoder116(_input))?;
+let y_scale = (Decoder116(_input))?;
 opentype_glyf_composite_acc_glyphs_scale_XY { x_scale, y_scale }
 };
 Some(opentype_glyf_composite_acc_glyphs_scale::XY(inner))
@@ -23665,7 +23687,7 @@ Some(opentype_glyf_composite_acc_glyphs_scale::XY(inner))
 false => {
 match flags.we_have_a_two_by_two {
 true => {
-Some(opentype_glyf_composite_acc_glyphs_scale::Matrix(((Decoder117(_input))?, (Decoder117(_input))?), ((Decoder117(_input))?, (Decoder117(_input))?)))
+Some(opentype_glyf_composite_acc_glyphs_scale::Matrix(((Decoder116(_input))?, (Decoder116(_input))?), ((Decoder116(_input))?, (Decoder116(_input))?)))
 },
 
 false => {
@@ -27808,7 +27830,7 @@ let compressed_text = {
 let zlib = (Decoder326(_input))?;
 let mut buf_parser = Parser::new(slice_all(&zlib.data.inflate));
 let buf_input = &mut buf_parser;
-(Decoder80(buf_input))?
+(Decoder79(buf_input))?
 };
 PResult::Ok(png_ztxt { keyword, compression_method, compressed_text })
 }

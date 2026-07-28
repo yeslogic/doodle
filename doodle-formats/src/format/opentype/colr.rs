@@ -104,28 +104,35 @@ mod paint_table {
 
     /// ColorStop record
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorstop-record
-    fn color_stop(f2dot14: FormatRef) -> Format {
-        record([
-            ("stop_offset", f2dot14.call()),
-            ("palette_index", u16be()),
-            ("alpha", f2dot14.call()),
-        ])
+    fn color_stop(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
+        module.define_format(
+            "opentype.colr.color_stop",
+            record([
+                ("stop_offset", f2dot14.call()),
+                ("palette_index", u16be()),
+                ("alpha", f2dot14.call()),
+            ]),
+        )
     }
 
     /// VarColorStop record
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorstop-record
-    fn var_color_stop(f2dot14: FormatRef) -> Format {
-        record([
-            ("stop_offset", f2dot14.call()),
-            ("palette_index", u16be()),
-            ("alpha", f2dot14.call()),
-            ("var_index_base", u32be()),
-        ])
+    fn var_color_stop(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
+        module.define_format(
+            "opentype.colr.var_color_stop",
+            record([
+                ("stop_offset", f2dot14.call()),
+                ("palette_index", u16be()),
+                ("alpha", f2dot14.call()),
+                ("var_index_base", u32be()),
+            ]),
+        )
     }
 
     /// ColorLine table (non-var)
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorline-table
     fn color_line(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
+        let color_stop = color_stop(module, f2dot14);
         module.define_format(
             "opentype.colr.color_line",
             record([
@@ -140,7 +147,7 @@ mod paint_table {
                 // `from_here(read_array(var("num_stops"), color_stop_ref))`.
                 (
                     "color_stops",
-                    repeat_count(var("num_stops"), color_stop(f2dot14)),
+                    from_here(read_array(var("num_stops"), color_stop)),
                 ),
             ]),
         )
@@ -149,6 +156,7 @@ mod paint_table {
     /// VarColorLine table
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/colr#colorline-table
     fn var_color_line(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
+        let var_color_stop = var_color_stop(module, f2dot14);
         module.define_format(
             "opentype.colr.var_color_line",
             record([
@@ -163,7 +171,7 @@ mod paint_table {
                 // `from_here(read_array(var("num_stops"), var_color_stop_ref))`.
                 (
                     "color_stops",
-                    repeat_count(var("num_stops"), var_color_stop(f2dot14)),
+                    from_here(read_array(var("num_stops"), var_color_stop)),
                 ),
             ]),
         )
