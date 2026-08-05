@@ -68,7 +68,6 @@ macro_rules! try_sub {
 ///
 /// When called on `x := 0`, will behave identically to `x - 1`.
 #[inline]
-// REVIEW - should we handle 0 explicitly/differently?
 // NOTE - this impl (and that of `succ`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
 pub fn pred<T>(x: T) -> T
 where
@@ -81,7 +80,6 @@ where
 ///
 /// When called on `x := T::MAX`, will behave identically to `x + 1`.
 #[inline]
-// REVIEW - should we handle T::MAX explicitly/differently?
 // NOTE - this impl (and that of `pred`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
 pub fn succ<T>(x: T) -> T
 where

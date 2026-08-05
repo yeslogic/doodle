@@ -200,19 +200,6 @@ mod cpal {
         }
     }
 
-    // REVIEW - this was temporarily useful for debugging but isn't strictly necessary anymore
-    fn validate_cpal(cpal: &CpalMetrics) {
-        let max_index = *cpal.color_record_indices.iter().max().unwrap() as usize;
-        let required_len = max_index + cpal.num_palette_entries as usize;
-        let actual_len = cpal.color_records_array.len();
-        if actual_len < required_len {
-            panic!(
-                "CPAL: max index {max_index} + num_palette_entries {num_palette_entries} > actual len {actual_len}",
-                num_palette_entries = cpal.num_palette_entries
-            );
-        }
-    }
-
     fn display_cpal_extra_fields(extra: &Option<CpalExtraV1>, conf: &Config) -> TokenStream {
         let Some(extra) = extra else {
             return TokenStream::empty();
@@ -339,11 +326,9 @@ mod colr {
         let Some(colr) = colr else {
             return TokenStream::empty();
         };
-        // TODO - implement display for colr
         let heading = toks(format!("COLR: version {}", colr.version));
 
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
-            // STUB
             heading.glue(
                 LineBreak,
                 TokenStream::join_with(
@@ -1763,7 +1748,8 @@ mod gvar {
             "Header (size: {} bytes)",
             header.variation_data_size
         ))
-        // STUB - consider what
+        // STUB - incomplete/deferred display logic
+        // REVIEW - consider what additional details of a GVarTupleVariationHeader are worth displaying
     }
 
     /// Tokenizer for GVAR `GlyphVariationData` (conditionally inline/multiline)

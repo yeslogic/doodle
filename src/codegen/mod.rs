@@ -248,8 +248,7 @@ impl CodeGen {
                 if let Some(decl) = self.metavariables.get(&var) {
                     let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
                     if cfg!(debug_assertions) && is_new {
-                        // FIXME - this panic potentially should be softened to just a warning, as it is a watermark for bad invariants but not an outright bug in itself
-                        panic!(
+                        log::error!(
                             "expansion of {var} -> Record(..) found previously-stored type-declaration, but name-generation generated a new name for it:\nfields: {fields:#?}\ndecl: {decl:?}\nType({ix}), is_new=true: {type_name:?}"
                         );
                     }
@@ -475,6 +474,15 @@ impl CodeGen {
                         }
                     }
                     SeqBorrowHint::Constructed => CompType::Vec(Box::new(inner)).into(),
+                    SeqBorrowHint::Empty => {
+                        log::warn!("found empty-sequence hint during code-generation");
+                        CompType::Borrow(
+                            Some(RustLt::Parametric("'static".into())),
+                            Mut::Immutable,
+                            Box::new(CompType::RawSlice(Box::new(inner)).into()),
+                        )
+                        .into()
+                    }
                     SeqBorrowHint::BufferView => CompType::Borrow(
                         Some(lt.clone()),
                         Mut::Immutable,
@@ -1267,6 +1275,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 GenType::Def((_ix, tname), def) => {
                     match &def.def {
                         RustTypeDef::Enum(vars) => {
+                            // NOTE - `this` is the definition-level layout of the variant whose name matches `vname` in the enum-declaration found in `gt`
                             let Some(this) = vars.iter().find(|var| var.get_label() == vname)
                             else {
                                 unreachable!("Variant not found: {:?}::{:?}", tname, vname)
@@ -1274,15 +1283,16 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                             let constr = Constructor::Compound(tname.clone(), vname.clone());
                             match this {
                                 RustVariant::Unit(_vname) => {
-                                    // FIXME - this leads to some '();' statements we might want to elide
+                                    // NOTE - the variant we are ultimately constructing (`this`) is found to be a Unit variant, so `inner` does not produce a final value (or implicitly produces `()`).
+                                    // REVIEW - determine whether there are any cases where `();` statements end up persisting in the output
                                     RustExpr::BlockScope(
-                                        // REVIEW - we only need EmbedCloned if there are any potential reuse-after-move patterns within the `_ : ()` preamble...
+                                        // REVIEW - EmbedCloned would be necessary in the rare case that the block `{ .. } : ()` contains variable references that might be subject to use-after-move issues
                                         vec![RustStmt::Expr(embed_expr_nat(inner))],
                                         Box::new(RustExpr::Struct(constr, StructExpr::Empty)),
                                     )
                                 }
                                 RustVariant::Tuple(_vname, _elts) => {
-                                    // FIXME - not sure how to avoid 1 x N (unary-over-tuple) if inner becomes RustExpr::Tuple...
+                                    // REVIEW - we have no strategy to avoid embedding a value of an N-tuple type as the member of a 1-tuple variant, but this is mostly a cosmetic concern and not a critical flaw
                                     RustExpr::Struct(
                                         constr,
                                         StructExpr::Tuple(vec![embed_expr_nat(inner)]),
@@ -1320,6 +1330,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         }
         TypedExpr::TupleProj(_, expr_tup, ix) => embed_expr(expr_tup, info).at_pos(*ix),
         TypedExpr::SeqIx(_, expr_seq, ix) => {
+            // REVIEW - there is needless cruft generated in the case of `Expr::SeqIx(Expr::EnumFromTo(..))`, but there is a low likelihood of this construction ending up in any practical format
             let ix_expr = RustExpr::Operation(RustOp::AsCast(
                 Box::new(embed_expr_nat(ix)),
                 PrimType::Usize.into(),
@@ -1370,7 +1381,6 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::EnumFromTo(_, from, to) => {
             let start = embed_expr_nat(from);
             let stop = embed_expr_nat(to);
-            // FIXME - currently, we have no optimization to pre-optimize SeqIx(EnumFromTo)...
             RustExpr::RangeExclusive(Box::new(start), Box::new(stop))
         }
         TypedExpr::IntRel(_, rel, lhs, rhs) => {
@@ -1573,7 +1583,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             RustExpr::local("dup32").call_with([embed_expr_nat(n), embed_expr_owned(expr)])
         }
         TypedExpr::Var(t, vname) => {
-            // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
+            // TODO[epic=soundness] - implement proper checks for proper scoping and variable-name sanitization; review the set of identifiers that are generated by codegen itself, and ensure that they do not shadow format-level variables
             let loc = RustExpr::local(vname.clone());
             let expr_type = t.to_rust_type();
             match info {
@@ -2131,11 +2141,16 @@ impl GenLambda {
         }
     }
 
-    // FIXME - the logic here may be broken
+    /// Internal driver for [`Self::apply_pair`] after the beta-reduction criterion has been settled,
+    /// which takes the final form of `param0` and `param1` without any further modifications.
+    ///
+    /// Specifically, this method expands the body of `self` and performs a deep traversal that
+    /// appropriately substitutes the parameter-pair wherever the head variable is referenced.
     fn __apply_pair(&self, param0: RustExpr, param1: RustExpr, body_info: ExprInfo) -> RustExpr {
         let raw_expansion = embed_expr(&self.body, body_info);
         match raw_expansion {
             RustExpr::BlockScope(stmts, tail) => match stmts.as_slice() {
+                // NOTE - if we are producing a RustExpr::BlockScope with an empty block, the code-generation engine is broken somehow and so we are willing to panic
                 [] => unreachable!("empty RustStmt-array in RustExpr::BlockScope"),
                 [first, rest @ ..] => match first {
                     RustStmt::LetPattern(pat, rhs) if rhs.as_local() == Some(&self.head) => {
@@ -2164,21 +2179,25 @@ impl GenLambda {
                                     out_stmts.extend_from_slice(rest.as_ref());
                                     RustExpr::BlockScope(out_stmts, tail)
                                 }
+                                // NOTE - the only case of LetPattern we ever expect to see at the start of a pair-lambda body is `let (<ident0>, <ident1>) = <head-var>`. We don't mind panicking for the time being to reduce the amount of edge-case support we would otherwise have to write.
                                 other => unreachable!(
                                     "expected pair-var capture pattern in lhs, found {other:?}"
                                 ),
                             },
+                            // NOTE - because we are presumptively a Pair-lambda, anything besides a tuple in a LetPattern statement is a sign we are calling this in the wrong place, or else earlier code-generation steps are broken
                             other => unreachable!(
                                 "expected pair-var capture pattern in lhs, found {other:?}"
                             ),
                         }
                     }
                     _ => {
+                        // NOTE - if we do not immediately capture the pair using a destructuring pattern, we have no reason to beta-reduce it and so we fall-back to calling our lambda with a pair argument without any specialization.
                         let arg = RustExpr::Tuple(vec![param0, param1]);
                         self.apply(arg, body_info)
                     }
                 },
             },
+            // NOTE - the panic within this block are mostly watermarks for exotic cases we haven't had to encounter yet, and we will drop any panic if it turns out there is a legitimate case where said branch should be handled gracefully
             RustExpr::Control(ctrl) => match ctrl.as_ref() {
                 RustControl::Match(scrutinee, match_body) => {
                     if scrutinee.as_local() != Some(&self.head) {
@@ -2250,7 +2269,20 @@ impl GenLambda {
         }
     }
 
-    // FIXME - the logic here may be broken
+    /// Produces a new expression equivalent to the application of a pair-lambda to `(param0, param1)`, using
+    /// the specified `body_info` to determine how locally-referenced variables in the lambda body are embedded.
+    ///
+    /// Produces the expected call `(|..| ..)((param0, param1))` if `self` is determined to be ineligible
+    /// for beta-reduction.
+    ///
+    /// Otherwise, performs beta-reduction to return the raw body of `self` with `(param0, param1)` substituted
+    /// in for the (single) head-variable, with specialization for destructuring expressions in the body.
+    ///
+    /// Infers the correct borrow-or-move strategy for each parameter based on the stored `ClosureKind`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if called on a [`GenLambda`] that is not a pair-lambda.
     pub fn apply_pair(&self, param0: RustExpr, param1: RustExpr, body_info: ExprInfo) -> RustExpr {
         let beta_reducible = self.is_beta_reducible();
         match (self.kind, beta_reducible) {
@@ -2468,18 +2500,33 @@ impl GenExpr {
         }
     }
 
+    /// Transforms a `GenExpr` that produces a value of type `T` into a `GenExpr` that returns `Option<T>` by enclosing the expression in `Some`.
+    ///
+    /// For the case of a block-scope expression, this function is applied only to the final value-producing expression, rather than wrapping
+    /// the entire block in `Some`.
+    ///
+    /// Due to the limitations of local analysis, this function is not responsible for ensuring that the return-value in a function/closure body
+    /// is always `Option<T>`, as in the case of a block-scope expression containing early-return statements.
     fn wrap_some(mut self) -> GenExpr {
         match self {
             Self::ResultOk(t, inner) => Self::ResultOk(t, Box::new(inner.wrap_some())),
             Self::BlockScope(ref mut block) => {
-                // REVIEW - this may not be enough if non-`ret` (statements) can return values
+                // NOTE - we cannot determine whether early-return branches should or should not be `Some`-wrapped, so we do not do anything but wrap the final value.
                 block.wrap_some_final_value();
                 self
             }
+            // TODO - consider whether to distribute `Some` over the branches of a `GenExpr::Control(..)`, for the cases of `RustControl::IfThenElse` and `RustControl::Match`
             this => Self::WrapSome(Box::new(this)),
         }
     }
 
+    /// Applies the most natural form of `Try` construction to self.
+    ///
+    /// If self happens to `ResultOk(.., inner)`, returns `inner`.
+    ///
+    /// If self is a block-scope expression, this method is recursively applied to the final expression.
+    ///
+    /// Otherwise, self is directly wrapped in a `Try` expression.
     fn wrap_try(self) -> GenExpr {
         match self {
             Self::ResultOk(_, inner) => *inner,
@@ -2515,43 +2562,9 @@ impl GenExpr {
         }
     }
 
-    fn has_binds(&self) -> bool {
-        match self {
-            GenExpr::Control(ctrl) => match ctrl.as_ref() {
-                RustControl::Break => false,
-
-                RustControl::Loop(block)
-                | RustControl::While(_, block)
-                | RustControl::ForIter(.., block)
-                | RustControl::ForRange0(.., block) => block.has_binds(),
-
-                RustControl::If(_, yes, maybe) => {
-                    yes.has_binds()
-                        || match maybe {
-                            Some(no) => no.has_binds(),
-                            None => false,
-                        }
-                }
-                RustControl::Match(.., body) => match body {
-                    RustMatchBody::Refutable(cases, ..) | RustMatchBody::Irrefutable(cases) => {
-                        cases.iter().any(|(_, rhs)| rhs.has_binds())
-                    }
-                },
-            },
-
-            GenExpr::BlockScope(block) => block.has_binds(),
-
-            GenExpr::Embed(..) | GenExpr::TyValCon(..) => false,
-
-            GenExpr::ResultOk(.., inner)
-            | GenExpr::ResultErr(inner)
-            | GenExpr::WrapSome(inner)
-            | GenExpr::Try(inner) => inner.has_binds(),
-
-            GenExpr::CallThunk(f) => f.thunk_body.has_binds(),
-        }
-    }
-
+    /// Returns `true` if `self` is sufficiently simple to be directly used within the predicate of a control-flow expression like `if <expr> { .. }`.
+    ///
+    /// Returns `false` if `self` is sufficiently complex that it should be extracted into a local variable assingment instead.
     pub fn is_simple(&self) -> bool {
         match self {
             GenExpr::Embed(r_expr) | GenExpr::TyValCon(r_expr) => !r_expr.is_complex(),
@@ -2566,6 +2579,69 @@ impl GenExpr {
             GenExpr::Control(_) => false,
             GenExpr::CallThunk(_) => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod genexpr_tests {
+    use super::rust_ast::ToFragmentExt;
+    use super::*;
+    use crate::{output::Fragment, precedence::Precedence};
+
+    fn expr_to_fragment(expr: GenExpr) -> Fragment {
+        let block = GenBlock::single_expr(expr);
+        let (stmts, ret) = block.synthesize();
+        assert!(stmts.is_empty());
+        let Some(ret) = ret else { unreachable!() };
+        ret.to_fragment_precedence(Precedence::TOP)
+    }
+
+    #[test]
+    /// Behavior regression for [`GenExpr::wrap_some`] that documents the current behavior, specifically the fact that `GenExpr::Control` are non-distrubively wrapped
+    /// (i.e. `Some(if <expr> { .. } else { .. })` rather than `(if <expr> { Some(..) } else { Some(..) })`).
+    // REVEIW - consider how often this case occurs in practice, and if it is preferable to adjust the logic to make Some-wrapping distributive over certain control-flow expressions
+    fn regression_wrap_some_non_distributive_over_control() {
+        let if_ctrl: RustControl<GenBlock> = {
+            let scrutinee = Box::new(RustExpr::local("x"));
+            let then_branch = GenBlock::simple_expr(RustExpr::local("y"));
+            let else_branch = GenBlock::simple_expr(RustExpr::local("z"));
+            RustControl::If(scrutinee, then_branch, Some(else_branch))
+        };
+
+        let match_ctrl: RustControl<GenBlock> = {
+            let scrutinee = Box::new(RustExpr::local("x"));
+            let true_case = {
+                let lhs =
+                    MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Boolean(true)));
+                let rhs = GenBlock::simple_expr(RustExpr::local("y"));
+                (lhs, rhs)
+            };
+            let false_case = {
+                let lhs =
+                    MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Boolean(false)));
+                let rhs = GenBlock::simple_expr(RustExpr::local("z"));
+                (lhs, rhs)
+            };
+            RustControl::Match(
+                scrutinee,
+                RustMatchBody::Irrefutable(vec![true_case, false_case]),
+            )
+        };
+        let if_expr = GenExpr::Control(Box::new(if_ctrl));
+        let match_expr = GenExpr::Control(Box::new(match_ctrl));
+
+        let wrapped_if = GenExpr::wrap_some(if_expr.clone());
+        let wrapped_match = GenExpr::wrap_some(match_expr.clone());
+
+        let if_oput_manual_wrap = format!("Some({})", expr_to_fragment(if_expr));
+        let wrapped_if_oput = format!("{}", expr_to_fragment(wrapped_if));
+
+        assert_eq!(wrapped_if_oput, if_oput_manual_wrap);
+
+        let match_oput_manual_wrap = format!("Some({})", expr_to_fragment(match_expr));
+        let wrapped_match_oput = format!("{}", expr_to_fragment(wrapped_match));
+
+        assert_eq!(wrapped_match_oput, match_oput_manual_wrap);
     }
 }
 
@@ -2598,14 +2674,6 @@ impl GenStmt {
         }
     }
 
-    pub fn has_binds(&self) -> bool {
-        match self {
-            GenStmt::BindOnce(..) => true,
-            GenStmt::Embed(..) => false,
-            GenStmt::Expr(expr) => expr.has_binds(),
-        }
-    }
-
     /// Returns the name for a distinguished binding (e.g. [`GenStmt::BindOnce`]), if there is one,
     /// or None if there is not.
     #[expect(unused)]
@@ -2617,7 +2685,7 @@ impl GenStmt {
         }
     }
 
-    fn assign<Name: IntoLabel>(binding: Name, rhs: GenBlock) -> Self {
+    pub fn assign<Name: IntoLabel>(binding: Name, rhs: GenBlock) -> Self {
         GenStmt::BindOnce(binding.into(), rhs)
     }
 }
@@ -2647,7 +2715,7 @@ struct GenBlock {
 }
 
 impl GenBlock {
-    /// Constructs a new, empty `GenBlock``.
+    /// Constructs a new, empty `GenBlock`.
     #[expect(dead_code)]
     pub const fn new() -> Self {
         GenBlock {
@@ -2656,10 +2724,12 @@ impl GenBlock {
         }
     }
 
+    /// Returns true if the `GenBlock` is empty - i.e. contains no statements and no return value.
     pub const fn is_empty(&self) -> bool {
         self.stmts.is_empty() && self.ret.is_none()
     }
 
+    /// Constructs a `GenBlock` from a possibly-empty list of statements `Vec<GenStmt>` and a possibly-none (implicit) return value `Option<GenExpr>`.
     pub const fn from_parts(stmts: Vec<GenStmt>, ret: Option<GenExpr>) -> Self {
         GenBlock { stmts, ret }
     }
@@ -2681,6 +2751,8 @@ impl GenBlock {
         self.stmts = stmts;
     }
 
+    /// Performs an in-place transformation of the return value of `self`, wrapping it in `Some`. If there is no explicit return-value,
+    /// wraps the implicit return-value of `()` in `Some`.
     pub fn wrap_some_final_value(&mut self) {
         let fallback = || -> Result<_, std::convert::Infallible> {
             Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_some())))
@@ -2689,6 +2761,11 @@ impl GenBlock {
             .unwrap()
     }
 
+    /// Performs an in-place transformation of the return value of `self` using the given function `f`.
+    ///
+    /// If `self.ret` is `Some(val)`, changes it to `Some(f(val))`.
+    ///
+    /// If `self.ret` is `None`, calls `fallback`, either storing the `Ok` result in `self.ret` or returning the `Err` it produces.
     fn transform_return_value<E, F, G>(&mut self, f: F, fallback: G) -> Result<(), E>
     where
         F: Fn(GenExpr) -> GenExpr,
@@ -2702,17 +2779,12 @@ impl GenBlock {
         Ok(())
     }
 
+    /// Given a bare `RustStmt`, constructs a `GenBlock` containing that single statement and nothing else.
     pub fn mono_statement(stmt: RustStmt) -> Self {
         GenBlock {
             stmts: vec![GenStmt::Embed(stmt)],
             ret: None,
         }
-    }
-
-    #[allow(unused)]
-    pub fn has_binds(&self) -> bool {
-        self.stmts.iter().any(GenStmt::has_binds)
-            || self.ret.as_ref().is_some_and(GenExpr::has_binds)
     }
 
     /// Constructs a traditional `RustBlock` value from a `GenBlock`, consuming the original in the process.
@@ -2894,10 +2966,16 @@ impl<'a> ProdCtxt<'a> {
     }
 }
 
+/// Trait for converting internally-modelled abstract decoder-logic into the gen-code AST.
 pub(crate) trait ToAst {
+    /// Correpsonding item in the RustAST grammar model that an item of type `Self` most naturally compiles to.
     type AstElem;
 
+    /// Compiles a decoder-logic directive into raw code-blocks.
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> Self::AstElem;
+
+    /// Helper heuristic for determining variance/invariance with respect to the input parameter passed in through `ProdCtxt`.
+    fn depends_on_input(&self) -> bool;
 }
 
 /// Abstraction type use to sub-categorize different Decoders and ensure that the codegen layer
@@ -2940,6 +3018,19 @@ macro_rules! impl_toast_caselogic {
                     CaseLogic::Sequential(sq) => sq.to_ast(ctxt),
                     CaseLogic::Simple(s) => s.to_ast(ctxt),
                     CaseLogic::View(v) => v.to_ast(ctxt),
+                }
+            }
+
+            fn depends_on_input(&self) -> bool {
+                match self {
+                    CaseLogic::Derived(d) => d.depends_on_input(),
+                    CaseLogic::Engine(e) => e.depends_on_input(),
+                    CaseLogic::Other(o) => o.depends_on_input(),
+                    CaseLogic::Parallel(p) => p.depends_on_input(),
+                    CaseLogic::Repeat(r) => r.depends_on_input(),
+                    CaseLogic::Sequential(sq) => sq.depends_on_input(),
+                    CaseLogic::Simple(s) => s.depends_on_input(),
+                    CaseLogic::View(v) => v.depends_on_input(),
                 }
             }
         }
@@ -3049,6 +3140,26 @@ impl ToAst for SimpleLogic<GTExpr> {
             SimpleLogic::ConstNone => GenBlock::simple_expr(RustExpr::NONE),
         }
     }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // true (leaf-nodes)
+            SimpleLogic::ExpectEnd => true,
+            SimpleLogic::SkipToNextMultiple(..) => true,
+            SimpleLogic::ByteIn(..) => true,
+            SimpleLogic::YieldCurrentOffsetAs(..) => true,
+            SimpleLogic::SkipRemainder => true,
+            // true (required for recursive dispatch)
+            SimpleLogic::Invoke(..) => true,
+            SimpleLogic::CallDynamic(..) => true,
+            // false cases
+            // NOTE - these cases can be double-checked via the [`ToAst::to_ast`] impl for [`SimpleLogic`]
+            SimpleLogic::Fail => false,
+            SimpleLogic::Eval(..) => false,
+            SimpleLogic::ConstNone => false,
+            SimpleLogic::PhantomData => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3098,6 +3209,17 @@ impl ToAst for ViewLogic<GTExpr> {
                 }
             },
             ViewLogic::ReifyView(view) => GenBlock::simple_expr(model::reify_view(view.clone())),
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // true - construct view from parser
+            ViewLogic::LetView(..) => true,
+            // false - only operate on view, not on parser directly
+            ViewLogic::CaptureBytes(..) | ViewLogic::ReadArray(..) | ViewLogic::ReifyView(..) => {
+                false
+            }
         }
     }
 }
@@ -3192,6 +3314,17 @@ where
                 let ret = Some(RustExpr::local(model::BITS_RET).into());
                 GenBlock::from_parts(stmts, ret)
             }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        // NOTE - 'Engine' logic inherently itneracts with the parse-engine, so all cases return true, but we don't want silent drift so we match on the current variants explicitly
+        match self {
+            EngineLogic::Slice(..)
+            | EngineLogic::Peek(..)
+            | EngineLogic::Bits(..)
+            | EngineLogic::PeekNot(..)
+            | EngineLogic::OffsetPeek(..) => true,
         }
     }
 }
@@ -3484,6 +3617,20 @@ where
             }
         }
     }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // tree-based repeats can only terminate based on input-conditions, so they are always dependent on input
+            RepeatLogic::Repeat0ContinueOnMatch(..) | RepeatLogic::Repeat1BreakOnMatch(..) => true,
+            RepeatLogic::BetweenCounts(..) => true,
+            // speculatively true but actually depend on the inner argument
+            RepeatLogic::ExactCount(.., inner)
+            | RepeatLogic::ForEach(.., inner)
+            | RepeatLogic::ConditionTerminal(.., inner)
+            | RepeatLogic::ConditionComplete(.., inner)
+            | RepeatLogic::AccumUntil(.., (inner, _)) => inner.depends_on_input(),
+        }
+    }
 }
 
 /// Cases that apply other case-logic in sequence to an incrementally updated input
@@ -3508,7 +3655,6 @@ where
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
-            // REVIEW - in certain cases, we may be able to use fixed-sized arrays instead of vec, but that might complicate matters...
             SequentialLogic::AccumSeq { as_array, elements } => {
                 if elements.is_empty() {
                     return if *as_array {
@@ -3522,7 +3668,7 @@ where
                     use model::ACCUM_SEQ_PREFIX;
                     move |ix| Label::Owned(format!("{ACCUM_SEQ_PREFIX}{ix}"))
                 };
-                // REVIEW - do we need `.local_try()` here?
+                // REVIEW - consider whether there might be cases in which we would have to to add `.local_try()` to `cl.to_ast(ctxt)`
                 let blocks = elements.iter().map(|cl| cl.to_ast(ctxt)).collect();
                 let (stmts, terms) = model::accum_seq_terms(blocks, mk_name);
 
@@ -3572,6 +3718,14 @@ where
                     // FIXME - In addition to local rule-interpretation for each tuple positional, we also want to selectively box the elements, either at site-of-binding or in the struct expr
                     GenBlock::from_parts(stmts, Some(GenExpr::TyValCon(RustExpr::Tuple(terms))))
                 }
+            }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            Self::AccumTuple { elements, .. } | Self::AccumSeq { elements, .. } => {
+                elements.iter().any(ToAst::depends_on_input)
             }
         }
     }
@@ -3660,7 +3814,7 @@ where
                 let prior_block = prior.to_ast(ctxt);
                 let mut inner_block = inner.to_ast(ctxt);
 
-                // REVIEW - handle empty-blocks from SimpleLogic::Noop (phantom)
+                // REVIEW - handle empty-blocks from SimpleLogic::PhantomData (phantom)
                 if !prior_block.is_empty() {
                     // REVIEW - is there a better construction we can use instead of this?
                     let prior_stmt = GenStmt::Expr(GenExpr::BlockScope(Box::new(prior_block)));
@@ -3680,6 +3834,17 @@ where
                     }
                 }
             }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            OtherLogic::Descend(..) => true,
+            OtherLogic::ExprMatch(_, items, _) => items.iter().any(|(_, cl)| cl.depends_on_input()),
+            OtherLogic::LetFormat(lhs, _, rhs) | OtherLogic::MonadSeq(lhs, rhs) => {
+                lhs.depends_on_input() || rhs.depends_on_input()
+            }
+            OtherLogic::Hint(.., inner) => inner.depends_on_input(),
         }
     }
 }
@@ -3752,6 +3917,11 @@ where
                 GenBlock::from_parts(stmts, last_ctrl).local_try()
             }
         }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        // NOTE - vacuously true but we don't want to unwittingly break things by hard-coding in `true` verbatim
+        matches!(self, ParallelLogic::Alts(..))
     }
 }
 
@@ -3920,7 +4090,7 @@ impl ToAst for DerivedLogic<GTExpr> {
                 // REVIEW - consider whether there are any issues with shadowing that could occur here
                 let varname = f.get_head_var();
                 let assign_inner = GenStmt::assign(varname.clone(), inner.to_ast(ctxt));
-                // REVIEW - consider repackaging this GenBlock as GenExpr::BlockScope and returning that as a single-expression block...
+                // REVIEW - consider repackaging this GenBlock as GenExpr::BlockScope and returning that as a single-expression block
                 GenBlock::from_parts(
                     vec![assign_inner],
                     Some(GenExpr::Embed(f.apply(
@@ -3967,6 +4137,27 @@ impl ToAst for DerivedLogic<GTExpr> {
             }
         }
     }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // false cases - ignore ctxt and read from value-level data-stream
+            DerivedLogic::DecodeBytes(..) | DerivedLogic::ParseView(..) => false,
+            // inductive cases
+            DerivedLogic::Maybe(_, inner)
+            | DerivedLogic::Where(.., inner)
+            | DerivedLogic::Let(.., inner)
+            | DerivedLogic::MapOf(_, inner)
+            | DerivedLogic::WrapSome(inner)
+            | DerivedLogic::VariantOf(_, inner)
+            | DerivedLogic::UnitVariantOf(_, inner) => inner.depends_on_input(),
+            DerivedLogic::Dynamic(dynamic, inner) => {
+                dynamic.depends_on_input() || inner.depends_on_input()
+            }
+            #[cfg(feature = "format_enforce")]
+            DerivedLogic::Enforce(inner) => inner.depends_on_input(),
+            DerivedLogic::Permit(inner, _) => inner.depends_on_input(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3977,7 +4168,7 @@ enum DynamicLogic<ExprT> {
 impl ToAst for DynamicLogic<GTExpr> {
     type AstElem = RustStmt;
 
-    fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> Self::AstElem {
+    fn to_ast(&self, _: ProdCtxt<'_>) -> Self::AstElem {
         match self {
             DynamicLogic::Huffman(lbl, code_lengths, opt_values_expr) => {
                 let rhs = {
@@ -3988,6 +4179,11 @@ impl ToAst for DynamicLogic<GTExpr> {
                 RustStmt::Let(Mut::Immutable, lbl.clone(), None, rhs)
             }
         }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        // NOTE - this is fine because to_ast doesn't capture ctxt and so there can never be any silent divergence
+        false
     }
 }
 
@@ -4039,6 +4235,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     // the final output.
     let mut read_unchecked_emitted = BTreeSet::<usize>::new();
 
+    // SECTION - type-declaration generation loop
     for (type_decl, (ix, path)) in type_decls.into_iter() {
         let name = elaborator
             .codegen
@@ -4135,7 +4332,9 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         };
         items.push(it.with_comment(comments));
     }
+    // !SECTION
 
+    // SECTION - decoder-function generation loop
     for (ix, ref mut decoder_fn) in sourcemap.decoder_skels.into_iter().enumerate() {
         decoder_fn.rebind(&table);
         if let Some(name) = &decoder_fn.adhoc_name {
@@ -4151,6 +4350,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         let func = decoder_fn.to_ast(ProdCtxt::default());
         items.push(RustItem::from_decl(RustDecl::Function(func)).with_comment([format!("d#{ix}")]));
     }
+    // !SECTION
 
     let mut content = RustProgram::from_iter(items);
     content.add_import(RustImport {
@@ -4188,16 +4388,22 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     content
 }
 
+/// Template-name production function for the default, pre-replacement-pass string to use for a Decoder-Function based on a unique IxLabel.
 fn decoder_fname(ixlabel: IxLabel) -> Label {
     Label::from(format!("Decoder{}", ixlabel.to_usize()))
 }
 
 #[derive(Clone, Debug)]
 pub struct DecoderFn<ExprT> {
+    /// If the return-type for the decoder happens to be a locally-defiend ad-hoc type, stores the raw identifier for said ad-hoc type.
     adhoc_name: Option<Label>,
+    /// Unique index-based identifier fragment as the canonical identifier before ad-hoc name cribbing or rebinding passes.
     ixlabel: IxLabel,
+    /// Semi-abstract parse-logic translated from the corresponding `TypedDecoder`.
     logic: CaseLogic<ExprT>,
+    /// Possibly-none list of arguments, beyond the parse-object (`&mut Parser<'_>`), that the decoder depends on (for value-dependent or view-dependent formats).
     extra_args: Option<Vec<(Label, GenType)>>,
+    /// RustType of the return-object (what `PResult` ends up being parametrized with).
     ret_type: RustType,
 }
 
@@ -4214,8 +4420,9 @@ where
         // properly capture associated lifetimes of extra arguments
         let mut arg_lt = None;
         for (_, t) in self.extra_args.iter().flatten() {
-            // specialize over views only, to avoid deep recursion
+            // specialize over views only, to avoid deep recursion - we mostly will not see explicit lt-params in any dependency-argument RustType other than `RustType::ViewObject`
             match t {
+                // if any of the dep-args are a view-object with an associated lifetime, capture that lifetime and store it in `arg_lt`
                 GenType::Inline(RustType::ViewObject(lt)) => {
                     let _ = arg_lt.insert(lt);
                     break;
@@ -4228,16 +4435,20 @@ where
         let params = this_lt
             .as_ref()
             .map(|lt| DefParams::from_lt(lt.as_ref().clone()));
+        let input_varname = if self.depends_on_input() {
+            "input"
+        } else {
+            "_input"
+        };
         let sig = {
             let args = {
                 let arg0 = {
-                    let name = "_input".into();
                     let ty = {
                         let mut params = RustParams::<RustLt, RustType>::new();
                         if let Some(lt) = this_lt {
                             params.push_lifetime(lt.clone());
                         } else {
-                            params.push_lifetime(RustLt::Parametric("'_".into()));
+                            params.push_lifetime(RustLt::WILD);
                         }
                         RustType::borrow_of(
                             None,
@@ -4245,7 +4456,7 @@ where
                             RustType::verbatim("Parser", Some(params)),
                         )
                     };
-                    (name, ty)
+                    (input_varname.into(), ty)
                 };
                 if let Some(ref args) = self.extra_args {
                     Iterator::chain(
@@ -4271,7 +4482,7 @@ where
             )
         };
         let ctxt = ProdCtxt {
-            input_varname: &Label::from("_input"),
+            input_varname: &Label::from(input_varname),
         };
         // NOTE - this is the last place we can modify the GenBlock before it is manifested as pure RustAST constructs
         let self_block = self.logic.to_ast(ctxt);
@@ -4291,6 +4502,10 @@ where
         };
 
         RustFn::new(name, params, sig, body)
+    }
+
+    fn depends_on_input(&self) -> bool {
+        self.logic.depends_on_input()
     }
 }
 
@@ -4330,10 +4545,8 @@ impl<'a> Generator<'a> {
                 let dec = dec_ext.get_dec();
                 let args = dec_ext.get_args();
                 let dec_gt = dec.get_type();
-                let adhoc_name = dec_gt.and_then(|t| match t.as_ref() {
-                    GenType::Def((_, name), ..) => Some(name.clone()),
-                    _ => None,
-                });
+                let adhoc_name =
+                    dec_gt.and_then(|t| t.try_as_adhoc().map(|(_, name, _)| name.clone()));
                 let cl = elab.codegen.translate(dec);
                 DecoderFn {
                     adhoc_name,
@@ -6201,6 +6414,15 @@ mod tests {
     }
 
     #[test]
+    fn test_embed_expr_unit_variant() {
+        let f = Format::Variant(Label::Borrowed("Empty"), Box::new(Format::EMPTY));
+        let mut module = FormatModule::new();
+        module.define_format("test.empty", f.clone());
+        let output = produce_string_gencode(&module, &f);
+        println!("{}", output);
+    }
+
+    #[test]
     fn test_lambda_sanity() {
         const TU16: RustType = RustType::Atom(AtomType::Prim(PrimType::U16));
         const TU8: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8)));
@@ -6443,5 +6665,51 @@ mod tests {
             writeln!(&mut log, "\n\n").unwrap();
             prop_assert!(is_valid_output(&output))
         })
+    }
+
+    #[test]
+    /// Regression test for the unoptimized case of `Expr::SeqIx(Expr::EnumFromTo(a, b), c)`
+    ///
+    /// Current behavior results in `(a..b)[c]`, which isn't even valid Rust-code. Because there are
+    /// no compiler warnings to this effect, we can be sure that this case isn't happening in practice.
+    ///
+    /// Properly speaking, the outcome should be `a + c`, or a panic if `c >= b - a`.
+    fn test_regression_unoptimized_seqix_of_enum_from_to() {
+        let range = {
+            let min = GTExpr::U32(0);
+            let max = GTExpr::U32(100);
+            let seq_type = GenType::from(RustType::Atom(AtomType::Comp(CompType::Vec(Box::new(
+                RustType::from(MachineUint::U32),
+            )))));
+            GTExpr::EnumFromTo(seq_type, Box::new(min), Box::new(max))
+        };
+        let ix = GTExpr::U32(42);
+        let expr = GTExpr::SeqIx(
+            GenType::from(RustType::from(MachineUint::U32)),
+            Box::new(range),
+            Box::new(ix),
+        );
+        let actual = embed_expr_nat(&expr);
+        if let RustExpr::Index(lhs, rhs) = &actual
+            && let (
+                RustExpr::RangeExclusive(start, stop),
+                RustExpr::Operation(RustOp::AsCast(
+                    ix,
+                    RustType::Atom(AtomType::Prim(PrimType::Usize)),
+                )),
+            ) = (lhs.as_ref(), rhs.as_ref())
+            && let (
+                RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(a))),
+                RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(b))),
+                RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(c))),
+            ) = (start.as_ref(), stop.as_ref(), ix.as_ref())
+            && *a == 0
+            && *b == 100
+            && *c == 42
+        {
+            ()
+        } else {
+            panic!("assertion failed! {actual:?} does not match expected shape")
+        }
     }
 }

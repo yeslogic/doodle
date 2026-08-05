@@ -237,7 +237,7 @@ fn mark_glyph_set(module: &mut FormatModule, coverage_table: FormatRef) -> Forma
             "table_view",
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
-                ("format", util::expect_u16be(1)), // FIXME - u16be() instead if this is validation fails
+                ("format", util::expect_u16be(1)),
                 ("mark_glyph_set_count", u16be()),
                 (
                     "coverage",

@@ -262,10 +262,12 @@ impl Fragment {
 
     /// Returns `true` if the printable representation of `self` fits on a single line.
     ///
+    /// Takes a boolean `is_final` parameter that is to be set to `true` if and only if `self` is the last fragment of a larger expression
+    ///
     /// Similar to [`Fragment::fits_inline`], but determines whether more than one line is displayed
     /// rather than whether inline concatenations are possible.
     ///
-    /// Importantly, a single trailing newline character is permitted, and `Symbols` care allowed to appear anywhere
+    /// Importantly, a single trailing newline character is permitted, and `Symbols` are allowed to appear anywhere
     pub(crate) fn is_single_line(&self, is_final: bool) -> bool {
         match self {
             Fragment::Empty => true,
@@ -307,7 +309,7 @@ impl Fragment {
     /// Returns `false` if any of the following are true:
     ///   - The Display form of `self` contains any newline characters
     ///   - `self` contains any `Symbol` sub-fragments
-    fn fits_inline(&self) -> bool {
+    pub(crate) fn fits_inline(&self) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Char(c) => *c != '\n',
@@ -348,6 +350,7 @@ impl Fragment {
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {
+            // FIXME - this doesn't work properly if `self` ends in a newline
             self.cat(trailer).cat_break().cat(other)
         }
     }
@@ -360,6 +363,7 @@ pub(crate) struct FragmentBuilder {
 }
 
 impl FragmentBuilder {
+    /// Constructs a new, empty [`FragmentBuilder`]
     pub fn new() -> Self {
         Self {
             frozen: Vec::new(),
@@ -367,6 +371,7 @@ impl FragmentBuilder {
         }
     }
 
+    /// Obtains a mutable reference to the currently-active Fragment if further mutation is desired before it is finalized.
     pub fn active_mut(&mut self) -> &mut Fragment {
         &mut self.active
     }
@@ -397,11 +402,13 @@ impl FragmentBuilder {
         }
     }
 
+    /// Freezes the active fragment (if any), before sequencing all frozen fragments into a [`Fragment::Sequence`].
     pub fn finalize(mut self) -> Fragment {
         let _ = self.renew();
         Fragment::seq(self.frozen, None)
     }
 
+    /// Similar to [`Self::finalize`], but adds a separator between each frozen fragment.
     pub fn finalize_with_sep(mut self, sep: Fragment) -> Fragment {
         let _ = self.renew();
         Fragment::seq(self.frozen, Some(sep))

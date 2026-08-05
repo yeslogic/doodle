@@ -6,7 +6,7 @@ use num_bigint::BigInt;
 use num_traits::{One as _, Signed, ToPrimitive, Zero};
 use serde::Serialize;
 
-use crate::decoder::UnknownVarError;
+use crate::error::UnknownVarError;
 use crate::scope::{EvalScope, VoidScope};
 use crate::{IntRel, ValueType};
 use crate::{Label, bounds::Bounds as UBounds};

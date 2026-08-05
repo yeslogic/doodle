@@ -410,6 +410,10 @@ impl BufferOffset {
 
     /// Performs a seek operation, and returns the checkpoint offset if successful, or `Err` if the seek is not allowed.
     ///
+    /// # Panics
+    ///
+    /// Panics if `self` is currently in bit-parsing mode.
+    ///
     /// # Note
     ///
     /// This operation is fragile and may lead to unexpected conditions under normal parsing. If the seek-to offset

@@ -10,22 +10,97 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
 
     let module = om.module();
 
-    let base_coord = base_coord(module, device_or_variation_index_table);
-    let min_max = min_max(module, tag, base_coord);
-    let base_values = base_values(module, base_coord);
-
-    let base_lang_sys = module.register_format_view(
-        "opentype.base.base-langsys",
+    let base_script = base_script(module, tag, device_or_variation_index_table);
+    let base_script_record = module.register_format_view(
+        "opentype.base.base-script-record",
         Label::Borrowed("table_view"),
         record([
-            ("base_lang_sys_tag", tag.call()),
+            ("base_script_tag", tag.call()),
             (
-                "min_max",
-                util::read_phantom_view_offset16(vvar("table_view"), min_max.call()),
+                "base_script",
+                util::read_phantom_view_offset16(vvar("table_view"), base_script.call()),
             ),
         ]),
     );
-    let base_script = om.module().define_format(
+    let base_script_list = let_view(
+        "table_view",
+        record([
+            ("table_scope", reify_view(vvar("table_view"))),
+            ("base_script_count", u16be()),
+            (
+                "base_script_records",
+                repeat_count(
+                    var("base_script_count"),
+                    base_script_record.invoke_view(vvar("table_view")),
+                ),
+            ),
+        ]),
+    );
+    let base_tag_list = record([
+        ("base_tag_count", u16be()),
+        (
+            "baseline_tags",
+            from_here(read_array(var("base_tag_count"), tag)),
+        ), // TODO[epic=sorting-validation] - must appear in alphabetical order (not enforced locally)
+    ]);
+    let axis_table = module.define_format(
+        "opentype.layout.axis_table",
+        let_view(
+            "table_view",
+            record([
+                ("table_scope", reify_view(vvar("table_view"))),
+                (
+                    "base_tag_list",
+                    util::read_phantom_view_offset16(vvar("table_view"), base_tag_list),
+                ),
+                (
+                    "base_script_list",
+                    util::read_phantom_view_offset16(vvar("table_view"), base_script_list),
+                ),
+            ]),
+        ),
+    );
+    module.define_format(
+        "opentype.base.table",
+        let_view(
+            "table_view",
+            record([
+                ("table_scope", reify_view(vvar("table_view"))),
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", where_between_u16(u16be(), 0, 1)), // v1.0 and v1.1
+                (
+                    "horiz_axis",
+                    util::read_phantom_view_offset16(vvar("table_view"), axis_table.call()),
+                ),
+                (
+                    "vert_axis",
+                    util::read_phantom_view_offset16(vvar("table_view"), axis_table.call()),
+                ),
+                (
+                    "item_var_store",
+                    cond_maybe(
+                        expr_gt(var("minor_version"), Expr::U16(0)),
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            item_variation_store.call(),
+                        ),
+                    ),
+                ),
+            ]),
+        ),
+    )
+}
+
+fn base_script(
+    module: &mut FormatModule,
+    tag: FormatRef,
+    device_or_variation_index_table: FormatRef,
+) -> FormatRef {
+    let base_coord = base_coord(module, device_or_variation_index_table);
+    let min_max = min_max(module, tag, base_coord);
+    let base_values = base_values(module, base_coord);
+    let base_lang_sys = base_lang_sys(module, tag, min_max);
+    module.define_format(
         "opentype.layout.base_script",
         let_view(
             "table_view",
@@ -49,95 +124,20 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
                 ),
             ]),
         ),
-    );
-    let base_script_record = om.module().define_format_views(
-        "opentype.base.base-script-record",
-        vec![Label::Borrowed("table_view")],
+    )
+}
+
+fn base_lang_sys(module: &mut FormatModule, tag: FormatRef, min_max: FormatRef) -> DepFormat<0, 1> {
+    module.register_format_view(
+        "opentype.base.base-langsys",
+        Label::Borrowed("table_view"),
         record([
-            ("base_script_tag", tag.call()),
+            ("base_lang_sys_tag", tag.call()),
             (
-                "base_script",
-                util::read_phantom_view_offset16(vvar("table_view"), base_script.call()),
+                "min_max",
+                util::read_phantom_view_offset16(vvar("table_view"), min_max.call()),
             ),
         ]),
-    );
-    let base_script_list = let_view(
-        "table_view",
-        record([
-            ("table_scope", reify_view(vvar("table_view"))),
-            ("base_script_count", u16be()),
-            (
-                "base_script_records",
-                repeat_count(
-                    var("base_script_count"),
-                    base_script_record.call_view(vvar("table_view")),
-                ),
-            ),
-        ]),
-    );
-    let base_tag_list = record([
-        ("base_tag_count", u16be()),
-        // readarray-eligible once `as_base_kind_read` can resolve `FormatRef::call()`
-        // indirection: element is bare `tag.call()`, which itself resolves to a bare `u32be()`
-        // -- no other blocker, and no `FormatRef` would even be needed once fixed (would map
-        // straight to `BaseKind::U32BE`). Although `base_tag_list` is itself the target of a
-        // `read_phantom_view_offset16` in `axis_table` below, `baseline_tags` is *not* the
-        // whole target (it's preceded by the sibling `base_tag_count` field within this same
-        // record), so this can't skip straight to the `pseudo_record`+`with_view` rewrite the
-        // way `stat.rs`'s `design_axes_array` can -- it would still need
-        // `from_here(read_array(var("base_tag_count"), BaseKind::U32BE))` applied at this field,
-        // nested inside the offset-jumped-to format.
-        (
-            "baseline_tags",
-            from_here(read_array(var("base_tag_count"), tag)),
-        ), // TODO[epic=sorting-validation] - must appear in alphabetical order (not enforced locally)
-    ]);
-    let axis_table = om.module().define_format(
-        "opentype.layout.axis_table",
-        let_view(
-            "table_view",
-            record([
-                ("table_scope", reify_view(vvar("table_view"))),
-                (
-                    "base_tag_list_offset",
-                    util::read_phantom_view_offset16(vvar("table_view"), base_tag_list),
-                ),
-                (
-                    "base_script_list_offset",
-                    util::read_phantom_view_offset16(vvar("table_view"), base_script_list),
-                ),
-            ]),
-        ),
-    );
-    om.module().define_format(
-        "opentype.base.table",
-        let_view(
-            "table_view",
-            record([
-                // WIP
-                ("table_scope", reify_view(vvar("table_view"))),
-                ("major_version", util::expect_u16be(1)),
-                ("minor_version", where_between_u16(u16be(), 0, 1)), // v1.0 and v1.1
-                (
-                    "horiz_axis_offset",
-                    util::read_phantom_view_offset16(vvar("table_view"), axis_table.call()),
-                ),
-                (
-                    "vert_axis_offset",
-                    util::read_phantom_view_offset16(vvar("table_view"), axis_table.call()),
-                ),
-                (
-                    "item_var_store_offset",
-                    cond_maybe(
-                        expr_gt(var("minor_version"), Expr::U16(0)),
-                        util::read_phantom_view_offset32(
-                            vvar("table_view"),
-                            item_variation_store.call(),
-                        ),
-                    ),
-                ),
-            ]),
-        ),
     )
 }
 
@@ -154,7 +154,7 @@ fn base_values(module: &mut FormatModule, base_coord: FormatRef) -> FormatRef {
                 ("default_baseline_index", u16be()),
                 ("base_coord_count", u16be()), // NOTE - should be equal to baseTagCount in BaseTagList
                 (
-                    "base_coord_offsets",
+                    "base_coords",
                     repeat_count(
                         var("base_coord_count"),
                         util::read_phantom_view_offset16(vvar("table_view"), base_coord.call()),
@@ -216,41 +216,39 @@ fn min_max(module: &mut FormatModule, tag: FormatRef, base_coord: FormatRef) -> 
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base#basecoord-tables
 fn base_coord(module: &mut FormatModule, device_or_variation_index_table: FormatRef) -> FormatRef {
-    // NOTE - 'data' field is a nested record of any fields beyond `{ format, coordinate }` used in a given format
-    let format1_data = Format::EMPTY;
-    let format2_data = record([("reference_glyph", u16be()), ("base_coord_point", u16be())]);
-    let format3_data = |table_view: ViewExpr| {
-        record([(
-            "device",
-            util::read_phantom_view_offset16(table_view, device_or_variation_index_table.call()),
-        )])
-    };
     module.define_format(
         "opentype.layout.base_coord",
         let_view(
             "table_view",
-            record([
-                // WIP
-                ("table_scope", reify_view(vvar("table_view"))),
-                ("format", u16be()),
-                ("coordinate", i16be()),
-                (
-                    "data",
-                    match_variant(
-                        var("format"),
-                        [
-                            (Pattern::U16(1), "NoData", format1_data),
-                            (Pattern::U16(2), "GlyphData", format2_data),
-                            (
-                                Pattern::U16(3),
-                                "DeviceData",
-                                format3_data(vvar("table_view")),
-                            ),
-                            (Pattern::Wildcard, "UnknownFormat", Format::Fail),
-                        ],
+            embedded_variadic_alternation(
+                [
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", u16be()),
+                    ("coordinate", i16be()),
+                ],
+                "format",
+                [
+                    (1u16, "NoData", Vec::new()),
+                    (
+                        2u16,
+                        "GlyphData",
+                        vec![("reference_glyph", u16be()), ("base_coord_point", u16be())],
                     ),
-                ),
-            ]),
+                    (
+                        3u16,
+                        "DeviceData",
+                        vec![(
+                            "device",
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                device_or_variation_index_table.call(),
+                            ),
+                        )],
+                    ),
+                ],
+                "data",
+                NestingKind::MinimalVariation,
+            ),
         ),
     )
 }

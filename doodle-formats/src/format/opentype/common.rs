@@ -212,7 +212,7 @@ pub(crate) fn device_table() -> Format {
         )
     };
 
-    // NOTE - Converts a 'number of delta-values' to a `number of 16-bit words', based on the implied bit-width of a single delta-value,
+    // NOTE - Converts a 'number of delta-values' to a `number of 16-bit words', based on the implied bit-width of a single delta-value
     let packed_array_length = |delta_format: Expr, num_sizes: Expr| {
         let divide_by = |divisor: u16| u16_div_ceil(num_sizes.clone(), Expr::U16(divisor));
         expr_match(

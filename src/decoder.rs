@@ -5,10 +5,10 @@ use std::rc::Rc;
 use anyhow::{Result as AResult, anyhow};
 
 use crate::byte_set::ByteSet;
-use crate::error::{DecodeErrorKind, DecodeResult, EDecodeResult};
+use crate::error::{DecodeError, DecodeErrorKind, UnknownVarError};
 use crate::fixed::{SpineElem, analyze_fixed_shape};
-use crate::read::ReadCtxt;
-use crate::util::WithErr;
+use crate::read::{BufferKind, ReadCtxt};
+use crate::util::{EResult, WithErr};
 use crate::util::{ErrTrace as _, downgrade_error_with};
 use crate::validation::Condition;
 use crate::{
@@ -63,6 +63,9 @@ pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
 pub mod value;
 pub use value::Value;
 
+pub type DecodeResult<T> = Result<T, DecodeError>;
+pub type EDecodeResult<T> = EResult<T, DecodeError>;
+
 impl Expr {
     pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
@@ -72,13 +75,12 @@ impl Expr {
             Expr::U16(i) => Cow::Owned(Value::U16(*i)),
             Expr::U32(i) => Cow::Owned(Value::U32(*i)),
             Expr::U64(i) => Cow::Owned(Value::U64(*i)),
-            Expr::Numeric(n) => {
-                match n.eval(scope) {
-                    Ok(v) => Cow::Owned(v.into()),
-                    // REVIEW[epic=embedded-num] - we probably want a more sensible outcome than panic
-                    Err(e) => panic!("{e}"),
+            Expr::Numeric(n) => match n.eval(scope) {
+                Ok(v) => Cow::Owned(v.into()),
+                Err(e) => {
+                    panic!("Expr::eval(Numeric({n:?})) failed during NumExpr evaluation: {e}")
                 }
-            }
+            },
             Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
@@ -852,7 +854,6 @@ impl<'a> Compiler<'a> {
                 ))
             }
             Format::RepeatUntilLast(expr, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
                 let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilLast(expr.clone(), da))
@@ -1065,17 +1066,6 @@ pub struct ViewScope<'a> {
 
 // REVIEW - do we want a specialized type for holding views?
 pub type View<'a> = ReadCtxt<'a>;
-
-#[derive(Debug)]
-pub struct UnknownVarError(pub(crate) Label);
-
-impl std::fmt::Display for UnknownVarError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "reference to unknown variable: `{}`", self.0)
-    }
-}
-
-impl std::error::Error for UnknownVarError {}
 
 impl<'a> Scope<'a> {
     pub(crate) fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
@@ -1304,19 +1294,17 @@ impl Decoder {
             }
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok(WithErr::new((Value::UNIT, input))),
-                Some((b, _)) => Err(DecodeErrorKind::trailing(b, input.offset).into()),
+                Some((b, _)) => Err(input.kind.trailing(b, input.offset).into()),
             },
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
-                    .ok_or(DecodeErrorKind::overrun(skip, input.offset))?;
+                    .ok_or(input.kind.overrun(skip, input.offset))?;
                 Ok(WithErr::new((Value::UNIT, input)))
             }
             Decoder::Byte(bs) => {
-                let (b, input) = input
-                    .read_byte()
-                    .ok_or(DecodeErrorKind::overbyte(input.offset))?;
+                let (b, input) = input.read_byte().ok_or(input.kind.overbyte(input.offset))?;
                 if bs.contains(b) {
                     Ok(WithErr::new((Value::U8(b), input)))
                 } else {
@@ -1426,17 +1414,12 @@ impl Decoder {
                         .map(|v| v.get_as_u8())
                         .collect::<Vec<u8>>()
                 };
-                let new_input = ReadCtxt::new(&bytes);
+                let new_input = ReadCtxt::from_value(&bytes);
                 try_with!(a.parse(program, scope, new_input) => ("DecodeBytes", bytes.len())).join(
                     |(va, rem_input)| {
                         Ok(match rem_input.read_byte() {
                             Some((b, _)) => {
-                                // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                                let err = DecodeErrorKind::Trailing {
-                                    byte: b,
-                                    offset: rem_input.offset,
-                                }
-                                .into();
+                                let err = rem_input.kind.trailing(b, rem_input.offset).into();
                                 WithErr::with_err((va, input), err)
                             }
                             None => WithErr::new((va, input)),
@@ -1611,10 +1594,13 @@ impl Decoder {
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
-                let (slice, input) = input.split_at(size).ok_or(
-                    DecodeErrorKind::overrun(size, input.offset)
+                let (mut slice, input) = input.split_at(size).ok_or(
+                    input
+                        .kind
+                        .overrun(size, input.offset)
                         .with_trace(("Slice(create)", format!("{:?}->{size}", expr))),
                 )?;
+                slice.kind &= BufferKind::Slice;
                 Ok(try_with!(a.parse(program, scope, slice) => ("Slice(parse)", format!("{:?}", a))).map(|(v, _)| (v, input)))
             }
             Decoder::Bits(a) => {
@@ -1631,7 +1617,7 @@ impl Decoder {
                         let bytes_read = input.remaining().len() - bytes_remain;
                         let (_, input) = input
                             .split_at(bytes_read)
-                            .ok_or(DecodeErrorKind::overrun(bytes_read, input.offset))?;
+                            .ok_or(input.kind.overrun(bytes_read, input.offset))?;
                         Ok(WithErr::new((v, input)))
                     })
             }
@@ -1640,7 +1626,9 @@ impl Decoder {
                 let offset = expr.eval_value(scope).unwrap_usize();
                 let abs_offset = base + offset;
                 let seek_input = input.seek_to(abs_offset).ok_or(
-                    DecodeErrorKind::bad_seek(abs_offset, input.input.len())
+                    input
+                        .kind
+                        .bad_seek(abs_offset, input.input.len())
                         .with_trace("WithRelativeOffset(seek)"),
                 )?;
                 Ok(try_with!(a.parse(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
@@ -1688,7 +1676,8 @@ impl Decoder {
                 )
             }
             Decoder::LetView(name, d) => {
-                let view = input;
+                let mut view = input;
+                view.kind &= BufferKind::View;
                 let let_scope = ViewScope::new(scope, name, view);
                 Ok(
                     try_with!(d.parse(program, &Scope::View(let_scope), input) => ("LetView(parse)", name.to_string(), format!("{d:?}"))),
@@ -1704,11 +1693,12 @@ impl Decoder {
                             .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
-                // REVIEW - should this be an error instead of a panic?
-                panic!(
-                    "non-exhaustive patterns: {head:?} not in {:#?}",
-                    branches.iter().map(|(p, _)| p).collect::<Vec<_>>()
-                );
+                // NOTE - if we reach this point, it means that none of the patterns matched the head value, and we therefore have to return an error
+                let cases = branches.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>();
+                Err(DecodeError::from(DecodeErrorKind::RefutedPatternMatch {
+                    cases,
+                    value: Box::new(head.into_owned()),
+                }))
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval(scope);
@@ -1751,7 +1741,7 @@ impl Decoder {
                 let mut buf = view_window;
                 for _ in 0..len {
                     let Some((byte, new_buf)) = buf.read_byte() else {
-                        return Err(DecodeErrorKind::overbyte(buf.offset).with_trace((
+                        return Err(input.kind.overbyte(buf.offset).with_trace((
                             "CaptureBytes",
                             format!("len: {len}"),
                             format!("view: {v_expr:?}"),
@@ -1767,8 +1757,6 @@ impl Decoder {
             Decoder::ReadArray(v_expr, len, kind) => {
                 let len = len.eval_value(scope).unwrap_usize();
                 let view_window = Self::eval_view_expr(scope, v_expr)?;
-
-                // REVIEW - hardcoded big-endianness
 
                 let folded = WithErr::fold(
                     (Vec::with_capacity(len), view_window),
@@ -1814,7 +1802,14 @@ impl Decoder {
             )),
         }
     }
-
+    /// Given a `ViewExpr` and a `Scope` to evaluate named views under, returns the appropriate `View`
+    /// (`:= ReadCtxt`).
+    ///
+    /// Returns an error if the `ViewExpr` is defined via an offset that overruns the base view.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the `ViewExpr` depends on a view-variable that is not in `scope`.
     fn eval_view_expr<'a>(
         scope: &Scope<'a>,
         v_expr: &ViewExpr,
@@ -1827,9 +1822,10 @@ impl Decoder {
             ViewExpr::Offset(base, offset) => {
                 let offset = offset.eval_value(scope).unwrap_usize();
                 let base_view = Self::eval_view_expr(scope, base)?;
-                let Some((_, view_window)) = base_view.split_at(offset) else {
-                    return Err(DecodeErrorKind::overrun(offset, base_view.offset));
+                let Some((_, mut view_window)) = base_view.split_at(offset) else {
+                    return Err(base_view.kind.overrun(offset, base_view.offset).into());
                 };
+                view_window.kind &= BufferKind::View;
                 Ok(view_window)
             }
         }
@@ -1885,39 +1881,9 @@ fn read_fixed_record<'a>(
     Ok(folded.map(|(captured, buf)| (Value::Record(captured), buf)))
 }
 
-fn read_base(
-    buf: ReadCtxt<'_>,
-    kind: BaseKind<Endian>,
-) -> Result<(Value, ReadCtxt<'_>), DecodeErrorKind> {
-    match kind {
-        BaseKind::U8 => {
-            let Some((byte, new_buf)) = buf.read_byte() else {
-                return Err(DecodeErrorKind::overbyte(buf.offset));
-            };
-            Ok((Value::U8(byte), new_buf))
-        }
-        BaseKind::U16BE => {
-            let Some((val, new_buf)) = buf.read_u16be() else {
-                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
-            };
-            Ok((Value::U16(val), new_buf))
-        }
-        BaseKind::U32BE => {
-            let Some((val, new_buf)) = buf.read_u32be() else {
-                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
-            };
-            Ok((Value::U32(val), new_buf))
-        }
-        BaseKind::U64BE => {
-            let Some((val, new_buf)) = buf.read_u64be() else {
-                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
-            };
-            Ok((Value::U64(val), new_buf))
-        }
-        BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
-            unimplemented!("little-endian read-base parses not yet implemented")
-        }
-    }
+fn read_base(buf: ReadCtxt<'_>, kind: BaseKind<Endian>) -> DecodeResult<(Value, ReadCtxt<'_>)> {
+    buf.read_base(kind)
+        .map_err(|e| DecodeErrorKind::from(e).into())
 }
 
 fn value_to_vec_usize(v: &Value) -> Vec<usize> {

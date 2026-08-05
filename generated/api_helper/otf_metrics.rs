@@ -1354,7 +1354,7 @@ pub use value_parse::ValueParseError;
 
 // SECTION - Generic (but niche-use-case) helper definitions
 
-// REVIEW - do we still need this?
+// REVIEW - this is a bit hackish and we would probably benefit from a holistic approach for "Options that we want to be able to tell are theoretically non-nullable".
 /// Lexically distinct Option for values that are theoretically non-Nullable and have no FromNull instance.
 type Link<T> = Option<T>;
 
@@ -4942,14 +4942,13 @@ pub(crate) mod fvar {
         }
     }
 
-    // REVIEW - currently not implemented in the OpentypeLayoutScriptList => ScrList spec;
+    // TODO -
     type InstanceFlags = ();
 
     impl Promote<OpentypeInstanceRecord> for InstanceRecord {
         fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
             InstanceRecord {
                 subfamily_nameid: NameId::from(orig.subfamily_nameid),
-                flags: InstanceFlags::promote(&orig.flags),
                 coordinates: UserTuple::promote(&orig.coordinates),
                 postscript_nameid: promote_opt(&orig.postscript_nameid),
             }
@@ -4959,7 +4958,6 @@ pub(crate) mod fvar {
     #[derive(Debug, Clone)]
     pub struct InstanceRecord {
         pub(crate) subfamily_nameid: NameId,
-        pub(crate) flags: InstanceFlags,
         pub(crate) coordinates: UserTuple,
         pub(crate) postscript_nameid: Option<NameId>,
     }
@@ -8006,7 +8004,7 @@ pub(crate) mod layout {
         fn promote(orig: &OpentypeFeatureTable<'input>) -> Self {
             FeatureTable {
                 feature_params: orig.feature_params,
-                lookup_list_indices: orig.lookup_list_indices.clone(),
+                lookup_list_indices: orig.lookup_list_indices.to_vec(),
             }
         }
     }
@@ -8853,7 +8851,7 @@ pub(crate) mod layout {
 
     impl std::fmt::Debug for ChainedRule<sem::GlyphId> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            // REVIEW - at the debug level, present a view of ChainedRule<GlyphId> as if it were its own type `ChainedSequenceRule`
+            // NOTE - at the debug level, present a view of ChainedRule<GlyphId> as if it were its own type `ChainedSequenceRule`
             f.debug_struct("ChainedSequenceRule")
                 .field("backtrack_glyph_count", &self.backtrack_glyph_count)
                 .field("backtrack_sequence", &self.backtrack_sequence)
@@ -8868,7 +8866,7 @@ pub(crate) mod layout {
 
     impl std::fmt::Debug for ChainedRule<sem::ClassId> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            // REVIEW - at the debug level, present a view of ChainedRule<ClassId> as if it were its own type `ChainedClassSequenceRule`
+            // NOTE - at the debug level, present a view of ChainedRule<ClassId> as if it were its own type `ChainedClassSequenceRule`
             f.debug_struct("ChainedClassSequenceRule")
                 .field("backtrack_glyph_count", &self.backtrack_glyph_count)
                 .field("backtrack_sequence", &self.backtrack_sequence)
@@ -9757,17 +9755,15 @@ pub(crate) mod layout {
                                     extension_lookup_type.replace(ext.extension_lookup_type)
                                     && lookup_type != ext.extension_lookup_type
                                 {
-                                    let _err = LookupError::BadExtensionType {
+                                    return Err(LookupError::BadExtensionType {
                                         expected: lookup_type,
                                         actual: ext.extension_lookup_type,
-                                    };
-                                    // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                    return Err(_err);
+                                    });
                                 }
                                 subtables.push(LookupSubtable::try_promote(&raw)?);
                             }
-                            _other => unreachable!(
-                                "lookup type is SubstExtension, found non-SubstExtension subtable: {_other:?}"
+                            other => unreachable!(
+                                "lookup type is SubstExtension, found non-SubstExtension subtable: {other:?}"
                             ),
                         }
                     }
@@ -9854,7 +9850,7 @@ pub(crate) mod layout {
 
     impl LayoutMetrics {
         pub(crate) fn promote_gpos<'a>(
-            gpos: &OpentypeGpos<'a>,
+            gpos: &'a OpentypeGpos<'a>,
         ) -> Result<Heap<LayoutMetrics>, TPErr<OpentypeGposLookupList<'a>, LookupList>> {
             let script_list = ScriptList::promote(&fn_reify::reify(gpos, Mandatory(obj::ScrList)));
             let feature_list =
@@ -9874,7 +9870,7 @@ pub(crate) mod layout {
         }
 
         pub(crate) fn promote_gsub<'a>(
-            gsub: &OpentypeGsub<'a>,
+            gsub: &'a OpentypeGsub<'a>,
         ) -> Result<Heap<LayoutMetrics>, TPErr<OpentypeGsubLookupList<'a>, LookupList>> {
             let script_list = ScriptList::promote(&fn_reify::reify(gsub, Mandatory(obj::ScrList)));
             let feature_list =
@@ -9925,7 +9921,7 @@ pub(crate) mod base {
     pub struct BaseMetrics {
         pub(crate) major_version: u16,
         pub(crate) minor_version: u16,
-        // STUB - add more fields as desired
+        // FIXME[epic=incomplete-otf-api] - add more fields as appropriate
         // horiz_axis
         // vert_axis
         // item_variation_store: Option<ItemVariationStore>,
@@ -10275,16 +10271,12 @@ impl<T> std::error::Error for UnknownValueError<T> where T: std::fmt::Display + 
 
 /// Validation-only analysis function.
 ///
-/// Parses a font file using the machine-generated decoder (and optionally perform per-table
-/// sanity checks).
-///
-/// Does not convert to `*Metrics` types, or produce any output.
+/// Parses a font file using the machine-generated decoder to confirm it decodes without error,
+/// but does nothing else.
 pub fn analyze_font_fast(test_file: &impl AsRef<std::ffi::OsStr>) -> TestResult<()> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
     let mut input = Parser::new(&buffer);
     let _tmp = Decoder_opentype_main(&mut input)?;
-    // FIXME - temporary hack to check vdmx
-    check_font_vdmx(&_tmp);
     Ok(())
 }
 

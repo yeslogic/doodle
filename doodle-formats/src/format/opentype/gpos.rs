@@ -124,52 +124,65 @@ pub(crate) fn pair_pos(
         .get_format_type(value_format_flags.get_level())
         .clone();
 
-    let pair_value_record = module.define_format_args_views(
-        "opentype.layout.pair_pos.pair_value_record",
-        vec![
-            (Label::Borrowed("value_format1"), vf_flags_type.clone()),
-            (Label::Borrowed("value_format2"), vf_flags_type.clone()),
-        ],
-        vec![Label::Borrowed("set_view")],
-        record([
-            // NOTE - first glyph id is listed in the Coverage table
-            ("second_glyph", u16be()),
-            (
-                "value_record1",
-                layout::optional_value_record(value_record, vvar("set_view"), var("value_format1")),
-            ),
-            (
-                "value_record2",
-                layout::optional_value_record(value_record, vvar("set_view"), var("value_format2")),
-            ),
-        ]),
+    let pair_pos_format1 = pair_pos_format1(
+        module,
+        coverage_table,
+        value_format_flags,
+        &vf_flags_type,
+        value_record,
     );
-    let pair_set = module.define_format_args(
-        "opentype.layout.pair_pos.pair_set",
-        vec![
-            (Label::Borrowed("value_format1"), vf_flags_type.clone()),
-            (Label::Borrowed("value_format2"), vf_flags_type.clone()),
-        ],
+    let class2_record = class2_record(module, value_record, vf_flags_type);
+    let pair_pos_format2 = pair_pos_format2(
+        module,
+        class_def,
+        coverage_table,
+        value_format_flags,
+        class2_record,
+    );
+
+    module.define_format(
+        "opentype.layout.pair_pos",
         let_view(
-            "set_view",
+            "table_view",
             record([
-                ("set_scope", reify_view(vvar("set_view"))),
-                ("pair_value_count", u16be()),
+                ("pos_format", u16be()),
                 (
-                    "pair_value_records",
-                    repeat_count(
-                        var("pair_value_count"),
-                        pair_value_record.call_args_views(
-                            vec![var("value_format1"), var("value_format2")],
-                            vec![vvar("set_view")],
-                        ),
+                    "subtable",
+                    match_variant(
+                        var("pos_format"),
+                        [
+                            (
+                                Pattern::U16(1),
+                                "Format1",
+                                pair_pos_format1.call_args_views(vec![], vec![vvar("table_view")]),
+                            ),
+                            (
+                                Pattern::U16(2),
+                                "Format2",
+                                pair_pos_format2.call_args_views(vec![], vec![vvar("table_view")]),
+                            ),
+                            // REVIEW - should this be a permanent hard-failure?
+                            (Pattern::Wildcard, "BadFormat", Format::Fail),
+                        ],
                     ),
                 ),
             ]),
         ),
-    );
-    // TODO - refactor into dep-format or standalone function
-    let pair_pos_format1 = module.define_format_views(
+    )
+}
+
+// SECTION - sub-definitions for PairPos (Lookup type 2)
+
+/// Lookup type 2 subtable: pair adjustment positioning format 1
+fn pair_pos_format1(
+    module: &mut FormatModule,
+    coverage_table: FormatRef,
+    value_format_flags: FormatRef,
+    vf_flags_type: &ValueType,
+    value_record: FormatRef,
+) -> FormatRef {
+    let pair_set = pair_set(module, value_record, vf_flags_type);
+    module.define_format_views(
         "opentype.layout.pair_pos.format1",
         vec![Label::Borrowed("table_view")],
         record_auto([
@@ -192,52 +205,18 @@ pub(crate) fn pair_pos(
                 ),
             ),
         ]),
-    );
-    let class2_record = module.define_format_args_views(
-        "opentype.layout.pair_pos.class2_record",
-        vec![
-            (Label::Borrowed("value_format1"), vf_flags_type.clone()),
-            (Label::Borrowed("value_format2"), vf_flags_type.clone()),
-        ],
-        vec![Label::Borrowed("table_view")],
-        record([
-            (
-                "value_record1",
-                layout::optional_value_record(
-                    value_record,
-                    vvar("table_view"),
-                    var("value_format1"),
-                ),
-            ),
-            (
-                "value_record2",
-                layout::optional_value_record(
-                    value_record,
-                    vvar("table_view"),
-                    var("value_format2"),
-                ),
-            ),
-        ]),
-    );
+    )
+}
 
-    // TODO - refactor into dep-format or standalone function
-    fn class1_record(
-        table_view: ViewExpr,
-        class2_count: Expr,
-        value_format1: Expr,
-        value_format2: Expr,
-        class2_record: FormatRef,
-    ) -> Format {
-        record([(
-            "class2_records",
-            repeat_count(
-                class2_count,
-                class2_record.call_args_views(vec![value_format1, value_format2], vec![table_view]),
-            ),
-        )])
-    }
-    // TODO - refactor into dep-format or standalone function
-    let pair_pos_format2 = module.define_format_views(
+/// Lookup type 2 subtable: pair adjustment positioning format 2
+fn pair_pos_format2(
+    module: &mut FormatModule,
+    class_def: FormatRef,
+    coverage_table: FormatRef,
+    value_format_flags: FormatRef,
+    class2_record: FormatRef,
+) -> FormatRef {
+    module.define_format_views(
         "opentype.layout.pair_pos.format2",
         vec![Label::Borrowed("table_view")],
         record([
@@ -272,37 +251,119 @@ pub(crate) fn pair_pos(
                 ),
             ),
         ]),
-    );
-    module.define_format(
-        "opentype.layout.pair_pos",
+    )
+}
+
+fn pair_value_record(
+    module: &mut FormatModule,
+    value_record: FormatRef,
+    vf_flags_type: &ValueType,
+) -> FormatRef {
+    module.define_format_args_views(
+        "opentype.layout.pair_pos.pair_value_record",
+        vec![
+            (Label::Borrowed("value_format1"), vf_flags_type.clone()),
+            (Label::Borrowed("value_format2"), vf_flags_type.clone()),
+        ],
+        vec![Label::Borrowed("set_view")],
+        record([
+            // NOTE - first glyph id is listed in the Coverage table
+            ("second_glyph", u16be()),
+            (
+                "value_record1",
+                layout::optional_value_record(value_record, vvar("set_view"), var("value_format1")),
+            ),
+            (
+                "value_record2",
+                layout::optional_value_record(value_record, vvar("set_view"), var("value_format2")),
+            ),
+        ]),
+    )
+}
+
+fn pair_set(
+    module: &mut FormatModule,
+    value_record: FormatRef,
+    vf_flags_type: &ValueType,
+) -> FormatRef {
+    let pair_value_record = pair_value_record(module, value_record, vf_flags_type);
+    module.define_format_args(
+        "opentype.layout.pair_pos.pair_set",
+        vec![
+            (Label::Borrowed("value_format1"), vf_flags_type.clone()),
+            (Label::Borrowed("value_format2"), vf_flags_type.clone()),
+        ],
         let_view(
-            "table_view",
+            "set_view",
             record([
-                ("pos_format", u16be()),
+                ("set_scope", reify_view(vvar("set_view"))),
+                ("pair_value_count", u16be()),
                 (
-                    "subtable",
-                    match_variant(
-                        var("pos_format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                pair_pos_format1.call_args_views(vec![], vec![vvar("table_view")]),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                pair_pos_format2.call_args_views(vec![], vec![vvar("table_view")]),
-                            ),
-                            // REVIEW - should this be a permanent hard-failure?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
+                    "pair_value_records",
+                    repeat_count(
+                        var("pair_value_count"),
+                        pair_value_record.call_args_views(
+                            vec![var("value_format1"), var("value_format2")],
+                            vec![vvar("set_view")],
+                        ),
                     ),
                 ),
             ]),
         ),
     )
 }
+
+// TODO - refactor into a dep-format (i.e. `module.register_format_view_args(..)`)
+fn class1_record(
+    table_view: ViewExpr,
+    class2_count: Expr,
+    value_format1: Expr,
+    value_format2: Expr,
+    class2_record: FormatRef,
+) -> Format {
+    record([(
+        "class2_records",
+        repeat_count(
+            class2_count,
+            class2_record.call_args_views(vec![value_format1, value_format2], vec![table_view]),
+        ),
+    )])
+}
+
+fn class2_record(
+    module: &mut FormatModule,
+    value_record: FormatRef,
+    vf_flags_type: ValueType,
+) -> FormatRef {
+    module.define_format_args_views(
+        "opentype.layout.pair_pos.class2_record",
+        vec![
+            (Label::Borrowed("value_format1"), vf_flags_type.clone()),
+            (Label::Borrowed("value_format2"), vf_flags_type.clone()),
+        ],
+        vec![Label::Borrowed("table_view")],
+        record([
+            (
+                "value_record1",
+                layout::optional_value_record(
+                    value_record,
+                    vvar("table_view"),
+                    var("value_format1"),
+                ),
+            ),
+            (
+                "value_record2",
+                layout::optional_value_record(
+                    value_record,
+                    vvar("table_view"),
+                    var("value_format2"),
+                ),
+            ),
+        ]),
+    )
+}
+
+// !SECTION
 
 /// Lookup type 3 subtable: cursive attachment positioning
 ///

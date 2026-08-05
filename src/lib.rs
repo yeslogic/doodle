@@ -767,6 +767,7 @@ impl Expr {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum DynFormat {
+    /// Huffman(lengths, values)
     Huffman(Box<Expr>, Option<Box<Expr>>),
 }
 
@@ -1389,7 +1390,7 @@ impl FormatModule {
             }
             Format::Dynamic(name, dynformat, format) => {
                 match dynformat {
-                    DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
+                    DynFormat::Huffman(lengths_expr, opt_values_expr) => {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) => match &*t {
                                 &ValueType::U8 | &ValueType::U16 => {}
@@ -1403,7 +1404,21 @@ impl FormatModule {
                                 return Err(anyhow!("Huffman: expected Seq, found {other:?}"));
                             }
                         }
-                        // FIXME check opt_values_expr type
+                        if let Some(values_expr) = opt_values_expr {
+                            match values_expr.infer_type(scope)? {
+                                ValueType::Seq(t) => match &*t {
+                                    &ValueType::U8 | &ValueType::U16 => {}
+                                    other => {
+                                        return Err(anyhow!(
+                                            "Huffman: expected U8 or U16, found {other:?}"
+                                        ));
+                                    }
+                                },
+                                other => {
+                                    return Err(anyhow!("Huffman: expected Seq, found {other:?}"));
+                                }
+                            }
+                        }
                     }
                 }
                 let mut child_scope = TypeScope::child(scope);
@@ -1802,8 +1817,9 @@ impl<'a> MatchTreeStep<'a> {
                 let min = *n;
                 let max = *m;
                 if min == max {
-                    // FIXME - this is technically allowable but we don't expect to get here...
-                    unreachable!("RepeatBetween(x, y, ..) precludes x == y");
+                    log::warn!("RepeatBetween({min}, {max}) converted to RepeatCount({min})");
+                    let next1 = Next::RepeatCount(min, *a, next0.clone());
+                    return Self::from_next(module, Rc::new(next1));
                 }
                 if min > 0 {
                     Self::from_mt_format(

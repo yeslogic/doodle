@@ -1,4 +1,5 @@
-use crate::decoder::{Scope, UnknownVarError, Value};
+use crate::decoder::{Scope, Value};
+use crate::error::UnknownVarError;
 use crate::loc_decoder::{LocScope, ParsedValue};
 
 #[derive(Clone, Copy)]

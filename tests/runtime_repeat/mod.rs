@@ -38,22 +38,22 @@ end: u8
 }
 
 /// d#0
-fn Decoder_test_outer(_input: &mut Parser<'_>) -> Result<test_outer, ParseError> {
-Decoder1(_input)
+fn Decoder_test_outer(input: &mut Parser<'_>) -> Result<test_outer, ParseError> {
+Decoder1(input)
 }
 
 /// d#1
-fn Decoder1(_input: &mut Parser<'_>) -> Result<test_outer, ParseError> {
+fn Decoder1(input: &mut Parser<'_>) -> Result<test_outer, ParseError> {
 let pairs = {
 let mut accum = Vec::new();
 for _ in 0..2u32 {
-let next_elem = (Decoder_test_inner(_input))?;
+let next_elem = (Decoder_test_inner(input))?;
 accum.push(next_elem)
 };
 accum
 };
 let end = {
-let b = _input.read_byte()?;
+let b = input.read_byte()?;
 if b == 204 {
 b
 } else {
@@ -64,9 +64,9 @@ PResult::Ok(test_outer { pairs, end })
 }
 
 /// d#2
-fn Decoder_test_inner(_input: &mut Parser<'_>) -> Result<test_inner, ParseError> {
+fn Decoder_test_inner(input: &mut Parser<'_>) -> Result<test_inner, ParseError> {
 let a = {
-let b = _input.read_byte()?;
+let b = input.read_byte()?;
 if b == 170 {
 b
 } else {
@@ -75,11 +75,11 @@ return Err(ParseError::ExcludedBranch(2206609067086327257u64));
 };
 let bs = {
 let mut accum = Vec::new();
-while _input.remaining() > 0 {
+while input.remaining() > 0 {
 let matching_ix = {
-_input.open_peek_context();
+input.open_peek_context();
 {
-let ret = match _input.read_byte()? {
+let ret = match input.read_byte()? {
 187u8 => {
 0
 },
@@ -96,13 +96,13 @@ _ => {
 return Err(ParseError::ExcludedBranch(11876854719037224982u64));
 }
 };
-_input.close_peek_context()?;
+input.close_peek_context()?;
 ret
 }
 };
 if matching_ix == 0 {
 let next_elem = {
-let b = _input.read_byte()?;
+let b = input.read_byte()?;
 if b == 187 {
 b
 } else {
