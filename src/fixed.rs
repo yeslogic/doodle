@@ -4,8 +4,7 @@ use crate::record_fmt::RecordFormat;
 use crate::{BaseKind, CommonOp, Endian, Format, FormatModule, FormatRef, Label, StyleHint};
 use anyhow::{Result as AResult, anyhow};
 
-// REVIEW - currently we are only able to compute the fixed-shape of a `Format` if it is record-shaped and uses raw commonops without any FormatRef indirection calls
-// REVIEW - cases that are unhandled: tuples, formatref calls, bit-flags records, nested fixedformats, variant-wrappers around commmonops
+// REVIEW - cases that are unhandled: bit-flags records, nested fixedformats, unimplemented marker-types (i.e. signed integer-ops)
 
 impl From<BaseKind<Endian>> for SpineElem {
     fn from(kind: BaseKind<Endian>) -> Self {
@@ -216,7 +215,6 @@ mod tests {
         assert!(fields.is_empty());
         assert_eq!(stride, 0);
 
-        // STUB - add more meaningful cases
         let rec = module.define_format(
             "rec",
             record([
@@ -252,6 +250,7 @@ mod tests {
     }
 
     #[test]
+    // NOTE - tuples do not result in ad-hoc type definitions being created, so we cannot spontaneously implement `ReadUnchecked` for them.
     fn analyze_fixed_shape_rejects_tuple() {
         let mut module = FormatModule::new();
         let tup = module.define_format("tup", tuple([u8(), u32be(), u32be()]));

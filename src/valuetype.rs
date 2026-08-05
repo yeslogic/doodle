@@ -104,6 +104,12 @@ impl From<SignedIntType> for NumRep {
     }
 }
 
+/// Hint attached to Sequence-types to indicate how they are constructed.
+///
+/// The ordering of hints is significant, and affects how the type is unified with other types.
+/// In particular, when two sequences are unified, the lesser-valued of the two hints is retained
+/// for the type-outcome. Therefore, if a new hint is added, it should be defined after all hints that
+/// supercede it but before any hints that it itself supercedes.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Serialize)]
 pub enum SeqBorrowHint {
     #[default]
@@ -117,6 +123,8 @@ pub enum SeqBorrowHint {
     ReadArray,
     /// Hint for an implied view (slice) of the buffer-data, e.g. `ViewFormat::CaptureBytes`.
     BufferView,
+    /// Hint generated for empty sequences, that is always dropped in favor of any other SeqBorrowHint, and never fails to unify against them.
+    Empty,
 }
 
 impl SeqBorrowHint {
@@ -133,6 +141,10 @@ impl SeqBorrowHint {
     /// Returns `true` if the hint is [`SeqBorrowHint::ReadArray`].
     pub fn is_read_array(&self) -> bool {
         matches!(self, Self::ReadArray)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
     }
 }
 

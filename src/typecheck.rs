@@ -163,7 +163,7 @@ pub(crate) mod scope {
         /// Will panic if the same identifier is added twice to the same local scope (but not if it is
         /// re-used across layers of scope).
         pub fn push_view(&mut self, name: Label) {
-            // FIXME - the clone cost ought to be avoidable but
+            // NOTE - we can technically avoid this clone, but not without reducing performance or having to over-engineer a bespoke solution
             let _name = name.clone();
             if !self.entries.insert(name) {
                 unreachable!("duplicate parameter identifier in format view-params: {_name}");
@@ -354,6 +354,13 @@ impl UType {
 
     pub fn opt(self: Rc<Self>) -> Self {
         Self::Option(self)
+    }
+
+    /// Constructs a `UType::Seq` specialized when inducing the type-constraints
+    /// on empty sequences, to avoid locking in [`SeqBorrowHint`] choices that
+    /// would cause failures or silent demotions during later unification.
+    pub fn seq_empty(self: Rc<Self>) -> Self {
+        Self::Seq(self, SeqBorrowHint::Empty)
     }
 
     /// Constructs a `UType::Seq` with an elem-type of `self` and a
@@ -1404,6 +1411,9 @@ impl TypeChecker {
         }
     }
 
+    /// Attempt to establish a unification between an existing metavariable and a VarMap Identifier (VMId).
+    ///
+    /// Only meant to be called by [`TypeChecker::add_uvar_variant`] under the contition that `uvar` or its canonical alias is ascribed `Constraints::Indefinite`.
     fn set_uvar_vmid(&mut self, uvar: UVar, vmid: VMId) -> TCResult<()> {
         assert!(
             self.varmaps.as_inner().contains_key(&vmid.0),
@@ -1412,28 +1422,16 @@ impl TypeChecker {
         let constraints = &mut self.constraints[uvar.0];
         match constraints {
             Constraints::Variant(other) => {
-                let old = *other;
-
-                // we only care about old if it is still an extant varmap
-                if let Some(old_vm) = self.varmaps.as_inner().get(&old.0) {
-                    let Some(new_vm) = self.varmaps.as_inner().get(&vmid.0) else {
-                        unreachable!(
-                            "HashMap::get returned None for {vmid} even though assertion on HashMap::contains_key succeeded"
-                        )
-                    };
-                    for key in old_vm.keys() {
-                        // NOTE: this check may be costly so we are gating it for non-release builds
-                        // NOTE: this isn't necessarily enough to validate subset-equivalence of the old and new VarMaps, as we do not check that the values associated with the common keys can unify
-                        debug_assert!(
-                            new_vm.contains_key(key),
-                            "previous varmap {other} of {uvar} has variant {key} but new varmap {vmid} does not"
-                        );
-                    }
+                if other.0 == vmid.0 {
+                    log::error!(
+                        "uvar {uvar} already points to VMId {vmid}; soft error, may be upgrade to panic in future"
+                    );
+                    Ok(())
+                } else {
+                    unreachable!(
+                        "uvar {uvar} already points to VMId {other}; cannot point to VMId {vmid}"
+                    )
                 }
-
-                // REVIEW - does the value of `old` matter here, or do we merely discard it?
-                *other = vmid;
-                Ok(())
             }
             Constraints::Invariant(orig) => Err(TCErrorKind::VarianceMismatch(
                 uvar,
@@ -1719,6 +1717,7 @@ impl TypeChecker {
             (UType::ViewObj, UType::ViewObj) => Ok(left),
             (UType::Seq(e1, h1), UType::Seq(e2, h2)) => {
                 if e1 == e2 {
+                    // NOTE - we rely on the implicit ordering of [`SeqBorrowHint`] to tie-break, always picking the earlier value of the two
                     if h1 <= h2 { Ok(left) } else { Ok(right) }
                 } else {
                     let inner = try_with!( self.unify_utype(e1.clone(), e2.clone()) => "unify_utype@Seq|Seq" );
@@ -1790,6 +1789,7 @@ impl TypeChecker {
             (&UType::Int(it), &UType::Base(bt)) | (&UType::Base(bt), &UType::Int(it)) => {
                 Self::unify_primint_basetype(it.to_prim(), bt)
             }
+            // NOTE - the fact that we return `Var(v)` here becomes crucial for the [`TypeChecker::expand_type`] step, which relies on [`WHNFSolution::coerce`] seeing [`UType::Var`] within the body of a shapeful UType
             (&UType::Var(v), _) => {
                 let constraint = Constraint::Equiv(right.clone());
                 let _tmp = (
@@ -2372,11 +2372,10 @@ impl TypeChecker {
                     let elem_t = self.infer_utype_expr(elem, scope)?;
                     self.unify_var_utype(elem_uvar, elem_t)?;
                 }
-                // FIXME - to allow empty-seq to not clobber views, we use a slight hack here
                 if elems.is_empty() {
                     self.unify_var_utype(
                         seq_uvar,
-                        Rc::new(UType::seq_view(Rc::new(UType::Var(elem_uvar)))),
+                        Rc::new(UType::seq_empty(Rc::new(UType::Var(elem_uvar)))),
                     )?;
                 } else {
                     self.unify_var_utype(
@@ -2470,32 +2469,24 @@ impl TypeChecker {
             Expr::AsU8(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsU16(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsU32(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsU64(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
@@ -3700,7 +3691,8 @@ impl TypeChecker {
                 let addr_var = self.infer_var_expr(addr, ctxt.scope)?;
                 let offs_var = self.infer_var_expr(offs, ctxt.scope)?;
                 self.unify_var_baseset(addr_var, BaseSet::UAny32)?;
-                // REVIEW - addr_var and offs_var only need to be compatible, not identical, but in our current model it is hard to support heterogenous typings
+                self.unify_var_baseset(offs_var, BaseSet::UAny32)?;
+                // REVIEW - without unification below, the current implementation fails to resolve unique solutions for at least one metavariable
                 self.unify_var_pair(addr_var, offs_var)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(newvar, inner_t)?;
@@ -4071,7 +4063,14 @@ impl TypeChecker {
         }
     }
 
-    // NOTE - the implementation here is not the most robust as it relies on every UVar expanding to a WHNF all of whose UTypes are Var.
+    /// Given a `UType`, produces its corresponding [`Expansion`] after one step of unravelling.
+    ///
+    /// # Notes
+    ///
+    /// This method may lead to unexpected panics based on the hidden requirements of [`WHNFSolution::coerce`], which
+    /// does not accept any shapeful UTypes within the body of a shapeful UType (only `Base`, `Int`, and unexpanded `Var`s).
+    ///
+    /// As such, the implem
     fn expand_type(&self, ty: Rc<UType>) -> Expansion {
         match ty.as_ref() {
             UType::Hole => {

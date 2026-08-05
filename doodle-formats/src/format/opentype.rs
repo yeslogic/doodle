@@ -904,9 +904,6 @@ pub(crate) fn table_links(
             // TODO - `CFF2` deferred for reasons of complexity
             // TODO - `VORG` deferred as it collocates with CFF{ ,2}
             // !SECTION
-            // SECTION - SVG Outline
-            // FIXME - `SVG ` postponed due to rarity (15 of 659 tested fonts)
-            // !SECTION
             // SECTION - Bitmap Glyphs
             // FIXME - `EBDT` postponed due to rarity (15 of 659 tested fonts)
             // FIXME - `EBLC` postponed due to rarity (15 of 659 tested fonts)
@@ -1173,7 +1170,7 @@ pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
 
     let ttc_header = {
         // Version 1.0
-        // WIP
+        // TODO - reimplement as DepFormat<0, 1>
         let ttc_header1 = |font_view: ViewExpr| {
             record([
                 ("num_fonts", u32be()),
@@ -1192,7 +1189,7 @@ pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
         };
 
         // Version 2.0
-        // WIP
+        // TODO - reimplement as DepFormat<0, 1>
         let ttc_header2 = |font_view: ViewExpr| {
             record([
                 ("num_fonts", u32be()),
@@ -1330,19 +1327,15 @@ pub(crate) mod table {
         let dep_format = |opt_table_match: Expr| -> Format {
             fmt_match(
                 opt_table_match,
-                [
-                    (
-                        pat_some(bind("matching_table")),
-                        // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
-                        util::parse_view_offset_mandatory(
-                            font_view,
-                            record_proj(var("matching_table"), "offset"),
-                            slice(record_proj(var("matching_table"), "length"), table_format),
-                        ),
+                [(
+                    pat_some(bind("matching_table")),
+                    // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
+                    util::parse_view_offset_mandatory(
+                        font_view,
+                        record_proj(var("matching_table"), "offset"),
+                        slice(record_proj(var("matching_table"), "length"), table_format),
                     ),
-                    // NOTE - the line below is not strictly necessary as an ExcludedBranch catchall will be generate
-                    // (pat_none(), Format::Fail)
-                ],
+                )],
             )
         };
         util::with_table(table_records, id, dep_format)
@@ -1360,26 +1353,22 @@ pub(crate) mod table {
         let dep_format = |opt_table_match: Expr| -> Format {
             fmt_match(
                 opt_table_match,
-                [
-                    (
-                        pat_some(bind("matching_table")),
-                        // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
-                        util::parse_view_offset_mandatory(
-                            font_view,
-                            record_proj(var("matching_table"), "offset"),
-                            fmt_let(
-                                "table_len",
-                                record_proj(var("matching_table"), "length"),
-                                slice(
-                                    var("table_len"),
-                                    table_format_ref.call_args(vec![var("table_len")]),
-                                ),
+                [(
+                    pat_some(bind("matching_table")),
+                    // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
+                    util::parse_view_offset_mandatory(
+                        font_view,
+                        record_proj(var("matching_table"), "offset"),
+                        fmt_let(
+                            "table_len",
+                            record_proj(var("matching_table"), "length"),
+                            slice(
+                                var("table_len"),
+                                table_format_ref.call_args(vec![var("table_len")]),
                             ),
                         ),
                     ),
-                    // NOTE - the line below is not strictly necessary as an ExcludedBranch catchall will be generate
-                    // (pat_none(), Format::Fail)
-                ],
+                )],
             )
         };
         util::with_table(table_records, id, dep_format)

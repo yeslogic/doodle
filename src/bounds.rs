@@ -385,6 +385,15 @@ impl Div<Bounds> for Bounds {
     }
 }
 
+/// Helper for `checked_shl` on Bounds, which returns `None` if `checked_shl` silently overflows.
+fn validated_shl(x: usize, y: u32) -> Option<usize> {
+    if y > 63 || usize::MAX >> y < x {
+        None
+    } else {
+        x.checked_shl(y)
+    }
+}
+
 impl Bounds {
     pub fn checked_shl(self, rhs: Self) -> Option<Self> {
         let min2 = u32::try_from(rhs.min).ok()?;
@@ -392,8 +401,7 @@ impl Bounds {
         let max = match (self.max, rhs.max) {
             (Some(m1), Some(m2)) => {
                 let max2 = u32::try_from(m2).ok()?;
-                // REVIEW - there may be edge-cases here where max2 < 64 but m1 overflows, yielding unexpectedly small values
-                m1.checked_shl(max2)
+                validated_shl(m1, max2)
             }
             _ => None,
         };

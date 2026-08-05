@@ -34,7 +34,7 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
 
 pub fn print_parsed_decoded_value(module: &FormatModule, p_value: &ParsedValue, format: &Format) {
     use std::io::Write;
-    let frag = TreePrinter::new(module).compile_parsed_decoded_value(p_value, format);
+    let frag = TreePrinter::new(module).compile_decoded_parsedvalue(p_value, format);
     let mut lock = io::stdout().lock();
     if let Err(e) = write!(&mut lock, "{frag}") {
         eprintln!("error: {e}");
@@ -57,9 +57,23 @@ pub struct Flags {
     summarize_boolean_record_set_fields: bool,
 }
 
+// TODO - introduce StyleHints to replace these name-based checks
 #[inline]
+/// Specialization predicate for identifying ASCII-character formats based on their registered name
+fn name_is_ascii_char(name: &str) -> bool {
+    name.contains("ascii") && name.contains("char")
+}
+
+#[inline]
+/// Specialization predicate for identifying ASCII-string formats based on their registered name
 fn name_is_ascii_string(name: &str) -> bool {
     name.contains("ascii") && name.contains("string")
+}
+
+#[inline]
+/// Specialization predicate for identifying UTF8-string formats based on their registered name
+fn name_is_utf8_string(name: &str) -> bool {
+    name.contains("utf8") && name.contains("string")
 }
 
 pub struct TreePrinter<'module> {
@@ -214,9 +228,15 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    /// Returns `true` for values that are 'atomic', i.e. cannot be subdivided into sub-values.
+    /// Returns `true` for values that are 'atomic', i.e. cannot be decomposed into sub-values.
     ///
-    /// Non-trivial tuples, records, sequences, and ranges, as well as any shallow embedding thereof,
+    /// Atomic values include:
+    ///
+    /// - `Char`, `Bool`, `U8`, `U16`, `U32`, `U64`, `Usize`, `Numeric`, and `View`
+    /// - empty tuples, records, sequences, and integer-ranges
+    /// - mono-variant wrappings of atomic values
+    ///
+    /// Non-trivial tuples, records, sequences, and integer-ranges, as well as any shallow embedding thereof,
     /// are considered non-atomic.
     fn is_atomic_value(&self, value: &Value, format: Option<&Format>) -> bool {
         if let Some(format) = format {
@@ -235,6 +255,7 @@ impl<'module> TreePrinter<'module> {
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
             Value::EnumFromTo(range) => range.is_empty(), // since this nominally represents a Seq, apply Seq-style logic
+            // FIXME - we may need to check that the `format` being passed in will be appropriately expanded if it could be indirect via FormatRef
             Value::Variant(label, value) => match format {
                 Some(Format::Variant(label2, format)) => {
                     assert_eq!(label, label2);
@@ -305,7 +326,7 @@ impl<'module> TreePrinter<'module> {
 
     /// Generates a fragment that identifies the location of a value within the input buffer,
     /// or as being synthetic.
-    fn compile_location(&self, loc: ParseLoc) -> Fragment {
+    fn compile_location(loc: ParseLoc) -> Fragment {
         match loc {
             ParseLoc::InBuffer { offset, length } => {
                 Fragment::string(format!("BUF({offset}:+{length})"))
@@ -316,33 +337,38 @@ impl<'module> TreePrinter<'module> {
 
     /// Given the Fragment `frag` representing a value, and a location `loc` we wish to attach to it,
     /// generates a fragment that annotates the value-fragment with a fragment identifying the location.
-    fn compile_with_location(&self, frag: Fragment, loc: ParseLoc) -> Fragment {
+    fn compile_with_location(frag: Fragment, loc: ParseLoc) -> Fragment {
         Fragment::intervene(
             frag,
             Fragment::string(" \t"),
-            self.compile_location(loc)
-                .delimit(Fragment::Char('['), Fragment::Char(']')),
+            Self::compile_location(loc).delimit(Fragment::Char('['), Fragment::Char(']')),
         )
     }
 
+    /// Produces the `Fragment` representation of a `ParsedValue`, as a standalone value. Used primarily
+    /// as a fallback when the `Format` of the value does not affect its display-form, when the format
+    /// cannot be fully inferred, or when the `Format`-depenent fragments are being handled separately
+    /// and we want to produce the value-specific component to compose into the final display.
     fn compile_parsed_value(&mut self, value: &ParsedValue) -> Fragment {
         match value {
             ParsedValue::Flat(Parsed { loc, inner }) => {
                 let symbol = match inner {
                     // Non-flat cases listed in order they are handled in the outer match
+                    // REVIEW - whenever any new shapeful variants are added to Value, make sure that they are handled correctly here
                     Value::Tuple(..)
                     | Value::Seq(..)
                     | Value::Record(..)
                     | Value::Variant(..)
                     | Value::Mapped(..)
                     | Value::Branch(..)
-                    | Value::Option(..) => {
+                    | Value::Option(..)
+                    | Value::Permit(..) => {
                         unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}")
                     }
                     // fall-through to all flat cases here
                     value => self.compile_value(value),
                 };
-                self.compile_with_location(symbol, *loc)
+                Self::compile_with_location(symbol, *loc)
             }
             ParsedValue::Tuple(vals) => self.compile_parsed_tuple(vals, None),
             ParsedValue::Seq(vals) => self.compile_parsed_seq(vals, None),
@@ -364,7 +390,7 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_byteset(&self, bs: &ByteSet) -> Fragment {
+    fn compile_byteset(bs: &ByteSet) -> Fragment {
         if bs.is_empty() {
             unreachable!("matches against empty byteset are unsatisfiable")
         } else {
@@ -407,26 +433,39 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    pub fn compile_parsed_decoded_value(&mut self, value: &ParsedValue, fmt: &Format) -> Fragment {
+    /// Generate the proper display-form for a `ParsedValue`, using its original `Format` as a guideline.
+    // TODO - review the naming conventions for this method and the other `loc_decoder` method-variants
+    pub fn compile_decoded_parsedvalue(&mut self, value: &ParsedValue, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
-            Format::Phantom(_) => unreachable!("phantom parses should not appear"),
+            Format::Phantom(_) => {
+                if !matches!(
+                    value,
+                    ParsedValue::Flat(Parsed {
+                        inner: Value::PhantomData,
+                        ..
+                    })
+                ) {
+                    log::error!("expected Flat(PhantomData), found {value:?}");
+                }
+
+                // REVIEW - we used to panic here and it never came up, so we should probably test this a bit more thoroughly
+                self.compile_parsed_value(value)
+            }
             Format::ItemVar(level, _args, _views) => {
                 let fmt_name = self.module.get_name(*level);
 
-                // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
-                if self.flags.pretty_utf8_strings && fmt_name == "text.string.utf8" {
-                    self.compile_parsed_string(value)
+                if self.flags.pretty_utf8_strings && name_is_utf8_string(fmt_name) {
+                    Self::compile_parsed_string(value)
                 } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
-                    self.compile_parsed_ascii_string(value)
-                } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
-                {
+                    Self::compile_parsed_ascii_string(value)
+                } else if self.flags.pretty_ascii_strings && name_is_ascii_char(fmt_name) {
                     frag.append(Fragment::Char('\''));
-                    frag.append(self.compile_parsed_ascii_char(value));
+                    frag.append(Self::compile_parsed_ascii_char(value));
                     frag.append(Fragment::Char('\''));
                     frag
                 } else {
-                    self.compile_parsed_decoded_value(value, self.module.get_format(*level))
+                    self.compile_decoded_parsedvalue(value, self.module.get_format(*level))
                 }
             }
             Format::Fail => panic!("uninhabited format (value={value:?}"),
@@ -435,10 +474,8 @@ impl<'module> TreePrinter<'module> {
             Format::Byte(_) => self.compile_parsed_value(value),
             // NOTE : Pos self-documents its position so we don't really need to annotate that...
             Format::Pos => self.compile_value(value.into_cow_value().as_ref()),
-            Format::DecodeBytes(_bytes, format) => self.compile_parsed_decoded_value(value, format),
-            Format::ParseFromView(_view, format) => {
-                self.compile_parsed_decoded_value(value, format)
-            }
+            Format::DecodeBytes(_bytes, format) => self.compile_decoded_parsedvalue(value, format),
+            Format::ParseFromView(_view, format) => self.compile_decoded_parsedvalue(value, format),
             Format::Variant(label, format) => match value {
                 ParsedValue::Variant(label2, value) => {
                     if label == label2 {
@@ -452,14 +489,14 @@ impl<'module> TreePrinter<'module> {
             Format::Union(branches) | Format::UnionNondet(branches) => match value {
                 ParsedValue::Branch(n, value) => {
                     let format = &branches[*n];
-                    self.compile_parsed_decoded_value(value, format)
+                    self.compile_decoded_parsedvalue(value, format)
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
             Format::Tuple(formats) => match value {
                 ParsedValue::Tuple(parsed_tuple) => {
                     if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
-                        self.compile_parsed_ascii_seq(parsed_tuple)
+                        Self::compile_parsed_ascii_seq(parsed_tuple)
                     } else {
                         self.compile_parsed_tuple(parsed_tuple, Some(formats))
                     }
@@ -469,7 +506,7 @@ impl<'module> TreePrinter<'module> {
             Format::Sequence(formats) => match value {
                 ParsedValue::Seq(parsed_seq) => {
                     if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
-                        self.compile_parsed_ascii_seq(parsed_seq)
+                        Self::compile_parsed_ascii_seq(parsed_seq)
                     } else {
                         self.compile_parsed_seq_formats(parsed_seq, Some(formats.as_slice()))
                     }
@@ -491,7 +528,7 @@ impl<'module> TreePrinter<'module> {
                     } else if self.flags.pretty_ascii_strings
                         && format.is_ascii_char_format(self.module)
                     {
-                        self.compile_parsed_ascii_seq(values)
+                        Self::compile_parsed_ascii_seq(values)
                     } else {
                         self.compile_parsed_seq(values, Some(format))
                     }
@@ -511,18 +548,16 @@ impl<'module> TreePrinter<'module> {
                                 } else if self.flags.pretty_ascii_strings
                                     && format.is_ascii_char_format(self.module)
                                 {
-                                    self.compile_parsed_ascii_seq(values)
+                                    Self::compile_parsed_ascii_seq(values)
                                 } else {
                                     self.compile_parsed_seq(values, Some(format))
                                 }
                             }
                             _ => panic!("expected sequence, found {vs:?}"),
                         };
+
                         // FIXME - this will probably break often, so adjust as necessary
-                        frag.append(accum);
-                        frag.append(Fragment::string(", "));
-                        frag.append(vs);
-                        frag.delimit(Fragment::Char('('), Fragment::Char(')'))
+                        self.compile_impromptu_pair(accum, vs)
                     }
                     _ => panic!("expected 2-tuple, found {values:#?}"),
                 },
@@ -548,12 +583,12 @@ impl<'module> TreePrinter<'module> {
                 },
                 _ => panic!("expected Option, found {value:?}"),
             },
-            Format::Peek(format) => self.compile_parsed_decoded_value(value, format),
+            Format::Peek(format) => self.compile_decoded_parsedvalue(value, format),
             Format::PeekNot(_format) => self.compile_parsed_value(value),
-            Format::Slice(_, format) => self.compile_parsed_decoded_value(value, format),
-            Format::Bits(format) => self.compile_parsed_decoded_value(value, format),
+            Format::Slice(_, format) => self.compile_decoded_parsedvalue(value, format),
+            Format::Bits(format) => self.compile_decoded_parsedvalue(value, format),
             Format::WithRelativeOffset(_, _, format) => {
-                self.compile_parsed_decoded_value(value, format)
+                self.compile_decoded_parsedvalue(value, format)
             }
             Format::Map(format, _expr) => {
                 if self.flags.collapse_mapped_values {
@@ -561,34 +596,34 @@ impl<'module> TreePrinter<'module> {
                 } else {
                     match value {
                         ParsedValue::Mapped(orig, _value) => {
-                            self.compile_parsed_decoded_value(orig, format)
+                            self.compile_decoded_parsedvalue(orig, format)
                         }
                         _ => panic!("expected mapped value, found {value:?}"),
                     }
                 }
             }
-            Format::Where(format, _expr) => self.compile_parsed_decoded_value(value, format),
+            Format::Where(format, _expr) => self.compile_decoded_parsedvalue(value, format),
             Format::Compute(_expr) => self.compile_parsed_value(value),
-            Format::Let(_name, _expr, format) => self.compile_parsed_decoded_value(value, format),
-            Format::LetView(_name, format) => self.compile_parsed_decoded_value(value, format),
+            Format::Let(_name, _expr, format) => self.compile_decoded_parsedvalue(value, format),
+            Format::LetView(_name, format) => self.compile_decoded_parsedvalue(value, format),
             Format::Match(_head, branches) => match value {
                 ParsedValue::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
-                    frag.append(self.compile_parsed_decoded_value(value, format));
+                    frag.append(self.compile_decoded_parsedvalue(value, format));
                     frag
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
             Format::Dynamic(_name, _dynformat, format) => {
-                self.compile_parsed_decoded_value(value, format)
+                self.compile_decoded_parsedvalue(value, format)
             }
             Format::Apply(_) => self.compile_parsed_value(value),
-            Format::LetFormat(_f0, _name, f) => self.compile_parsed_decoded_value(value, f),
-            Format::MonadSeq(_f0, f) => self.compile_parsed_decoded_value(value, f),
-            Format::Hint(_hint, f) => self.compile_parsed_decoded_value(value, f),
+            Format::LetFormat(_f0, _name, f) => self.compile_decoded_parsedvalue(value, f),
+            Format::MonadSeq(_f0, f) => self.compile_decoded_parsedvalue(value, f),
+            Format::Hint(_hint, f) => self.compile_decoded_parsedvalue(value, f),
             Format::Permit(f, _e) => match value {
                 ParsedValue::Permit(res) => match res {
-                    Ok(v) => self.compile_parsed_decoded_value(v, f),
+                    Ok(v) => self.compile_decoded_parsedvalue(v, f),
                     Err(e) => self.compile_parsed_permit_err(e),
                 },
                 _ => panic!("expected Value::Permit, found {value:?}"),
@@ -600,22 +635,30 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    /// Generates a pretty-printed `Fragment` representing a decoded value, using the original `Format`
+    /// as a guide.
     pub fn compile_decoded_value(&mut self, value: &Value, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
-            Format::Phantom(_) => panic!("phantom parses should not appear"),
+            Format::Phantom(_) => {
+                if !matches!(value, Value::PhantomData) {
+                    log::error!("expected PhantomData, found {value:?}");
+                }
+                // REVIEW - we used to panic here, so we ought to make sure things work properly with this change in place
+                self.compile_value(value)
+            }
             Format::ItemVar(level, _args, _views) => {
                 let fmt_name = self.module.get_name(*level);
 
                 // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
                 if self.flags.pretty_utf8_strings && fmt_name == "text.string.utf8" {
-                    self.compile_string(value)
+                    Self::compile_string(value)
                 } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
-                    self.compile_ascii_string(value)
+                    Self::compile_ascii_string(value)
                 } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
                     frag.append(Fragment::Char('\''));
-                    frag.append(self.compile_ascii_char(value));
+                    frag.append(Self::compile_ascii_char(value));
                     frag.append(Fragment::Char('\''));
                     frag
                 } else {
@@ -649,7 +692,7 @@ impl<'module> TreePrinter<'module> {
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
                     if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
-                        self.compile_ascii_seq(values)
+                        Self::compile_ascii_seq(values)
                     } else {
                         self.compile_tuple(values, Some(formats))
                     }
@@ -659,7 +702,7 @@ impl<'module> TreePrinter<'module> {
             Format::Sequence(formats) => match value {
                 Value::Seq(values) => {
                     if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
-                        self.compile_ascii_seq(values)
+                        Self::compile_ascii_seq(values)
                     } else {
                         self.compile_seq_formats(values, Some(formats.as_slice()))
                     }
@@ -684,14 +727,14 @@ impl<'module> TreePrinter<'module> {
             },
             Format::Hint(StyleHint::AsciiStr, str_format) => {
                 if self.flags.pretty_ascii_strings {
-                    self.compile_ascii_string(value)
+                    Self::compile_ascii_string(value)
                 } else {
                     self.compile_decoded_value(value, str_format)
                 }
             }
             Format::Hint(StyleHint::AsciiChar, char_format) => {
                 if self.flags.pretty_ascii_strings {
-                    self.compile_ascii_char(value)
+                    Self::compile_ascii_char(value)
                 } else {
                     self.compile_decoded_value(value, char_format)
                 }
@@ -724,7 +767,7 @@ impl<'module> TreePrinter<'module> {
                     } else if self.flags.pretty_ascii_strings
                         && format.is_ascii_char_format(self.module)
                     {
-                        self.compile_ascii_seq(values)
+                        Self::compile_ascii_seq(values)
                     } else {
                         self.compile_seq(values, Some(format))
                     }
@@ -744,7 +787,7 @@ impl<'module> TreePrinter<'module> {
                                 } else if self.flags.pretty_ascii_strings
                                     && format.is_ascii_char_format(self.module)
                                 {
-                                    self.compile_ascii_seq(values)
+                                    Self::compile_ascii_seq(values)
                                 } else {
                                     self.compile_seq(values, Some(format))
                                 }
@@ -850,17 +893,16 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn extract_string_field<'a, T>(&self, fields: &'a [Field<T>]) -> Option<&'a T> {
+    fn extract_string_field<'a, T>(fields: &'a [Field<T>]) -> Option<&'a T> {
         fields
             .iter()
             .find_map(|(label, value)| (label == "string").then_some(value))
     }
 
-    pub fn compile_parsed_string(&self, value: &ParsedValue) -> Fragment {
+    pub fn compile_parsed_string(value: &ParsedValue) -> Fragment {
         let vs = match value.coerce_mapped_value() {
             ParsedValue::Record(fields) => {
-                match self
-                    .extract_string_field(fields.inner.as_slice())
+                match Self::extract_string_field(fields.inner.as_slice())
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
                     ParsedValue::Seq(vs) => vs,
@@ -870,15 +912,14 @@ impl<'module> TreePrinter<'module> {
             ParsedValue::Seq(vs) => vs,
             v => panic!("expected record or sequence, found {v:?}"),
         };
-        self.compile_parsed_char_seq(vs)
+        Self::compile_parsed_char_seq(vs)
     }
 
-    pub fn compile_string(&self, value: &Value) -> Fragment {
+    pub fn compile_string(value: &Value) -> Fragment {
         // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
         let vs = match value.coerce_mapped_value() {
             Value::Record(fields) => {
-                match self
-                    .extract_string_field(fields)
+                match Self::extract_string_field(fields)
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
                     Value::Seq(vs) => vs,
@@ -888,14 +929,13 @@ impl<'module> TreePrinter<'module> {
             Value::Seq(vs) => vs,
             v => panic!("expected record or sequence, found {v}"),
         };
-        self.compile_char_seq(vs)
+        Self::compile_char_seq(vs)
     }
 
-    pub fn compile_parsed_ascii_string(&self, value: &ParsedValue) -> Fragment {
+    pub fn compile_parsed_ascii_string(value: &ParsedValue) -> Fragment {
         let vs = match value.coerce_mapped_value() {
             ParsedValue::Record(fields) => {
-                match self
-                    .extract_string_field(fields.get_inner())
+                match Self::extract_string_field(fields.get_inner())
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
                     ParsedValue::Seq(vs) => vs,
@@ -905,15 +945,14 @@ impl<'module> TreePrinter<'module> {
             ParsedValue::Seq(vs) => vs,
             _ => panic!("expected record value, found {value:?}"),
         };
-        self.compile_parsed_ascii_seq(vs)
+        Self::compile_parsed_ascii_seq(vs)
     }
 
-    pub fn compile_ascii_string(&self, value: &Value) -> Fragment {
+    pub fn compile_ascii_string(value: &Value) -> Fragment {
         // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
         let vs = match value.coerce_mapped_value() {
             Value::Record(fields) => {
-                match self
-                    .extract_string_field(fields)
+                match Self::extract_string_field(fields)
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
                     Value::Seq(vs) => vs,
@@ -923,20 +962,20 @@ impl<'module> TreePrinter<'module> {
             Value::Seq(vs) => vs,
             _ => panic!("expected record value, found {value}"),
         };
-        self.compile_ascii_seq(vs)
+        Self::compile_ascii_seq(vs)
     }
 
-    fn compile_parsed_char_seq(&self, vals: &Parsed<SeqKind<ParsedValue>>) -> Fragment {
+    fn compile_parsed_char_seq(vals: &Parsed<SeqKind<ParsedValue>>) -> Fragment {
         let mut frag = Fragment::new();
         frag.append(Fragment::Char('"'));
         for v in vals.inner.iter() {
-            frag.append(self.compile_parsed_char(v));
+            frag.append(Self::compile_parsed_char(v));
         }
         frag.append(Fragment::Char('"'));
-        self.compile_with_location(frag.group(), vals.loc)
+        Self::compile_with_location(frag.group(), vals.loc)
     }
 
-    fn compile_char_seq<'a, S>(&self, vals: &'a S) -> Fragment
+    fn compile_char_seq<'a, S>(vals: &'a S) -> Fragment
     where
         S: Clone,
         &'a S: IntoIterator<Item = &'a Value>,
@@ -944,13 +983,13 @@ impl<'module> TreePrinter<'module> {
         let mut frag = Fragment::new();
         frag.append(Fragment::Char('"'));
         for v in vals {
-            frag.append(self.compile_char(v));
+            frag.append(Self::compile_char(v));
         }
         frag.append(Fragment::Char('"'));
         frag.group()
     }
 
-    fn compile_parsed_ascii_seq<'a, S>(&self, vals: &'a Parsed<S>) -> Fragment
+    fn compile_parsed_ascii_seq<'a, S>(vals: &'a Parsed<S>) -> Fragment
     where
         &'a S: IntoIterator<Item = &'a ParsedValue>,
         S: Clone,
@@ -958,13 +997,13 @@ impl<'module> TreePrinter<'module> {
         let mut frag = Fragment::new();
         frag.append(Fragment::Char('"'));
         for v in &vals.inner {
-            frag.append(self.compile_parsed_ascii_char(v));
+            frag.append(Self::compile_parsed_ascii_char(v));
         }
         frag.append(Fragment::Char('"'));
-        self.compile_with_location(frag.group(), vals.loc)
+        Self::compile_with_location(frag.group(), vals.loc)
     }
 
-    fn compile_ascii_seq<'a, S>(&self, vals: &'a S) -> Fragment
+    fn compile_ascii_seq<'a, S>(vals: &'a S) -> Fragment
     where
         S: Clone,
         &'a S: IntoIterator<Item = &'a Value>,
@@ -972,13 +1011,13 @@ impl<'module> TreePrinter<'module> {
         let mut frag = Fragment::new();
         frag.append(Fragment::Char('"'));
         for v in vals {
-            frag.append(self.compile_ascii_char(v));
+            frag.append(Self::compile_ascii_char(v));
         }
         frag.append(Fragment::Char('"'));
         frag.group()
     }
 
-    fn compile_parsed_char(&self, v: &ParsedValue) -> Fragment {
+    fn compile_parsed_char(v: &ParsedValue) -> Fragment {
         let c = match v.coerce_mapped_value() {
             ParsedValue::Flat(Parsed { inner, .. }) => match inner {
                 Value::U8(b) => *b as char,
@@ -993,7 +1032,7 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_char(&self, v: &Value) -> Fragment {
+    fn compile_char(v: &Value) -> Fragment {
         // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
         let c = match v.coerce_mapped_value() {
             Value::U8(b) => *b as char,
@@ -1006,7 +1045,7 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_parsed_ascii_char(&self, v: &ParsedValue) -> Fragment {
+    fn compile_parsed_ascii_char(v: &ParsedValue) -> Fragment {
         let (_loc, b) = match v {
             ParsedValue::Flat(Parsed {
                 loc,
@@ -1026,7 +1065,7 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_ascii_char(&self, v: &Value) -> Fragment {
+    fn compile_ascii_char(v: &Value) -> Fragment {
         let b = match v {
             Value::U8(b) => *b,
             _ => panic!("expected U8 value, found {v}"),
@@ -1318,8 +1357,7 @@ impl<'module> TreePrinter<'module> {
             frag.enclose()
                 .append(Fragment::string(" \t"))
                 .append(
-                    self.compile_location(*loc)
-                        .delimit(Fragment::Char('['), Fragment::Char(']')),
+                    Self::compile_location(*loc).delimit(Fragment::Char('['), Fragment::Char(']')),
                 )
                 .append_break();
             frag = frags.renew();
@@ -1409,7 +1447,7 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_parsed_bool_flags(&mut self, value_fields: &[FieldPValue]) -> Fragment {
+    fn compile_parsed_bool_flags(&self, value_fields: &[FieldPValue]) -> Fragment {
         let mut set_fields = Vec::with_capacity(value_fields.len());
 
         for (label, value) in value_fields {
@@ -1468,7 +1506,7 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_bool_flags(&mut self, value_fields: &[FieldValue]) -> Fragment {
+    fn compile_bool_flags(&self, value_fields: &[FieldValue]) -> Fragment {
         let mut set_fields = Vec::with_capacity(value_fields.len());
 
         for (label, value) in value_fields {
@@ -1497,7 +1535,7 @@ impl<'module> TreePrinter<'module> {
             let mut frag = Fragment::new();
             frag.append(Fragment::String(format!("{{ {label} := ").into()));
             if let Some(format) = format {
-                frag.append(self.compile_parsed_decoded_value(value, format));
+                frag.append(self.compile_decoded_parsedvalue(value, format));
             } else {
                 frag.append(self.compile_parsed_value(value));
             }
@@ -1509,6 +1547,9 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    /// Compiles the display-fragment form of [`Value`]s parsed according to [`Format::Variant(label, format)`](crate::Format::Variant).
+    ///
+    /// `format`, if it is provided, is the inner format
     fn compile_variant(&mut self, label: &str, value: &Value, format: Option<&Format>) -> Fragment {
         if self.flags.omit_implied_values
             && format.is_some_and(|format| self.is_implied_value_format(format))
@@ -1541,13 +1582,17 @@ impl<'module> TreePrinter<'module> {
         frags.finalize()
     }
 
-    fn is_indirect_format(&self, format: &Format) -> bool {
+    /// Returns true if `format` is 'indirect'
+    fn is_indirect_format(format: &Format) -> bool {
         matches!(
             format,
+            // FIXME - determine whether any of the cases that are not explicitly listed below *ought* to be considered indirect
             Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..)
         )
     }
 
+    /// Alternate version of [`Self::compile_field_value_continue`] for the `loc_decoder`/`ParsedValue` path.
+    // TODO: figure out if there is any way to reduce the code-duplication between this and [`Self::compile_field_value_continue`]
     fn compile_parsed_field_value_continue(
         &mut self,
         label: impl fmt::Display,
@@ -1567,19 +1612,21 @@ impl<'module> TreePrinter<'module> {
         self.gutter.pop();
 
         if let Some(format) = format {
-            if format_needed
-                || self.flags.show_redundant_formats
-                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
-            {
+            if format_needed || self.should_interject_format(format, &frag_value) {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
             }
         }
-        // let tagged = self.compile_with_location(frag_value, value.get_loc());
+        // let tagged = Self::compile_with_location(frag_value, value.get_loc());
         frags.push(frag_value);
         frags.finalize().group()
     }
 
+    /// Produces the per-field display of the value (with accompanying format hint) for any non-final field of a record-like format being displayed.
+    ///
+    /// When `format_needed` is set to `true`, the format will always be displayed if provided.
+    ///
+    /// Otherwise, the display of `format` may be selectively omitted according to the internal flags of `self` or on more complex pretty-printing heuristics.
     fn compile_field_value_continue(
         &mut self,
         label: impl fmt::Display,
@@ -1599,10 +1646,7 @@ impl<'module> TreePrinter<'module> {
         self.gutter.pop();
 
         if let Some(format) = format {
-            if format_needed
-                || self.flags.show_redundant_formats
-                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
-            {
+            if format_needed || self.should_interject_format(format, &frag_value) {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
             }
@@ -1611,6 +1655,7 @@ impl<'module> TreePrinter<'module> {
         frags.finalize().group()
     }
 
+    // TODO: figure out if there is any way to reduce the code-duplication between this and [`Self::compile_field_value_last`]
     fn compile_parsed_field_value_last(
         &mut self,
         label: impl fmt::Display,
@@ -1630,15 +1675,12 @@ impl<'module> TreePrinter<'module> {
         self.gutter.pop();
 
         if let Some(format) = format {
-            if format_needed
-                || self.flags.show_redundant_formats
-                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
-            {
+            if format_needed || self.should_interject_format(format, &frag_value) {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Default::default()));
             }
         }
-        // let tagged = self.compile_with_location(frag_value, value.get_loc());
+        // let tagged = Self::compile_with_location(frag_value, value.get_loc());
         frags.push(frag_value);
         frags.finalize().group()
     }
@@ -1664,7 +1706,7 @@ impl<'module> TreePrinter<'module> {
         if let Some(format) = format {
             if format_needed
                 || self.flags.show_redundant_formats
-                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
+                || (Self::is_indirect_format(format) && !frag_value.is_single_line(true))
             {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Default::default()));
@@ -1684,17 +1726,17 @@ impl<'module> TreePrinter<'module> {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
                     Fragment::cat(
                         Fragment::string(" \t"),
-                        self.compile_location(value.get_loc())
+                        Self::compile_location(value.get_loc())
                             .delimit(Fragment::Char('['), Fragment::Char(']')),
                     )
                     .cat_break()
                 } else {
                     Fragment::join_with_wsp_eol(
                         Fragment::String(" :=".into()),
-                        self.compile_parsed_decoded_value(value, format),
+                        self.compile_decoded_parsedvalue(value, format),
                         Fragment::cat(
                             Fragment::string(" \t"),
-                            self.compile_location(value.get_loc())
+                            Self::compile_location(value.get_loc())
                                 .delimit(Fragment::Char('['), Fragment::Char(']')),
                         ),
                     )
@@ -1706,7 +1748,7 @@ impl<'module> TreePrinter<'module> {
                 self.compile_parsed_value(value),
                 Fragment::cat(
                     Fragment::string(" \t"),
-                    self.compile_location(value.get_loc())
+                    Self::compile_location(value.get_loc())
                         .delimit(Fragment::Char('['), Fragment::Char(']')),
                 ),
             )
@@ -1734,29 +1776,33 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_field_skipped(&mut self) -> Fragment {
+    fn compile_field_skipped(&self) -> Fragment {
         self.compile_gutter()
             .cat(Fragment::String("~\n".into()))
             .group()
     }
+}
 
+impl<'module> TreePrinter<'module> {
+    /// Renders a binary operator applied to two `Expr` terms, each rendered according to a provided [`Precedence`].
     fn binary_op(
-        &mut self,
         op: &'static str,
         lhs: &Expr,
         rhs: &Expr,
         lhs_prec: Precedence,
         rhs_prec: Precedence,
     ) -> Fragment {
-        self.compile_expr(lhs, lhs_prec)
-            .cat(Fragment::String(op.into()))
-            .cat(self.compile_expr(rhs, rhs_prec))
-            .group()
+        Fragment::intervene(
+            Self::compile_expr(lhs, lhs_prec),
+            Fragment::string(op),
+            Self::compile_expr(rhs, rhs_prec),
+        )
+        .group()
     }
 
     /// Renders an Expr as a prefix-operator (with optional auxiliary arguments in parentheses)
     /// applied to a nested Expr.
-    fn prefix_op(&mut self, op: &'static str, args: Option<&[&Expr]>, operand: &Expr) -> Fragment {
+    fn prefix_op(op: &'static str, args: Option<&[&Expr]>, operand: &Expr) -> Fragment {
         let mut frags = FragmentBuilder::new();
 
         frags.push(Fragment::String(op.into()));
@@ -1767,18 +1813,22 @@ impl<'module> TreePrinter<'module> {
                 frag.append(Fragment::Char('('));
                 frag.append(Fragment::seq(
                     args.iter()
-                        .map(|arg| self.compile_expr(arg, Precedence::default()))
+                        .map(|arg| Self::compile_expr(arg, Precedence::default()))
                         .collect::<Vec<_>>(),
                     Some(Fragment::String(", ".into())),
                 ));
                 frag.append(Fragment::Char(')'));
             }
         }
-        frags.push(self.compile_expr(operand, Precedence::ATOM));
+        frags.push(Self::compile_expr(operand, Precedence::ATOM));
         frags.finalize_with_sep(Fragment::Char(' '))
     }
 
-    // NOTE - currently used only for `Expr::Destructure, otherwise patterns are not shown`.
+    /// Helper for [`Expr::Destructure`] that generates a fragment for the enclosed pattern.
+    ///
+    /// # Panics
+    ///
+    /// Panics for any patterns that are not legal in a `Destructure` expression (i.e. constant primitive literals).
     fn compile_pattern(pat: &Pattern) -> Fragment {
         match pat {
             Pattern::Binding(name) => Fragment::String(name.clone()),
@@ -1802,9 +1852,7 @@ impl<'module> TreePrinter<'module> {
             .delimit(Fragment::Char('['), Fragment::Char(']'))
             .group(),
             Pattern::Variant(name, pat) => Fragment::String(name.clone())
-                .cat(Fragment::Char('('))
-                .cat(Self::compile_pattern(pat))
-                .cat(Fragment::Char(')'))
+                .cat(Self::compile_pattern(pat).delimit(Fragment::Char('('), Fragment::Char(')')))
                 .group(),
             Pattern::Int(..)
             | Pattern::ZConst(..)
@@ -1818,11 +1866,11 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_expr(&mut self, expr: &Expr, prec: Precedence) -> Fragment {
+    fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
         match expr {
             Expr::Match(head, _) => cond_paren(
                 Fragment::String("match ".into())
-                    .cat(self.compile_expr(head, Precedence::MATCH))
+                    .cat(Self::compile_expr(head, Precedence::MATCH))
                     .cat(Fragment::String(" { ... }".into()))
                     .group(),
                 prec,
@@ -1833,9 +1881,9 @@ impl<'module> TreePrinter<'module> {
                     .cat(Fragment::Char('['))
                     .cat(Self::compile_pattern(pat))
                     .cat(Fragment::String(" = ".into()))
-                    .cat(self.compile_expr(head, Precedence::TOP))
+                    .cat(Self::compile_expr(head, Precedence::TOP))
                     .cat(Fragment::string("] "))
-                    .cat(self.compile_expr(expr, prec)),
+                    .cat(Self::compile_expr(expr, prec)),
                 prec,
                 // REVIEW - does this need its own precedence level?
                 Precedence::MATCH,
@@ -1843,88 +1891,88 @@ impl<'module> TreePrinter<'module> {
             Expr::Lambda(name, expr) => cond_paren(
                 Fragment::String(name.clone())
                     .cat(Fragment::String(" -> ".into()))
-                    .cat(self.compile_expr(expr, Precedence::ARROW))
+                    .cat(Self::compile_expr(expr, Precedence::ARROW))
                     .group(),
                 prec,
                 Precedence::ARROW,
             ),
             Expr::IntRel(IntRel::Eq, lhs, rhs) => cond_paren(
-                self.binary_op(" == ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
+                Self::binary_op(" == ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Ne, lhs, rhs) => cond_paren(
-                self.binary_op(" != ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
+                Self::binary_op(" != ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Lt, lhs, rhs) => cond_paren(
-                self.binary_op(" < ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                Self::binary_op(" < ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Gt, lhs, rhs) => cond_paren(
-                self.binary_op(" > ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                Self::binary_op(" > ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Lte, lhs, rhs) => cond_paren(
-                self.binary_op(" <= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                Self::binary_op(" <= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Gte, lhs, rhs) => cond_paren(
-                self.binary_op(" >= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                Self::binary_op(" >= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::Arith(Arith::Add, lhs, rhs) => cond_paren(
-                self.binary_op(" + ", lhs, rhs, Precedence::ADD_SUB, Precedence::ADD_SUB),
+                Self::binary_op(" + ", lhs, rhs, Precedence::ADD_SUB, Precedence::ADD_SUB),
                 prec,
                 Precedence::ADD_SUB,
             ),
             Expr::Arith(Arith::Sub, lhs, rhs) => cond_paren(
-                self.binary_op(" - ", lhs, rhs, Precedence::ADD_SUB, Precedence::ADD_SUB),
+                Self::binary_op(" - ", lhs, rhs, Precedence::ADD_SUB, Precedence::ADD_SUB),
                 prec,
                 Precedence::ADD_SUB,
             ),
             Expr::Arith(Arith::Mul, lhs, rhs) => cond_paren(
-                self.binary_op(" * ", lhs, rhs, Precedence::MUL, Precedence::MUL),
+                Self::binary_op(" * ", lhs, rhs, Precedence::MUL, Precedence::MUL),
                 prec,
                 Precedence::MUL,
             ),
             Expr::Arith(Arith::Div, lhs, rhs) => cond_paren(
-                self.binary_op(" / ", lhs, rhs, Precedence::DIV_REM, Precedence::DIV_REM),
+                Self::binary_op(" / ", lhs, rhs, Precedence::DIV_REM, Precedence::DIV_REM),
                 prec,
                 Precedence::DIV_REM,
             ),
             Expr::Arith(Arith::Rem, lhs, rhs) => cond_paren(
-                self.binary_op(" % ", lhs, rhs, Precedence::DIV_REM, Precedence::DIV_REM),
+                Self::binary_op(" % ", lhs, rhs, Precedence::DIV_REM, Precedence::DIV_REM),
                 prec,
                 Precedence::DIV_REM,
             ),
             Expr::Arith(Arith::BitAnd, lhs, rhs) => cond_paren(
-                self.binary_op(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                Self::binary_op(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
                 prec,
                 Precedence::BITAND,
             ),
             Expr::Arith(Arith::BitOr, lhs, rhs) => cond_paren(
-                self.binary_op(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                Self::binary_op(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
                 prec,
                 Precedence::BITOR,
             ),
             Expr::Arith(Arith::BoolAnd, lhs, rhs) => cond_paren(
-                self.binary_op(" && ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                Self::binary_op(" && ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
                 prec,
                 Precedence::LOGICAL_AND,
             ),
             Expr::Arith(Arith::BoolOr, lhs, rhs) => cond_paren(
-                self.binary_op(" || ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                Self::binary_op(" || ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
                 prec,
                 Precedence::LOGICAL_OR,
             ),
             Expr::Arith(Arith::Shl, lhs, rhs) => cond_paren(
-                self.binary_op(
+                Self::binary_op(
                     " << ",
                     lhs,
                     rhs,
@@ -1935,7 +1983,7 @@ impl<'module> TreePrinter<'module> {
                 Precedence::BIT_SHIFT,
             ),
             Expr::Arith(Arith::Shr, lhs, rhs) => cond_paren(
-                self.binary_op(
+                Self::binary_op(
                     " >> ",
                     lhs,
                     rhs,
@@ -1946,117 +1994,117 @@ impl<'module> TreePrinter<'module> {
                 Precedence::BIT_SHIFT,
             ),
             Expr::Append(lhs, rhs) => cond_paren(
-                self.binary_op(" ++ ", lhs, rhs, Precedence::APPEND, Precedence::APPEND),
+                Self::binary_op(" ++ ", lhs, rhs, Precedence::APPEND, Precedence::APPEND),
                 prec,
                 Precedence::APPEND,
             ),
             Expr::Unary(UnaryOp::BoolNot, expr) => cond_paren(
-                self.prefix_op("!", None, expr),
+                Self::prefix_op("!", None, expr),
                 prec,
                 Precedence::LOGICAL_NEGATE,
             ),
             Expr::Unary(UnaryOp::IntPred, expr) => cond_paren(
-                self.prefix_op("pred", None, expr),
+                Self::prefix_op("pred", None, expr),
                 prec,
                 Precedence::NUMERIC_PREFIX,
             ),
             Expr::Unary(UnaryOp::IntSucc, expr) => cond_paren(
-                self.prefix_op("succ", None, expr),
+                Self::prefix_op("succ", None, expr),
                 prec,
                 Precedence::NUMERIC_PREFIX,
             ),
             Expr::AsU8(expr) => cond_paren(
-                self.prefix_op("as-u8", None, expr),
+                Self::prefix_op("as-u8", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsU16(expr) => cond_paren(
-                self.prefix_op("as-u16", None, expr),
+                Self::prefix_op("as-u16", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsU32(expr) => cond_paren(
-                self.prefix_op("as-u32", None, expr),
+                Self::prefix_op("as-u32", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsU64(expr) => cond_paren(
-                self.prefix_op("as-u64", None, expr),
+                Self::prefix_op("as-u64", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsChar(expr) => cond_paren(
-                self.prefix_op("as-char", None, expr),
+                Self::prefix_op("as-char", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U16Be(bytes) => cond_paren(
-                self.prefix_op("u16be", None, bytes),
+                Self::prefix_op("u16be", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U16Le(bytes) => cond_paren(
-                self.prefix_op("u16le", None, bytes),
+                Self::prefix_op("u16le", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U32Be(bytes) => cond_paren(
-                self.prefix_op("u32be", None, bytes),
+                Self::prefix_op("u32be", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U32Le(bytes) => cond_paren(
-                self.prefix_op("u32le", None, bytes),
+                Self::prefix_op("u32le", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U64Be(bytes) => cond_paren(
-                self.prefix_op("u64be", None, bytes),
+                Self::prefix_op("u64be", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U64Le(bytes) => cond_paren(
-                self.prefix_op("u64le", None, bytes),
+                Self::prefix_op("u64le", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::SeqLength(seq) => cond_paren(
-                self.prefix_op("seq-length", None, seq),
+                Self::prefix_op("seq-length", None, seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::SeqIx(seq, index) => cond_paren(
-                self.prefix_op("seq-ix", Some(&[index]), seq),
+                Self::prefix_op("seq-ix", Some(&[index]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::SubSeq(seq, start, length) => cond_paren(
-                self.prefix_op("sub-seq", Some(&[start, length]), seq),
+                Self::prefix_op("sub-seq", Some(&[start, length]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::SubSeqInflate(seq, start, length) => cond_paren(
-                self.prefix_op("sub-seq-inflate", Some(&[start, length]), seq),
+                Self::prefix_op("sub-seq-inflate", Some(&[start, length]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::FlatMap(expr, seq) => cond_paren(
-                self.prefix_op("flat-map", Some(&[expr]), seq),
+                Self::prefix_op("flat-map", Some(&[expr]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => cond_paren(
-                self.prefix_op("flat-map-accum", Some(&[expr, accum]), seq),
+                Self::prefix_op("flat-map-accum", Some(&[expr, accum]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::LeftFold(expr, accum, _accum_type, seq) => cond_paren(
-                self.prefix_op("left-fold", Some(&[expr, accum]), seq),
+                Self::prefix_op("left-fold", Some(&[expr, accum]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::FindByKey(is_sorted, keying_fn, query, seq) => cond_paren(
-                self.prefix_op(
+                Self::prefix_op(
                     if *is_sorted {
                         "binary-search"
                     } else {
@@ -2069,17 +2117,17 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FUN_APPLICATION,
             ),
             Expr::FlatMapList(expr, _ret_type, seq) => cond_paren(
-                self.prefix_op("flat-map-list", Some(&[expr]), seq),
+                Self::prefix_op("flat-map-list", Some(&[expr]), seq),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::Dup(count, expr) => cond_paren(
-                self.prefix_op("dup", Some(&[count]), expr),
+                Self::prefix_op("dup", Some(&[count]), expr),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::EnumFromTo(start, stop) => cond_paren(
-                self.binary_op(
+                Self::binary_op(
                     " .. ",
                     start,
                     stop,
@@ -2091,13 +2139,13 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FUN_APPLICATION,
             ),
             Expr::LiftOption(Some(expr)) => cond_paren(
-                self.prefix_op("some", None, expr),
+                Self::prefix_op("some", None, expr),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
             Expr::LiftOption(None) => Fragment::string("none"),
             Expr::TupleProj(head, index) => cond_paren(
-                self.compile_expr(head, Precedence::PROJ)
+                Self::compile_expr(head, Precedence::PROJ)
                     .cat(Fragment::Char('.'))
                     .cat(Fragment::DisplayAtom(Rc::new(*index)))
                     .group(),
@@ -2105,7 +2153,7 @@ impl<'module> TreePrinter<'module> {
                 Precedence::PROJ,
             ),
             Expr::RecordProj(head, label) => cond_paren(
-                self.compile_expr(head, Precedence::PROJ)
+                Self::compile_expr(head, Precedence::PROJ)
                     .cat(Fragment::Char('.'))
                     .cat(Fragment::String(label.clone()))
                     .group(),
@@ -2123,18 +2171,20 @@ impl<'module> TreePrinter<'module> {
             Expr::Variant(label, expr) => Fragment::String("{ ".into())
                 .cat(Fragment::String(label.clone()))
                 .cat(Fragment::String(" := ".into()))
-                .cat(self.compile_expr(expr, Default::default()))
+                .cat(Self::compile_expr(expr, Default::default()))
                 .cat(Fragment::String(" }".into()))
                 .group(),
             Expr::Seq(..) => Fragment::String("[..]".into()),
             Expr::Numeric(n_tree) => crate::numeric::printer::compile_expr(n_tree, prec),
         }
     }
+}
 
+impl<'module> TreePrinter<'module> {
     /// Creates a [Fragment] representing a compound format as a prefix label
     /// followed by a nested inner format.
     fn compile_nested_format(
-        &mut self,
+        &self,
         label: &'static str,
         args: Option<&[Fragment]>,
         inner: &Format,
@@ -2151,8 +2201,8 @@ impl<'module> TreePrinter<'module> {
         frags.finalize_with_sep(Fragment::Char(' '))
     }
 
-    // FIXME - without a first-class record, Formats will be printed in less sensible ways
-    fn compile_format(&mut self, format: &Format, prec: Precedence) -> Fragment {
+    //
+    fn compile_format(&self, format: &Format, prec: Precedence) -> Fragment {
         match format {
             Format::Phantom(_f) => Fragment::string("phantom"),
             Format::Variant(label, f) => cond_paren(
@@ -2171,7 +2221,7 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::Maybe(expr, f) => {
-                let frag_expr = self.compile_expr(expr, Precedence::ATOM);
+                let frag_expr = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("maybe", Some(&[frag_expr]), f, prec),
                     prec,
@@ -2198,7 +2248,7 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::RepeatCount(len, format) => {
-                let expr_frag = self.compile_expr(len, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("repeat-count", Some(&[expr_frag]), format, prec),
                     prec,
@@ -2206,7 +2256,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::RepeatBetween(min, max, format) => {
-                let expr_frag = self.compile_expr(
+                let expr_frag = Self::compile_expr(
                     &Expr::Tuple(vec![*min.clone(), *max.clone()]),
                     Precedence::ATOM,
                 );
@@ -2217,7 +2267,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::RepeatUntilLast(expr, format) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "repeat-until-last",
@@ -2230,7 +2280,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::RepeatUntilSeq(expr, format) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "repeat-until-seq",
@@ -2243,9 +2293,9 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::AccumUntil(f_done, f_update, init, _vt, format) => {
-                let done_frag = self.compile_expr(f_done, Precedence::ATOM);
-                let update_frag = self.compile_expr(f_update, Precedence::ATOM);
-                let init_frag = self.compile_expr(init, Precedence::ATOM);
+                let done_frag = Self::compile_expr(f_done, Precedence::ATOM);
+                let update_frag = Self::compile_expr(f_update, Precedence::ATOM);
+                let init_frag = Self::compile_expr(init, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "accum-until",
@@ -2258,7 +2308,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::DecodeBytes(expr, format) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("decode-bytes", Some(&[expr_frag]), format, prec),
                     prec,
@@ -2266,7 +2316,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::ParseFromView(view, format) => {
-                let view_frag = self.compile_view_expr(view, Precedence::ATOM);
+                let view_frag = Self::compile_view_expr(view, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("parse-from-view", Some(&[view_frag]), format, prec),
                     prec,
@@ -2274,7 +2324,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::ForEach(expr, lbl, format) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "for-each",
@@ -2297,7 +2347,7 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::Slice(len, format) => {
-                let expr_frag = self.compile_expr(len, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("slice", Some(&[expr_frag]), format, prec),
                     prec,
@@ -2310,8 +2360,8 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::WithRelativeOffset(base_addr, offset, format) => {
-                let base_frag = self.compile_expr(base_addr, Precedence::ATOM);
-                let offs_frag = self.compile_expr(offset, Precedence::ATOM);
+                let base_frag = Self::compile_expr(base_addr, Precedence::ATOM);
+                let offs_frag = Self::compile_expr(offset, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "with-relative-offset",
@@ -2324,7 +2374,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::Map(format, expr) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("map", Some(&[expr_frag]), format, prec),
                     prec,
@@ -2332,7 +2382,7 @@ impl<'module> TreePrinter<'module> {
                 )
             }
             Format::Where(format, Condition { expr, severity }) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 let label = match severity {
                     Severity::Require => "require",
                     Severity::Expect => "expect",
@@ -2346,13 +2396,13 @@ impl<'module> TreePrinter<'module> {
             Format::Compute(expr) => cond_paren(
                 Fragment::cat(
                     Fragment::String("compute ".into()),
-                    self.compile_expr(expr, Default::default()),
+                    Self::compile_expr(expr, Default::default()),
                 ),
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::Let(name, expr, format) => {
-                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let expr_frag = Self::compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "let",
@@ -2398,7 +2448,7 @@ impl<'module> TreePrinter<'module> {
             }
             Format::Match(head, _) => cond_paren(
                 Fragment::String("match ".into())
-                    .cat(self.compile_expr(head, Precedence::PROJ))
+                    .cat(Self::compile_expr(head, Precedence::PROJ))
                     .cat(Fragment::String(" { ... }".into()))
                     .group(),
                 prec,
@@ -2441,33 +2491,15 @@ impl<'module> TreePrinter<'module> {
             Format::Pos => Fragment::string("pos"),
             Format::Align(n) => Fragment::String(format!("align {n}").into()),
 
-            Format::Byte(bs) => self.compile_byteset(bs),
+            Format::Byte(bs) => Self::compile_byteset(bs),
             Format::Tuple(formats) if formats.is_empty() => Fragment::String("()".into()),
             Format::Tuple(_) => Fragment::String("(...)".into()),
 
             Format::Sequence(formats) if formats.is_empty() => Fragment::String("[]".into()),
             Format::Sequence(_) => Fragment::String("[ ... ]".into()),
 
-            Format::Hint(StyleHint::Record { old_style: true }, inner) => match inner.as_ref() {
-                Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => {
-                    Fragment::String("{}".into())
-                }
-                Format::Compute(..) => Fragment::String("{ ... }".into()),
-                Format::LetFormat(..) => Fragment::String("{ ... }".into()),
-                Format::MonadSeq(..) => Fragment::String("{ ... }".into()),
-                _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
-            },
-            Format::Hint(StyleHint::Record { old_style: false }, inner) => {
-                // FIXME - print enhanced output for new-style records
-                match inner.as_ref() {
-                    Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => {
-                        Fragment::String("{}".into())
-                    }
-                    Format::Compute(..) => Fragment::String("{ ... }".into()),
-                    Format::LetFormat(..) => Fragment::String("{ ... }".into()),
-                    Format::MonadSeq(..) => Fragment::String("{ ... }".into()),
-                    _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
-                }
+            Format::Hint(StyleHint::Record { old_style }, inner) => {
+                Self::compile_record_format(inner, *old_style)
             }
             Format::Hint(StyleHint::AsciiStr, str_format) => cond_paren(
                 self.compile_nested_format("ascii-str", None, str_format, prec),
@@ -2482,15 +2514,9 @@ impl<'module> TreePrinter<'module> {
             Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind_endian)), _format) => {
                 let kind_fragment = Fragment::string(kind_endian.name());
                 Fragment::string("Read").cat(kind_fragment)
-
-                // cond_paren(
-                //     self.compile_nested_format("endian-parse", Some(&[kind_fragment.cat(endian_fragment)]), _format, prec),
-                //     prec,
-                //     Precedence::FORMAT_COMPOUND,
-                // )
             }
             Format::Permit(format, expr) => {
-                let dft_frag = self.compile_expr(expr, Precedence::Top);
+                let dft_frag = Self::compile_expr(expr, Precedence::Top);
                 cond_paren(
                     self.compile_nested_format("permit", Some(&[dft_frag]), format, prec),
                     prec,
@@ -2504,10 +2530,10 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::WithView(view, view_format) => {
-                let view_frag = self.compile_view_expr(view, Precedence::Atomic);
+                let view_frag = Self::compile_view_expr(view, Precedence::Atomic);
                 let view_fmt_frag = match view_format {
                     ViewFormat::CaptureBytes(len) => {
-                        let len_frag = self.compile_expr(len, Precedence::Top);
+                        let len_frag = Self::compile_expr(len, Precedence::Top);
                         let mut builder = FragmentBuilder::new();
                         builder.push(Fragment::string("capture-bytes"));
                         builder.push(Fragment::Char('['));
@@ -2516,7 +2542,7 @@ impl<'module> TreePrinter<'module> {
                         builder.finalize()
                     }
                     ViewFormat::ReadArray(len, FixedReadKind::Base(kind)) => {
-                        let len_frag = self.compile_expr(len, Precedence::Top);
+                        let len_frag = Self::compile_expr(len, Precedence::Top);
                         let mut builder = FragmentBuilder::new();
                         builder.push(Fragment::string("read-array"));
                         builder.push(Fragment::Char('('));
@@ -2528,7 +2554,7 @@ impl<'module> TreePrinter<'module> {
                         builder.finalize()
                     }
                     ViewFormat::ReadArray(len, FixedReadKind::FixedFormat(format_ref)) => {
-                        let len_frag = self.compile_expr(len, Precedence::Top);
+                        let len_frag = Self::compile_expr(len, Precedence::Top);
                         let mut builder = FragmentBuilder::new();
                         builder.push(Fragment::string("read-array"));
                         builder.push(Fragment::Char('('));
@@ -2554,13 +2580,35 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn compile_view_expr(&mut self, view_expr: &ViewExpr, prec: Precedence) -> Fragment {
+    /// Standalone helper for [`Self::compile_format`] for the case of `Format::Hint(StyleHint::Record { old_style }, inner)`
+    fn compile_record_format<F: AsRef<Format> + std::fmt::Debug>(
+        inner: &F,
+        old_style: bool,
+    ) -> Fragment {
+        // REVIEW - after shifting from first-class records to style-hint, the display-form of record formats may have degraded
+        match inner.as_ref() {
+            Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => {
+                Fragment::String("{}".into())
+            }
+            Format::Compute(..) => Fragment::String("{ ... }".into()),
+            Format::LetFormat(..) => Fragment::String("{ ... }".into()),
+            Format::MonadSeq(..) => Fragment::String("{ ... }".into()),
+            _ => unreachable!(
+                "unexpected {which}-style record-hint inner format: {inner:?}",
+                which = if old_style { "old" } else { "new" }
+            ),
+        }
+    }
+}
+
+impl<'module> TreePrinter<'module> {
+    fn compile_view_expr(view_expr: &ViewExpr, prec: Precedence) -> Fragment {
         match view_expr {
             ViewExpr::Var(ident) => Fragment::String(ident.clone()),
             ViewExpr::Offset(base, offs) => {
-                let base_frag = self.compile_view_expr(base, Precedence::ADD_SUB);
-                let offs_frag = self.compile_expr(offs, Precedence::ADD_SUB);
-                // TODO - double-check this logic
+                let base_frag = Self::compile_view_expr(base, Precedence::ADD_SUB);
+                let offs_frag = Self::compile_expr(offs, Precedence::ADD_SUB);
+                // TODO - double-check whether this `cond_paren` invocation produces the desired output
                 cond_paren(
                     base_frag.intervene(Fragment::Char('+'), offs_frag),
                     prec,
@@ -2568,5 +2616,67 @@ impl<'module> TreePrinter<'module> {
                 )
             }
         }
+    }
+
+    /// Helper function for displaying an impromptu pair (2-tuple) from two independently-generated `Fragments`, most notably
+    /// when joining the displays of the sequence and accumulator value when compiling values produced via [`Format::AccumUntil`]
+    fn compile_impromptu_pair(&self, accum: Fragment, vs: Fragment) -> Fragment {
+        // Check whether inline concatenation is possible
+        if accum.is_single_line(false) && vs.fits_inline() {
+            Fragment::intervene(accum, Fragment::string(", "), vs)
+                .delimit(Fragment::Char('('), Fragment::Char(')'))
+        } else {
+            // REVIEW - the output of this branch is not tested yet, so it may be broken
+            log::warn!("non-inlineable concatenation of accum and vs is not properly handled yet");
+            let fst = Fragment::cat(
+                Fragment::Char('('),
+                Fragment::cat(accum, Fragment::Char(',')),
+            );
+            let snd = Fragment::cat(vs, Fragment::Char(')'));
+            // REVIEW - ensure this works properly
+            fst.cat_break().cat(self.compile_gutter().cat(snd))
+        }
+    }
+
+    /// Helper function for deciding whether to interject the fragment describing a `Format` between a field-or-positional label
+    /// and the display-fragment for the decoded value itself (`frag_value`).
+    fn should_interject_format(&self, format: &Format, frag_value: &Fragment) -> bool {
+        self.flags.show_redundant_formats
+            || (Self::is_indirect_format(format) && !frag_value.is_single_line(true))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_regression_compile_impromptu_pair() {
+        let module = FormatModule::new();
+        let mut printer = TreePrinter::new(&module);
+
+        // case 0: no gutter, inline
+        let accum = Fragment::string("accum");
+        let vs = Fragment::string("vs");
+        let frag = printer.compile_impromptu_pair(accum, vs);
+        let disp = frag.to_string();
+        assert_eq!(disp.as_str(), "(accum, vs)");
+
+        // case 1: no gutter, multi-line
+        let accum = Fragment::string("accum");
+        let vs = {
+            let seq = SeqKind::Strict(vec![Value::U8(0), Value::U8(1)]);
+            let frag = printer.compile_seq(&seq, None);
+            frag
+        };
+        let frag = printer.compile_impromptu_pair(accum, vs);
+        let disp = frag.to_string();
+        assert_eq!(
+            disp.as_str(),
+            r#"(accum,
+├── 0 := 0
+└── 1 := 1
+)"#
+        );
     }
 }

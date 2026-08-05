@@ -265,8 +265,14 @@ impl Value {
     pub(crate) fn tuple_proj(&self, index: usize) -> &Self {
         match self {
             Value::Tuple(vs) => &vs[index],
-            // REVIEW[epic=permit] - there is no clean way of returning a same-lifetime reference for tuple-projection over `Permit(Err(Some(v)))` without silently erasing the `Permit` wrapper
-            Value::Permit(Err(None | Some(_))) => &Value::Permit(Err(None)),
+            Value::Permit(Ok(v)) => v.tuple_proj(index),
+            // REVIEW[epic=permit] - we have no way to return `Permit(Err(Some(v.tuple_proj(index))))` due to lifetime considerations; therefore, we avoid erasing Permit and simply return `Permit(Err(None))`
+            Value::Permit(Err(None | Some(_))) => {
+                log::warn!(
+                    "tuple_proj over `Permit(Err(_))` can only return `Permit(Err(None))` due to implementation constraints"
+                );
+                &Value::Permit(Err(None))
+            }
             _ => panic!("expected tuple"),
         }
     }
@@ -277,7 +283,7 @@ impl Value {
                 Some((_, v)) => v,
                 None => panic!("{label} not found in record"),
             },
-            // REVIEW[epic=permit] - there is no clean way of returning a same-lifetime reference for record-projection over `Permit(Err(Some(v)))` without silently erasing the `Permit` wrapper
+            // REVIEW[epic=permit] - we have no way to return `Permit(Err(Some(v.record_proj(index))))` due to lifetime considerations; therefore, we avoid erasing Permit and simply return `Permit(Err(None))`
             Value::Permit(Err(None | Some(_))) => &Value::Permit(Err(None)),
             other => panic!("expected record, found {other:?}"),
         }
@@ -394,7 +400,7 @@ impl Value {
             .then_some(pattern_scope)
     }
 
-    /// Higher-level version of `coerce_mapped_value` that also unwraps any `Value::Permit(Err)`
+    /// Higher-level version of [`Self::coerce_mapped_value`] that also unwraps any `Value::Permit(Err)`
     /// for pattern-matching purposes.
     pub fn coerce_nominal_value(&self) -> &Self {
         match self {
@@ -408,7 +414,7 @@ impl Value {
     }
 
     /// Reduces any referenced `Value` to its underlying nominal value, by recursively unwrapping any
-    /// `Value::Branch`, `Value::Permit(Ok(..))`, `Value::Mapped` encompassing it.
+    /// `Value::Branch`, `Value::Permit(Ok(v))`, `Value::Mapped` encompassing it.
     // FIXME[epic=coerce-value-permiterr] - refactor to return `Coerced<&'a Self>`
     pub fn coerce_mapped_value(&self) -> &Self {
         match self {
@@ -419,7 +425,7 @@ impl Value {
         }
     }
 
-    /// Like `coerce_mapped_value`, but for owned values rather than borrowed ones.
+    /// Like [`Self::coerce_mapped_value`], but for owned values rather than borrowed ones.
     // FIXME[epic=coerce-value-permiterr] - refactor to return `Coerced<Self>`
     pub fn extract_mapped_value(self) -> Self {
         match self {

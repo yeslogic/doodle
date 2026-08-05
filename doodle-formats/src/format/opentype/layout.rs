@@ -507,6 +507,7 @@ fn feature_record(
             ("feature_tag", tag.call()),
             (
                 "feature",
+                // TODO - if we ever get a working model for the Params mapping from feature-tag, we should make feature-table a dep-format and pass in `feature_tag` as an argument.
                 util::read_phantom_view_offset16(vvar("list_view"), feature_table.call()),
             ),
         ]),
@@ -523,16 +524,12 @@ pub(crate) fn feature_table(module: &mut FormatModule) -> FormatRef {
             "table_view",
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
-                // WIP - `feature_params` is technically an offset16 but we don't have a good handle on what data is stored at the offset, or what FeatureRecord tags allow for parameters
-                ("feature_params", u16be()), // TODO - format of params table depends on the feature tag,
+                // NOTE - the format of the Params table is opaquely dependent on the precise feature tag, so while we want to parse an offset16 here, we don't have a good handle on what the offset is pointing to (or even how many bytes it occupies), nor on wehich FeatureRecord tags allow for parameters to be present
+                ("feature_params", u16be()),
                 ("lookup_index_count", u16be()),
                 // Array of 0-based indices into LookupList (first lookup at LookupListIndex = 0)
                 (
                     "lookup_list_indices",
-                    // readarray-eligible: bare u16be element -> BaseKind::U16BE, no FormatRef needed.
-                    // Read sequentially at the cursor inside the `table_view`-scoped record (no offset
-                    // arithmetic for this field itself), so it would need
-                    // `from_here(read_array(var("lookup_index_count"), BaseKind::U16BE))`.
                     repeat_count(var("lookup_index_count"), u16be()),
                 ),
             ]),

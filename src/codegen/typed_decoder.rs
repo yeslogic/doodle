@@ -366,7 +366,6 @@ impl<'a> GTCompiler<'a> {
         next: Rc<Next<'a>>,
     ) -> AResult<GTDecoderExt> {
         let dec = match format {
-            // TODO - figure out what needs to be done with `_arg_views`
             TypedFormat::FormatCall(gt, level, arg_exprs, arg_views, deref) => {
                 let this_args = (arg_exprs.to_vec(), arg_views.to_vec());
                 let sig_args = if arg_exprs.is_empty() && arg_views.is_empty() {

@@ -1,25 +1,30 @@
 use std::{cell::RefCell, collections::HashMap};
 
 pub(crate) mod heap_optimize;
-pub(crate) mod read_width;
 use crate::codegen::model::{READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 
 use super::*;
 use heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
-use read_width::{ReadWidth, ValueWidth};
 
 /// Helper trait for any AST model-type that represents a type-construct in Rust that may rely on non-local
 /// context to properly analyze certain static properties of.
 pub trait ASTContext {
+    /// The minimal amount of information required to make static inferences about the type-items encapsulated by `Self.
     type Context<'a>: Sized + 'a;
 }
 
+/// Computes the expected number of niches in a product-type, given a list of the niche-counts of each of its components.
 fn niche_product(iter: impl Iterator<Item = usize>) -> usize {
     iter.map(|x| x.saturating_add(1))
         .fold(1usize, usize::saturating_mul)
         - 1
 }
 
+/// Computes the expected number of niches in a sum-type, given a ist of the niche-counts of each of its variants
+///
+/// Assumes that the discriminants occupy a fixed number of bytes and are not optimized away.
+///
+/// Does not account for how many niches are filled by the unoccupied values in the discriminant memory-slot.
 fn niche_sum(iter: impl Iterator<Item = usize>) -> usize {
     iter.fold(0usize, usize::saturating_add)
 }
@@ -34,33 +39,45 @@ pub trait CanOptimize: ASTContext {
     }
 }
 
+/// Helper trait for performing recursive, memoized static analysis of an AST type-item
+/// to determine high-confidence estimatees of its size and alignment when emitted as
+/// a native Rust type in generated code.
 pub trait MemSize: CanOptimize {
+    /// High-confidence estimation of what `std::mem::size_of` will return for the type being modelled.
     fn size_hint(&self, context: Self::Context<'_>) -> usize;
 
+    /// High-confidence estimation of what `std::mem::align_of` will return for the type being modelled.
     fn align_hint(&self, context: Self::Context<'_>) -> usize;
 }
 
+/// Helper trait for determining whether an AST type-item is `Copy`-eligible
 pub trait CopyEligible: ASTContext {
+    /// High-confidence estimation of whether the type being modelled is `Copy`-eligible
     fn copy_hint(&self, context: Self::Context<'_>) -> bool;
 }
 
+/// Internal cache of static analysis results to memoize previous inferences of type-properties.
 #[derive(Default)]
 struct CacheEntry {
+    /// Whether the type can derive `Copy`
     copy: Option<bool>,
+    /// Number of niches in the memory representation of a type-value
     niches: Option<usize>,
-    /// Number of machine-bytes a stored type-value takes up, or best approximation
+    /// Number of machine-bytes a type-value takes up, or best approximation
     size: Option<usize>,
-    /// Number of buffer-bytes that will be advanced after fully parsing a single value of this type
-    width: Option<ValueWidth>,
+    /// Alignment (in bytes) that the Rust compiler will determine this type should have
     align: Option<usize>,
+    /// Determination of how the type itself or its sub-members should be heap-optimized according to the strategy passed in on first invocation
     heap: Option<HeapOutcome>,
 }
 
+/// Context for memoized static analysis of compiled FormatModule
 pub(crate) struct SourceContext<'a> {
     def_map: &'a [RustTypeDecl],
     cache: Rc<RefCell<HashMap<usize, CacheEntry>>>,
 }
 
+/// Helper macro for automating the lookup, computation, and memoization of static analysis results
 macro_rules! cache_get {
     ( $this:expr, $field:ident, $ix:ident, $method:ident $( , $pre_arg:expr )? ) => {{
         let cache = $this.cache.borrow();
@@ -90,34 +107,50 @@ macro_rules! cache_get {
 }
 
 impl SourceContext<'_> {
+    /// Returns the RustAST declaration for the type at `ix`.
     pub fn get_def(&self, ix: usize) -> &RustTypeDecl {
         &self.def_map[ix]
     }
 
+    /// Polls the cache for the computed niche-count for the type at `ix`.
+    ///
+    /// See [`CanOptimize::niches`] for details.
     pub fn get_niches(&self, ix: usize) -> usize {
         cache_get!(self, niches, ix, niches)
     }
 
+    /// Polls the cache for the computed raw memory footprint (in bytes) for the type at `ix`.
+    ///
+    /// See [`MemSize::size_hint`] for details.
     pub fn get_size(&self, ix: usize) -> usize {
         cache_get!(self, size, ix, size_hint)
     }
 
-    pub fn get_width(&self, ix: usize) -> ValueWidth {
-        cache_get!(self, width, ix, read_width)
-    }
+    /// Polls the cache for the computed raw alignment (in bytes) for the type at `ix`.
+    ///
+    /// See [`MemSize::align_hint`] for details.
 
     pub fn get_align(&self, ix: usize) -> usize {
         cache_get!(self, align, ix, align_hint)
     }
 
+    /// Polls the cache for the determination of whether the type is `Copy`-eligible.
+    ///
+    /// See [`CopyEligible::copy_hint`] for details
     pub fn get_copy(&self, ix: usize) -> bool {
         cache_get!(self, copy, ix, copy_hint)
     }
 
-    /// NOTE: Due to memoization, only one strategy will be computed for a given type-definition,
-    /// meaning that if you then request a different strategy with the same Context object, the old
-    /// result will be served up regardless of the actual strategy being passed in the second time
-    /// around.
+    /// Polls the cache for a heap-optimization result for the type at `ix` under the given `strategy`.
+    ///
+    /// If no entry is found, it will be computed and cached for future requests.
+    ///
+    /// # Notes
+    ///
+    /// Due to memoization, the strategy passed in the first time will determine the cached result,
+    /// and subsequent calls will serve up that same cached result even if a different strategy is
+    /// passed in. This is generally fine, because a single generation-run will almost always
+    /// commit to a single strategy.
     pub fn get_heap(&self, strategy: HeapStrategy, ix: usize) -> HeapOutcome {
         cache_get!(self, heap, ix, heap_hint, strategy)
     }

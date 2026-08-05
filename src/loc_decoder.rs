@@ -8,17 +8,22 @@ use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
-    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, SpineDecoder, UnknownVarError,
-    Value, ValueSeq, cow_map, cow_remap, extract_pair,
+    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, SpineDecoder, Value, ValueSeq,
+    cow_map, cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
 };
-use crate::error::{DecodeErrorKind, ELocDecodeResult, LocDecodeResult};
-use crate::read::ReadCtxt;
-use crate::util::WithErr;
+use crate::error::{DecodeError, DecodeErrorKind, UnknownVarError};
+use crate::read::{BufferKind, ReadCtxt};
+use crate::try_with;
+use crate::util::ErrTrace as _;
 use crate::util::downgrade_error_with;
+use crate::util::{EResult, WithErr};
 use crate::validation::Condition;
 use crate::{BaseKind, DynFormat, Endian, Expr, Format, Label, Pattern, ViewExpr};
+
+pub type LocDecodeResult<T> = Result<T, DecodeError<crate::loc_decoder::ParsedValue>>;
+pub type ELocDecodeResult<T> = EResult<T, DecodeError<crate::loc_decoder::ParsedValue>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize)]
 pub enum ParseLoc {
@@ -598,8 +603,9 @@ impl Expr {
                 let num_val = n.eval(scope);
                 match num_val {
                     Ok(v) => Cow::Owned(ParsedValue::from_evaluated(Value::from(v))),
-                    // REVIEW[epic=embedded-num] - we probably want a more sensible outcome than panic
-                    Err(e) => panic!("{e}"),
+                    Err(e) => panic!(
+                        "Expr::eval_with_loc(Numeric({n:?})) failed during NumExpr evaluation: {e}"
+                    ),
                 }
             }
             Expr::Tuple(exprs) => Cow::Owned(ParsedValue::from_evaluated(Value::Tuple(
@@ -1346,12 +1352,14 @@ impl Decoder {
                     let v = Self::eval_view_expr_with_loc(scope, vv)?;
                     new_scope.push_view(name.clone(), v);
                 }
-                program.decoders[*n]
+                Ok(try_with!(program.decoders[*n]
                     .0
                     .parse_with_loc(program, &LocScope::Multi(&new_scope), input)
+                => ("parse_with_loc@Call", *n)
+                ))
             }
             Decoder::Phantom => Ok(WithErr::new((ParsedValue::new_phantom(), input))),
-            Decoder::Fail => Err(DecodeErrorKind::<ParsedValue>::loc_fail(scope, input)),
+            Decoder::Fail => Err(DecodeErrorKind::<ParsedValue>::loc_fail(scope, input).into()),
             Decoder::Pos => {
                 let pos = input.offset as u64;
                 Ok(WithErr::new((
@@ -1367,29 +1375,29 @@ impl Decoder {
             }
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok(WithErr::new((ParsedValue::unit_at(start_offset), input))),
-                Some((b, _)) => Err(DecodeErrorKind::<ParsedValue>::trailing(b, input.offset)),
+                Some((b, _)) => {
+                    Err(input.kind.trailing(b, input.offset).into())
+                }
             },
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
-                    .ok_or(DecodeErrorKind::overrun(skip, input.offset))?;
+                    .ok_or(input.kind.overrun(skip, input.offset))?;
                 Ok(WithErr::new((
                     ParsedValue::unit_spanning(start_offset, skip),
                     input,
                 )))
             }
             Decoder::Byte(bs) => {
-                let (b, input) = input
-                    .read_byte()
-                    .ok_or(DecodeErrorKind::overbyte(input.offset))?;
+                let (b, input) = input.read_byte().ok_or(input.kind.overbyte(input.offset))?;
                 if bs.contains(b) {
                     Ok(WithErr::new((
                         ParsedValue::new_flat(Value::U8(b), start_offset, 1),
                         input,
                     )))
                 } else {
-                    Err(DecodeErrorKind::unexpected(b, *bs, input.offset))
+                    Err(DecodeErrorKind::unexpected(b, *bs, input.offset).into())
                 }
             }
             Decoder::Variant(label, d) => Ok(d
@@ -1412,17 +1420,18 @@ impl Decoder {
                         );
                     }
                 }
-                Err(DecodeErrorKind::loc_fail(scope, input))
+                Err(DecodeErrorKind::loc_fail(scope, input).with_trace("no valid branch"))
             }
             Decoder::Tuple(fields) => Ok(WithErr::fold(
                 (Vec::with_capacity(fields.len()), input),
-                fields.iter(),
-                |(mut v, input), f| {
-                    Ok(f.parse_with_loc(program, scope, input)?
-                        .map(move |(vf, next_input)| {
-                            v.push(vf);
-                            (v, next_input)
-                        }))
+                fields.iter().enumerate(),
+                |(mut v, input), (ix, f)| {
+                    Ok(try_with!(f.parse_with_loc(program, scope, input) => ("Tuple", ix))
+                            .map(move |(vf, next_input)| {
+                                v.push(vf);
+                                (v, next_input)
+                            }),
+                    )
                 },
             )?
             .map(|(v, input)| {
@@ -1432,12 +1441,14 @@ impl Decoder {
             Decoder::Sequence(decs) => Ok(WithErr::fold(
                 (Vec::with_capacity(decs.len()), input),
                 decs.iter(),
-                |(mut vs, input), f| {
-                    Ok(f.parse_with_loc(program, scope, input)?
-                        .map(move |(vf, next_input)| {
-                            vs.push(vf);
-                            (vs, next_input)
-                        }))
+                |(mut v, input), f| {
+                    Ok(
+                        try_with!(f.parse_with_loc(program, scope, input) => ("Sequence", v.len()))
+                            .map(move |(vf, next_input)| {
+                                v.push(vf);
+                                (v, next_input)
+                            }),
+                    )
                 },
             )?
             .map(|(v, input)| {
@@ -1447,12 +1458,12 @@ impl Decoder {
             Decoder::While(tree, a) => {
                 let mut input = input;
                 let mut res = WithErr::new((Vec::new(), input));
-                while tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
+                while try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                     offset: input.offset,
-                })? == 0
+                }) => ("While(matchtree)", res.as_ref().0.len())) == 0
                 {
                     res = res.join(|(mut v, input)| {
-                        Ok(a.parse_with_loc(program, scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("While(parse)", v.len()))
                             .map(|(va, next_input)| {
                                 v.push(va);
                                 (v, next_input)
@@ -1469,16 +1480,16 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
                     res = res.join(|(mut v, input)| {
-                        Ok(a.parse_with_loc(program, scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("Until(parse)", v.len()))
                             .map(|(va, next_input)| {
                                 v.push(va);
                                 (v, next_input)
                             }))
                     })?;
                     let input = res.as_ref().1;
-                    if tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
+                    if try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                         offset: input.offset,
-                    })? == 0
+                    }) => ("Until(matchtree)", res.as_ref().0.len())) == 0
                     {
                         break;
                     }
@@ -1497,16 +1508,12 @@ impl Decoder {
                         .map(|v| v.get_as_u8())
                         .collect::<Vec<u8>>()
                 };
-                let new_input = ReadCtxt::new(&bytes);
-                a.parse_with_loc(program, scope, new_input)?
+                let new_input = ReadCtxt::from_value(&bytes);
+                try_with!(a.parse_with_loc(program, scope, new_input) => ("DecodeBytes", bytes.len()))
                     .join(|(va, rem_input)| {
                         Ok(match rem_input.read_byte() {
                             Some((b, _)) => {
-                                // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                                let err = DecodeErrorKind::Trailing {
-                                    byte: b,
-                                    offset: rem_input.offset,
-                                };
+                                let err = rem_input.kind.trailing(b, rem_input.offset).into();
                                 WithErr::with_err((va, input), err)
                             }
                             None => WithErr::new((va, input)),
@@ -1515,19 +1522,21 @@ impl Decoder {
             }
             Decoder::ParseFromView(v_expr, a) => {
                 let view = Self::eval_view_expr_with_loc(scope, v_expr)?;
-                Ok(a.parse_with_loc(program, scope, view)?
+                Ok(try_with!(a.parse_with_loc(program, scope, view) => ("ParseFromView", format!("{:?}", v_expr)))
                     .map(|(va, _)| (va, input)))
             }
             Decoder::LetFormat(da, name, db) => {
-                da.parse_with_loc(program, scope, input)?
+                try_with!(da.parse_with_loc(program, scope, input) => ("LetFormat(lhs)", name.to_string()))
                     .join(|(va, input)| {
                         let new_scope = LocScope::Single(LocSingleScope::new(scope, name, &va));
                         db.parse_with_loc(program, &new_scope, input)
                     })
             }
-            Decoder::MonadSeq(da, db) => da
-                .parse_with_loc(program, scope, input)?
-                .join(|(_, input)| db.parse_with_loc(program, scope, input)),
+            Decoder::MonadSeq(da, db) => {
+                try_with!(da.parse_with_loc(program, scope, input) => "MonadSeq(lhs)").join(|(_, input)| {
+                    Ok(try_with!(db.parse_with_loc(program, scope, input) => "MonadSeq(rhs)"))
+                })
+            }
             Decoder::ForEach(expr, lbl, a) => {
                 let val = expr.eval_with_loc(scope);
                 let seq = val.get_sequence().expect("bad type for ForEach input");
@@ -1536,7 +1545,7 @@ impl Decoder {
                     seq,
                     |(mut v, input), e| {
                         let new_scope = LocScope::Single(LocSingleScope::new(scope, lbl, &e));
-                        Ok(a.parse_with_loc(program, &new_scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, &new_scope, input) => ("ForEach", v.len(), format!("{e:?}")))
                             .map(|(va, next_input)| {
                                 v.push(va);
                                 (v, next_input)
@@ -1554,11 +1563,12 @@ impl Decoder {
                     (Vec::with_capacity(count), input),
                     0..count,
                     |(mut v, input), _| {
-                        Ok(a.parse_with_loc(program, scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("RepeatCount", v.len()))
                             .map(|(va, next_input)| {
                                 v.push(va);
                                 (v, next_input)
-                            }))
+                            }),
+                        )
                     },
                 )?
                 .map(|(v, input)| {
@@ -1577,8 +1587,8 @@ impl Decoder {
                         .matches(input)
                         .ok_or(DecodeErrorKind::NoValidBranch {
                             offset: input.offset,
-                        })?
-                        == 0
+                        }.with_trace(v.len()),
+                    )? == 0
                         || v.len() == max
                     {
                         if v.len() < min {
@@ -1587,11 +1597,12 @@ impl Decoder {
                         break;
                     }
                     res = res.join(|(mut v, input)| {
-                        Ok(a.parse_with_loc(program, scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("RepeatBetween", v.len()))
                             .map(move |(va, next_input)| {
                                 v.push(va);
                                 (v, next_input)
-                            }))
+                            }),
+                        )
                     })?;
                 }
                 Ok(res.map(|(v, input)| {
@@ -1602,8 +1613,9 @@ impl Decoder {
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value_with_loc(scope).unwrap_bool();
                 if is_present {
-                    Ok(a.parse_with_loc(program, scope, input)?
-                        .map(|(val, input)| (ParsedValue::Option(Some(Box::new(val))), input)))
+                    Ok(try_with!(a.parse_with_loc(program, scope, input) => "Maybe")
+                        .map(|(val, input)| (ParsedValue::Option(Some(Box::new(val))), input))
+                    )
                 } else {
                     Ok(WithErr::new((ParsedValue::Option(None), input)))
                 }
@@ -1613,7 +1625,7 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
-                        Ok(a.parse_with_loc(program, scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("RepeatUntilLast", v.len()))
                             .map(move |(va, next_input)| {
                                 let done = expr.eval_lambda_with_loc(scope, &va).unwrap_bool();
                                 v.push(va);
@@ -1635,7 +1647,7 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
-                        Ok(a.parse_with_loc(program, scope, input)?
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
                             .map(|(va, next_input)| {
                                 v.push(va);
                                 let vs = ParsedValue::from_evaluated_seq(v);
@@ -1645,7 +1657,8 @@ impl Decoder {
                                     _ => unreachable!(),
                                 };
                                 (v, next_input, done)
-                            }))
+                            }),
+                        )
                     })?;
                     break_if_done!(res => (v, input));
                 }
@@ -1671,7 +1684,8 @@ impl Decoder {
                         if is_done {
                             return Ok(WithErr::new((v, accum, input, true)));
                         }
-                        Ok(a.parse_with_loc(program, scope, input)?.map(
+                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("AccumUntil", v.len()))
+                            .map(
                             |(next_elem, next_input)| {
                                 v.push(next_elem.clone());
                                 let update_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
@@ -1706,7 +1720,7 @@ impl Decoder {
                 .map(|(v, _)| (v, input))),
             Decoder::PeekNot(a) => {
                 if a.parse_with_loc(program, scope, input).is_ok() {
-                    Err(DecodeErrorKind::loc_fail(scope, input))
+                    Err(DecodeErrorKind::loc_fail(scope, input).with_trace(("PeekNot", format!("{:?}", a))))
                 } else {
                     Ok(WithErr::new((ParsedValue::unit_at(start_offset), input)))
                 }
@@ -1715,8 +1729,8 @@ impl Decoder {
                 let size = expr.eval_value_with_loc(scope).unwrap_usize();
                 let (slice, input) = input
                     .split_at(size)
-                    .ok_or(DecodeErrorKind::overrun(size, input.offset))?;
-                Ok(a.parse_with_loc(program, scope, slice)?
+                    .ok_or(input.kind.overrun(size, input.offset).with_trace(("Slice(create)", format!("{:?}->{size}", expr))))?;
+                Ok(try_with!(a.parse_with_loc(program, scope, slice) => ("Slice(parse)", format!("{:?}", a)))
                     .map(|(v, _)| (v, input)))
             }
             Decoder::Bits(a) => {
@@ -1727,13 +1741,13 @@ impl Decoder {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                a.parse_with_loc(program, scope, ReadCtxt::new(&bits))?
+                try_with!(a.parse_with_loc(program, scope, ReadCtxt::new(&bits)) => ("Bits(parse)", format!("{a:?}")))
                     .join(|(v, bits)| {
                         let bytes_remain = bits.remaining().len() >> 3;
                         let bytes_read = input.remaining().len() - bytes_remain;
                         let (_, input) = input
                             .split_at(bytes_read)
-                            .ok_or(DecodeErrorKind::overrun(bytes_read, input.offset))?;
+                            .ok_or(input.kind.overrun(bytes_read, input.offset))?;
                         Ok(WithErr::new((v, input)))
                     })
             }
@@ -1743,37 +1757,39 @@ impl Decoder {
                 let abs_offset = base_addr + offset;
                 let seek_input = input
                     .seek_to(abs_offset)
-                    .ok_or(DecodeErrorKind::bad_seek(abs_offset, input.input.len()))?;
-                Ok(a.parse_with_loc(program, scope, seek_input)?
+                    .ok_or(input.kind.bad_seek(abs_offset, input.input.len()).with_trace("WithRelativeOffset(seek)"))?;
+                Ok(try_with!(a.parse_with_loc(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
                     .map(|(v, _)| (v, input)))
             }
-            Decoder::Map(d, expr) => {
-                Ok(d.parse_with_loc(program, scope, input)?
+            Decoder::Map(d, expr) => Ok(
+                try_with!(d.parse_with_loc(program, scope, input) => ("Map(parse)", format!("{d:?}")))
                     .map(|(orig, input)| {
                         let v = expr.eval_lambda_with_loc(scope, &orig);
                         let image = ParsedValue::inherit(&orig, v);
                         (ParsedValue::Mapped(Box::new(orig), Box::new(image)), input)
-                    }))
-            }
+                    },
+                ),
+            ),
             Decoder::Where(d, cond) => {
-                d.parse_with_loc(program, scope, input)?.join(|(v, input)| {
-                    let Condition { expr, severity } = cond;
-                    match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
-                        true => Ok(WithErr::new((v, input))),
-                        false => {
-                            let err = DecodeErrorKind::loc_bad_where(
-                                scope,
-                                expr.clone(),
-                                Box::new(v.clone()),
-                            );
-                            if severity.is_strict() {
-                                Err(err)
-                            } else {
-                                Ok(WithErr::with_err((v, input), err))
+                try_with!(d.parse_with_loc(program, scope, input) => ("Where(parse)", format!("{d:?}")))
+                    .join(|(v, input)| {
+                        let Condition { expr, severity } = cond;
+                        match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
+                            true => Ok(WithErr::new((v, input))),
+                            false => {
+                                let err = DecodeErrorKind::loc_bad_where(
+                                    scope,
+                                    expr.clone(),
+                                    Box::new(v.clone()),
+                                ).into();
+                                if severity.is_strict() {
+                                    Err(err)
+                                } else {
+                                    Ok(WithErr::with_err((v, input), err))
+                                }
                             }
                         }
-                    }
-                })
+                    })
             }
             Decoder::Compute(expr) => {
                 let v = expr.eval_with_loc(scope);
@@ -1782,27 +1798,36 @@ impl Decoder {
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_with_loc(scope).as_ref().clone();
                 let let_scope = LocSingleScope::new(scope, name, &v);
-                d.parse_with_loc(program, &LocScope::Single(let_scope), input)
+                Ok(
+                    try_with!(d.parse_with_loc(program, &LocScope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),
+                )
             }
             Decoder::LetView(name, d) => {
-                let view = input;
+                let mut view = input;
+                view.kind &= BufferKind::View;
                 let let_scope = LocViewScope::new(scope, name, view);
-                d.parse_with_loc(program, &LocScope::View(let_scope), input)
+                Ok(
+                    try_with!(d.parse_with_loc(program, &LocScope::View(let_scope), input) => ("LetView(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval_with_loc(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        return Ok(decoder
-                            .parse_with_loc(program, &LocScope::Multi(&pattern_scope), input)?
-                            .map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input)));
+                        return Ok(
+                            try_with!(decoder.parse_with_loc(program, &LocScope::Multi(&pattern_scope), input)
+                            => ("Match(parse)", format!("[{}]: {:?} => {:?}", index, pattern, decoder))
+                            )
+                            .map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input))
+                        );
                     }
                 }
                 // REVIEW - should this be an error instead of a panic?
-                panic!(
-                    "non-exhaustive patterns: {head:?} not in {:#?}",
-                    branches.iter().map(|(p, _)| p).collect::<Vec<_>>()
-                );
+                let cases = branches.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>();
+                Err(DecodeError::<ParsedValue>::from(DecodeErrorKind::RefutedPatternMatch {
+                    cases,
+                    value: Box::new(head.into_owned()),
+                }))
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval_with_loc(scope);
@@ -1821,29 +1846,38 @@ impl Decoder {
                 let f = make_huffman_codes(&lengths);
                 let dyn_d = Compiler::compile_one(&f).unwrap();
                 let child_scope = LocDecoderScope::new(scope, name, dyn_d);
-                d.parse_with_loc(program, &LocScope::Decoder(child_scope), input)
+                Ok(
+                    try_with!(d.parse_with_loc(program, &LocScope::Decoder(child_scope), input) => ("Dynamic(parse)", name.to_string(), format!("{d:?}")))
+                )
             }
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
-                d.parse_with_loc(program, scope, input)
+                Ok(
+                    try_with!(d.parse_with_loc(program, scope, input) => ("Apply(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::LiftedOption(None) => Ok(WithErr::new((
                 ParsedValue::from_evaluated(Value::Option(None)),
                 input,
             ))),
-            Decoder::LiftedOption(Some(d)) => Ok(d
-                .parse_with_loc(program, scope, input)?
+            Decoder::LiftedOption(Some(dec)) => Ok(try_with!(dec
+                .parse_with_loc(program, scope, input) => ("LiftedOption(parse)", format!("{dec:?}")))
                 .map(|(v, input)| (ParsedValue::Option(Some(Box::new(v))), input))),
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
 
                 let view_window = Self::eval_view_expr_with_loc(scope, v_expr)?;
-                // accumulate `len` bytes into a Vec<Value>
+                // accumulate `len` bytes into a Vec<ParsedValue>
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
+                buf.kind &= BufferKind::View;
                 for i in 0..len {
                     let Some((byte, new_buf)) = buf.read_byte() else {
-                        return Err(DecodeErrorKind::overbyte(buf.offset));
+                        return Err(buf.kind.overbyte(buf.offset).with_trace((
+                            "CaptureBytes",
+                            format!("len: {len}"),
+                            format!("view: {v_expr:?}"),
+                        )));
                     };
                     accum.push(ParsedValue::Flat(Parsed {
                         inner: Value::U8(byte),
@@ -1865,22 +1899,21 @@ impl Decoder {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
                 let view_window = Self::eval_view_expr_with_loc(scope, v_expr)?;
 
-                // REVIEW - hardcoded big-endianness
-                let mut accum = Vec::with_capacity(len);
-                let mut buf = view_window;
-                for _ in 0..len {
-                    let (val, new_buf) = read_array_elem(program, buf, kind)?;
-                    accum.push(val);
-                    buf = new_buf;
-                }
+                let folded = WithErr::fold(
+                    (Vec::with_capacity(len), view_window),
+                    0..len,
+                    |(mut accum, buf), ix| {
+                        Ok(try_with!(read_array_elem(program, buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}"))).map(|(val, new_buf)| {
+                            accum.push(val);
+                            (accum, new_buf)
+                        }))
+                    },
+                )?;
 
-                Ok(WithErr::new((
-                    ParsedValue::new_seq(accum, view_window.offset, len * kind.stride()),
-                    input,
-                )))
+                Ok(folded.map(|(accum, _buf)| (ParsedValue::new_seq(accum, view_window.offset, len * kind.stride()), input)))
             }
             Decoder::ReifyView(v_expr) => {
-                let view = Self::eval_view_expr_with_loc(scope, v_expr)?;
+                let view = try_with!(Self::eval_view_expr_with_loc(scope, v_expr) => ("ReifyView", format!("view: {v_expr:?}")));
                 let v = ParsedValue::from_evaluated(Value::View {
                     offset: view.offset,
                 });
@@ -1926,9 +1959,10 @@ impl Decoder {
             ViewExpr::Offset(base, offset) => {
                 let offset = offset.eval_value_with_loc(scope).unwrap_usize();
                 let base_view = Self::eval_view_expr_with_loc(scope, base)?;
-                let Some((_, view_window)) = base_view.split_at(offset) else {
-                    return Err(DecodeErrorKind::overrun(offset, base_view.offset));
+                let Some((_, mut view_window)) = base_view.split_at(offset) else {
+                    return Err(base_view.kind.overrun(offset, base_view.offset).into());
                 };
+                view_window.kind &= BufferKind::View;
                 Ok(view_window)
             }
         }
@@ -1939,9 +1973,9 @@ fn read_array_elem<'a>(
     program: &'a Program,
     buf: ReadCtxt<'a>,
     kind: &ReadArrayKind,
-) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
+) -> ELocDecodeResult<(ParsedValue, ReadCtxt<'a>)> {
     match kind {
-        ReadArrayKind::Base(kind) => read_base(buf, *kind),
+        ReadArrayKind::Base(kind) => Ok(WithErr::new(read_base(buf, *kind)?)),
         ReadArrayKind::Single { elem, .. } => read_spine_elem(program, buf, elem),
         ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(program, buf, fields),
     }
@@ -1956,12 +1990,10 @@ fn read_spine_elem<'a>(
     program: &'a Program,
     buf: ReadCtxt<'a>,
     elem: &SpineDecoder,
-) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
+) -> ELocDecodeResult<(ParsedValue, ReadCtxt<'a>)> {
     match elem {
-        SpineDecoder::Raw(kind) => read_base(buf, *kind),
-        SpineDecoder::Indirect { dec } => Ok(dec
-            .parse_with_loc(program, &LocScope::Empty, buf)?
-            .extract_warn()),
+        SpineDecoder::Raw(kind) => Ok(WithErr::new(read_base(buf, *kind)?)),
+        SpineDecoder::Indirect { dec } => dec.parse_with_loc(program, &LocScope::Empty, buf),
     }
 }
 
@@ -1972,63 +2004,43 @@ fn read_fixed_record<'a>(
     program: &'a Program,
     buf: ReadCtxt<'a>,
     fields: &[(Option<Label>, SpineDecoder)],
-) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
+) -> ELocDecodeResult<(ParsedValue, ReadCtxt<'a>)> {
     let start = buf.offset;
-    let mut buf = buf;
-    let mut captured = Vec::with_capacity(fields.len());
-    for (name, elem) in fields {
-        let (v, new_buf) = read_spine_elem(program, buf, elem)?;
-        if let Some(name) = name {
-            captured.push((name.clone(), v));
-        }
-        buf = new_buf;
-    }
-    let length = buf.offset - start;
-    Ok((
-        ParsedValue::Record(Parsed {
-            loc: ParseLoc::InBuffer {
-                offset: start,
-                length,
-            },
-            inner: captured,
-        }),
-        buf,
-    ))
+
+    let folded = WithErr::fold(
+        (Vec::with_capacity(fields.len()), buf),
+        fields,
+        |(mut captured, input), (name, elem)| {
+            Ok(try_with!(read_spine_elem(program, input, elem) => ("FixedFormat field", format!("name: {name:?}"))).map(|(v, new_buf)| {
+                if let Some(name) = name {
+                    captured.push((name.clone(), v));
+                }
+                (captured, new_buf)
+            }))
+        },
+    )?;
+    Ok(folded.map(|(captured, buf)| {
+        let length = buf.offset - start;
+        (
+            ParsedValue::Record(Parsed {
+                loc: ParseLoc::InBuffer {
+                    offset: start,
+                    length,
+                },
+                inner: captured,
+            }),
+            buf,
+        )
+    }))
 }
 
 fn read_base(
     buf: ReadCtxt<'_>,
     kind: BaseKind<Endian>,
-) -> Result<(ParsedValue, ReadCtxt<'_>), DecodeErrorKind<ParsedValue>> {
-    let (val, new_buf) = match kind {
-        BaseKind::U8 => {
-            let Some((byte, new_buf)) = buf.read_byte() else {
-                return Err(DecodeErrorKind::overbyte(buf.offset));
-            };
-            (Value::U8(byte), new_buf)
-        }
-        BaseKind::U16BE => {
-            let Some((val, new_buf)) = buf.read_u16be() else {
-                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
-            };
-            (Value::U16(val), new_buf)
-        }
-        BaseKind::U32BE => {
-            let Some((val, new_buf)) = buf.read_u32be() else {
-                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
-            };
-            (Value::U32(val), new_buf)
-        }
-        BaseKind::U64BE => {
-            let Some((val, new_buf)) = buf.read_u64be() else {
-                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
-            };
-            (Value::U64(val), new_buf)
-        }
-        BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
-            unimplemented!("little-endian read-base parses not yet implemented")
-        }
-    };
+) -> LocDecodeResult<(ParsedValue, ReadCtxt<'_>)> {
+    let (val, new_buf) = buf
+        .read_base(kind)
+        .map_err(|e| DecodeError::<ParsedValue>::from(e))?;
     Ok((ParsedValue::new_flat(val, buf.offset, kind.size()), new_buf))
 }
 

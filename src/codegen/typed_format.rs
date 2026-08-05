@@ -39,14 +39,7 @@ impl GenType {
         }
     }
 
-    // pub(crate) fn into_rust_type(self) -> RustType {
-    //     match self {
-    //         GenType::Inline(rt) => rt,
-    //         GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),
-    //     }
-    // }
-
-    /// Attempt to extract the type-index and corresponding name (`Label`) from `self`.
+    /// Attempt to extract the type-index and corresponding name (`Label`) (along with any generic parameters) from `self`.
     ///
     /// Returns `None` if the type in question is not itself a concrete definition (`GenType::Def`)
     /// or an abstract reference to a locally-defined adhoc type (`GenType::Inline` of nested `LocalType::LocalDef`).
@@ -122,7 +115,6 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 branches.hash(state)
             }
             TypedFormat::Tuple(_, elts) => elts.hash(state),
-            // REVIEW - do we want to dodge collision between Tuple and Sequence with a salt, or is this okay?
             TypedFormat::Sequence(_, elts) => elts.hash(state),
             TypedFormat::RepeatCount(_, n, inner) => {
                 n.hash(state);
@@ -984,7 +976,6 @@ impl TypedExpr<GenType> {
     }
 }
 
-// FIXME - same as TypedExpr, requirements of HashMap include Eq and Hash for this type
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedPattern<TypeRep> {
     Binding(TypeRep, Label),

@@ -1063,13 +1063,6 @@ impl ToFragment for RustType {
     }
 }
 
-impl ToFragmentExt for RustType {
-    // FIXME - this impl is only to fix test cases
-    fn to_fragment_precedence(&self, _prec: Precedence) -> Fragment {
-        self.to_fragment()
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum RustStruct {
     Record(Vec<(Label, RustType)>),
@@ -1243,14 +1236,6 @@ pub(crate) enum LocalType {
     LocalDef(usize, Label, Option<Box<UseParams>>),
     External(Label),
 }
-
-// impl AsRef<Label> for LocalType {
-//     fn as_ref(&self) -> &Label {
-//         match self {
-//             LocalType::External(lab) | LocalType::LocalDef(_, lab) => lab,
-//         }
-//     }
-// }
 
 impl ToFragment for LocalType {
     fn to_fragment(&self) -> Fragment {
@@ -2438,10 +2423,6 @@ impl RustExpr {
 
     /// Invokes `<self>.<name>::<ty_args>` as a callable method (i.e. using turbofish syntax to specify
     /// explicit generic type-arguments), passing in the argument list produced by iterating over `args`.
-    // NOTE - not yet called outside of tests; expected to be picked up by the FixedFormat ReadArray
-
-    // codegen path (see the TODO on `TypedFixedReadKind::FixedFormat` in codegen/mod.rs)
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn call_method_turbofish(
         self,
         name: impl Into<Label>,
@@ -4111,7 +4092,7 @@ pub trait ToFragment {
     }
 }
 
-trait ToFragmentExt: ToFragment {
+pub(crate) trait ToFragmentExt: ToFragment {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment;
 
     fn delim_list_prec<'a>(
@@ -4160,7 +4141,11 @@ where
 mod test {
     use super::*;
 
-    fn expect_fragment(value: &impl ToFragmentExt, expected: &str) {
+    fn expect_fragment(value: &impl ToFragment, expected: &str) {
+        assert_eq!(&format!("{}", value.to_fragment()), expected)
+    }
+
+    fn expect_fragment_top(value: &impl ToFragmentExt, expected: &str) {
         assert_eq!(
             &format!("{}", value.to_fragment_precedence(Precedence::TOP)),
             expected
@@ -4182,7 +4167,7 @@ mod test {
             "append",
             [RustExpr::BorrowMut(Box::new(RustExpr::local("other")))],
         );
-        expect_fragment(&re, "this.append(&mut other)")
+        expect_fragment_top(&re, "this.append(&mut other)")
     }
 }
 
