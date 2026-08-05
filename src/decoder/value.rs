@@ -72,6 +72,116 @@ impl Value {
     }
 }
 
+/// Pairs a coerced value (typically a `Value` or `&Value`) with a flag recording whether
+/// producing it required looking through a `Value::Permit(Err(Some(_)))`, i.e. a fallback
+/// substituted in place of a decode failure permitted by `Format::Permit`.
+///
+/// This exists to let coercion helpers (see [`Value::coerce_mapped_value`] and
+/// [`Value::extract_mapped_value`]) unwrap `Permit`-wrapped fallback values transparently, so
+/// that shape-matching code written before `Permit` existed does not need to special-case it or
+/// panic, without silently discarding the fact that a fallback was involved for the callers that
+/// do care to check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Coerced<T> {
+    value: T,
+    is_fallback: bool,
+}
+
+impl<T> Coerced<T> {
+    /// Wraps `value` as a non-fallback (`is_fallback = false`) result.
+    pub const fn pure(value: T) -> Self {
+        Coerced {
+            value,
+            is_fallback: false,
+        }
+    }
+
+    /// Wraps `value` as a fallback (`is_fallback = true`) result, i.e. one that was found behind
+    /// a `Value::Permit(Err(Some(_)))`.
+    pub const fn fallback(value: T) -> Self {
+        Coerced {
+            value,
+            is_fallback: true,
+        }
+    }
+
+    /// Constructs a `Coerced` from its constituent parts directly.
+    pub const fn new(value: T, is_fallback: bool) -> Self {
+        Coerced { value, is_fallback }
+    }
+
+    /// Returns `true` if and only if producing the wrapped value required looking through a
+    /// `Value::Permit(Err(Some(_)))`.
+    pub const fn is_fallback(&self) -> bool {
+        self.is_fallback
+    }
+
+    /// Discards the fallback-tracking bit and returns the underlying value.
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+
+    /// Decomposes into the underlying value and the fallback-tracking bit.
+    pub fn into_parts(self) -> (T, bool) {
+        (self.value, self.is_fallback)
+    }
+
+    /// Applies `f` to the underlying value, preserving the fallback-tracking bit.
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Coerced<U> {
+        Coerced {
+            value: f(self.value),
+            is_fallback: self.is_fallback,
+        }
+    }
+
+    /// Converts a `Coerced<T>` into a `Coerced<&T>` borrowing the underlying value.
+    ///
+    /// (Named to avoid colliding with the inherent behavior of the blanket [`AsRef`] impl, which
+    /// returns a bare `&T` rather than a `Coerced<&T>`.)
+    pub fn borrowed(&self) -> Coerced<&T> {
+        Coerced {
+            value: &self.value,
+            is_fallback: self.is_fallback,
+        }
+    }
+
+    /// Combines `self` with another `Coerced` value via `f`, OR-ing together their
+    /// fallback-tracking bits (i.e. the result is a fallback if either input was).
+    pub fn combine<U, V>(self, other: Coerced<U>, f: impl FnOnce(T, U) -> V) -> Coerced<V> {
+        Coerced {
+            value: f(self.value, other.value),
+            is_fallback: self.is_fallback || other.is_fallback,
+        }
+    }
+}
+
+impl<T> std::ops::Deref for Coerced<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> std::ops::DerefMut for Coerced<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+impl<T> AsRef<T> for Coerced<T> {
+    fn as_ref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> From<T> for Coerced<T> {
+    /// Converts a bare value into a non-fallback `Coerced`, equivalent to [`Coerced::pure`].
+    fn from(value: T) -> Self {
+        Coerced::pure(value)
+    }
+}
+
 impl From<usize> for Value {
     fn from(value: usize) -> Value {
         Value::Usize(value)
@@ -299,6 +409,7 @@ impl Value {
 
     /// Reduces any referenced `Value` to its underlying nominal value, by recursively unwrapping any
     /// `Value::Branch`, `Value::Permit(Ok(..))`, `Value::Mapped` encompassing it.
+    // FIXME[epic=coerce-value-permiterr] - refactor to return `Coerced<&'a Self>`
     pub fn coerce_mapped_value(&self) -> &Self {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
@@ -309,6 +420,7 @@ impl Value {
     }
 
     /// Like `coerce_mapped_value`, but for owned values rather than borrowed ones.
+    // FIXME[epic=coerce-value-permiterr] - refactor to return `Coerced<Self>`
     pub fn extract_mapped_value(self) -> Self {
         match self {
             Value::Mapped(_orig, v) => v.extract_mapped_value(),
@@ -327,6 +439,7 @@ impl Value {
     }
 
     pub(crate) fn is_boolean(&self) -> bool {
+        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
         matches!(self.coerce_mapped_value(), Value::Bool(_))
     }
 }

@@ -160,6 +160,7 @@ mod test {
                     (Cow::Borrowed("mask"), ref mask),
                     (Cow::Borrowed("data"), ref data),
                 ] => {
+                    // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
                     match len.coerce_mapped_value() {
                         &Value::U32(n) => assert_eq!(n, 32),
                         other => panic!("Unexpected Value for `len` field: {other:?}"),
