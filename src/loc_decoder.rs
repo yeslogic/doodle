@@ -2038,6 +2038,7 @@ fn value_to_vec_usize(v: &ParsedValue) -> Vec<usize> {
         _ => panic!("expected Seq"),
     };
     vs.iter()
+        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
         .map(|v| match v.coerce_mapped_value() {
             Value::U8(n) => *n as usize,
             _ => panic!("expected U8"),
