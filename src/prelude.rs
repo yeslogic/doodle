@@ -331,7 +331,7 @@ pub fn make_huffman_decoder(
 }
 
 pub(crate) mod huffman {
-    use crate::parser::error::StateError;
+    use crate::parser::error::{DataStateError, StateError};
 
     use super::{PResult, ParseError, Parser};
 
@@ -440,8 +440,8 @@ pub(crate) mod huffman {
                 node = match node.follow(b) {
                     Ok(node) => node,
                     Err(e) => {
-                        return Err(ParseError::InternalError(StateError::HuffmanDescentError(
-                            e,
+                        return Err(ParseError::InternalError(StateError::Data(
+                            DataStateError::HuffmanDescentError(e),
                         )));
                     }
                 }

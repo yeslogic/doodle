@@ -1,8 +1,9 @@
 pub mod error;
 pub mod offset;
+pub mod util;
 pub mod view;
 
-use error::{PResult, ParseError, StateError};
+use error::{DataStateError, PResult, ParseError, ParserStateError, StateError};
 use offset::{BufferOffset, ByteOffset};
 pub use view::View;
 
@@ -123,7 +124,16 @@ impl<'a> Parser<'a> {
     pub fn read_byte(&mut self) -> Result<u8, ParseError> {
         let (ix, sub_bit) = self.offset.try_increment(1)?.as_bytes();
         let Some(&byte) = self.buffer.buffer.get(ix) else {
-            return Err(ParseError::InternalError(StateError::OutOfBoundsRead));
+            // `ix` can only be at or past the end of the buffer here, since `try_increment` would
+            // otherwise have rejected the advance; `ix == len` is the well-formed case of trying
+            // to read past the final legal offset (a data-driven, in-bounds condition), while
+            // `ix > len` would indicate that the current offset was already illegally out of
+            // bounds, which should be precluded by proactive enforcement elsewhere.
+            return Err(ParseError::InternalError(if ix == self.buffer.buffer.len() {
+                StateError::Data(DataStateError::EndOfStreamRead)
+            } else {
+                StateError::Parser(ParserStateError::IllegalOffsetRead)
+            }));
         };
         let ret = if let Some(n) = sub_bit {
             let i = n as u8;
@@ -222,11 +232,13 @@ impl<'a> Parser<'a> {
         let end = _current_offset.increment_by(size);
         let current_limit = self.offset.current_limit();
         if end > current_limit {
-            return Err(ParseError::InternalError(StateError::UnstackableSlices {
-                current_offset: _current_offset,
-                current_limit,
-                new_slice_end: end,
-            }));
+            return Err(ParseError::InternalError(StateError::Data(
+                DataStateError::UnstackableSlices {
+                    current_offset: _current_offset,
+                    current_limit,
+                    new_slice_end: end,
+                },
+            )));
         }
         unsafe {
             self.offset.open_slice_unchecked(size);
