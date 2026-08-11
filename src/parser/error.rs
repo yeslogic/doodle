@@ -170,19 +170,16 @@ impl std::error::Error for ParseError {
     }
 }
 
-/// Sub-class of errors that only occur when an illegal operation is attempted,
-/// due to incoherent usage or improperly nesting of various state-manipulation methods
-/// within the [`BufferOffset`].
+/// Sub-class of [`StateError`] for errors that arise purely from incoherent usage or improper
+/// nesting/bracketing of the various state-manipulation methods on [`BufferOffset`].
+///
+/// These indicate a bug in the parsing logic itself (or in `doodle`'s code-generation), and can
+/// never be triggered by a well-formed decoder processing any buffer, however malformed or
+/// adversarial its contents.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum StateError {
+pub enum ParserStateError {
     /// Failed attempt to return to a fail-safe 'recovery-point', such as the starting offset of a `PeekNot` or `UnionNondet`.
     NoRecovery,
-    /// Failed attempt to open a slice whose final offset overruns either an existing slice, or the buffer itself
-    UnstackableSlices {
-        current_offset: ByteOffset,
-        current_limit: ByteOffset,
-        new_slice_end: ByteOffset,
-    },
     /// Failed attempt to return to a neutral 'restoration-point', such as the starting offset of a `Peek` or `WithRelativeOffset`
     NoRestore,
     /// Attempt to enter bits-mode while already in bits-mode, or escape bits-mode while not in bits-mode
@@ -191,18 +188,56 @@ pub enum StateError {
     MissingSlice,
     /// The current offset somehow exceeded the limit of an extant slice
     SliceOverrun,
-    /// Reading one byte is not possible because we are outside of the buffer bounds
-    OutOfBoundsRead,
+    /// Attempted to read a byte at an offset that is not just past the end of the buffer, but
+    /// genuinely outside of it, which should be precluded by proactive enforcement elsewhere.
+    IllegalOffsetRead,
+}
+
+impl std::fmt::Display for ParserStateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserStateError::NoRecovery => write!(f, "unable to recover from parse failure"),
+            ParserStateError::NoRestore => write!(f, "unable to restore to a parsing checkpoint"),
+            ParserStateError::BinaryModeError => {
+                write!(f, "illegal binary-mode switch operation")
+            }
+            ParserStateError::MissingSlice => write!(f, "missing slice cannot be closed"),
+            ParserStateError::SliceOverrun => {
+                write!(
+                    f,
+                    "cannot close slice properly, as it has already been overrun"
+                )
+            }
+            ParserStateError::IllegalOffsetRead => {
+                write!(f, "attempted read at an offset outside of the buffer")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ParserStateError {}
+
+/// Sub-class of [`StateError`] for errors that can be triggered by contrarian, adversarial, or
+/// otherwise non-conformant buffer-data being processed by an otherwise correctly-implemented
+/// decoder.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DataStateError {
+    /// Failed attempt to open a slice whose final offset overruns either an existing slice, or the buffer itself
+    UnstackableSlices {
+        current_offset: ByteOffset,
+        current_limit: ByteOffset,
+        new_slice_end: ByteOffset,
+    },
+    /// Attempted to read a byte having already reached the final legal offset of the buffer.
+    EndOfStreamRead,
     /// No corresponding path for decoding a prefix code according to a constructed HuffmanNode-tree.
     HuffmanDescentError(crate::prelude::huffman::DescentError),
 }
 
-impl std::fmt::Display for StateError {
+impl std::fmt::Display for DataStateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StateError::NoRecovery => write!(f, "unable to recover from parse failure"),
-            StateError::NoRestore => write!(f, "unable to restore to a parsing checkpoint"),
-            StateError::UnstackableSlices {
+            DataStateError::UnstackableSlices {
                 current_offset,
                 current_limit,
                 new_slice_end,
@@ -210,23 +245,59 @@ impl std::fmt::Display for StateError {
                 f,
                 "unable to open slice due to limit-violation: to-be-constructed slice endpoint {new_slice_end} exceeds existing limit (slice or stream) of {current_limit} (current offset: {current_offset})",
             ),
-            StateError::BinaryModeError => write!(f, "illegal binary-mode switch operation"),
-            StateError::MissingSlice => write!(f, "missing slice cannot be closed"),
-            StateError::SliceOverrun => {
-                write!(
-                    f,
-                    "cannot close slice properly, as it has already been overrun"
-                )
+            DataStateError::EndOfStreamRead => {
+                write!(f, "unable to read past the end of the buffer")
             }
-            StateError::OutOfBoundsRead => {
-                write!(f, "unguarded illegal read operation (out of bounds)")
-            }
-            StateError::HuffmanDescentError(e) => write!(f, "{e}"),
+            DataStateError::HuffmanDescentError(e) => write!(f, "{e}"),
         }
     }
 }
 
-impl std::error::Error for StateError {}
+impl std::error::Error for DataStateError {}
+
+/// Sub-class of errors that only occur when an illegal operation is attempted,
+/// due to incoherent usage or improperly nesting of various state-manipulation methods
+/// within the [`BufferOffset`], or due to contrarian, adversarial, or otherwise malformed
+/// buffer-data being processed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StateError {
+    /// Errors that indicate a bug in the parsing logic itself, and can never be triggered by any
+    /// buffer-data, however malformed.
+    Parser(ParserStateError),
+    /// Errors that can be triggered by contrarian, adversarial, or otherwise non-conformant
+    /// buffer-data, even in an otherwise correctly-implemented decoder.
+    Data(DataStateError),
+}
+
+impl std::fmt::Display for StateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StateError::Parser(e) => write!(f, "{e}"),
+            StateError::Data(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for StateError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            StateError::Parser(e) => Some(e),
+            StateError::Data(e) => Some(e),
+        }
+    }
+}
+
+impl From<ParserStateError> for StateError {
+    fn from(value: ParserStateError) -> Self {
+        StateError::Parser(value)
+    }
+}
+
+impl From<DataStateError> for StateError {
+    fn from(value: DataStateError) -> Self {
+        StateError::Data(value)
+    }
+}
 
 impl From<StateError> for ParseError {
     fn from(value: StateError) -> Self {
