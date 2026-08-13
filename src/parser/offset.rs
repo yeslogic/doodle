@@ -348,13 +348,11 @@ impl ViewStack {
 
     /// Attempts to restore the return-on-success offset-checkpoint for a speculative parse that has succeeded.
     ///
-    /// Pops elements from the top of the stack until a `Lens` with a valid restore-point (see [`Lens::restore`]) is found,
-    /// returning the updated [`ViewStack`] along with the unwrapped result of [`Lens::restore`].
+    /// Scans the stack from the top down for the first `Lens` with a valid restore-point (see [`Lens::restore`]),
+    /// then truncates the stack to that point, discarding the matching `Lens` itself along with everything above it,
+    /// and returns the updated [`ViewStack`] along with the unwrapped result of [`Lens::restore`].
     ///
-    /// All elements above the first `Lens` whose restore-point was found will be discarded.
-    ///
-    /// If the stack is exhausted before a valid restore-point is found, returns an error reporting
-    /// that no restore-point was found.
+    /// If no Lenses in the stack have a valid restore-point, returns an error.
     ///
     /// # Note
     ///
@@ -382,13 +380,11 @@ impl ViewStack {
 
     /// Attempts to recover to the return-on-fail offset-checkpoint for a speculative parse that has failed.
     ///
-    /// Pops elements from the top of the stack until a `Lens` with a valid recovery-point (see [`Lens::recover`]) is found,
-    /// returning the updated [`ViewStack`] along with the unwrapped result of [`Lens::recover`].
+    /// Scans the stack from the top down for the first `Lens` with a valid recovery-point (see [`Lens::recover`]),
+    /// then truncates the stack to that point, discarding the matching `Lens` itself along with everything above it,
+    /// and returns the updated [`ViewStack`] along with the unwrapped result of [`Lens::recover`].
     ///
-    /// All elements above the first `Lens` whose recovery-point was found will be discarded.
-    ///
-    /// If the stackis exhausted before a valid recovery-point is found, returns an error reporting
-    /// that no recovery-point was found.
+    /// If no Lenses in the stack have a valid recovery-point, returns an error.
     ///
     /// # Note
     ///
@@ -737,7 +733,7 @@ impl BufferOffset {
         };
         let Lens::Slice { endpoint } = slice else {
             unreachable!(
-                "first element in iterator returned by unstack_slice_context should always be Lens::Slice"
+                "if the iterator returne dby unstack_slice_context is non-empty, the first element should always be Lens::Slice"
             );
         };
 
@@ -755,46 +751,25 @@ impl BufferOffset {
                     );
                     continue;
                 }
-                Lens::Peek { checkpoint } => {
-                    log::error!(
-                        "BufferOffset::close_slice: unexpected, unclosed Peek (<-@{checkpoint}) found while closing slice (@{endpoint}->) (@{})",
-                        self.current_offset
-                    );
-                    panic!(
-                        "[STATE]: encountered unfinished Peek lens above the slice we are closing (@{})",
-                        self.current_offset
-                    );
+                Lens::Seek {
+                    is_transparent: false,
+                    ..
                 }
-                Lens::PeekNot { checkpoint } => {
-                    log::error!(
-                        "BufferOffset::close_slice: unexpected, unclosed PeekNot (<-@{checkpoint}) found while closing slice (@{endpoint}->) (@{})",
-                        self.current_offset
-                    );
-                    panic!(
-                        "[STATE]: encountered unfinished PeekNot lens above the slice we are closing (@{})",
-                        self.current_offset
-                    );
+                | Lens::PeekNot { .. }
+                | Lens::Peek { .. } => {
+                    return Err(ParseError::InternalError(StateError::Parser(
+                        ParserStateError::UnfinishedLensAboveSlice(top),
+                    )));
                 }
                 Lens::Seek {
-                    is_transparent,
+                    is_transparent: true,
                     checkpoint,
                 } => {
-                    if is_transparent {
-                        log::info!(
-                            "BufferOffset::close_slice: found a transparent Seek (<-@{checkpoint}) within the slice we are closing (@{endpoint}->) (@{})",
-                            self.current_offset
-                        );
-                        continue;
-                    } else {
-                        log::error!(
-                            "BufferOffset::close_slice: unexpected, unclosed Seek (<-@{checkpoint}) found while closing slice (@{endpoint}->) (@{})",
-                            self.current_offset
-                        );
-                        panic!(
-                            "[STATE]: encountered unfinished Seek lens above the slice we are closing (@{})",
-                            self.current_offset
-                        );
-                    }
+                    log::info!(
+                        "BufferOffset::close_slice: found a transparent Seek (<-@{checkpoint}) within the slice we are closing (@{endpoint}->) (@{})",
+                        self.current_offset
+                    );
+                    continue;
                 }
             }
         }
@@ -859,7 +834,7 @@ impl BufferOffset {
         Ok(())
     }
 
-    /// Performs an [`ViewStack::recover`] operation upon reaching a parse-failure, unwinding the internal ViewStack until a fail-safe (recovery-point) `Lens` is popped.
+    /// Performs an [`ViewStack::recover`] operation upon reaching a parse-failure, unwinding the internal ViewStack until a fail-safe (recovery-point) `Lens` is found and discarded.
     ///
     /// If the ViewStack is empty, or is exhausted before such a Lens is found, will return `Err` with the appropriate
     /// `StateError` value. In such a case, `self` will be left in a semi-indeterminate state, and there is no way to

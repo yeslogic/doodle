@@ -4017,11 +4017,11 @@ impl ToAst for DerivedLogic<GTExpr> {
                 let bind_res = GenStmt::assign(model::PERMIT_BIND, rhs);
                 let if_ok = GenBlock::simple_expr(RustExpr::local(model::PERMIT_BIND));
                 let if_err = {
-                    let (stmts, expr) = model::yield_value_with_error(
+                    let handle_err = model::permit_err_fallback_value(
                         (&**expr).clone(),
                         RustExpr::local(model::PERMIT_ERR),
                     );
-                    GenBlock::lift_block(stmts, expr)
+                    GenBlock::simple_expr(handle_err)
                 };
                 let ctrl = GenExpr::Control(Box::new(RustControl::Match(
                     Box::new(RustExpr::local(model::PERMIT_BIND)),
@@ -4111,11 +4111,11 @@ impl ToAst for DerivedLogic<GTExpr> {
                             GenBlock::explicit_return(model::err_where_unsatisfied(trace))
                         }
                         Severity::Expect => {
-                            let (handle_err, value) = model::yield_value_with_error(
+                            let handle_err = model::permit_err_fallback_value(
                                 RustExpr::local(model::WHERE_INNER),
                                 model::err_where_unsatisfied(trace),
                             );
-                            GenBlock::lift_block(handle_err, value)
+                            GenBlock::simple_expr(handle_err)
                         }
                     };
                     GenControl::If(

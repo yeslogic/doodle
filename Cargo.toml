@@ -18,6 +18,11 @@ name = "runtime_repeat"
 path = "tests/runtime_repeat/mod.rs"
 test = true
 
+[[test]]
+name = "permit_state_error"
+path = "tests/permit_state_error/mod.rs"
+test = true
+
 [features]
 default = []
 alt = []

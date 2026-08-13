@@ -6,7 +6,7 @@ pub use crate::byte_set::ByteSet;
 pub use crate::numeric::eval::*;
 pub use crate::parser::{
     Parser, View,
-    error::{PResult, ParseError},
+    error::{PResult, ParseError, Permissible},
 };
 pub use smallsorts::{
     self as allsorts,

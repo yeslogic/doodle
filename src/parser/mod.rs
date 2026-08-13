@@ -107,6 +107,12 @@ impl<'a> Parser<'a> {
         Ok(is_advance)
     }
 
+    /// Immediately advances to the furthest offset reachable in the current context.
+    ///
+    /// With in a slice context, this will advance to the end of the slice. Otherwise, it will advance
+    /// to the end of the buffer.
+    ///
+    /// Operationally equivalent to calling [`Self::read_byte`] (discarding the output) until Err is returned.
     pub fn skip_remainder(&mut self) {
         let after_skip = self.offset.current_limit();
         unsafe {
@@ -129,11 +135,13 @@ impl<'a> Parser<'a> {
             // to read past the final legal offset (a data-driven, in-bounds condition), while
             // `ix > len` would indicate that the current offset was already illegally out of
             // bounds, which should be precluded by proactive enforcement elsewhere.
-            return Err(ParseError::InternalError(if ix == self.buffer.buffer.len() {
-                StateError::Data(DataStateError::EndOfStreamRead)
-            } else {
-                StateError::Parser(ParserStateError::IllegalOffsetRead)
-            }));
+            return Err(ParseError::InternalError(
+                if ix == self.buffer.buffer.len() {
+                    StateError::Data(DataStateError::EndOfStreamRead)
+                } else {
+                    StateError::Parser(ParserStateError::IllegalOffsetRead)
+                },
+            ));
         };
         let ret = if let Some(n) = sub_bit {
             let i = n as u8;
