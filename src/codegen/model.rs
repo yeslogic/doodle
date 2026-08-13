@@ -14,7 +14,7 @@ pub(crate) const READ_ARRAY_IS_COPY: bool = true;
 // we wish to record certain properties of it abstractly without difficult-to-track hardcoding
 pub(crate) const VIEW_OBJECT_IS_COPY: bool = true;
 
-/// Helper macro for producing RustExprs for method-calls on parser objects, as well as generic function calls
+/// Helper macro for producing RustExprs for method-calls on parser objects (or other receivers), as well as generic function calls
 ///
 /// Used for ease-of-implementation of template-fns that are defined in this module for performing abstract operations using parser objects and prelude functions
 ///
@@ -26,17 +26,17 @@ pub(crate) const VIEW_OBJECT_IS_COPY: bool = true;
 /// call!(fn parse_huffman, code_lengths, values) // parse_huffman($code_lengths, $values)
 /// ```
 macro_rules! call {
-    ( $parser:expr, $method:ident ) => {
+    ( $recv:expr, $method:ident ) => {
         RustExpr::MethodCall(
-            Box::new($parser),
+            Box::new($recv),
             mk_method(stringify!($method)),
             UseParams::new(),
             Vec::new(),
         )
     };
-    ( $parser:expr, $method:ident, $( $arg:tt ),+ ) => {
+    ( $recv:expr, $method:ident, $( $arg:tt ),+ ) => {
         RustExpr::MethodCall(
-            Box::new($parser),
+            Box::new($recv),
             mk_method(stringify!($method)),
             UseParams::new(),
             vec![$($arg),+]
@@ -458,24 +458,32 @@ pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
 
 // SECTION - helper functions for various kinds of error-handling patterns
 
-pub fn yield_value_with_error(value: RustExpr, error: RustExpr) -> (Vec<RustStmt>, RustExpr) {
-    let handle_err = {
-        let error = if let RustExpr::ResultErr(error) = error {
-            *error
-        } else {
-            error
+/// Given a nominal value and an error, calls `Permissible::fallback_value` on `err` with `value` and a logging function.
+pub fn permit_err_fallback_value(value: RustExpr, error: RustExpr) -> RustExpr {
+    let log_fn: RustExpr = {
+        const ERR_BIND: &'static str = "err";
+        let head = RustClosureHead::SimpleVar(Label::Borrowed(ERR_BIND), None);
+        let body = {
+            let log_message = LogMessage {
+                format_string: Label::Borrowed("data-level parse error suppressed by Permit: {}"),
+                args: vec![RustExpr::local(ERR_BIND)],
+            };
+            ClosureBody::Statements(
+                [RustStmt::Expr(RustExpr::Macro(RustMacro::Log(
+                    LogFn::Error,
+                    log_message,
+                )))]
+                .to_vec(),
+            )
         };
-        let log_message = LogMessage {
-            format_string: Label::Borrowed("expect-level value assertion failed: {}"),
-            args: vec![error],
-        };
-        [RustStmt::Expr(RustExpr::Macro(RustMacro::Log(
-            LogFn::Error,
-            log_message,
-        )))]
-        .to_vec()
+        RustExpr::Closure(RustClosure::from_parts(head, body))
     };
-    (handle_err, value)
+    let error = if let RustExpr::ResultErr(error) = error {
+        *error
+    } else {
+        error
+    };
+    try_call!(error, fallback_value, value, log_fn)
 }
 
 // !SECTION

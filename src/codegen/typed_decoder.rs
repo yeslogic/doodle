@@ -800,4 +800,31 @@ mod tests {
         let mut f = File::create(TEST_PATH).unwrap();
         write!(f, "{}", frag).unwrap();
     }
+
+    #[test]
+    /// Test to pre-generate a Permit-parse of a slice we will peek within and manually remove the 'close_peek' within to cause a state-error we want to see
+    /// how permit handles.
+    fn permit_slice_no_close_peek_base_codegen() {
+        let mut module = FormatModule::new();
+        let in_permit = module.define_format(
+            "test.in_permit",
+            monad_seq(
+                slice(Expr::U8(6), Format::Peek(Box::new(byte_seq(b"abcd")))),
+                compute(Expr::Bool(true)),
+            ),
+        );
+        let fallback = module.define_format("test.fallback", compute(Expr::UNIT));
+        let outer = module.define_format(
+            "test.main",
+            alts_nondet([
+                ("InPermit", permit(in_permit.call(), Expr::Bool(false))),
+                ("Fallback", fallback.call()),
+            ]),
+        );
+        let top = outer.call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/permit_state_error/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
+    }
 }

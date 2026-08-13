@@ -1,5 +1,7 @@
 use std::hash::Hasher as _;
 
+use crate::util::ErrTrace;
+
 use super::offset::ByteOffset;
 
 pub type PResult<T> = Result<T, ParseError>;
@@ -28,7 +30,7 @@ impl From<ParseError> for CtxtParseError {
     }
 }
 
-impl crate::util::ErrTrace for CtxtParseError {
+impl ErrTrace for CtxtParseError {
     fn with_trace<T>(mut self, ctxt: T) -> Self
     where
         T: std::fmt::Debug + Sync + Send + 'static,
@@ -191,6 +193,8 @@ pub enum ParserStateError {
     /// Attempted to read a byte at an offset that is not just past the end of the buffer, but
     /// genuinely outside of it, which should be precluded by proactive enforcement elsewhere.
     IllegalOffsetRead,
+    /// During an operation that closes a slice, an unclosed Lens was found within the slice-context we would close
+    UnfinishedLensAboveSlice(super::offset::Lens),
 }
 
 impl std::fmt::Display for ParserStateError {
@@ -210,6 +214,12 @@ impl std::fmt::Display for ParserStateError {
             }
             ParserStateError::IllegalOffsetRead => {
                 write!(f, "attempted read at an offset outside of the buffer")
+            }
+            ParserStateError::UnfinishedLensAboveSlice(lens) => {
+                write!(
+                    f,
+                    "attempted slice-close operation cannot proceed due to an unfinished lens above it: {lens:?}"
+                )
             }
         }
     }
@@ -302,5 +312,53 @@ impl From<DataStateError> for StateError {
 impl From<StateError> for ParseError {
     fn from(value: StateError) -> Self {
         ParseError::InternalError(value)
+    }
+}
+
+/// Trait for conditionally suppressing errors that can be triggered by non-conformant buffer-data,
+/// without silencing more fundamental state errors related to the integrity of a parser definition.
+pub trait Permissible: Sized {
+    /// Returns `Ok(self)` if the error is eligible for suppression (e.g. [`Format::Permit`]), and `Err(self)`
+    /// if it cannot be triggered by non-conformant buffer-data alone.
+    fn permit(self) -> Result<Self, Self>;
+
+    /// If `self` is eligible for suppression, calls `log_fn` on `self` and returns `Ok(value)`. Otherwise, returns `Err(self)`.
+    fn fallback_value<T: Sized>(self, value: T, log_fn: impl FnOnce(Self)) -> Result<T, Self> {
+        log_fn(self.permit()?);
+        Ok(value)
+    }
+}
+
+impl Permissible for StateError {
+    fn permit(self) -> Result<Self, Self> {
+        match &self {
+            StateError::Parser(_) => Err(self),
+            StateError::Data(_) => Ok(self),
+        }
+    }
+}
+
+#[inline]
+fn map_ok_err<T, U>(res: Result<T, T>, f: impl FnOnce(T) -> U) -> Result<U, U> {
+    match res {
+        Ok(v) => Ok(f(v)),
+        Err(e) => Err(f(e)),
+    }
+}
+
+impl Permissible for ParseError {
+    fn permit(self) -> Result<Self, Self> {
+        match &self {
+            ParseError::InternalError(e) => map_ok_err(e.permit(), ParseError::InternalError),
+            _ => Ok(self),
+        }
+    }
+}
+
+impl Permissible for CtxtParseError {
+    fn permit(self) -> Result<Self, Self> {
+        let CtxtParseError { err, _trace } = self;
+        let res = err.permit();
+        map_ok_err(res, |err| CtxtParseError { err, _trace })
     }
 }
