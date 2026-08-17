@@ -85,8 +85,7 @@ impl Expr {
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
             Expr::TupleProj(head, index) => cow_map(head.eval(scope), |v| {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-                v.coerce_mapped_value().tuple_proj(*index)
+                v.coerce_mapped_value().tuple_proj(*index).into_inner()
             }),
             Expr::Record(fields) => {
                 Cow::Owned(Value::record(fields.iter().map(|(label, expr)| {
@@ -94,8 +93,9 @@ impl Expr {
                 })))
             }
             Expr::RecordProj(head, label) => cow_map(head.eval(scope), |v| {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-                v.coerce_mapped_value().record_proj(label.as_ref())
+                v.coerce_mapped_value()
+                    .record_proj(label.as_ref())
+                    .into_inner()
             }),
             Expr::Variant(label, expr) => {
                 Cow::Owned(Value::variant(label.clone(), expr.eval_value(scope)))
@@ -255,7 +255,6 @@ impl Expr {
                 ),
                 _ => panic!("AsChar: expected U8, U16, U32, or U64"),
             }),
-            // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
             Expr::SeqLength(seq) => match seq.eval(scope).coerce_mapped_value().get_sequence() {
                 Some(values) => {
                     let len = values.len();
@@ -264,7 +263,6 @@ impl Expr {
                 _ => panic!("SeqLength: expected Seq"),
             },
             Expr::SeqIx(seq, index) => cow_remap(seq.eval(scope), |v| {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
                 match v.coerce_mapped_value().get_sequence() {
                     Some(values) => match values {
                         ValueSeq::ValueSeq(values) => {
@@ -280,7 +278,6 @@ impl Expr {
                 }
             }),
             Expr::SubSeq(seq, start, length) => {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => match values {
                         ValueSeq::ValueSeq(values) => {
@@ -298,7 +295,6 @@ impl Expr {
                 }
             }
             Expr::SubSeqInflate(seq, start, length) => {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
                         let start = start.eval_value(scope).unwrap_usize();
@@ -333,14 +329,13 @@ impl Expr {
                 }
             }
             Expr::Append(seq0, seq1) => {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
                 match seq0.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(val_seq0) => match seq1.eval(scope).coerce_mapped_value().get_sequence() {
                         Some(val_seq1) => {
                             if val_seq0.is_empty() {
-                                return Cow::Owned(seq1.eval(scope).coerce_mapped_value().clone());
+                                return Cow::Owned(seq1.eval(scope).coerce_mapped_value().cloned());
                             } else if val_seq1.is_empty() {
-                                return Cow::Owned(seq0.eval(scope).coerce_mapped_value().clone());
+                                return Cow::Owned(seq0.eval(scope).coerce_mapped_value().cloned());
                             }
                             Cow::Owned(Value::Seq(val_seq0.append(val_seq1)))
                         }
@@ -350,7 +345,6 @@ impl Expr {
                 }
             }
             Expr::FlatMap(expr, seq) => {
-                // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
                         let mut vs = Vec::new();
@@ -463,10 +457,9 @@ impl Expr {
     }
 
     fn eval_value_ref<'a, 'b: 'a>(&'b self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
-        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
         match self.eval(scope) {
-            Cow::Borrowed(value) => Cow::Borrowed(value.coerce_mapped_value()),
-            Cow::Owned(v) => Cow::Owned(v.extract_mapped_value()),
+            Cow::Borrowed(value) => Cow::Borrowed(value.coerce_mapped_value().into_inner()),
+            Cow::Owned(v) => Cow::Owned(v.extract_mapped_value().into_inner()),
         }
     }
 
@@ -1892,8 +1885,7 @@ fn value_to_vec_usize(v: &Value) -> Vec<usize> {
         _ => panic!("expected Seq"),
     };
     vs.iter()
-        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-        .map(|v| match v.coerce_mapped_value() {
+        .map(|v| match v.coerce_mapped_value().into_inner() {
             Value::U8(n) => *n as usize,
             _ => panic!("expected U8"),
         })

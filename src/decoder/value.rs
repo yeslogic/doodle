@@ -155,6 +155,24 @@ impl<T> Coerced<T> {
     }
 }
 
+impl<'a> Coerced<&'a Value> {
+    /// Performs tuple-projection on the underlying `Value` of a `Coerced<&'_ Value>`, preserving
+    /// the fallback-tracking bit.
+    pub(crate) fn tuple_proj(self, index: usize) -> Self {
+        self.map(|v| v._tuple_proj(index))
+    }
+
+    /// Performs record-projection on the underlying `Value` of a `Coerced<&'_ Value>`, preserving
+    /// the fallback-tracking bit.
+    pub(crate) fn record_proj(self, label: &str) -> Self {
+        self.map(|v| v._record_proj(label))
+    }
+
+    pub(crate) fn cloned(self) -> Value {
+        self.value.clone()
+    }
+}
+
 impl<T> std::ops::Deref for Coerced<T> {
     type Target = T;
 
@@ -262,29 +280,22 @@ impl std::fmt::Display for Value {
 }
 
 impl Value {
-    pub(crate) fn tuple_proj(&self, index: usize) -> &Self {
+    /// Internal helper for [`Coerced::tuple_proj`].
+    fn _tuple_proj(&self, index: usize) -> &Value {
         match self {
             Value::Tuple(vs) => &vs[index],
-            Value::Permit(Ok(v)) => v.tuple_proj(index),
-            // REVIEW[epic=permit] - we have no way to return `Permit(Err(Some(v.tuple_proj(index))))` due to lifetime considerations; therefore, we avoid erasing Permit and simply return `Permit(Err(None))`
-            Value::Permit(Err(None | Some(_))) => {
-                log::warn!(
-                    "tuple_proj over `Permit(Err(_))` can only return `Permit(Err(None))` due to implementation constraints"
-                );
-                &Value::Permit(Err(None))
-            }
+            Value::Permit(Err(None)) => self,
             _ => panic!("expected tuple"),
         }
     }
 
-    pub(crate) fn record_proj(&self, label: &str) -> &Self {
+    /// Internal helper for [`Coerced::record_proj`].
+    fn _record_proj(&self, label: &str) -> &Value {
         match self {
             Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
                 Some((_, v)) => v,
                 None => panic!("{label} not found in record"),
             },
-            // REVIEW[epic=permit] - we have no way to return `Permit(Err(Some(v.record_proj(index))))` due to lifetime considerations; therefore, we avoid erasing Permit and simply return `Permit(Err(None))`
-            Value::Permit(Err(None | Some(_))) => &Value::Permit(Err(None)),
             other => panic!("expected record, found {other:?}"),
         }
     }
@@ -415,24 +426,33 @@ impl Value {
 
     /// Reduces any referenced `Value` to its underlying nominal value, by recursively unwrapping any
     /// `Value::Branch`, `Value::Permit(Ok(v))`, `Value::Mapped` encompassing it.
-    // FIXME[epic=coerce-value-permiterr] - refactor to return `Coerced<&'a Self>`
-    pub fn coerce_mapped_value(&self) -> &Self {
+    pub fn coerce_mapped_value(&self) -> Coerced<&Self> {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
             Value::Branch(_n, v) => v.coerce_mapped_value(),
-            Value::Permit(Ok(v)) => v.coerce_mapped_value(),
-            v => v,
+            Value::Permit(p) => match p {
+                Ok(v) => v.coerce_mapped_value(),
+                Err(Some(v)) => {
+                    let ret = v.coerce_mapped_value();
+                    Coerced::fallback(ret.into_inner())
+                }
+                Err(None) => Coerced::pure(self),
+            },
+            v => Coerced::pure(v),
         }
     }
 
     /// Like [`Self::coerce_mapped_value`], but for owned values rather than borrowed ones.
-    // FIXME[epic=coerce-value-permiterr] - refactor to return `Coerced<Self>`
-    pub fn extract_mapped_value(self) -> Self {
+    pub fn extract_mapped_value(self) -> Coerced<Self> {
         match self {
             Value::Mapped(_orig, v) => v.extract_mapped_value(),
             Value::Branch(_n, v) => v.extract_mapped_value(),
             Value::Permit(Ok(v)) => v.extract_mapped_value(),
-            v => v,
+            Value::Permit(Err(Some(v))) => {
+                let ret = v.extract_mapped_value();
+                Coerced::fallback(ret.into_inner())
+            }
+            v => Coerced::pure(v),
         }
     }
 
@@ -445,8 +465,7 @@ impl Value {
     }
 
     pub(crate) fn is_boolean(&self) -> bool {
-        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-        matches!(self.coerce_mapped_value(), Value::Bool(_))
+        matches!(self.coerce_nominal_value(), Value::Bool(_))
     }
 }
 

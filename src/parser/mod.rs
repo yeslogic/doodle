@@ -139,7 +139,7 @@ impl<'a> Parser<'a> {
                 if ix == self.buffer.buffer.len() {
                     StateError::Data(DataStateError::EndOfStreamRead)
                 } else {
-                    StateError::Parser(ParserStateError::IllegalOffsetRead)
+                    StateError::Parser(ParserStateError::IllegalOffsetRead.logged())
                 },
             ));
         };
@@ -368,13 +368,13 @@ impl<'a> Parser<'a> {
     ///
     /// # Panics
     ///
-    /// As currently defined, will panic if we are in bits-mode.
+    /// Will panic if the parser is currently in bits-mode, as there is no sensible answer we can provide,
+    /// and there isn't any clear context where a format that uses `Format::Pos` within `Format::Bits` is well-formed.
     pub fn get_offset_u64(&self) -> u64 {
         match self.get_current_offset() {
             ByteOffset::Bytes(n) => n as u64,
             ByteOffset::Bits { .. } => {
-                // FIXME - this panic should perhaps be eliminated if possible
-                unreachable!("no unequivocal way to compute a byte-offset while in bits-mode");
+                unreachable!("unsound operation: get_offset_u64 called while in bits-mode")
             }
         }
     }

@@ -61,14 +61,14 @@ impl<'a> View<'a> {
         match ctxt.read_array::<T>(len) {
             Ok(ret) => Ok(ret),
             Err(e) => match e {
+                // NOTE - because the error we return relies on local context, it can't be folded into the definition fo `ParseError::from_allsorts_error` cleanly.
                 AllSortsParseError::BadEof => {
                     Err(DoodleParseError::Overrun(OverrunKind::EndOfStream {
                         offset: ByteOffset::from_bytes(self.start_offset + len * size),
                         max_offset: ByteOffset::from_bytes(self.start_offset + self.buffer.len()),
                     }))
                 }
-                // FIXME - use a more robust conversion strategy
-                _ => unreachable!("unexpected error-kind from `read_array`: {:?}", e),
+                other_err => Err(DoodleParseError::from_allsorts_error(other_err)),
             },
         }
     }
@@ -98,5 +98,13 @@ impl<'a> View<'a> {
 
     pub fn read_array_u64be(&self, len: usize) -> Result<ReadArray<'a, U64Be>, DoodleParseError> {
         self.as_read_array(len)
+    }
+}
+
+impl DoodleParseError {
+    /// Fallback method for casting an `AllSortsParseError` to a [`DoodleParseError`](crate::parser::error::ParseError)
+    fn from_allsorts_error(err: AllSortsParseError) -> Self {
+        // REVIEW - determine whether are any special-case correspondences we would like to map to custom ParseError variants rather than embedding indiscriminately
+        Self::AllsortsError(err)
     }
 }

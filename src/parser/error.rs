@@ -15,6 +15,7 @@ pub(crate) fn mk_trace(value: &impl std::hash::Hash) -> TraceHash {
     hasher.finish()
 }
 
+// TODO - we don't actually use CtxtParseError anywhere yet, so we should decide whether to drop it or swap it in for ParseError in selected places
 #[derive(Debug)]
 pub struct CtxtParseError {
     pub err: ParseError,
@@ -63,36 +64,50 @@ impl std::error::Error for CtxtParseError {
 /// General error type for both recoverable and unrecoverable errors encountered during parsing operations
 #[derive(Clone, Debug)]
 pub enum ParseError {
-    /// Explicit `Format::Fail` or any of its derived equivalents
+    /// Unconditional error yielded when reading `Format::Fail` or equivalent derivatives.
     FailToken(TraceHash),
-    /// Validation failure for a Format::Where
+    /// The condition asserted by a `Format::Where` was not upheld by the value produced by the inner format.
     FalsifiedWhere(TraceHash),
-    /// For Repeat1, RepeatCount, or RepeatUntil*, indicates that an inadequate number of values were read before encountering end-of-buffer or end-of-slice.
+    /// Reached local end-of-input (whether slice, or buffer) before reading sufficient elements to satisfy the minimum-element requirement of a "repeat N times" format, or the predicate of a repeat-unfil-condition format.
+    ///
+    /// For `Format::Repeat1`, this happens if 0 elements are read before the end-of-input is reached.
+    /// For `Format::RepeatCount(N)` and `Format::RepeatBetween(N, M)`, this happens when fewer than `N` elements were read before the end-of-input was reached.
+    /// For `Format::RepeatUntilLast` and `Format::RepeatUntilSeq`, this means that the end-of-input was reached before the "are we done" predicate was satisfied.
     InsufficientRepeats,
-    /// Indicates a successful parse within a negated context, as in the case of PeekNot
+    /// A sub-parse in a negated-match context (namely `Format::PeekNot`) succeeded instead of failing.
     NegatedSuccess,
-    /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent; u64 value is a trace mechanic for determining which error was triggered
+    /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent; TraceHash is used as a tracking mechanism to fingerprint the line of code where the error occurred
     ExcludedBranch(TraceHash),
     /// Attempted offset-increment would run past the last legal offset of either the overall buffer, or a context-local `Format::Slice`.
     Overrun(OverrunKind),
-    /// Attempted random-access seek cannot be performed due to view-based truncation past the destination
+    /// Attempted random-access seek cannot be performed due to view-based truncation past the destination.
     NegativeIndex {
         abs_target: usize,
         abs_buf_start: usize,
     },
     /// A `Format::EndOfInput` token occurring anywhere except the final offset of a Slice or the overall buffer.
-    IncompleteParse { bytes_remaining: usize },
+    IncompleteParse {
+        bytes_remaining: usize,
+    },
     /// Any unrecoverable error in the state of the Parser itself.
     InternalError(StateError),
-    /// An operation performed on values derived via parsing is not sound, mostly due to a bad assumption of the format for what is being parsed
+    /// An operation performed on values derived via parsing is not sound, often when parsing valid buffer-data as a completely unrelated format
     UnsoundOperation(Option<&'static str>, TraceHash),
     /// A numeric evaluation error
     BadEval(crate::numeric::eval::EvalError),
+    // REVIEW - figure out if there are any variants of AllsortsError that have a strong enough correspondence with existing or sensibly distinguished first-class variants of ParseError
+    AllsortsError(crate::alt::prelude::allsorts::error::ParseError),
 }
 
 impl From<crate::numeric::eval::EvalError> for ParseError {
     fn from(err: crate::numeric::eval::EvalError) -> Self {
         Self::BadEval(err)
+    }
+}
+
+impl From<crate::alt::prelude::allsorts::error::ParseError> for ParseError {
+    fn from(err: crate::alt::prelude::allsorts::error::ParseError) -> Self {
+        Self::AllsortsError(err)
     }
 }
 
@@ -158,6 +173,7 @@ impl std::fmt::Display for ParseError {
             },
             ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {e}"),
             ParseError::BadEval(e) => write!(f, "{e}"),
+            ParseError::AllsortsError(e) => write!(f, "{e}"),
         }
     }
 }
@@ -167,6 +183,7 @@ impl std::error::Error for ParseError {
         match self {
             ParseError::InternalError(e) => Some(e),
             ParseError::BadEval(e) => Some(e),
+            ParseError::AllsortsError(e) => Some(e),
             _ => None,
         }
     }
@@ -222,6 +239,19 @@ impl std::fmt::Display for ParserStateError {
                 )
             }
         }
+    }
+}
+
+impl ParserStateError {
+    /// Logs `self` as a parser-implementation bug and returns it unchanged.
+    ///
+    /// Intended to be called at the point of construction, since downstream combinators
+    /// (`Format::Permit`, nondeterministic-union branch-retry) may go on to discard the
+    /// `Err` this ends up wrapped in without ever surfacing it; construction time is the
+    /// only point in the call chain guaranteed to see every occurrence exactly once.
+    pub(crate) fn logged(self) -> Self {
+        log::error!("parser-state error (bug in parsing logic or codegen): {self}");
+        self
     }
 }
 

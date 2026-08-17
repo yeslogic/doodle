@@ -64,11 +64,36 @@ macro_rules! try_sub {
     };
 }
 
-/// Computes the predecessor `x - 1`.
-///
-/// When called on `x := 0`, will behave identically to `x - 1`.
+/// `Numeric` trait to support the code-generation pipeline for the `IntSucc` and `IntPred` unary operations defined in the `numeric` engine.
+pub trait Numeric {
+    /// Computes the predecessor `x - 1`.
+    ///
+    /// This should produce the same result and behavior as `x - 1`, including for edge-cases.
+    fn pred(self) -> Self;
+
+    /// Computes the successor `x + 1`.
+    ///
+    /// This should produce the same result and behavior as `x + 1`, including for edge-cases.
+    fn succ(self) -> Self;
+}
+
+impl<T> Numeric for T
+where
+    T: One + std::ops::Sub<Output = T> + std::ops::Add<Output = T>,
+{
+    #[inline]
+    fn pred(self) -> Self {
+        self - one()
+    }
+
+    #[inline]
+    fn succ(self) -> Self {
+        self + one()
+    }
+}
+
+// REVIEW - after introducing the Numeric trait, the standalone `succ` and `pred` functions can be phased out once all references to them have been migrated
 #[inline]
-// NOTE - this impl (and that of `succ`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
 pub fn pred<T>(x: T) -> T
 where
     T: One + std::ops::Sub<Output = T>,
@@ -76,11 +101,7 @@ where
     x - one()
 }
 
-/// Computes the successor `x + 1`.
-///
-/// When called on `x := T::MAX`, will behave identically to `x + 1`.
 #[inline]
-// NOTE - this impl (and that of `pred`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
 pub fn succ<T>(x: T) -> T
 where
     T: One + std::ops::Add<Output = T>,
