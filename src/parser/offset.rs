@@ -157,7 +157,7 @@ impl ByteOffset {
             Ok(())
         } else {
             Err(ParseError::InternalError(StateError::Parser(
-                ParserStateError::BinaryModeError,
+                ParserStateError::BinaryModeError.logged(),
             )))
         }
     }
@@ -179,7 +179,7 @@ impl ByteOffset {
         } = *self
         else {
             return Err(ParseError::InternalError(StateError::Parser(
-                ParserStateError::BinaryModeError,
+                ParserStateError::BinaryModeError.logged(),
             )));
         };
 
@@ -375,7 +375,7 @@ impl ViewStack {
                 }
             }
         }
-        Err(StateError::Parser(ParserStateError::NoRestore))
+        Err(StateError::Parser(ParserStateError::NoRestore.logged()))
     }
 
     /// Attempts to recover to the return-on-fail offset-checkpoint for a speculative parse that has failed.
@@ -407,7 +407,7 @@ impl ViewStack {
                 }
             }
         }
-        Err(StateError::Parser(ParserStateError::NoRecovery))
+        Err(StateError::Parser(ParserStateError::NoRecovery.logged()))
     }
 }
 
@@ -695,24 +695,23 @@ impl BufferOffset {
     ///
     /// # Errors
     ///
-    /// Returns an appropriate `Err` value if either of the conditions below are met:
+    /// Returns an appropriate `Err` value if any of the conditions below are met:
     ///   - No active slices were found in the `ViewStack`
     ///   - A slice was found, but its endpoint is strictly lower than the current `ByteOffset`
+    ///   - A lens discarded above the topmost [`Lens::Slice`] still represents an open speculative
+    ///     parse-state (e.g. [`Lens::Peek`], [`Lens::PeekNot`]) or an opaque [`Lens::Seek`]. These are
+    ///     expected to have already been closed by the time `close_slice` is called (for example, via
+    ///     [`BufferOffset::close_peek`] for a `Lens::Peek`), so finding one still open here can only
+    ///     arise from mismatched open/close calls elsewhere in `Parser` (or the `BufferOffset` methods
+    ///     they delegate to) -- never from malformed or unexpected buffer data.
     ///
-    /// # Panics
-    ///
-    /// The lenses discarded above the topmost [`Lens::Slice`] are expected to have already been closed
-    /// by the time `close_slice` is called; if any of them still represents an open speculative parse-state
-    /// (e.g. [`Lens::Peek`], [`Lens::PeekNot`]) or an opaque [`Lens::Seek`], this method panics instead of
-    /// silently discarding it. For example, an unclosed `Lens::Peek` above the topmost slice triggers a
-    /// panic, since `close_peek` should always be called to remove it before the enclosing slice is closed.
-    ///
-    /// Such a state can only arise from mismatched open/close calls elsewhere in `Parser` (or the
-    /// `BufferOffset` methods they delegate to) -- never from malformed or unexpected buffer data -- so it
-    /// signals a bug in the parsing logic itself rather than a recoverable data-inconsistency. Panicking
-    /// here is deliberate: downgrading this to an ordinary `Err` would let it be silently absorbed by the
-    /// fallback/`Permit` machinery meant for recoverable data-errors, hiding the underlying bug instead of
-    /// surfacing it.
+    /// The last of these conditions signals a bug in the parsing logic itself rather than a recoverable
+    /// data-inconsistency, and is reported as [`ParserStateError::UnfinishedLensAboveSlice`]. Errors of
+    /// this kind are logged unconditionally at the point they are constructed (see
+    /// [`ParserStateError::logged`]), since downstream combinators such as `Permit` or a
+    /// nondeterministic union's branch-retry logic are free to discard the returned `Err` without ever
+    /// surfacing it, and construction time is the only point in the call chain guaranteed to see every
+    /// occurrence.
     ///
     /// # Note
     ///
@@ -728,7 +727,7 @@ impl BufferOffset {
         // extract the slice we are closing, which should be the first element in the iterator
         let Some(slice) = topmost.next() else {
             return Err(ParseError::InternalError(StateError::Parser(
-                ParserStateError::MissingSlice,
+                ParserStateError::MissingSlice.logged(),
             )));
         };
         let Lens::Slice { endpoint } = slice else {
@@ -758,7 +757,7 @@ impl BufferOffset {
                 | Lens::PeekNot { .. }
                 | Lens::Peek { .. } => {
                     return Err(ParseError::InternalError(StateError::Parser(
-                        ParserStateError::UnfinishedLensAboveSlice(top),
+                        ParserStateError::UnfinishedLensAboveSlice(top).logged(),
                     )));
                 }
                 Lens::Seek {
@@ -777,7 +776,7 @@ impl BufferOffset {
         if self.current_offset > endpoint {
             // return the appropriate state-error if we somehow managed to overrun the slice, which should typically never happen
             return Err(ParseError::InternalError(StateError::Parser(
-                ParserStateError::SliceOverrun,
+                ParserStateError::SliceOverrun.logged(),
             )));
         }
         self.current_offset = endpoint;

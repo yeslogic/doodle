@@ -2152,6 +2152,7 @@ impl GenLambda {
             RustExpr::BlockScope(stmts, tail) => match stmts.as_slice() {
                 // NOTE - if we are producing a RustExpr::BlockScope with an empty block, the code-generation engine is broken somehow and so we are willing to panic
                 [] => unreachable!("empty RustStmt-array in RustExpr::BlockScope"),
+                // NOTE - based on the `crate::helper::lambda_tuple` helper, we assume and specialize for pair-lambdas that immediately de-structure the pair (as the first statement)
                 [first, rest @ ..] => match first {
                     RustStmt::LetPattern(pat, rhs) if rhs.as_local() == Some(&self.head) => {
                         match pat {
@@ -2197,13 +2198,14 @@ impl GenLambda {
                     }
                 },
             },
-            // NOTE - the panic within this block are mostly watermarks for exotic cases we haven't had to encounter yet, and we will drop any panic if it turns out there is a legitimate case where said branch should be handled gracefully
             RustExpr::Control(ctrl) => match ctrl.as_ref() {
+                // NOTE - Match is the only case where destructuring can
                 RustControl::Match(scrutinee, match_body) => {
+                    // NOTE - the panic within this block are mostly watermarks for exotic cases we haven't had to encounter yet, and we will drop any panic if it turns out there is a legitimate case where said branch should be handled gracefully
                     if scrutinee.as_local() != Some(&self.head) {
                         unreachable!(
-                            "unexpected outer scrutinee in expansion of pair-lambda (head: {}): {scrutinee:?}",
-                            &self.head
+                            "unexpected outer scrutinee in expansion of pair-lambda (head: {head}): {scrutinee:?}",
+                            head = &self.head
                         );
                     }
                     match match_body {
@@ -2258,11 +2260,13 @@ impl GenLambda {
                     }
                 }
                 _ => {
+                    // NOTE - because this function is intended to specialize pair-lambdas that pair-destructure their head-variable, we fall-bcak to standard `apply` if this expectation is not fulfilled
                     let arg = RustExpr::Tuple(vec![param0, param1]);
                     self.apply(arg, body_info)
                 }
             },
             _ => {
+                // NOTE - because this function is intended to specialize pair-lambdas that pair-destructure their head-variable, we fall-bcak to standard `apply` if this expectation is not fulfilled
                 let arg = RustExpr::Tuple(vec![param0, param1]);
                 self.apply(arg, body_info)
             }

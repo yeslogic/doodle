@@ -802,6 +802,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "running this test clobbers the manually-edited test file for permit_state_error"]
     /// Test to pre-generate a Permit-parse of a slice we will peek within and manually remove the 'close_peek' within to cause a state-error we want to see
     /// how permit handles.
     fn permit_slice_no_close_peek_base_codegen() {

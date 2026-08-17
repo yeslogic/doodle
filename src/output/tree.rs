@@ -916,8 +916,7 @@ impl<'module> TreePrinter<'module> {
     }
 
     pub fn compile_string(value: &Value) -> Fragment {
-        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-        let vs = match value.coerce_mapped_value() {
+        let vs = match value.coerce_mapped_value().into_inner() {
             Value::Record(fields) => {
                 match Self::extract_string_field(fields)
                     .unwrap_or_else(|| unreachable!("no string field"))
@@ -949,8 +948,7 @@ impl<'module> TreePrinter<'module> {
     }
 
     pub fn compile_ascii_string(value: &Value) -> Fragment {
-        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-        let vs = match value.coerce_mapped_value() {
+        let vs = match value.coerce_mapped_value().into_inner() {
             Value::Record(fields) => {
                 match Self::extract_string_field(fields)
                     .unwrap_or_else(|| unreachable!("no string field"))
@@ -1033,8 +1031,7 @@ impl<'module> TreePrinter<'module> {
     }
 
     fn compile_char(v: &Value) -> Fragment {
-        // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
-        let c = match v.coerce_mapped_value() {
+        let c = match v.coerce_mapped_value().into_inner() {
             Value::U8(b) => *b as char,
             Value::Char(c) => *c,
             _ => panic!("expected U8 or Char value, found {v}"),
@@ -1510,7 +1507,6 @@ impl<'module> TreePrinter<'module> {
         let mut set_fields = Vec::with_capacity(value_fields.len());
 
         for (label, value) in value_fields {
-            // TODO[epic=coerce-value-permiterr] - revisit once [`Value::coerce_mapped_value`] and [`Value::extract_mapped_value`] are refactored to return `Coerced<&'_ Value>`/`Coerced<Value>`.
             if value.coerce_mapped_value().unwrap_bool() {
                 set_fields.push(Fragment::String(label.clone()));
             }
