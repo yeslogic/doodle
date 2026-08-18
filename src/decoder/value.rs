@@ -447,11 +447,14 @@ impl Value {
         match self {
             Value::Mapped(_orig, v) => v.extract_mapped_value(),
             Value::Branch(_n, v) => v.extract_mapped_value(),
-            Value::Permit(Ok(v)) => v.extract_mapped_value(),
-            Value::Permit(Err(Some(v))) => {
-                let ret = v.extract_mapped_value();
-                Coerced::fallback(ret.into_inner())
-            }
+            Value::Permit(p) => match p {
+                Ok(v) => v.extract_mapped_value(),
+                Err(Some(v)) => {
+                    let ret = v.extract_mapped_value();
+                    Coerced::fallback(ret.into_inner())
+                }
+                Err(None) => Coerced::pure(Value::Permit(Err(None))),
+            },
             v => Coerced::pure(v),
         }
     }
