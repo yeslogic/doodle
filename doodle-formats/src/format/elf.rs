@@ -5,8 +5,11 @@ use doodle::{
     bounds::Bounds, helper::*,
 };
 
-const ISBE_ARG: (Label, ValueType) = (Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool));
-const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::U8);
+const ISBE_VAR: &str = "is_be";
+const ISBE_ARG: (Label, ValueType) = (Label::Borrowed(ISBE_VAR), ValueType::Base(BaseType::Bool));
+
+const CLASS_VAR: &str = "class";
+const CLASS_ARG: (Label, ValueType) = (Label::Borrowed(CLASS_VAR), ValueType::U8);
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     // SECTION - common byte-oriented types
@@ -22,7 +25,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             vec![ISBE_ARG],
             align_then(
                 size_of::<T>(),
-                if_then_else(var("is_be"), be_version, le_version),
+                if_then_else(var(ISBE_VAR), be_version, le_version),
             ),
         )
     }
@@ -146,9 +149,9 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // ELF File Type
     let e_type = module.define_format_args(
         "elf.header.type",
-        vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
+        vec![ISBE_ARG],
         where_lambda(
-            elf_half_endian.call_args(vec![var("is_be")]),
+            elf_half_endian.call_args(vec![var(ISBE_VAR)]),
             "type",
             expr_match(
                 var("type"),
@@ -176,16 +179,16 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // TODO - machine variants are an open class that has no fixed definition, and enough distinct values that it would be difficult to exhaustively list them
     let e_machine = module.define_format_args(
         "elf.header.machine",
-        vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
-        elf_half_endian.call_args(vec![var("is_be")]),
+        vec![ISBE_ARG],
+        elf_half_endian.call_args(vec![var(ISBE_VAR)]),
     );
 
     // 4-byte version that should match
     let e_version = module.define_format_args(
         "elf.header.version",
-        vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
+        vec![ISBE_ARG],
         where_between_u32(
-            elf_word_endian.call_args(vec![var("is_be")]),
+            elf_word_endian.call_args(vec![var(ISBE_VAR)]),
             EV_NONE as u32,
             EV_CURRENT as u32,
         ),
@@ -195,22 +198,19 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let elf_addr = module.define_format_args(
         "elf.types.elf-addr",
-        vec![
-            (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::U8),
-        ],
+        vec![ISBE_ARG, CLASS_ARG],
         match_variant(
-            var("class"),
+            var(CLASS_VAR),
             vec![
                 (
                     Pattern::U8(ELF_CLASS_32),
                     "Addr32",
-                    elf32_addr_endian.call_args(vec![var("is_be")]),
+                    elf32_addr_endian.call_args(vec![var(ISBE_VAR)]),
                 ), // 32-bit addr
                 (
                     Pattern::U8(ELF_CLASS_64),
                     "Addr64",
-                    elf64_addr_endian.call_args(vec![var("is_be")]),
+                    elf64_addr_endian.call_args(vec![var(ISBE_VAR)]),
                 ), // 64-bit addr
             ],
         ),
@@ -218,22 +218,19 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let elf_off = module.define_format_args(
         "elf.types.elf-off",
-        vec![
-            (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::U8),
-        ],
+        vec![ISBE_ARG, CLASS_ARG],
         match_variant(
-            var("class"),
+            var(CLASS_VAR),
             vec![
                 (
                     Pattern::U8(ELF_CLASS_32),
                     "Off32",
-                    elf32_off_endian.call_args(vec![var("is_be")]),
+                    elf32_off_endian.call_args(vec![var(ISBE_VAR)]),
                 ), // 32-bit offset
                 (
                     Pattern::U8(ELF_CLASS_64),
                     "Off64",
-                    elf64_off_endian.call_args(vec![var("is_be")]),
+                    elf64_off_endian.call_args(vec![var(ISBE_VAR)]),
                 ), // 64-bit foffset
             ],
         ),
@@ -242,22 +239,19 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // Value that is Elf32_Word in 32-bit and Elf64_Xword in 64-bit ELF files
     let elf_full_endian = module.define_format_args(
         "elf.types.elf-full",
-        vec![
-            (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::U8),
-        ],
+        vec![ISBE_ARG, CLASS_ARG],
         match_variant(
-            var("class"),
+            var(CLASS_VAR),
             vec![
                 (
                     Pattern::U8(ELF_CLASS_32),
                     "Full32",
-                    elf_word_endian.call_args(vec![var("is_be")]),
+                    elf_word_endian.call_args(vec![var(ISBE_VAR)]),
                 ), // 32-bit full-width unsigned int
                 (
                     Pattern::U8(ELF_CLASS_64),
                     "Full64",
-                    elf64_xword_endian.call_args(vec![var("is_be")]),
+                    elf64_xword_endian.call_args(vec![var(ISBE_VAR)]),
                 ), // 64-bit full-width unsigned int
             ],
         ),
@@ -356,7 +350,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.shdr.sh-type",
         vec![ISBE_ARG],
         where_lambda(
-            elf_word_endian.call_args(vec![var("is_be")]),
+            elf_word_endian.call_args(vec![var(ISBE_VAR)]),
             "sh-type",
             expr_match(
                 var("sh-type"),
@@ -418,7 +412,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let elf_sh_info = module.define_format_args(
         "elf.shdr.sh-info",
         vec![ISBE_ARG],
-        elf_word_endian.call_args(vec![var("is_be")]),
+        elf_word_endian.call_args(vec![var(ISBE_VAR)]),
     );
 
     // Elf Section Header
@@ -426,30 +420,30 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.shdr",
         vec![ISBE_ARG, CLASS_ARG],
         record([
-            ("name", elf_word_endian.call_args(vec![var("is_be")])), // specifier for the section-name, given as an index into the string-header section table
-            ("type", elf_sh_type.call_args(vec![var("is_be")])), // section type, which dictates its contents and semantics
+            ("name", elf_word_endian.call_args(vec![var(ISBE_VAR)])), // specifier for the section-name, given as an index into the string-header section table
+            ("type", elf_sh_type.call_args(vec![var(ISBE_VAR)])), // section type, which dictates its contents and semantics
             (
                 "flags",
-                elf_sh_flags.call_args(vec![var("is_be"), var("class")]),
+                elf_sh_flags.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ), // sequence of 1-bit flags dictating various attributes
-            ("addr", elf_addr.call_args(vec![var("is_be"), var("class")])), // virtual address of (the first byte of) this section in memory, when it will appear in the memory image of the process during execution (0 otherwise)
+            ("addr", elf_addr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)])), // virtual address of (the first byte of) this section in memory, when it will appear in the memory image of the process during execution (0 otherwise)
             (
                 "offset",
-                elf_off.call_args(vec![var("is_be"), var("class")]),
+                elf_off.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ), // file-offset of the first byte in this section
             (
                 "size",
-                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+                elf_full_endian.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ), // number of bytes in this section
-            ("link", elf_word_endian.call_args(vec![var("is_be")])), // section header table index link (depends on section type)
-            ("info", elf_sh_info.call_args(vec![var("is_be")])), // extra information that the section type dictates the interpretation of
+            ("link", elf_word_endian.call_args(vec![var(ISBE_VAR)])), // section header table index link (depends on section type)
+            ("info", elf_sh_info.call_args(vec![var(ISBE_VAR)])), // extra information that the section type dictates the interpretation of
             (
                 "addralign",
-                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+                elf_full_endian.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ), // section alignment
             (
                 "entsize",
-                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+                elf_full_endian.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ), // section entry size
         ]),
     );
@@ -465,7 +459,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ],
         repeat_count(
             var("shnum"),
-            elf_shdr.call_args(vec![var("is_be"), var("class")]),
+            elf_shdr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
         ),
     );
 
@@ -476,8 +470,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.phdr.p-flags64",
         vec![ISBE_ARG, CLASS_ARG],
         cond_maybe(
-            expr_eq(var("class"), Expr::U8(ELF_CLASS_64)),
-            elf_word_endian.call_args(vec![var("is_be")]),
+            expr_eq(var(CLASS_VAR), Expr::U8(ELF_CLASS_64)),
+            elf_word_endian.call_args(vec![var(ISBE_VAR)]),
         ),
     );
 
@@ -486,8 +480,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.phdr.p-flags32",
         vec![ISBE_ARG, CLASS_ARG],
         cond_maybe(
-            expr_eq(var("class"), Expr::U8(ELF_CLASS_32)),
-            elf_word_endian.call_args(vec![var("is_be")]),
+            expr_eq(var(CLASS_VAR), Expr::U8(ELF_CLASS_32)),
+            elf_word_endian.call_args(vec![var(ISBE_VAR)]),
         ),
     );
 
@@ -495,38 +489,38 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.phdr",
         vec![ISBE_ARG, CLASS_ARG],
         record([
-            ("type", elf_word_endian.call_args(vec![var("is_be")])),
+            ("type", elf_word_endian.call_args(vec![var(ISBE_VAR)])),
             (
                 "flags64",
-                elf_ph_flags64.call_args(vec![var("is_be"), var("class")]),
+                elf_ph_flags64.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "offset",
-                elf_off.call_args(vec![var("is_be"), var("class")]),
+                elf_off.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "vaddr",
-                elf_addr.call_args(vec![var("is_be"), var("class")]),
+                elf_addr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "paddr",
-                elf_addr.call_args(vec![var("is_be"), var("class")]),
+                elf_addr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "filesz",
-                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+                elf_full_endian.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "memsz",
-                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+                elf_full_endian.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "flags32",
-                elf_ph_flags32.call_args(vec![var("is_be"), var("class")]),
+                elf_ph_flags32.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
             (
                 "align",
-                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+                elf_full_endian.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ),
         ]),
     );
@@ -540,7 +534,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ],
         repeat_count(
             var("phnum"),
-            elf_phdr.call_args(vec![var("is_be"), var("class")]),
+            elf_phdr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
         ),
     );
 
