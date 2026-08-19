@@ -27,9 +27,31 @@ fn tag_pattern3(tag: [char; 3]) -> Pattern {
 /// Given the correct `FormatRef` for mpeg4 tag-sequences, as well as the inner `datta` format
 /// for an mpeg4 atom-kind, constructs an mpeg4 atom.
 ///
-// TODO - add a relevant reference hint for where this appears in the spec
-// TODO - refactor so that either `data` is a FormatRef, or creates a definition corresponding to it
+/// Corresponding specification for the objects/'boxes' this format models
+/// appears in section 4.2 of the MPEG4 specification ISO/IEC 14496-12:2005(E)// TODO - refactor so that either `data` is a FormatRef, or creates a definition corresponding to it
 fn make_atom(tag: FormatRef, data: Format) -> Format {
+    /// Helper for ensuring that a parse reaches the end of the input by the time it is complete
+    fn then_eof(format: Format) -> Format {
+        chain(
+            format,
+            "data",
+            monad_seq(Format::EndOfInput, compute(var("data"))),
+        )
+    }
+    /// Specialized helper for conditionally treating a size-value of 0 as a "read until EOF" instruction instead
+    /// of constructing an empty slice
+    fn slice_eof0(len_or_zero: Expr, data: Format) -> Format {
+        fmt_match(
+            len_or_zero,
+            vec![
+                (Pattern::U64(0), then_eof(data.clone())),
+                (
+                    Pattern::Binding(Label::Borrowed("len")),
+                    slice(var("len"), data),
+                ),
+            ],
+        )
+    }
     record([
         ("size-field", u32be()),
         ("type", tag.call()),
@@ -38,7 +60,8 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
             Format::Match(
                 Box::new(var("size-field")),
                 vec![
-                    (Pattern::U32(0), compute(Expr::U64(0))), // FIXME
+                    // NOTE - per specification, a size of 0 indicates that the box-data extends to EOF
+                    (Pattern::U32(0), compute(Expr::U64(0))),
                     (
                         Pattern::U32(1),
                         map(u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
@@ -51,7 +74,7 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
             ),
         ),
         // TODO: refactor so `data: FormatRef`
-        ("data", slice(var("size"), data)),
+        ("data", slice_eof0(var("size"), data)),
     ])
 }
 
@@ -300,12 +323,13 @@ pub(crate) mod subformats {
             )
         }
         pub(crate) fn ctts_data(module: &mut FormatModule) -> FormatRef {
-            let sample_entry = module.define_format(
+            let sample_entry_v0 = module.define_format(
                 "mpeg4.ctts.sample-entry",
-                record([
-                    ("sample_count", u32be()),
-                    ("sample_offset", u32be()), // FIXME - signed if version == 1
-                ]),
+                record([("sample_count", u32be()), ("sample_offset", u32be())]),
+            );
+            let sample_entry_v1 = module.define_format(
+                "mpeg4.ctts.sample-entry-v1",
+                record([("sample_count", u32be()), ("sample_offset", i32be())]),
             );
             module.define_format(
                 "mpeg4.ctts-data",
@@ -315,7 +339,25 @@ pub(crate) mod subformats {
                     ("entry_count", u32be()),
                     (
                         "sample_entries",
-                        repeat_count(var("entry_count"), sample_entry.call()),
+                        fmt_match(
+                            var("version"),
+                            vec![
+                                (
+                                    Pattern::U8(0),
+                                    fmt_variant(
+                                        "SamplesV0",
+                                        repeat_count(var("entry_count"), sample_entry_v0.call()),
+                                    ),
+                                ),
+                                (
+                                    Pattern::U8(1),
+                                    fmt_variant(
+                                        "SamplesV1",
+                                        repeat_count(var("entry_count"), sample_entry_v1.call()),
+                                    ),
+                                ),
+                            ],
+                        ),
                     ),
                 ]),
             )

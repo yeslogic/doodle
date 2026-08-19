@@ -426,7 +426,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 "flags",
                 elf_sh_flags.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
             ), // sequence of 1-bit flags dictating various attributes
-            ("addr", elf_addr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)])), // virtual address of (the first byte of) this section in memory, when it will appear in the memory image of the process during execution (0 otherwise)
+            (
+                "addr",
+                elf_addr.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
+            ), // virtual address of (the first byte of) this section in memory, when it will appear in the memory image of the process during execution (0 otherwise)
             (
                 "offset",
                 elf_off.call_args(vec![var(ISBE_VAR), var(CLASS_VAR)]),
