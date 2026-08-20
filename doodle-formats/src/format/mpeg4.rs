@@ -30,10 +30,14 @@ fn tag_pattern3(tag: [char; 3]) -> Pattern {
 /// This corresponds directly to the MPEG-4 'box' described in section 4.2 of ISO/IEC 14496-12:2005(E)
 // TODO - refactor so that either `data` is a FormatRef, or creates a definition corresponding to it
 fn make_atom(tag: FormatRef, data: Format) -> Format {
-    /// 'Smart' constructor for slices where a length-value of `0` is interpreted as a "read until EOF" instruction.
+    /// 'Smart' constructor for slices where a raw length-value of `0` is interpreted as a "read until EOF" instruction.
     ///
-    /// If the length-value is not `0`, then the slice is constructed normally.
-    fn slice_eof0(len_or_zero: Expr, data: Format) -> Format {
+    /// Uses the raw length to disambiguate between zero-by-construction and verbatim-zero in the
+    /// size-field, because a length of 0 is possible even in cases where the raw `size-field` was
+    /// not actually `0`.
+    ///
+    /// If the raw-length is not `0`, then the slice is constructed normally using `len` as-is.
+    fn slice_eof0(len: Expr, rawlen: Expr, data: Format) -> Format {
         /// Constructs a format that processes an EOF format after reading `format`.
         ///
         /// The original result of `format` is preserved and returned, as long as the EOF-parse
@@ -46,15 +50,10 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
             )
         }
 
-        fmt_match(
-            len_or_zero,
-            vec![
-                (Pattern::U64(0), then_eof(data.clone())),
-                (
-                    Pattern::Binding(Label::Borrowed("len")),
-                    slice(var("len"), data),
-                ),
-            ],
+        if_then_else(
+            expr_eq(rawlen, poly_zero()),
+            then_eof(data.clone()),
+            slice(len, data),
         )
     }
 
@@ -80,7 +79,7 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
             ),
         ),
         // TODO: refactor so `data: FormatRef`
-        ("data", slice_eof0(var("size"), data)),
+        ("data", slice_eof0(var("size"), var("size-field"), data)),
     ])
 }
 
