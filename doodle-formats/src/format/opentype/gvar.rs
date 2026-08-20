@@ -535,6 +535,7 @@ fn tuple_record(module: &mut FormatModule, f2dot14: FormatRef) -> DepFormat<1, 0
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
             "coordinates",
+            // NOTE - despite being readarray-eligible, implementing with `read_array` introduces complications due to novel lifetime parametricity in codegen output
             repeat_count(var("axis_count"), f2dot14.call()),
         )]),
     )

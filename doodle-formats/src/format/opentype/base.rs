@@ -40,6 +40,7 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
         ("base_tag_count", u16be()),
         (
             "baseline_tags",
+            // NOTE - migrated to `read_array` from `repeat_count(var("base_tag_count"), tag.call())`
             from_here(read_array(var("base_tag_count"), tag)),
         ), // TODO[epic=sorting-validation] - must appear in alphabetical order (not enforced locally)
     ]);

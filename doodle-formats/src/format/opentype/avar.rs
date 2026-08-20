@@ -32,6 +32,7 @@ fn segment_maps(module: &mut FormatModule, f2dot14: FormatRef) -> FormatRef {
             ("position_map_count", u16be()),
             (
                 "axis_value_maps",
+                // NOTE - despite being readarray-eligible, implementing with `read_array` introduces complications due to novel lifetime parametricity in codegen output
                 repeat_count(var("position_map_count"), axis_value_map.call()),
             ),
         ]),

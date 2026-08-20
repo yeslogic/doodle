@@ -113,6 +113,7 @@ fn user_tuple(module: &mut FormatModule, fixed32be: FormatRef) -> DepFormat<1, 0
         [(Label::Borrowed("axis_count"), ValueType::U16)],
         record([(
             "coordinates",
+            // NOTE - despite being readarray-eligible, implementing with `read_array` introduces complications due to novel lifetime parametricity in codegen output
             repeat_count(var("axis_count"), fixed32be.call()),
         )]),
     )
