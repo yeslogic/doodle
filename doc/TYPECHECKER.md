@@ -1,13 +1,13 @@
 # Type-Checker Extension Guide
 
-This is a WIP guide for the current implementation of the [type-inference engine](src/typecheck.rs) and the accompanying elaborator
-within the [code-generation module](src/codgen/mod.rs).
+This is a WIP guide for the current implementation of the [type-inference engine](../src/typecheck.rs) and the accompanying elaborator
+within the [code-generation module](../src/codgen/mod.rs).
 
 This is meant primarily as a rough reference document and not a design doc, but hopefully should help in future efforts to extend the `Format + Expr + Pattern` language with additional primitives over time, with respect to ensuring that the new primitives have full support in the type-inference and elaboration layers.
 
 ## Type-Inference
 
-[`typecheck.rs`](src/typecheck.rs) is a bidirectional type-inference engine that uses a fixed-traversal-order indexing of a `Format`-rooted tree, by assigning unification-metavariables (`UVar`s) to each node in the tree, regardless of the sub-language (`Format` vs `Expr` vs `Pattern`) of the node in question.
+[`typecheck.rs`](../src/typecheck.rs) is a bidirectional type-inference engine that uses a fixed-traversal-order indexing of a `Format`-rooted tree, by assigning unification-metavariables (`UVar`s) to each node in the tree, regardless of the sub-language (`Format` vs `Expr` vs `Pattern`) of the node in question.
 
 At every stage, all inferred constraints on individual `UVar`s, or between pairs of `UVar`s are recorded, and gradually reified as the total structure of the top-level `Format` is expanded. If any `UVar`s remain insoluble by the time the top-level `Format` is fully processed, this is a type-level error and reification of the full tree is not possible.
 

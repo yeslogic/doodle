@@ -27,9 +27,37 @@ fn tag_pattern3(tag: [char; 3]) -> Pattern {
 /// Given the correct `FormatRef` for mpeg4 tag-sequences, as well as the inner `datta` format
 /// for an mpeg4 atom-kind, constructs an mpeg4 atom.
 ///
-// TODO - add a relevant reference hint for where this appears in the spec
+/// This corresponds directly to the MPEG-4 'box' described in section 4.2 of ISO/IEC 14496-12:2005(E)
 // TODO - refactor so that either `data` is a FormatRef, or creates a definition corresponding to it
 fn make_atom(tag: FormatRef, data: Format) -> Format {
+    /// 'Smart' constructor for slices where a length-value of `0` is interpreted as a "read until EOF" instruction.
+    ///
+    /// If the length-value is not `0`, then the slice is constructed normally.
+    fn slice_eof0(len_or_zero: Expr, data: Format) -> Format {
+        /// Constructs a format that processes an EOF format after reading `format`.
+        ///
+        /// The original result of `format` is preserved and returned, as long as the EOF-parse
+        /// does not fail.
+        fn then_eof(format: Format) -> Format {
+            chain(
+                format,
+                "data",
+                monad_seq(Format::EndOfInput, compute(var("data"))),
+            )
+        }
+
+        fmt_match(
+            len_or_zero,
+            vec![
+                (Pattern::U64(0), then_eof(data.clone())),
+                (
+                    Pattern::Binding(Label::Borrowed("len")),
+                    slice(var("len"), data),
+                ),
+            ],
+        )
+    }
+
     record([
         ("size-field", u32be()),
         ("type", tag.call()),
@@ -38,7 +66,8 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
             Format::Match(
                 Box::new(var("size-field")),
                 vec![
-                    (Pattern::U32(0), compute(Expr::U64(0))), // FIXME
+                    // NOTE - we special-case `0` here and in `slice_eof0` to mean 'read to end of input', as per the ISO base media specification
+                    (Pattern::U32(0), compute(Expr::U64(0))),
                     (
                         Pattern::U32(1),
                         map(u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
@@ -51,10 +80,12 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
             ),
         ),
         // TODO: refactor so `data: FormatRef`
-        ("data", slice(var("size"), data)),
+        ("data", slice_eof0(var("size"), data)),
     ])
 }
 
+/// Registers the Format returned by [`make_atom(tag, data)`](make_atom)
+/// under the specified format-name in `module`.
 fn define_atom(
     module: &mut FormatModule,
     name: impl IntoLabel,
@@ -166,6 +197,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
 pub(crate) mod subformats {
     use super::*;
+
     pub(crate) fn mdia_atom_data(
         module: &mut FormatModule,
         tag: FormatRef,
@@ -212,6 +244,13 @@ pub(crate) mod subformats {
         )
     }
 
+    /// `trak` atom.
+    ///
+    /// Parent: [`moov_atom`]
+    ///
+    /// Children: [`tkhd_data`], [`edts_atom`], [`mdia_atom`]
+    ///
+    /// Gaps: `tref`
     pub(crate) fn trak_atom(
         module: &mut FormatModule,
         tag: FormatRef,
@@ -230,6 +269,7 @@ pub(crate) mod subformats {
                 var("type"),
                 vec![
                     (tag_pattern(['t', 'k', 'h', 'd']), "tkhd", tkhd_data.call()),
+                    // FIXME: implement `tref`
                     (
                         tag_pattern(['e', 'd', 't', 's']),
                         "edts",
@@ -247,6 +287,10 @@ pub(crate) mod subformats {
         trak_atom
     }
 
+    /// `mdia` atom
+    ///
+    /// Parent: [`trak_atom`]
+    /// Children: [`mdhd_atom`], [`minf_atom`]
     pub(crate) fn mdia_atom(
         module: &mut FormatModule,
         tag: FormatRef,
@@ -263,6 +307,7 @@ pub(crate) mod subformats {
 
     pub(crate) mod stbl {
         use super::*;
+
         pub(crate) fn stsd_data(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
             let sample_entry =
                 module.define_format("mpeg4.stsd.sample-entry", make_atom(tag, opaque_bytes()));
@@ -280,6 +325,7 @@ pub(crate) mod subformats {
                 ]),
             )
         }
+
         pub(crate) fn stts_data(module: &mut FormatModule) -> FormatRef {
             let sample_entry = module.define_format(
                 "mpeg4.stts.sample-entry",
@@ -299,13 +345,15 @@ pub(crate) mod subformats {
                 ]),
             )
         }
+
         pub(crate) fn ctts_data(module: &mut FormatModule) -> FormatRef {
-            let sample_entry = module.define_format(
+            let sample_entry_v0 = module.define_format(
                 "mpeg4.ctts.sample-entry",
-                record([
-                    ("sample_count", u32be()),
-                    ("sample_offset", u32be()), // FIXME - signed if version == 1
-                ]),
+                record([("sample_count", u32be()), ("sample_offset", u32be())]),
+            );
+            let sample_entry_v1 = module.define_format(
+                "mpeg4.ctts.sample-entry-v1",
+                record([("sample_count", u32be()), ("sample_offset", i32be())]),
             );
             module.define_format(
                 "mpeg4.ctts-data",
@@ -315,7 +363,25 @@ pub(crate) mod subformats {
                     ("entry_count", u32be()),
                     (
                         "sample_entries",
-                        repeat_count(var("entry_count"), sample_entry.call()),
+                        fmt_match(
+                            var("version"),
+                            vec![
+                                (
+                                    Pattern::U8(0),
+                                    fmt_variant(
+                                        "SamplesV0",
+                                        repeat_count(var("entry_count"), sample_entry_v0.call()),
+                                    ),
+                                ),
+                                (
+                                    Pattern::U8(1),
+                                    fmt_variant(
+                                        "SamplesV1",
+                                        repeat_count(var("entry_count"), sample_entry_v1.call()),
+                                    ),
+                                ),
+                            ],
+                        ),
                     ),
                 ]),
             )
@@ -373,6 +439,7 @@ pub(crate) mod subformats {
                 ]),
             )
         }
+
         pub(crate) fn stco_data(module: &mut FormatModule) -> FormatRef {
             module.define_format(
                 "mpeg4.stco-data",
@@ -396,14 +463,16 @@ pub(crate) mod subformats {
                 ]),
             )
         }
+
         pub(crate) fn sgpd_data(module: &mut FormatModule) -> FormatRef {
             module.define_format(
                 "mpeg4.sgpd-data",
                 record([
-                    ("version", u8()),
+                    ("version", u8()), // our current implementation only supports versions 0 and 1
                     ("flags", u24be()),
                     ("grouping_type", u32be()),
-                    // FIXME handle version >= 2
+                    // FIXME - this implementation applies only to versions 0 and 1, with no support for version >= 2
+                    // TODO - find an authoritative source for information on what the field-layout is for version >= 2
                     ("default_length", u32be()),
                     ("entry_count", u32be()),
                     (
@@ -544,6 +613,7 @@ pub(crate) mod subformats {
             ),
         )
     }
+
     pub(crate) fn edts_atom(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
         let elst_data = elst_data(module);
         define_atom(
@@ -599,8 +669,8 @@ pub(crate) mod subformats {
             ]),
         )
     }
-    /// `smhd` data; used in [`minf_atom`]
 
+    /// `smhd` data; used in [`minf_atom`]
     pub(crate) fn smhd_data(module: &mut FormatModule) -> FormatRef {
         module.define_format(
             "mpeg4.smhd-data",
