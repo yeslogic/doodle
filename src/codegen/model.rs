@@ -260,6 +260,7 @@ pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian
         BaseKind::U16BE => try_call!(view, read_array_u16be, len),
         BaseKind::U32BE => try_call!(view, read_array_u32be, len),
         BaseKind::U64BE => try_call!(view, read_array_u64be, len),
+        // FIXME[epic=technical-debt] - either add the methods to support these cases, or call underlying method with turbofish
         BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
             unimplemented!("little-endian read-array parses not yet implemented")
         }

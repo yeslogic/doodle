@@ -2,8 +2,8 @@ use crate::parser::error::ParseError as DoodleParseError;
 use crate::{
     alt::prelude::allsorts::{
         binary::{
-            U8, U16Be, U32Be, U64Be,
             read::{self, ReadArray, ReadScope},
+            *,
         },
         error::ParseError as AllSortsParseError,
     },
@@ -83,21 +83,25 @@ impl<'a> View<'a> {
         Ok(u16::from_be_bytes([self.buffer[0], self.buffer[1]]))
     }
 
-    // NOTE - we need these separate methods because RustExpr::MethodCall doesn't allow turbo-fish type-parameters
+    // TODO[epic=technical-debt] - we now hae some support for MethodCall/FunctionCall turbofishing, so these methods are no longer load-bearing
     pub fn read_array_u8(&self, len: usize) -> Result<ReadArray<'a, U8>, DoodleParseError> {
-        self.as_read_array(len)
+        self.as_read_array::<U8>(len)
     }
 
     pub fn read_array_u16be(&self, len: usize) -> Result<ReadArray<'a, U16Be>, DoodleParseError> {
-        self.as_read_array(len)
+        self.as_read_array::<U16Be>(len)
+    }
+
+    pub fn read_array_u24be(&self, len: usize) -> Result<ReadArray<'a, U24Be>, DoodleParseError> {
+        self.as_read_array::<U24Be>(len)
     }
 
     pub fn read_array_u32be(&self, len: usize) -> Result<ReadArray<'a, U32Be>, DoodleParseError> {
-        self.as_read_array(len)
+        self.as_read_array::<U32Be>(len)
     }
 
     pub fn read_array_u64be(&self, len: usize) -> Result<ReadArray<'a, U64Be>, DoodleParseError> {
-        self.as_read_array(len)
+        self.as_read_array::<U64Be>(len)
     }
 }
 
