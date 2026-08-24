@@ -550,7 +550,7 @@ impl CodeGen {
                                     Box::new(self.translate(inner.get_dec())),
                                 ))
                             }
-                            Some(RustVariant::Tuple(_, types)) => {
+                            Some(RustVariant::Tuple(con_name, types)) => {
                                 if types.is_empty() {
                                     unreachable!(
                                         "unexpected Tuple-Variant with 0 positional arguments"
@@ -559,10 +559,18 @@ impl CodeGen {
                                 match inner.get_dec() {
                                     TypedDecoder::Tuple(_, decs) => {
                                         if decs.len() != types.len() {
+                                            // NOTE - this branch is reserved for special-cases where a tuple-decoder and the variant-definition have different arities; panics are expected but certain exceptions are allowed
+                                            log::warn!(
+                                                "mismatched arity between decoder {name} (== {}) and variant {type_name}::{con_name} (== {})",
+                                                decs.len(),
+                                                types.len()
+                                            );
+                                            // NOTE - if the variant definition expects only 1 argument but the decoder has `N > 1`, we accept it if the variant's argument is a tuple-type with arity `N`
                                             if types.len() == 1 {
-                                                // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
                                                 match &types[0] {
-                                                    RustType::AnonTuple(..) => {
+                                                    RustType::AnonTuple(vs) => {
+                                                        // this checks that the inner tuple actually has the proper arity; if it doesn't, we shouldn't dodge the panic
+                                                        assert_eq!(decs.len(), vs.len());
                                                         let cl_mono_tuple =
                                                             self.translate(inner.get_dec());
                                                         CaseLogic::Derived(DerivedLogic::VariantOf(
