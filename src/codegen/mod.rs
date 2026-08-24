@@ -11,6 +11,7 @@ use trace::get_and_increment_seed;
 use crate::{
     Arith, BaseType, CommonOp, DynFormat, Expr, FixedReadKind, Format, FormatModule, FormatRef,
     IntRel, IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
+    bounds::Bounds,
     byte_set::ByteSet,
     codegen::typed_format::TypedFixedReadKind,
     decoder::extract_pair,
@@ -1732,6 +1733,26 @@ impl Refutability {
     }
 }
 
+/// Determines the 'refutability' of a set of match-branches `cases`,
+/// when matching against a value of the given `head_type`.
+///
+/// If it is determined that the match-set is exhaustive over the given `head_type`, returns `Refutability::Irrefutable`.
+/// This is typically the case when `cases` contains a wildcard or unconditional bindin-pattern, or when `head_type` has
+/// a small enumerable set of possible shapes each of which are matched irrefutably.
+///
+/// If it is determined that at least one value of `head_type` satisfies no pattern-match, returns `Refutability::Refutable`.
+///
+/// If neither determination can be made before reaching prohibitive complexity limits, returns `Refutability::Indeterminate`.
+///
+/// # Notes
+///
+/// `cases` is typed as `&[(TypedPattern, A)]` to allow this function to be called over the original
+/// list of branches in a match-construction, and the `A` values are left out of the analysis; the
+/// overall branch-set may be formatted using `std::fmt::Debug` in certain edge-cases, hence the
+/// requirement that `A` be `Debug`. Furthermore, to allow this function to recurse into itself
+/// after modifying the pattern-set, `A` is also provisionally required to be `Clone`, though this
+/// is not a hard requirement and merely exists to preserve identifying information for the aforementioned
+/// debug-panics.
 fn refutability_check<A: std::fmt::Debug + Clone>(
     head_type: &GenType,
     cases: &[(TypedPattern<GenType>, A)],
@@ -1744,7 +1765,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
             RustType::Atom(at) => match at {
                 AtomType::TypeRef(lt) => match lt {
                     LocalType::LocalDef(ix, lbl, _) => unreachable!(
-                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
+                        "inline LocalDef ({ix}, {lbl}) cannot be resolved without external context, use GenType::Def instead"
                     ),
                     LocalType::External(t) => unreachable!(
                         "external type '{t}' cannot be resolved without further information"
@@ -1764,9 +1785,17 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                             Refutability::Irrefutable
                         }
                     }
-                    // FIXME - handle Pattern::Int properly
-                    // these cases have too many values to practically cover...
-                    PrimType::Unsigned(_) | PrimType::Char => Refutability::Indeterminate,
+                    PrimType::Unsigned(uint_t) => {
+                        let coverage =
+                            util::IntCoverage::from_iter(cases.iter().map(|(pat, _)| pat));
+                        if coverage.covers_all(0..=uint_t.upper_bound()) {
+                            Refutability::Irrefutable
+                        } else {
+                            Refutability::Refutable
+                        }
+                    }
+                    // we cannot exhaustively cover char values because they can only be matched one-at-a-time (unlike integers) and there are too many cases
+                    PrimType::Char => Refutability::Indeterminate,
                     PrimType::Bool => {
                         // mask for inclusion with indices 0: false, 1: true
                         let mut cover_mask = [false, false];
@@ -1887,6 +1916,14 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
     }
 }
 
+/// Returns `true` if the given pattern is irrefutable, i.e. it is satisfied by every possible value of a given type
+///
+/// Determined inductively from a base-case of atomic irrefutable patterns `TypedPattern::Binding` and `TypedPattern::WildCard`;
+/// a pattern whose head-normal form is invariant for its type is also irrefutable if every sub-pattern within its head-normal form
+/// is irrefutale by this same token.
+///
+/// E.g. `(_, _, _)` is irrefutable because the tuple-shape is implicitly invariant for the type it matches, whereas `[_]` is easily refuted
+/// by sequences of length not equal to one.
 fn is_pattern_irrefutable(pat: &TypedPattern<GenType>) -> bool {
     match pat {
         TypedPattern::Binding(..) | TypedPattern::Wildcard(..) => true,
@@ -1906,10 +1943,23 @@ fn is_pattern_irrefutable(pat: &TypedPattern<GenType>) -> bool {
                     _ => unreachable!("variant pattern cannot match non-LocalDef type"),
                 })
         }
+        TypedPattern::Int(
+            GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unsigned(uint)))),
+            Bounds { min: 0, max },
+        ) => match uint {
+            MachineUint::U8 => max.is_none_or(|v| v == u8::MAX as usize),
+            MachineUint::U16 => max.is_none_or(|v| v == u16::MAX as usize),
+            MachineUint::U32 => max.is_none_or(|v| v == u32::MAX as usize),
+            MachineUint::U64 => max.is_none_or(|v| v == u64::MAX as usize),
+        },
         _ => false, // all the other cases are prim-types that cover only one of N > 1 possible values
     }
 }
 
+/// Returns `true` if any pattern-lhs among the match-cases `head_cases` is irrefutable,
+/// i.e. it cannot fail to match for any value.
+///
+/// Only true of
 fn contains_irrefutable_pattern<A>(head_cases: &[(TypedPattern<GenType>, A)]) -> bool {
     for (pat, _) in head_cases {
         if is_pattern_irrefutable(pat) {
@@ -1923,38 +1973,43 @@ fn contains_irrefutable_pattern<A>(head_cases: &[(TypedPattern<GenType>, A)]) ->
 /// capture they perform (i.e. move or borrow)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ClosureKind {
-    /// Category for closures that take a single borrowed argument
+    /// Category for closures that take a single borrowed argument, most commonly for predicates: `|_: &T| -> bool`, or `|_: &T| -> _` in general
     Predicate,
-    /// Category for closures that take a single owned argument
+    /// Category for closures that take a single owned argument and return another owned value: `|_: T| -> T`, `|_: T| -> U`
     Transform,
-    /// Hybrid category for closures taking an pair-argument, the first element of which is borrowed and the second of which is owned
+    /// Hybrid category for closures taking a 2-tuple (pair) whose first element is borrowed: `|(x, y): (&T, U)| -> _`
     PairBorrowOwned,
     /// Hybrid category for closures taking an pair-argument, the first element of which is owned and the second of which is borrowed
     PairOwnedBorrow,
-    /// Category for closures that take a single borrowed argument and extract an owned value of a `Copy` type, to use as a key for scanning arrays
+    /// Category for closures that 'extract' a `Copy`able key-element from a borrowed complex type, most commonly for `Expr::FindByKey`: `|_: &T| -> K`
+    ///
+    /// Operationally similar to [`ClosureKind::Predicate`], but specialized for `Expr::FindByKey`. In general, if the returned value is a `Copy`-typed
+    /// data-member of the argument, e.g. a field or positional argument thereof, `FindByKey` is preferred over `Predicate`. For boolean predicates or
+    /// general computations that don't uniquely identify the argument, `Predicate` is preferred.
     ExtractKey,
 }
 
 /// Transcribes `GTExpr::Lambda` instances into RustExpr values.
 ///
-/// When `kind` is `ClosureKind::Predicate`, the resulting RustExpr will be a closure that operates on a reference to its associated argument-type.
+/// When `kind` is `ClosureKind::Predicate` or `ClosureKind::ExtractKey`,
+/// the resulting RustExpr will be a closure that operates on a **reference** to its associated argument-type.
 ///
-/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an owned value of its associated argument-type.
+/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an **owned** value of its associated argument-type.
 ///
-/// For hybrid `kind`s `PairBorrowOwned` and `PairOwnedBorrow`, the closure in question operates on a tuple with one borrowed and one owned value.
+/// For hybrid `kind`s `PairBorrowOwned` and `PairOwnedBorrow`, the closure in question operates on a 2-tuple with one member borrowed and one member owned.
 ///
 /// The `needs_ok` argument controls whether the overall body of the closure expression will be wrapped in `Ok` or not, which depends on whether
 /// there are any short-circuiting code-paths within the embedded lambda body. If `true`, an `Ok(...)` will be produced. Otherwise, the body will be
 /// transcribed as-is.
 ///
 /// Additionally takes an argument `info` that dictates how the body is to be transcribed, according to the
-/// implied semantics used in `embed_expr`
+/// implied `ExprInfo`-dependent semantics used in [`embed_expr`].
 fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo) -> RustExpr {
     match expr {
         TypedExpr::Lambda((head_t, _), head, body) => match kind {
-            // REVIEW - while ExtractKind is very similar to Predicate semantics, we want to avoid hard-coding Predicate for cases where that descriptor is misleading
             ClosureKind::Predicate | ClosureKind::ExtractKey => {
                 let expansion = embed_expr(body, info);
+                // NOTE - despite the name, `new_predicate` also applies for ExtractKey-style closures
                 RustExpr::Closure(RustClosure::new_predicate(
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
@@ -1981,12 +2036,9 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                 let RustType::AnonTuple(args) = head_t.clone().to_rust_type() else {
                     panic!("type {head_t:?} does not look like a tuple...")
                 };
-                let point_t = match &args[..] {
-                    [fst, snd] => RustType::AnonTuple(vec![
-                        RustType::borrow_of(None, Mut::Immutable, fst.clone()),
-                        snd.clone(),
-                    ]),
-                    other => unreachable!("tuple is not a pair: {other:?}"),
+                let point_t = {
+                    let (fst, snd) = extract_pair(args);
+                    RustType::AnonTuple(vec![fst.borrow_immutable_elided(), snd])
                 };
                 let expansion = embed_expr(body, info);
                 RustExpr::Closure(RustClosure::new_transform(
@@ -2003,12 +2055,9 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                 let RustType::AnonTuple(args) = head_t.clone().to_rust_type() else {
                     panic!("type {head_t:?} does not look like a tuple...")
                 };
-                let point_t = match &args[..] {
-                    [fst, snd] => RustType::AnonTuple(vec![
-                        fst.clone(),
-                        RustType::borrow_of(None, Mut::Immutable, snd.clone()),
-                    ]),
-                    other => unreachable!("tuple is not a pair: {other:?}"),
+                let point_t = {
+                    let (fst, snd) = extract_pair(args);
+                    RustType::AnonTuple(vec![fst, snd.borrow_immutable_elided()])
                 };
                 let expansion = embed_expr(body, info);
                 RustExpr::Closure(RustClosure::new_transform(
@@ -2381,7 +2430,7 @@ impl GenLambda {
                 };
                 let point_t = {
                     let (fst, snd) = extract_pair(args);
-                    RustType::AnonTuple(vec![RustType::borrow_of(None, Mut::Immutable, fst), snd])
+                    RustType::AnonTuple(vec![fst.borrow_immutable_elided(), snd])
                 };
                 let expansion = embed_expr(&self.body, info);
                 RustExpr::Closure(RustClosure::new_transform(
@@ -2400,7 +2449,7 @@ impl GenLambda {
                 };
                 let point_t = {
                     let (fst, snd) = extract_pair(args);
-                    RustType::AnonTuple(vec![fst, RustType::borrow_of(None, Mut::Immutable, snd)])
+                    RustType::AnonTuple(vec![fst, snd.borrow_immutable_elided()])
                 };
                 let expansion = embed_expr(&self.body, info);
                 RustExpr::Closure(RustClosure::new_transform(
@@ -4447,19 +4496,7 @@ where
         let sig = {
             let args = {
                 let arg0 = {
-                    let ty = {
-                        let mut params = RustParams::<RustLt, RustType>::new();
-                        if let Some(lt) = this_lt {
-                            params.push_lifetime(lt.clone());
-                        } else {
-                            params.push_lifetime(RustLt::WILD);
-                        }
-                        RustType::borrow_of(
-                            None,
-                            Mut::Mutable,
-                            RustType::verbatim("Parser", Some(params)),
-                        )
-                    };
+                    let ty = model::parser_param_type(this_lt);
                     (input_varname.into(), ty)
                 };
                 if let Some(ref args) = self.extra_args {

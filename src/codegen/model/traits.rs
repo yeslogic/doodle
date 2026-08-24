@@ -146,12 +146,8 @@ pub mod object_api {
                             let arg0 = {
                                 let name = lbl("p");
                                 let ty = {
-                                    let params = UseParams::from_lt(lt(METHOD_LIFETIME));
-                                    RustType::borrow_of(
-                                        None,
-                                        Mut::Mutable,
-                                        RustType::verbatim("Parser", Some(params)),
-                                    )
+                                    let parser_lt = Some(&lt(METHOD_LIFETIME));
+                                    super::parser_param_type(parser_lt)
                                 };
                                 (name, ty)
                             };

@@ -884,8 +884,18 @@ impl RustType {
         }
     }
 
+    /// Helper for calling [`RustType::borrow_of`] without a named lifetime and with [`Mut::Immutable`].
+    pub fn borrow_immutable_elided(self) -> Self {
+        Self::borrow_of(None, Mut::Immutable, self)
+    }
+
     /// Constructs a `RustType` representing `&'a (mut|) T` from parameters representing `'a` (optional),
     /// the mutability of the reference, and `T`, respectively.
+    ///
+    /// # Notes
+    ///
+    /// For immutable borrows only, performs an implicit dereference of `ty` when constructing the actual `RustType`.
+    /// For example, `Vec<T>` is mapped to `[T]` before the (immutable) borrow is applied.
     pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
         let ty = if m.is_mutable() { ty } else { ty.deref_tgt() };
         Self::Atom(AtomType::Comp(CompType::Borrow(lt, m, Box::new(ty))))
@@ -1386,6 +1396,15 @@ pub enum MachineUint {
 }
 
 impl MachineUint {
+    pub const fn upper_bound(&self) -> usize {
+        match self {
+            MachineUint::U8 => u8::MAX as usize,
+            MachineUint::U16 => u16::MAX as usize,
+            MachineUint::U32 => u32::MAX as usize,
+            MachineUint::U64 => u64::MAX as usize,
+        }
+    }
+
     pub const fn to_static_str(self) -> &'static str {
         match self {
             MachineUint::U8 => "u8",
@@ -3332,21 +3351,28 @@ impl RustClosure {
         )
     }
 
-    /// Constructs a new closure with 'predicate' (ref-bound argument) semantics.
+    /// Constructs a new closure with 'predicate' (borrowed-argument) semantics.
     ///
-    /// Also applies to extract-key semantics `(&T) -> K where K: Copy`
+    /// The identifier used for the head-variable binding is given via the argument `head`, which will be bound
+    /// for expansions in `body`. If `deref_t` is provided, it fills in the `: _` part of the closure head-capture
+    /// signature, which will be a reference to the type represented by `deref_t` (i.e. if `deref_t` models type `T`,
+    /// the signature will be `: &T`).
+    ///
+    /// If `deref_t` is `None`, no explicit signature is produced for the closure head, and the type of the argument
+    /// will be left to the Rust compiler to infer via type-inference of the generated code.
+    ///
+    /// # Notes
+    ///
+    /// Also applies to extract-key semantics (`impl Fn(&T) -> K where K: Copy`)
     pub fn new_predicate(
         head: impl IntoLabel,
         deref_t: Option<RustType>,
         body: RustExpr,
     ) -> RustClosure {
-        RustClosure(
-            RustClosureHead::SimpleVar(
-                head.into(),
-                deref_t.map(|ty| RustType::borrow_of(None, Mut::Immutable, ty)),
-            ),
-            ClosureBody::Expression(Box::new(body)),
-        )
+        let sig = deref_t.map(RustType::borrow_immutable_elided);
+        let capture = RustClosureHead::SimpleVar(head.into(), sig);
+        let expansion = ClosureBody::Expression(Box::new(body));
+        RustClosure(capture, expansion)
     }
 
     /// Constructs a new closure with 'transform' (value) semantics

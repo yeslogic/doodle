@@ -219,6 +219,68 @@ pub fn err_where_unsatisfied(trace: u64) -> RustExpr {
 // !SECTION
 
 // SECTION - Helper functions for prelude-specific AST-constructions
+
+/// RustType for `&mut Parser<...>`, using the provided lifetime parameter (or `'_` if `None`).
+pub fn parser_param_type(parser_lt: Option<&RustLt>) -> RustType {
+    let mut params = RustParams::<RustLt, RustType>::new();
+    if let Some(lt) = parser_lt {
+        params.push_lifetime(lt.clone());
+    } else {
+        params.push_lifetime(RustLt::WILD);
+    }
+    RustType::borrow_of(
+        None,
+        Mut::Mutable,
+        RustType::verbatim("Parser", Some(params)),
+    )
+}
+
+/// RustExpr for `Parser::new(<buffer>)`
+///
+/// `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
+pub fn parser_new(buffer: RustExpr) -> RustExpr {
+    RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("Parser")],
+            lbl("new"),
+        ))),
+        vec![buffer],
+    )
+}
+
+/// RustStmt for `let mut <ident> = Parser::new(<buffer>)`.
+///
+/// The argument `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
+pub fn let_mut_parser_new(ident: &'static str, buffer: RustExpr) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_new(buffer))
+}
+
+/// RustExpr for `Parser::from(<view>)`
+pub fn parser_from(view: RustExpr) -> RustExpr {
+    RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("Parser")],
+            lbl("from"),
+        ))),
+        vec![view],
+    )
+}
+
+/// RustStmt for `let mut <ident> = Parser::from(<view>)`.
+pub fn let_mut_parser_from(ident: &'static str, view: RustExpr) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_from(view))
+}
+
+pub fn reify_view(view_raw: RustExpr) -> RustExpr {
+    // NOTE - View used both for transient parses and persisted values
+    view_raw
+}
+
+/// RustExpr for `<view>.offset(<offset>)?`
+pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
+    view.call_method_with("offset", [offset]).wrap_try()
+}
+
 /// Model RustExpr for handling [`Format::EndOfInput`] as a Try-pattern (`<..>?`).
 pub fn try_enforce_eos(parser: RustExpr) -> RustExpr {
     try_call!(parser, finish)
@@ -336,7 +398,6 @@ pub fn start_alt(parser: RustExpr) -> RustExpr {
 pub fn try_next_alt(parser: RustExpr, next_is_final: bool) -> RustExpr {
     try_call!(parser, next_alt, RustExpr::bool_lit(next_is_final))
 }
-
 // !SECTION
 
 // SECTION - boilerplate patterns based on incidental implementation details of codegen process
@@ -407,52 +468,6 @@ pub fn match_case_err_bind(lab: &'static str) -> MatchCaseLHS {
         Constructor::Simple(lbl("Err")),
         Box::new(RustPattern::CatchAll(Some(lbl(lab)))),
     ))
-}
-
-/// RustExpr for `Parser::new(<buffer>)`
-///
-/// `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
-pub fn parser_new(buffer: RustExpr) -> RustExpr {
-    RustExpr::FunctionCall(
-        Box::new(RustExpr::Entity(RustEntity::Scoped(
-            vec![lbl("Parser")],
-            lbl("new"),
-        ))),
-        vec![buffer],
-    )
-}
-
-/// RustStmt for `let mut <ident> = Parser::new(<buffer>)`.
-///
-/// The argument `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
-pub fn let_mut_parser_new(ident: &'static str, buffer: RustExpr) -> RustStmt {
-    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_new(buffer))
-}
-
-/// RustExpr for `Parser::from(<view>)`
-pub fn parser_from(view: RustExpr) -> RustExpr {
-    RustExpr::FunctionCall(
-        Box::new(RustExpr::Entity(RustEntity::Scoped(
-            vec![lbl("Parser")],
-            lbl("from"),
-        ))),
-        vec![view],
-    )
-}
-
-/// RustStmt for `let mut <ident> = Parser::from(<view>)`.
-pub fn let_mut_parser_from(ident: &'static str, view: RustExpr) -> RustStmt {
-    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_from(view))
-}
-
-pub fn reify_view(view_raw: RustExpr) -> RustExpr {
-    // NOTE - View used both for transient parses and persisted values
-    view_raw
-}
-
-/// RustExpr for `<view>.offset(<offset>)?`
-pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
-    view.call_method_with("offset", [offset]).wrap_try()
 }
 
 // !SECTION
