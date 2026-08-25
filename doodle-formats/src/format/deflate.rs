@@ -113,7 +113,13 @@ fn bits16(n: usize) -> Format {
     )
 }
 
-// FIXME: document this
+/// Parses the extra length bits and following distance code/record for a length code in the
+/// range 257-285 (DEFLATE RFC 1951 §3.2.5), as found in a dynamic-Huffman (TYPE==2) block.
+///
+/// `start` is the base length associated with the length code, `extra_bits` is the number of
+/// extra bits to read and add to `start` to obtain the true length, and `distance_record` is
+/// the format used to decode the subsequent distance code (read via the dynamic
+/// `distance-alphabet-format`) into its corresponding distance value.
 fn length_record(start: usize, extra_bits: usize, distance_record: FormatRef) -> Format {
     record([
         ("length-extra-bits", bits8(extra_bits)),
@@ -135,7 +141,9 @@ fn length_record(start: usize, extra_bits: usize, distance_record: FormatRef) ->
     ])
 }
 
-// FIXME: document this
+/// As [`length_record`], but for fixed-Huffman (TYPE==1) blocks (DEFLATE RFC 1951 §3.2.6), where
+/// the distance code is a plain 5-bit value (see [`dist8`]) rather than being decoded through a
+/// dynamic Huffman format.
 fn length_record_fixed(start: usize, extra_bits: usize, distance_record: FormatRef) -> Format {
     record([
         ("length-extra-bits", bits8(extra_bits)),
@@ -154,7 +162,15 @@ fn length_record_fixed(start: usize, extra_bits: usize, distance_record: FormatR
     ])
 }
 
-// FIXME - document this
+/// Given the `Expr` for a `{code, extra}` record decoded from a length code in the range
+/// 257-285 together with its length/distance data (DEFLATE RFC 1951 §3.2.5), projects out the
+/// `length` and `distance` fields and wraps them in a single-element `Expr::Seq` holding a
+/// `reference` variant, matching the shape expected by the `codes-values`/`inflate` back-reference
+/// logic further down this module.
+///
+/// Only handles the case where `extra` is `Some(..)`, i.e. `scrutinee` must already be known to
+/// come from a length code (257-285); it is not meant to be called on literal or end-of-block
+/// codes.
 fn reference_record(scrutinee: Expr) -> Expr {
     expr_match(
         record_proj(scrutinee, "extra"),

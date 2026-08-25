@@ -54,11 +54,6 @@ pub fn main(
         ),
     );
 
-    // let any_tag = module.define_format(
-    //     "png.any-tag",
-    //     tuple([u8(), u8(), u8(), u8()]), // FIXME: ASCII
-    // );
-
     let ihdr_tag = module.define_format("png.ihdr-tag", is_bytes(b"IHDR"));
     let ihdr_data = module.define_format(
         "png.ihdr-data",
