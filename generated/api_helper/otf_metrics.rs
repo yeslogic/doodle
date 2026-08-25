@@ -4942,8 +4942,15 @@ pub(crate) mod fvar {
         }
     }
 
-    // TODO -
+    // NOTE - the flags field of InstanceRecord is hard-coded to `0` and reserved for future use
     type InstanceFlags = ();
+
+    #[derive(Debug, Clone)]
+    pub struct InstanceRecord {
+        pub(crate) subfamily_nameid: NameId,
+        pub(crate) coordinates: UserTuple,
+        pub(crate) postscript_nameid: Option<NameId>,
+    }
 
     impl Promote<OpentypeInstanceRecord> for InstanceRecord {
         fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
@@ -4953,13 +4960,6 @@ pub(crate) mod fvar {
                 postscript_nameid: promote_opt(&orig.postscript_nameid),
             }
         }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct InstanceRecord {
-        pub(crate) subfamily_nameid: NameId,
-        pub(crate) coordinates: UserTuple,
-        pub(crate) postscript_nameid: Option<NameId>,
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -5405,11 +5405,11 @@ pub mod vmtx {
 
     impl Promote<OpentypeVmtx> for VmtxMetrics {
         fn promote(orig: &OpentypeVmtx) -> Self {
-            // FIXME - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `orig` are misleading
+            // NOTE - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `orig` are misleading
             let mut accum =
                 Vec::with_capacity(orig.long_metrics.len() + orig.left_side_bearings.len());
             for vmet in orig.long_metrics.iter() {
-                // FIXME - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `vmet` are misleading
+                // NOTE - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `vmet` are misleading
                 accum.push(UnifiedBearing::new_vertical(
                     vmet.advance_width,
                     vmet.left_side_bearing,

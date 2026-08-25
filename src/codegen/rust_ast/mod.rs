@@ -4203,18 +4203,18 @@ pub mod short_circuit {
         RustMatchCase, RustOp, RustStmt, StructExpr, VecExpr,
     };
 
-    /// Purity-rank for individual AST items.
+    /// Short-circuit rank for individual AST items.
     ///
     /// This is used to determine whether sub-sections of a function or closure body
     /// would unintentionally violate operational boundaries (e.g. a return keyword in an inner block)
     /// and therefore need to be wrapped in a closure to prevent short-circuiting from happening across
     /// a scope boundary.
     #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
-    pub enum EvalPurity {
-        /// Rank 0, i.e. fully pure: Regardless of the context in which the item appears, the evaluation does not cause control-flow to short-circuit.
+    pub enum ShortCircuitRank {
+        /// Rank 0, i.e. straight-line: Regardless of the context in which the item appears, the evaluation does not cause control-flow to short-circuit.
         ///
-        /// If every sub-item of a block-scope is Pure, it will never require closure indirection.
-        Pure = 0,
+        /// If every sub-item of a block-scope is StraightLine, it will never require closure indirection.
+        StraightLine = 0,
         /// Rank 1, i.e. contains one or more Try operations (but no `return` keywords)
         ///
         /// Any expression, statement, or block that contains a mix of Rank-0 and (at least one) Rank-1 sub-nodes will be Rank-1.
@@ -4229,26 +4229,26 @@ pub mod short_circuit {
         Return = 2,
     }
 
-    impl std::ops::BitOr for EvalPurity {
+    impl std::ops::BitOr for ShortCircuitRank {
         type Output = Self;
 
         fn bitor(self, rhs: Self) -> Self::Output {
             match self {
-                EvalPurity::Pure => rhs,
-                EvalPurity::Try => match rhs {
-                    EvalPurity::Return => EvalPurity::Return,
+                ShortCircuitRank::StraightLine => rhs,
+                ShortCircuitRank::Try => match rhs {
+                    ShortCircuitRank::Return => ShortCircuitRank::Return,
                     _ => self,
                 },
-                EvalPurity::Return => EvalPurity::Return,
+                ShortCircuitRank::Return => ShortCircuitRank::Return,
             }
         }
     }
 
-    impl std::ops::BitOrAssign for EvalPurity {
+    impl std::ops::BitOrAssign for ShortCircuitRank {
         fn bitor_assign(&mut self, rhs: Self) {
             if matches!(
                 (&self, rhs),
-                (EvalPurity::Pure, _) | (_, EvalPurity::Return)
+                (ShortCircuitRank::StraightLine, _) | (_, ShortCircuitRank::Return)
             ) {
                 *self = rhs;
             }
@@ -4261,18 +4261,18 @@ pub mod short_circuit {
     }
 
     pub trait ShortCircuitExt: ShortCircuit {
-        /// Returns the eval-purity of the given Rust-AST node.
-        fn check_eval_purity(&self) -> EvalPurity;
+        /// Returns the short-circuit rank of the given Rust-AST node.
+        fn short_circuit_rank(&self) -> ShortCircuitRank;
 
         /// Returns `true` if there is a 'true' short-circuit before the final value returned by the evaluation of `self`
         /// as in `BlockScope` with a short-circuiting statement.
         ///
         /// Used to determine whether a closure can be beta-reduced.
         fn has_short_circuit(&self, is_last: bool) -> bool {
-            match self.check_eval_purity() {
-                EvalPurity::Pure => false,
-                EvalPurity::Try => !is_last,
-                EvalPurity::Return => true,
+            match self.short_circuit_rank() {
+                ShortCircuitRank::StraightLine => false,
+                ShortCircuitRank::Try => !is_last,
+                ShortCircuitRank::Return => true,
             }
         }
     }
@@ -4350,15 +4350,15 @@ pub mod short_circuit {
     }
 
     impl ShortCircuitExt for RustStmt {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
                 RustStmt::Expr(expr)
                 | RustStmt::Reassign(.., expr)
                 | RustStmt::Let(.., expr)
                 | RustStmt::LetPattern(.., expr)
-                | RustStmt::Return(ReturnKind::Implicit, expr) => expr.check_eval_purity(),
-                RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::Try,
-                // RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
+                | RustStmt::Return(ReturnKind::Implicit, expr) => expr.short_circuit_rank(),
+                RustStmt::Return(ReturnKind::Keyword, ..) => ShortCircuitRank::Try,
+                // RustStmt::Control(ctrl) => ctrl.short_circuit_rank(),
             }
         }
     }
@@ -4400,25 +4400,26 @@ pub mod short_circuit {
     where
         BlockType: ShortCircuitExt,
     {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
-                RustControl::Loop(stmts) => stmts.check_eval_purity(),
+                RustControl::Loop(stmts) => stmts.short_circuit_rank(),
                 RustControl::ForIter(_, expr, stmts)
                 | RustControl::While(expr, stmts)
                 | RustControl::ForRange0(_, expr, stmts) => {
-                    expr.check_eval_purity() | stmts.check_eval_purity()
+                    expr.short_circuit_rank() | stmts.short_circuit_rank()
                 }
                 RustControl::If(cond, then, opt_else) => {
-                    cond.check_eval_purity()
-                        | then.check_eval_purity()
-                        | opt_else
-                            .as_ref()
-                            .map_or(EvalPurity::Pure, BlockType::check_eval_purity)
+                    cond.short_circuit_rank()
+                        | then.short_circuit_rank()
+                        | opt_else.as_ref().map_or(
+                            ShortCircuitRank::StraightLine,
+                            BlockType::short_circuit_rank,
+                        )
                 }
                 RustControl::Match(scrutinee, body) => {
-                    scrutinee.check_eval_purity() | body.check_eval_purity()
+                    scrutinee.short_circuit_rank() | body.short_circuit_rank()
                 }
-                RustControl::Break => EvalPurity::Pure,
+                RustControl::Break => ShortCircuitRank::StraightLine,
             }
         }
     }
@@ -4430,8 +4431,8 @@ pub mod short_circuit {
     }
 
     impl<BlockType: ShortCircuitExt> ShortCircuitExt for RustMatchCase<BlockType> {
-        fn check_eval_purity(&self) -> EvalPurity {
-            self.1.check_eval_purity()
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
+            self.1.short_circuit_rank()
         }
     }
 
@@ -4448,23 +4449,23 @@ pub mod short_circuit {
     }
 
     impl<BlockType: ShortCircuitExt> ShortCircuitExt for RustMatchBody<BlockType> {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
-                RustMatchBody::Irrefutable(branches) => branches.check_eval_purity(),
+                RustMatchBody::Irrefutable(branches) => branches.short_circuit_rank(),
                 RustMatchBody::Refutable(branches, rust_catch_all) => match rust_catch_all {
-                    RustCatchAll::ReturnErrorValue { .. } => EvalPurity::Try,
-                    RustCatchAll::PanicUnreachable { .. } => branches.check_eval_purity(),
+                    RustCatchAll::ReturnErrorValue { .. } => ShortCircuitRank::Try,
+                    RustCatchAll::PanicUnreachable { .. } => branches.short_circuit_rank(),
                 },
             }
         }
     }
 
     impl<BlockType: ShortCircuitExt> ShortCircuitExt for Vec<RustMatchCase<BlockType>> {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             self.iter()
-                .map(<RustMatchCase<BlockType>>::check_eval_purity)
+                .map(<RustMatchCase<BlockType>>::short_circuit_rank)
                 .max()
-                .unwrap_or(EvalPurity::Pure)
+                .unwrap_or(ShortCircuitRank::StraightLine)
         }
     }
 
@@ -4523,11 +4524,11 @@ pub mod short_circuit {
         ( $( $t:ty ),+ $(,)? ) => {
             $(
                 impl ShortCircuitExt for Vec<$t> {
-                    fn check_eval_purity(&self) -> EvalPurity {
-                        let mut acc = EvalPurity::Pure;
+                    fn short_circuit_rank(&self) -> ShortCircuitRank {
+                        let mut acc = ShortCircuitRank::StraightLine;
                         for expr in self.iter() {
-                            if acc == EvalPurity::Return { break; }
-                            acc |= expr.check_eval_purity();
+                            if acc == ShortCircuitRank::Return { break; }
+                            acc |= expr.short_circuit_rank();
                         }
                         acc
                     }
@@ -4537,13 +4538,13 @@ pub mod short_circuit {
     }
 
     impl ShortCircuitExt for Vec<RustStmt> {
-        fn check_eval_purity(&self) -> EvalPurity {
-            let mut acc = EvalPurity::Pure;
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
+            let mut acc = ShortCircuitRank::StraightLine;
             for expr in self.iter() {
-                if matches!(acc, EvalPurity::Try | EvalPurity::Return) {
-                    return EvalPurity::Return;
+                if matches!(acc, ShortCircuitRank::Try | ShortCircuitRank::Return) {
+                    return ShortCircuitRank::Return;
                 }
-                acc |= expr.check_eval_purity();
+                acc |= expr.short_circuit_rank();
             }
             acc
         }
@@ -4552,49 +4553,51 @@ pub mod short_circuit {
     short_circuit_ext_vec!(RustExpr, (crate::Label, Option<RustExpr>));
 
     impl ShortCircuitExt for RustExpr {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
-                RustExpr::Void => EvalPurity::Pure,
-                RustExpr::ArrayLit(exprs) => exprs.check_eval_purity(),
-                RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
-                RustExpr::ConstNum(..) => EvalPurity::Pure,
-                RustExpr::Closure(..) => EvalPurity::Pure,
+                RustExpr::Void => ShortCircuitRank::StraightLine,
+                RustExpr::ArrayLit(exprs) => exprs.short_circuit_rank(),
+                RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => ShortCircuitRank::StraightLine,
+                RustExpr::ConstNum(..) => ShortCircuitRank::StraightLine,
+                RustExpr::Closure(..) => ShortCircuitRank::StraightLine,
                 RustExpr::MethodCall(recv, _, _, args) => {
-                    recv.check_eval_purity() | args.check_eval_purity()
+                    recv.short_circuit_rank() | args.short_circuit_rank()
                 }
-                RustExpr::FieldAccess(expr, ..) => expr.check_eval_purity(),
+                RustExpr::FieldAccess(expr, ..) => expr.short_circuit_rank(),
                 RustExpr::FunctionCall(.., args) | RustExpr::Invoke(.., args) => {
-                    args.check_eval_purity()
+                    args.short_circuit_rank()
                 }
-                RustExpr::Tuple(elts) => elts.check_eval_purity(),
-                RustExpr::Struct(.., struct_expr) => struct_expr.check_eval_purity(),
+                RustExpr::Tuple(elts) => elts.short_circuit_rank(),
+                RustExpr::Struct(.., struct_expr) => struct_expr.short_circuit_rank(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
                 | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
-                | RustExpr::BorrowMut(inner) => inner.check_eval_purity(),
+                | RustExpr::BorrowMut(inner) => inner.short_circuit_rank(),
                 RustExpr::Try(inner) => match inner.as_ref() {
-                    RustExpr::ResultOk(.., expr) => expr.check_eval_purity(),
-                    _ => EvalPurity::Try,
+                    RustExpr::ResultOk(.., expr) => expr.short_circuit_rank(),
+                    _ => ShortCircuitRank::Try,
                 },
-                RustExpr::Operation(op) => op.check_eval_purity(),
+                RustExpr::Operation(op) => op.short_circuit_rank(),
                 RustExpr::BlockScope(stmts, expr) => {
-                    stmts.check_eval_purity() | expr.check_eval_purity()
+                    stmts.short_circuit_rank() | expr.short_circuit_rank()
                 }
-                RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.check_eval_purity(),
-                RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.check_eval_purity(),
+                RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.short_circuit_rank(),
+                RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.short_circuit_rank(),
                 // REVIEW - has side effects but does not short circuit
-                RustExpr::Macro(RustMacro::Log(..)) => EvalPurity::Pure,
-                RustExpr::Control(ctrl) => ctrl.check_eval_purity(),
+                RustExpr::Macro(RustMacro::Log(..)) => ShortCircuitRank::StraightLine,
+                RustExpr::Control(ctrl) => ctrl.short_circuit_rank(),
                 RustExpr::Index(head, index) => {
-                    head.check_eval_purity() | index.check_eval_purity()
+                    head.short_circuit_rank() | index.short_circuit_rank()
                 }
                 RustExpr::Slice(seq, start, stop) => {
-                    seq.check_eval_purity() | start.check_eval_purity() | stop.check_eval_purity()
+                    seq.short_circuit_rank()
+                        | start.short_circuit_rank()
+                        | stop.short_circuit_rank()
                 }
                 RustExpr::RangeExclusive(start, stop) => {
-                    start.check_eval_purity() | stop.check_eval_purity()
+                    start.short_circuit_rank() | stop.short_circuit_rank()
                 }
             }
         }
@@ -4612,12 +4615,12 @@ pub mod short_circuit {
     }
 
     impl ShortCircuitExt for VecExpr {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
-                VecExpr::Nil => EvalPurity::Pure,
-                VecExpr::Single(x) => x.check_eval_purity(),
-                VecExpr::Repeat(x, n) => x.check_eval_purity() | n.check_eval_purity(),
-                VecExpr::List(xs) => xs.check_eval_purity(),
+                VecExpr::Nil => ShortCircuitRank::StraightLine,
+                VecExpr::Single(x) => x.short_circuit_rank(),
+                VecExpr::Repeat(x, n) => x.short_circuit_rank() | n.short_circuit_rank(),
+                VecExpr::List(xs) => xs.short_circuit_rank(),
             }
         }
     }
@@ -4635,10 +4638,10 @@ pub mod short_circuit {
     }
 
     impl ShortCircuitExt for RustOp {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
-                RustOp::InfixOp(_, lhs, rhs) => lhs.check_eval_purity() | rhs.check_eval_purity(),
-                RustOp::PrefixOp(_, expr) | RustOp::AsCast(expr, _) => expr.check_eval_purity(),
+                RustOp::InfixOp(_, lhs, rhs) => lhs.short_circuit_rank() | rhs.short_circuit_rank(),
+                RustOp::PrefixOp(_, expr) | RustOp::AsCast(expr, _) => expr.short_circuit_rank(),
             }
         }
     }
@@ -4650,11 +4653,11 @@ pub mod short_circuit {
     }
 
     impl ShortCircuitExt for (crate::Label, Option<RustExpr>) {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             if let Some(expr) = self.1.as_ref() {
-                expr.check_eval_purity()
+                expr.short_circuit_rank()
             } else {
-                EvalPurity::Pure
+                ShortCircuitRank::StraightLine
             }
         }
     }
@@ -4670,11 +4673,11 @@ pub mod short_circuit {
     }
 
     impl ShortCircuitExt for StructExpr {
-        fn check_eval_purity(&self) -> EvalPurity {
+        fn short_circuit_rank(&self) -> ShortCircuitRank {
             match self {
-                StructExpr::Empty => EvalPurity::Pure,
-                StructExpr::Tuple(elts) => elts.check_eval_purity(),
-                StructExpr::Record(flds) => flds.check_eval_purity(),
+                StructExpr::Empty => ShortCircuitRank::StraightLine,
+                StructExpr::Tuple(elts) => elts.short_circuit_rank(),
+                StructExpr::Record(flds) => flds.short_circuit_rank(),
             }
         }
     }
