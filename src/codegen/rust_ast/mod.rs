@@ -13,6 +13,7 @@ use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY}
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{Precedence, cond_paren};
+use crate::valuetype::{BaseNumType, SignedIntType};
 use crate::{BaseKind, BaseType, Endian, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
@@ -1279,6 +1280,7 @@ where
     }
 }
 
+// ANCHOR - markertype-enum
 /// Representatives for `smallsorts::binary::*` marker-types.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
 pub(crate) enum MarkerType {
@@ -1286,6 +1288,10 @@ pub(crate) enum MarkerType {
     U16Be,
     U32Be,
     U64Be,
+    I8,
+    I16Be,
+    I32Be,
+    I64Be,
 }
 
 impl MarkerType {
@@ -1296,6 +1302,10 @@ impl MarkerType {
             MarkerType::U16Be => size_of::<u16>(),
             MarkerType::U32Be => size_of::<u32>(),
             MarkerType::U64Be => size_of::<u64>(),
+            MarkerType::I8 => size_of::<i8>(),
+            MarkerType::I16Be => size_of::<i16>(),
+            MarkerType::I32Be => size_of::<i32>(),
+            MarkerType::I64Be => size_of::<i64>(),
         }
     }
 
@@ -1306,6 +1316,10 @@ impl MarkerType {
             MarkerType::U16Be => "U16Be",
             MarkerType::U32Be => "U32Be",
             MarkerType::U64Be => "U64Be",
+            MarkerType::I8 => "I8",
+            MarkerType::I16Be => "I16Be",
+            MarkerType::I32Be => "I32Be",
+            MarkerType::I64Be => "I64Be",
         }
     }
 
@@ -1320,9 +1334,16 @@ impl MarkerType {
             BaseKind::U16Ext(Endian::Be) => MarkerType::U16Be,
             BaseKind::U32Ext(Endian::Be) => MarkerType::U32Be,
             BaseKind::U64Ext(Endian::Be) => MarkerType::U64Be,
+            BaseKind::I8 => MarkerType::I8,
+            BaseKind::I16Ext(Endian::Be) => MarkerType::I16Be,
+            BaseKind::I32Ext(Endian::Be) => MarkerType::I32Be,
+            BaseKind::I64Ext(Endian::Be) => MarkerType::I64Be,
             BaseKind::U16Ext(Endian::Le)
             | BaseKind::U32Ext(Endian::Le)
-            | BaseKind::U64Ext(Endian::Le) => {
+            | BaseKind::U64Ext(Endian::Le)
+            | BaseKind::I16Ext(Endian::Le)
+            | BaseKind::I32Ext(Endian::Le)
+            | BaseKind::I64Ext(Endian::Le) => {
                 unimplemented!("little-endian read-array parses not yet implemented")
             }
         }
@@ -1336,6 +1357,10 @@ impl From<BaseKind> for MarkerType {
             BaseKind::U16 => MarkerType::U16Be,
             BaseKind::U32 => MarkerType::U32Be,
             BaseKind::U64 => MarkerType::U64Be,
+            BaseKind::I8 => MarkerType::I8,
+            BaseKind::I16 => MarkerType::I16Be,
+            BaseKind::I32 => MarkerType::I32Be,
+            BaseKind::I64 => MarkerType::I64Be,
         }
     }
 }
@@ -2058,6 +2083,24 @@ impl From<MachineUint> for NumType {
 impl From<MachineSint> for NumType {
     fn from(v: MachineSint) -> Self {
         Self::I(v)
+    }
+}
+
+impl From<BaseNumType> for NumType {
+    fn from(value: BaseNumType) -> Self {
+        match value {
+            BaseNumType::Unsigned(BaseType::U8) => NumType::U(MachineUint::U8),
+            BaseNumType::Unsigned(BaseType::U16) => NumType::U(MachineUint::U16),
+            BaseNumType::Unsigned(BaseType::U32) => NumType::U(MachineUint::U32),
+            BaseNumType::Unsigned(BaseType::U64) => NumType::U(MachineUint::U64),
+            BaseNumType::Unsigned(other) => unreachable!(
+                "BaseNumType::Unsigned should only ever wrap a numeric BaseType (found {other:?})"
+            ),
+            BaseNumType::Signed(SignedIntType::I8) => NumType::I(MachineSint::I8),
+            BaseNumType::Signed(SignedIntType::I16) => NumType::I(MachineSint::I16),
+            BaseNumType::Signed(SignedIntType::I32) => NumType::I(MachineSint::I32),
+            BaseNumType::Signed(SignedIntType::I64) => NumType::I(MachineSint::I64),
+        }
     }
 }
 

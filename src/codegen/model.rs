@@ -326,6 +326,13 @@ pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian
         BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
             unimplemented!("little-endian read-array parses not yet implemented")
         }
+        // ANCHOR - view-signed-readarray-gap
+        // FIXME[epic=signed-parse] - add read_array_i8/i16be/i32be/i64be to View (parser/view.rs)
+        // and wire them in here, mirroring the unsigned read_array_uNN methods, if/when a
+        // signed ReadArray-over-View format shows up; not needed by anything today.
+        BaseKind::I8 | BaseKind::I16Ext(_) | BaseKind::I32Ext(_) | BaseKind::I64Ext(_) => {
+            unimplemented!("signed read-array-from-view parses not yet implemented")
+        }
     }
 }
 

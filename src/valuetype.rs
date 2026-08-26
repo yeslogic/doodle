@@ -13,6 +13,7 @@ use crate::{
     typecheck::error::UnificationError,
 };
 
+// ANCHOR - basetype-enum
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Hash, PartialOrd, Ord)]
 pub enum BaseType {
     Bool,
@@ -101,6 +102,24 @@ impl From<SignedIntType> for IntType {
 impl From<SignedIntType> for NumRep {
     fn from(s: SignedIntType) -> Self {
         NumRep::Concrete(MachineRep::from(s))
+    }
+}
+
+/// Narrow sum of [`BaseType`] and [`SignedIntType`], mirroring [`crate::codegen::rust_ast::NumType`]'s
+/// `{U(MachineUint), I(MachineSint)}` shape -- used as the target of `BaseKind -> ..` conversions
+/// so they stay total without routing through all of [`ValueType`]'s unrelated variants.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Hash, PartialOrd, Ord)]
+pub enum BaseNumType {
+    Unsigned(BaseType),
+    Signed(SignedIntType),
+}
+
+impl From<BaseNumType> for ValueType {
+    fn from(value: BaseNumType) -> Self {
+        match value {
+            BaseNumType::Unsigned(bt) => ValueType::Base(bt),
+            BaseNumType::Signed(sit) => ValueType::Signed(sit),
+        }
     }
 }
 

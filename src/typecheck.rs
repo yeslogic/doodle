@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
+use crate::valuetype::{BaseNumType, SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
@@ -1041,7 +1041,10 @@ impl TypeChecker {
                 let len_var = self.infer_var_expr(len, ctxt.scope)?;
                 self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
                 let elem_t = match kind {
-                    FixedReadKind::Base(kind) => Rc::new(UType::Base(BaseType::from(*kind))),
+                    FixedReadKind::Base(kind) => Rc::new(match BaseNumType::from(*kind) {
+                        BaseNumType::Unsigned(bt) => UType::Base(bt),
+                        BaseNumType::Signed(sit) => UType::Int(IntType::from(sit)),
+                    }),
                     FixedReadKind::FixedFormat(format_ref) => {
                         let level = format_ref.get_level();
                         let format = ctxt.module.get_format(level);

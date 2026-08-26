@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::numeric::core::MachineRep;
 use crate::{BaseKind, Endian};
 
 /// The kind of buffer that a Decoder is currently operating on, which can be used to provide more context in error messages.
@@ -311,6 +312,61 @@ impl<'a> ReadCtxt<'a> {
                 };
                 Ok((crate::decoder::Value::U64(val), new_buf))
             }
+
+            BaseKind::I8 => {
+                let Some((byte, new_buf)) = self.read_byte() else {
+                    return Err(self.kind.overbyte(self.offset));
+                };
+                Ok((Self::signed_value(byte as i8, MachineRep::I8), new_buf))
+            }
+            BaseKind::I16Ext(Endian::Be) => {
+                let Some((val, new_buf)) = self.read_u16be() else {
+                    return Err(self.kind.overrun(kind.size(), self.offset));
+                };
+                Ok((Self::signed_value(val as i16, MachineRep::I16), new_buf))
+            }
+            BaseKind::I16Ext(Endian::Le) => {
+                let Some((val, new_buf)) = self.read_u16le() else {
+                    return Err(self.kind.overrun(kind.size(), self.offset));
+                };
+                Ok((Self::signed_value(val as i16, MachineRep::I16), new_buf))
+            }
+            BaseKind::I32Ext(Endian::Be) => {
+                let Some((val, new_buf)) = self.read_u32be() else {
+                    return Err(self.kind.overrun(kind.size(), self.offset));
+                };
+                Ok((Self::signed_value(val as i32, MachineRep::I32), new_buf))
+            }
+            BaseKind::I32Ext(Endian::Le) => {
+                let Some((val, new_buf)) = self.read_u32le() else {
+                    return Err(self.kind.overrun(kind.size(), self.offset));
+                };
+                Ok((Self::signed_value(val as i32, MachineRep::I32), new_buf))
+            }
+            BaseKind::I64Ext(Endian::Be) => {
+                let Some((val, new_buf)) = self.read_u64be() else {
+                    return Err(self.kind.overrun(kind.size(), self.offset));
+                };
+                Ok((Self::signed_value(val as i64, MachineRep::I64), new_buf))
+            }
+            BaseKind::I64Ext(Endian::Le) => {
+                let Some((val, new_buf)) = self.read_u64le() else {
+                    return Err(self.kind.overrun(kind.size(), self.offset));
+                };
+                Ok((Self::signed_value(val as i64, MachineRep::I64), new_buf))
+            }
         }
+    }
+
+    /// Wraps a signed machine-int read as a `Value::Numeric`, matching the representation
+    /// already produced by the `helper::base::i8`/`i16be`/`i32be`/`i64be` Format constructors
+    /// (a bitwise-cast `TypedConst` tagged with the corresponding `MachineRep`) -- see
+    /// `BASEKIND_EXTENSION.md` for why this mirrors rather than replaces that existing path.
+    fn signed_value<N>(n: N, rep: MachineRep) -> crate::decoder::Value
+    where
+        num_bigint::BigInt: From<N>,
+    {
+        use crate::numeric::core::{NumRep, TypedConst};
+        crate::decoder::Value::Numeric(std::rc::Rc::new(TypedConst::new(n, NumRep::Concrete(rep))))
     }
 }

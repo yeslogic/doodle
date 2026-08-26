@@ -19,7 +19,7 @@ use crate::{
     parser::error::TraceHash,
     typecheck::{TypeChecker, UType, UVar, WHNFSolution},
     validation::{Severity, TypedCondition},
-    valuetype::{SeqBorrowHint, ValueType},
+    valuetype::{BaseNumType, SeqBorrowHint, ValueType},
 };
 use intmap::IntMap;
 
@@ -5295,15 +5295,15 @@ impl<'a> Elaborator<'a> {
                             // double-check the base kind against the type
                             // FIXME - extract into proper method that can then support future common-ops more adequately
                             let ty = gt.to_rust_type();
-                            let prim1 = PrimType::from(BaseType::from(*base_kind));
-                            let Some(prim0) = ty.try_as_prim() else {
+                            let num1 = NumType::from(BaseNumType::from(*base_kind));
+                            let Some(num0) = ty.try_as_num() else {
                                 unreachable!(
-                                    "found non-primitive type for common format elaboration: {ty:?} @ {index} (expected {prim1:?})"
+                                    "found non-numeric type for common format elaboration: {ty:?} @ {index} (expected {num1:?})"
                                 );
                             };
                             assert_eq!(
-                                prim0, prim1,
-                                "CommonOp: actual inner-parse type ({prim0:?}) does not match claimed type ({prim1:?})"
+                                num0, num1,
+                                "CommonOp: actual inner-parse type ({num0:?}) does not match claimed type ({num1:?})"
                             );
                         }
                     },

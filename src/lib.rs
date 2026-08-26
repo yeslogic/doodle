@@ -14,6 +14,7 @@ use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::numeric::core::{Expr as NumExpr, VOID};
 use crate::read::ReadCtxt;
+use crate::valuetype::BaseNumType;
 
 pub mod alt;
 pub mod bounds;
@@ -1473,7 +1474,7 @@ impl FormatModule {
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
                     let ty = match kind {
-                        FixedReadKind::Base(bk) => ValueType::Base(BaseType::from(*bk)),
+                        FixedReadKind::Base(bk) => ValueType::from(BaseNumType::from(*bk)),
                         FixedReadKind::FixedFormat(format_ref) => {
                             let level = format_ref.get_level();
                             // As in `typecheck::infer_var_view_format`, a `FixedFormat`
