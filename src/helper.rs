@@ -608,11 +608,10 @@ pub fn record_ext<Name: IntoLabel>(
 }
 
 /// Helper function that encloses a Format in an 'optional' context,
-/// parsing it only if it its characteristic byte-pattern is detected,
-/// and otherwise as a no-op parse.
+/// parsing it if only if it its characteristic byte-pattern is detected,
+/// otherwise yielding `None` without parsing any bytes.
 ///
-/// Uses the in-model `Option` layer to avoid constructing a duplicate
-/// version of `Option`.
+/// If `format` is parsed and yields a value of `x`, this format will yield `Some(x)`.
 pub fn optional(format: Format) -> Format {
     Format::Union([fmt_some(format), fmt_none()].to_vec())
 }
@@ -1364,7 +1363,7 @@ pub fn unwrap_singleton(expr: Expr) -> Expr {
     )
 }
 
-/// Given a value `expr` of type ``Expr@Option<T>` and a format-closure `opt_f` of type `Expr@T -> Format@Option<U>`,
+/// Given a value `expr` of type `Expr@Option<T>` and a format-closure `opt_f` of type `Expr@T -> Format@Option<U>`,
 /// parses a format that is equivalent to `opt_f(x)` if `expr` evaluates to `Some(x)`, and which yields `None` otherwise.
 ///
 /// The `binding_name` argument is used for the capture-variable of the `Some(..)` match-branch, as well as the

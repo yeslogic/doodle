@@ -256,7 +256,8 @@
             │               │                                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │                                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) :=
             │               │                                       └── mime <- mpeg4.infe-atom.data.extra-fields.mime :=
-            │               │                                           └── content_type <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "application/rdf+xml"
+            │               │                                           ├── content_type <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "application/rdf+xml"
+            │               │                                           └── content_encoding <- _ |...| _ := none
             │               ├── 4 <- mpeg4.meta-atom :=
             │               │   ├── size-field <- ReadU32Be := 64
             │               │   ├── type <- mpeg4.tag := "iref"

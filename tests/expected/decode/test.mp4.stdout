@@ -680,13 +680,14 @@
             │           │                                               │   ├── size <- match size-field { ... } := 18
             │           │                                               │   └── data <- match (size-field == 0?) { ... } :=
             │           │                                               │       └── sgpd <- mpeg4.sgpd-data :=
-            │           │                                               │           ├── version <- ReadU8 := 1
+            │           │                                               │           ├── version <- require (x -> x != 0) ReadU8 := 1
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
             │           │                                               │           │   ├── 1 <- ReadU8 := 0
             │           │                                               │           │   └── 2 <- ReadU8 := 0
             │           │                                               │           ├── grouping_type <- ReadU32Be := 1919904876
             │           │                                               │           ├── default_length <- ReadU32Be := 2
+            │           │                                               │           ├── default_sample_description_index <- maybe (version >= 2) ReadU32Be := none
             │           │                                               │           ├── entry_count <- ReadU32Be := 1
             │           │                                               │           └── sample_groups <- repeat-count entry_count { ... } :=
             │           │                                               │               └── 0 :=

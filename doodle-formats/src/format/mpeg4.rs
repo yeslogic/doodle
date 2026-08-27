@@ -467,16 +467,13 @@ pub(crate) mod subformats {
             module.define_format(
                 "mpeg4.sgpd-data",
                 record([
-                    ("version", u8()), // our current implementation only supports versions 0 and 1
+                    ("version", where_nonzero::<U8>(u8())), // version 0 entries are deprecated; version 1 and 2 are supported by this impl
                     ("flags", u24be()),
                     ("grouping_type", u32be()),
-                    // `default_length` field: appears in versions 1 and above
+                    // `default_length` field: appears in versions 1 and above, but version 0 is deprecated
                     // NOTE - per ISO/IEC 14496-12:2012
                     // > `default_length`: indicates the length of every group entry (if the length is constant), or zero (0) if it is variable
-                    (
-                        "default_length",
-                        cond_maybe(expr_gte(var("version"), Expr::U8(1)), u32be()),
-                    ),
+                    ("default_length", u32be()),
                     // `default_sample_description_index` field: appears in versions 2 and above
                     // NOTE - Per ISO/IEC 14496-12:2012/Amd.3:2015(E),
                     // > `default_sample_description_index`: specifies the index of the sample group description entry
@@ -1201,7 +1198,8 @@ pub(crate) mod subformats {
             "mpeg4.infe-atom.data.extra-fields.mime",
             record([
                 ("content_type", asciiz_string()),
-                //FIXME optional ("content_encoding", asciiz_string()),
+                // FIXME - determine whether uncommenting the line below this breaks anything
+                ("content_encoding", optional(asciiz_string())),
             ]),
         );
         let infe_data_extra_uri = module.define_format(
@@ -1244,14 +1242,14 @@ pub(crate) mod subformats {
                 ("item_protection_index", u16be()),
                 ("item_name", asciiz_string()),
                 ("content_type", asciiz_string()),
-                ("content_encoding", asciiz_string()),
+                ("content_encoding", optional(asciiz_string())),
                 // FIXME unfinished
             ]),
         );
 
         let infe_data_ver2 = module.define_format_args(
             "mpeg4.infe-data.fields.version-gte2",
-            vec![("version".into(), ValueType::U8)],
+            vec![(Label::Borrowed("version"), ValueType::U8)],
             record([
                 (
                     "item_ID",
