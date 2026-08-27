@@ -470,9 +470,23 @@ pub(crate) mod subformats {
                     ("version", u8()), // our current implementation only supports versions 0 and 1
                     ("flags", u24be()),
                     ("grouping_type", u32be()),
-                    // FIXME - this implementation applies only to versions 0 and 1, with no support for version >= 2
-                    // TODO - find an authoritative source for information on what the field-layout is for version >= 2
-                    ("default_length", u32be()),
+                    // `default_length` field: appears in versions 1 and above
+                    // NOTE - per ISO/IEC 14496-12:2012
+                    // > `default_length`: indicates the length of every group entry (if the length is constant), or zero (0) if it is variable
+                    (
+                        "default_length",
+                        cond_maybe(expr_gte(var("version"), Expr::U8(1)), u32be()),
+                    ),
+                    // `default_sample_description_index` field: appears in versions 2 and above
+                    // NOTE - Per ISO/IEC 14496-12:2012/Amd.3:2015(E),
+                    // > `default_sample_description_index`: specifies the index of the sample group description entry
+                    // > which applies to all samples in the track for which no sample to group mapping is provided
+                    // > through a SampleToGroup box. The default value of this field is zero (indicating that the samples are
+                    // > mapped to no group of this type).
+                    (
+                        "default_sample_description_index",
+                        cond_maybe(expr_gte(var("version"), Expr::U8(2)), u32be()),
+                    ),
                     ("entry_count", u32be()),
                     (
                         "sample_groups",
