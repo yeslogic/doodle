@@ -8445,13 +8445,13 @@ Decoder_opentype_hdmx_device_record(p, num_glyphs)
 }
 }
 
-/// expected size: 48
+/// expected size: 16
 /// trait-ready: unique decoder function (d#63)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_hdmx_device_record<'input> {
 pixel_size: u8,
 max_width: u8,
-widths: ReadArray<'input, U8>
+widths: &'input [u8]
 }
 
 impl<'a> CommonObject for opentype_hdmx_table<'a> {
@@ -14954,7 +14954,7 @@ let pixel_size = input.read_byte()?;
 let max_width = input.read_byte()?;
 let widths = {
 let here_view = input.view();
-here_view.read_array_u8(num_glyphs as usize)?
+here_view.read_len(num_glyphs as usize)
 };
 input.skip_align(4)?;
 PResult::Ok(opentype_hdmx_device_record { pixel_size, max_width, widths })

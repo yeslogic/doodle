@@ -46,8 +46,8 @@ fn device_record(module: &mut FormatModule) -> DepFormat<1, 0> {
             ("max_width", u8()),
             (
                 "widths",
-                // TODO - should this be capture_bytes instead?
-                from_here(read_array(var("num_glyphs"), BaseKind::U8)),
+                // NOTE - this was formerly implemented using `ReadArray` but CaptureBytes makes downstream processing infallible
+                from_here(capture_bytes(var("num_glyphs"))),
             ),
             ("__pad", align_to_size::<u32>()),
         ]),
