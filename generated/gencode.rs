@@ -17343,7 +17343,7 @@ let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_
 u32be(x)
 };
 let data = if offset > 0u32 {
-Some(table_view.offset(offset as usize)?.read_array_u16be(num_palettes as usize)?)
+Some(table_view.offset(offset as usize)?.as_read_array::<U16Be>(num_palettes as usize)?)
 } else {
 None
 };
@@ -17357,7 +17357,7 @@ let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_
 u32be(x)
 };
 let data = if offset > 0u32 {
-Some(table_view.offset(offset as usize)?.read_array_u16be(num_palette_entries as usize)?)
+Some(table_view.offset(offset as usize)?.as_read_array::<U16Be>(num_palette_entries as usize)?)
 } else {
 None
 };

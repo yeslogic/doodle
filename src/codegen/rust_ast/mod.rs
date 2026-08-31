@@ -565,14 +565,26 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
         }
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.lt_params.is_empty() && self.ty_params.is_empty()
     }
 
-    pub(crate) fn from_lt(lt: Lt) -> Self {
+    pub fn from_lt(lt: Lt) -> Self {
         Self {
             lt_params: vec![lt],
             ty_params: Vec::new(),
+        }
+    }
+
+    /// Creates a new `RustParams` with a single type parameter.
+    ///
+    /// For convenience, allows the argument to be any type that has an `Into<Ty>` implementation.
+    /// For example, if `Ty` is `RustType`, types like [`AtomType`] and [`CompType`] can be used directly,
+    /// as they implement `Into<Ty>`.
+    pub fn from_ty(ty: impl Into<Ty>) -> Self {
+        Self {
+            lt_params: Vec::new(),
+            ty_params: vec![ty.into()],
         }
     }
 }
@@ -580,6 +592,10 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
 impl<Lt, Ty> RustParams<Lt, Ty> {
     pub fn push_lifetime(&mut self, lt: impl Into<Lt>) {
         self.lt_params.push(lt.into())
+    }
+
+    pub fn push_type(&mut self, ty: impl Into<Ty>) {
+        self.ty_params.push(ty.into())
     }
 }
 
