@@ -501,7 +501,6 @@ pub fn match_case_err_bind(lab: &'static str) -> MatchCaseLHS {
         Box::new(RustPattern::CatchAll(Some(lbl(lab)))),
     ))
 }
-
 // !SECTION
 
 // SECTION - helper functions for various kinds of error-handling patterns
