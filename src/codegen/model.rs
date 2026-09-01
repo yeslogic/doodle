@@ -349,42 +349,28 @@ pub fn read_from_view(view: RustExpr, len: RustExpr) -> RustExpr {
 
 /// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model.
 pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian>) -> RustExpr {
-    // NOTE - these are separate hardcoded methods rather than a single turbofish-qualified
-    // `read_array::<T>` call for parity with the non-generic primitive-kind methods on View;
-    // `RustExpr::MethodCall` itself does support turbofish now (`RustExpr::call_method_turbofish`),
-    // and is used for the FixedFormat case (see `read_fixed_array_from_view`, below).
-    use MarkerType::*;
-    match kind {
-        BaseKind::U8 => try_(call!(view, as_read_array::<U8>, len)),
-        BaseKind::I8 => try_(call!(view, as_read_array::<I8>, len)),
-        BaseKind::U16BE => try_(call!(view, as_read_array::<U16Be>, len)),
-        BaseKind::U32BE => try_(call!(view, as_read_array::<U32Be>, len)),
-        BaseKind::U64BE => try_(call!(view, as_read_array::<U64Be>, len)),
-        BaseKind::I16BE => try_(call!(view, as_read_array::<I16Be>, len)),
-        BaseKind::I32BE => try_(call!(view, as_read_array::<I32Be>, len)),
-        BaseKind::I64BE => try_(call!(view, as_read_array::<I64Be>, len)),
-        // FIXME[epic=technical-debt] - either add the methods to support these cases, or call underlying method with turbofish
-        BaseKind::I16Ext(Endian::Le)
-        | BaseKind::I32Ext(Endian::Le)
-        | BaseKind::I64Ext(Endian::Le)
-        | BaseKind::U16LE
-        | BaseKind::U32LE
-        | BaseKind::U64LE => {
-            unimplemented!("little-endian read-array parses not yet implemented")
-        }
-    }
+    // NOTE - we check that `kind` is big-endian here to avoid an internal panic below, as `MarkerType::from_base_kind_endian` is unimplemented for little-endian kinds (which are unsupported in allsorts)
+    assert!(
+        kind.is_be(),
+        "read_array_from_view: cannot read little-endian kinds (kind={:?})",
+        kind
+    );
+    read_fixed_array_from_view(view, len, MarkerType::from_base_kind_endian(kind))
 }
 
-/// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model,
-/// for the `FixedFormat`-kinded case where `elem_ty` is the generated struct-type of the
-/// (statically-verified fixed-size, all-primitive-field) format being read as an array element.
+/// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model generically,
+/// where `elem_ty` is either a valid MarkerType or the generated struct-type of the
+/// (statically-verified fixed-size, all-primitive-field) format being read as an array element in the `FixedFormat` case.
 ///
 /// Relies on `View::as_read_array::<T>` (see `parser/view.rs`), which is generic over any
 /// `T: ReadUnchecked`; the emitted call will only type-check once `elem_ty` actually implements
 /// that trait (see the trait-impl-generation work in `codegen/model/traits.rs`).
-pub fn read_fixed_array_from_view(view: RustExpr, len: RustExpr, elem_ty: RustType) -> RustExpr {
-    view.call_method_turbofish("as_read_array", [elem_ty], [len])
-        .wrap_try()
+pub fn read_fixed_array_from_view(
+    view: RustExpr,
+    len: RustExpr,
+    elem_ty: impl Into<RustType>,
+) -> RustExpr {
+    try_(call!(view, as_read_array::<elem_ty>, len))
 }
 
 /// Model RustExpr for setup of `Format::Slice` parse-context in the Parser model.
@@ -696,6 +682,28 @@ mod tests {
         let recv = RustExpr::local("x");
         let ty = PrimType::Bool;
         let actual = call!(recv, frobnicate::<ty>);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && params.lt_params.is_empty()
+            && let RustType::Atom(AtomType::Prim(pt)) = &params.ty_params[0]
+            && matches!(pt, PrimType::Bool)
+            && args.is_empty()
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_ty_param_inline() {
+        let recv = RustExpr::local("x");
+        let actual = call!(recv, frobnicate::<(PrimType::Bool)>);
         if let RustExpr::MethodCall(
             obj,
             MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),

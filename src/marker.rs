@@ -113,6 +113,23 @@ impl BaseKind<Endian> {
             BaseKind::I64Ext(Le) => "I64Le",
         }
     }
+
+    /// Returns `true` if self can be considered big-endian, i.e. if it is either a big-endian type or an endianness-agnostic type (u8/i8).
+    ///
+    /// Returns `false` if self is a multi-byte kind flagged as little-endian.
+    pub const fn is_be(&self) -> bool {
+        matches!(
+            self,
+            BaseKind::U8
+                | BaseKind::U16Ext(Endian::Be)
+                | BaseKind::U32Ext(Endian::Be)
+                | BaseKind::U64Ext(Endian::Be)
+                | BaseKind::I8
+                | BaseKind::I16Ext(Endian::Be)
+                | BaseKind::I32Ext(Endian::Be)
+                | BaseKind::I64Ext(Endian::Be)
+        )
+    }
 }
 
 impl std::fmt::Display for BaseKind {

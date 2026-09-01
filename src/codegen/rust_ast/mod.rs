@@ -1347,20 +1347,24 @@ impl MarkerType {
     pub(crate) fn from_base_kind_endian(kind: BaseKind<Endian>) -> Self {
         match kind {
             BaseKind::U8 => MarkerType::U8,
-            BaseKind::U16Ext(Endian::Be) => MarkerType::U16Be,
-            BaseKind::U32Ext(Endian::Be) => MarkerType::U32Be,
-            BaseKind::U64Ext(Endian::Be) => MarkerType::U64Be,
             BaseKind::I8 => MarkerType::I8,
+            BaseKind::U16Ext(Endian::Be) => MarkerType::U16Be,
             BaseKind::I16Ext(Endian::Be) => MarkerType::I16Be,
+            BaseKind::U32Ext(Endian::Be) => MarkerType::U32Be,
             BaseKind::I32Ext(Endian::Be) => MarkerType::I32Be,
+            BaseKind::U64Ext(Endian::Be) => MarkerType::U64Be,
             BaseKind::I64Ext(Endian::Be) => MarkerType::I64Be,
+            // NOTE - little-endian reads are unsupported in allsorts
             BaseKind::U16Ext(Endian::Le)
             | BaseKind::U32Ext(Endian::Le)
             | BaseKind::U64Ext(Endian::Le)
             | BaseKind::I16Ext(Endian::Le)
             | BaseKind::I32Ext(Endian::Le)
             | BaseKind::I64Ext(Endian::Le) => {
-                unimplemented!("little-endian read-array parses not yet implemented")
+                unimplemented!(
+                    "from_base_kind_endian:cannot convert {:?} to MarkerType\n\t(MarkerType models allsorts::binary marker-types, which are all big-endian)",
+                    kind
+                )
             }
         }
     }
