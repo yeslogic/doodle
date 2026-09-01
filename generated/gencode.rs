@@ -8445,13 +8445,13 @@ Decoder_opentype_hdmx_device_record(p, num_glyphs)
 }
 }
 
-/// expected size: 48
+/// expected size: 16
 /// trait-ready: unique decoder function (d#63)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_hdmx_device_record<'input> {
 pixel_size: u8,
 max_width: u8,
-widths: ReadArray<'input, U8>
+widths: &'input [u8]
 }
 
 impl<'a> CommonObject for opentype_hdmx_table<'a> {
@@ -12294,8 +12294,9 @@ res
 },
 
 Err(err) => {
-log::error!("expect-level value assertion failed: {}", err);
-None
+err.fallback_value(None, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 }
 };
@@ -12370,8 +12371,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(12652804269632162478u64));
-inner
+(ParseError::FalsifiedWhere(12652804269632162478u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -12386,8 +12388,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(18134882366868794706u64));
-inner
+(ParseError::FalsifiedWhere(18134882366868794706u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let font_revision = (Decoder_opentype_types_fixed32(input))?;
@@ -12576,8 +12579,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(908377722732597655u64));
-inner
+(ParseError::FalsifiedWhere(908377722732597655u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 PResult::Ok(opentype_head_table { major_version, minor_version, font_revision, checksum_adjustment, magic_number, flags, units_per_em, created, modified, glyph_extents, mac_style, lowest_rec_ppem, font_direction_hint, index_to_loc_format, glyph_data_format })
@@ -12597,8 +12601,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(3203034260088513018u64));
-inner
+(ParseError::FalsifiedWhere(3203034260088513018u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -12613,8 +12618,9 @@ matches!(x, 0u16 | 4096u16)
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14677505873656710393u64));
-inner
+(ParseError::FalsifiedWhere(14677505873656710393u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let ascent = {
@@ -12700,8 +12706,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10102114574336663273u64));
-inner
+(ParseError::FalsifiedWhere(10102114574336663273u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let arg1 = {
@@ -12716,8 +12723,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4386762582485017400u64));
-inner
+(ParseError::FalsifiedWhere(4386762582485017400u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let arg2 = {
@@ -12732,8 +12740,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(8893850231119365992u64));
-inner
+(ParseError::FalsifiedWhere(8893850231119365992u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let arg3 = {
@@ -12748,8 +12757,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(7659860344311718435u64));
-inner
+(ParseError::FalsifiedWhere(7659860344311718435u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 (arg0, arg1, arg2, arg3)
@@ -12766,8 +12776,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(11052099086134529863u64));
-inner
+(ParseError::FalsifiedWhere(11052099086134529863u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let number_of_long_metrics = {
@@ -13342,8 +13353,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1079884235207081886u64));
-inner
+(ParseError::FalsifiedWhere(1079884235207081886u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13406,8 +13418,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9042484249406774160u64));
-inner
+(ParseError::FalsifiedWhere(9042484249406774160u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13535,8 +13548,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14931240509007516758u64));
-inner
+(ParseError::FalsifiedWhere(14931240509007516758u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13596,8 +13610,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(11328034188734904930u64));
-inner
+(ParseError::FalsifiedWhere(11328034188734904930u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13655,8 +13670,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1338347005175300217u64));
-inner
+(ParseError::FalsifiedWhere(1338347005175300217u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13671,8 +13687,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(15432825464810477099u64));
-inner
+(ParseError::FalsifiedWhere(15432825464810477099u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -13687,8 +13704,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(8987822076696059625u64));
-inner
+(ParseError::FalsifiedWhere(8987822076696059625u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let axis_count = {
@@ -13722,8 +13740,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10078755145706786000u64));
-inner
+(ParseError::FalsifiedWhere(10078755145706786000u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13738,8 +13757,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1977899765720151190u64));
-inner
+(ParseError::FalsifiedWhere(1977899765720151190u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let offset_axes = {
@@ -13769,8 +13789,9 @@ x == 2u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(12890902517277365935u64));
-inner
+(ParseError::FalsifiedWhere(12890902517277365935u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let axis_count = {
@@ -13789,8 +13810,9 @@ x == 20u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(13049534979177835905u64));
-inner
+(ParseError::FalsifiedWhere(13049534979177835905u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let instance_count = {
@@ -13824,8 +13846,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9011855507994367971u64));
-inner
+(ParseError::FalsifiedWhere(9011855507994367971u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13840,8 +13863,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14796083725261108356u64));
-inner
+(ParseError::FalsifiedWhere(14796083725261108356u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let axis_count = {
@@ -13927,8 +13951,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(2879885114680241844u64));
-inner
+(ParseError::FalsifiedWhere(2879885114680241844u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -13943,8 +13968,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14009314771729697611u64));
-inner
+(ParseError::FalsifiedWhere(14009314771729697611u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let item_variation_store = {
@@ -13998,8 +14024,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10973085168168570837u64));
-inner
+(ParseError::FalsifiedWhere(10973085168168570837u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -14014,8 +14041,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10603707580403307601u64));
-inner
+(ParseError::FalsifiedWhere(10603707580403307601u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -14030,8 +14058,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(18065118697073160549u64));
-inner
+(ParseError::FalsifiedWhere(18065118697073160549u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let value_record_size = {
@@ -14046,8 +14075,9 @@ x != 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10686389193617118447u64));
-inner
+(ParseError::FalsifiedWhere(10686389193617118447u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let value_record_count = {
@@ -14089,8 +14119,9 @@ x <= 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(16128388243093908143u64));
-inner
+(ParseError::FalsifiedWhere(16128388243093908143u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_base_glyph_records = {
@@ -14192,8 +14223,9 @@ x <= 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(2818918064991511645u64));
-inner
+(ParseError::FalsifiedWhere(2818918064991511645u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_palette_entries = {
@@ -14208,8 +14240,9 @@ x != 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14082539304789607227u64));
-inner
+(ParseError::FalsifiedWhere(14082539304789607227u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_palettes = {
@@ -14224,8 +14257,9 @@ x != 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(11072034178440885507u64));
-inner
+(ParseError::FalsifiedWhere(11072034178440885507u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_color_records = {
@@ -14240,8 +14274,9 @@ x != 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4608405370414018463u64));
-inner
+(ParseError::FalsifiedWhere(4608405370414018463u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let color_records_array = {
@@ -14308,8 +14343,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4418518334087228745u64));
-inner
+(ParseError::FalsifiedWhere(4418518334087228745u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let svg_document_list = {
@@ -14352,8 +14388,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(7511456693437940214u64));
-inner
+(ParseError::FalsifiedWhere(7511456693437940214u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let n_tables = {
@@ -14387,8 +14424,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(973408085875818710u64));
-inner
+(ParseError::FalsifiedWhere(973408085875818710u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -14403,8 +14441,9 @@ matches!(x, 1u16 | 2u16)
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(15557503981608772456u64));
-inner
+(ParseError::FalsifiedWhere(15557503981608772456u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let design_axis_size = {
@@ -14456,8 +14495,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(2154669163482751322u64));
-inner
+(ParseError::FalsifiedWhere(2154669163482751322u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -14472,8 +14512,9 @@ matches!(x, 0u16 | 4096u16)
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10263667190582992611u64));
-inner
+(ParseError::FalsifiedWhere(10263667190582992611u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let ascent = {
@@ -14559,8 +14600,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(5482396765248532989u64));
-inner
+(ParseError::FalsifiedWhere(5482396765248532989u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let arg1 = {
@@ -14575,8 +14617,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(12275201028130973875u64));
-inner
+(ParseError::FalsifiedWhere(12275201028130973875u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let arg2 = {
@@ -14591,8 +14634,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(16097120758067046920u64));
-inner
+(ParseError::FalsifiedWhere(16097120758067046920u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let arg3 = {
@@ -14607,8 +14651,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9331632426086095927u64));
-inner
+(ParseError::FalsifiedWhere(9331632426086095927u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 (arg0, arg1, arg2, arg3)
@@ -14625,8 +14670,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14959848987246965519u64));
-inner
+(ParseError::FalsifiedWhere(14959848987246965519u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let number_of_long_metrics = {
@@ -14692,8 +14738,9 @@ matches!(x, 1)
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9092905213558799443u64));
-inner
+(ParseError::FalsifiedWhere(9092905213558799443u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_signatures = {
@@ -14713,8 +14760,9 @@ packed & 254u16 == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(17544092807091201u64));
-inner
+(ParseError::FalsifiedWhere(17544092807091201u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let cannot_be_resigned = _packed_bits & 1u16 > 0u16;
@@ -14745,8 +14793,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(10502127387712395480u64));
-inner
+(ParseError::FalsifiedWhere(10502127387712395480u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_records = {
@@ -14801,8 +14850,9 @@ matches!(x, 0u16 | 1u16)
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(5322124757500927073u64));
-inner
+(ParseError::FalsifiedWhere(5322124757500927073u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let num_recs = {
@@ -14904,7 +14954,7 @@ let pixel_size = input.read_byte()?;
 let max_width = input.read_byte()?;
 let widths = {
 let here_view = input.view();
-here_view.read_array_u8(num_glyphs as usize)?
+here_view.read_len(num_glyphs as usize)
 };
 input.skip_align(4)?;
 PResult::Ok(opentype_hdmx_device_record { pixel_size, max_width, widths })
@@ -14945,8 +14995,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(13431462572241034712u64));
-inner
+(ParseError::FalsifiedWhere(13431462572241034712u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -14961,8 +15012,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(3433937857563719729u64));
-inner
+(ParseError::FalsifiedWhere(3433937857563719729u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let signature_length = {
@@ -15161,8 +15213,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14751251992141172493u64));
-inner
+(ParseError::FalsifiedWhere(14751251992141172493u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -15347,8 +15400,9 @@ x != 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(8997881400116719018u64));
-inner
+(ParseError::FalsifiedWhere(8997881400116719018u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let document_records = {
@@ -15384,8 +15438,9 @@ x != 0u32
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(13614619987783239962u64));
-inner
+(ParseError::FalsifiedWhere(13614619987783239962u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let svg_document_length = {
@@ -17258,8 +17313,9 @@ packed & 224u8 == 0u8
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1278184758971178969u64));
-inner
+(ParseError::FalsifiedWhere(1278184758971178969u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let fcomment = _packed_bits >> 4u8 & 1u8 > 0u8;
@@ -17287,7 +17343,7 @@ let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_
 u32be(x)
 };
 let data = if offset > 0u32 {
-Some(table_view.offset(offset as usize)?.read_array_u16be(num_palettes as usize)?)
+Some(table_view.offset(offset as usize)?.as_read_array::<U16Be>(num_palettes as usize)?)
 } else {
 None
 };
@@ -17301,7 +17357,7 @@ let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_
 u32be(x)
 };
 let data = if offset > 0u32 {
-Some(table_view.offset(offset as usize)?.read_array_u16be(num_palette_entries as usize)?)
+Some(table_view.offset(offset as usize)?.as_read_array::<U16Be>(num_palette_entries as usize)?)
 } else {
 None
 };
@@ -17322,8 +17378,9 @@ packed & 4294967292u32 == 0u32
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4480225125687487743u64));
-inner
+(ParseError::FalsifiedWhere(4480225125687487743u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let usable_with_dark_background = _packed_bits >> 1u32 & 1u32 > 0u32;
@@ -17448,8 +17505,9 @@ x <= 1u8
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(3426398976290336157u64));
-inner
+(ParseError::FalsifiedWhere(3426398976290336157u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let _entry_format = (Decoder_opentype_var_dsim_entry_format(input))?;
@@ -17496,8 +17554,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(11250208753083412758u64));
-inner
+(ParseError::FalsifiedWhere(11250208753083412758u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let variation_region_list = {
@@ -17712,8 +17771,9 @@ packed & 192u8 == 0u8
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(2153064741293804702u64));
-inner
+(ParseError::FalsifiedWhere(2153064741293804702u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let map_entry_size = _packed_bits >> 4u8 & 3u8;
@@ -19644,8 +19704,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1386817607731947864u64));
-inner
+(ParseError::FalsifiedWhere(1386817607731947864u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let coordinates = (Decoder_opentype_fvar_user_tuple(input, axis_count))?;
@@ -19775,8 +19836,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4795509455376621436u64));
-inner
+(ParseError::FalsifiedWhere(4795509455376621436u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -19791,8 +19853,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(3923207427992258326u64));
-inner
+(ParseError::FalsifiedWhere(3923207427992258326u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let feature_variation_record_count = {
@@ -19847,8 +19910,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(5174369311102857850u64));
-inner
+(ParseError::FalsifiedWhere(5174369311102857850u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let minor_version = {
@@ -19863,8 +19927,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(15995337135637623051u64));
-inner
+(ParseError::FalsifiedWhere(15995337135637623051u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let substitution_count = {
@@ -21189,8 +21254,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(2508979988921372290u64));
-inner
+(ParseError::FalsifiedWhere(2508979988921372290u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let required_feature_index = {
@@ -22227,8 +22293,9 @@ packed & 65280u16 == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(515819609734101411u64));
-inner
+(ParseError::FalsifiedWhere(515819609734101411u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let y_advance_device = _packed_bits >> 7u16 & 1u16 > 0u16;
@@ -22908,8 +22975,9 @@ x == 1u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9277543013594125416u64));
-inner
+(ParseError::FalsifiedWhere(9277543013594125416u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let mark_glyph_set_count = {
@@ -24071,8 +24139,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4649034608147552416u64));
-inner
+(ParseError::FalsifiedWhere(4649034608147552416u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?);
@@ -24096,8 +24165,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(16096650375442290768u64));
-inner
+(ParseError::FalsifiedWhere(16096650375442290768u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24139,8 +24209,9 @@ x == 2u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14339975513692068616u64));
-inner
+(ParseError::FalsifiedWhere(14339975513692068616u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let inner = {
@@ -24175,8 +24246,9 @@ x == 2u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1479153625485860551u64));
-inner
+(ParseError::FalsifiedWhere(1479153625485860551u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24312,8 +24384,9 @@ x == 4u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(8094248233631264621u64));
-inner
+(ParseError::FalsifiedWhere(8094248233631264621u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?);
@@ -24337,8 +24410,9 @@ x == 4u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1844274570107701975u64));
-inner
+(ParseError::FalsifiedWhere(1844274570107701975u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24391,8 +24465,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(4839194687019048322u64));
-inner
+(ParseError::FalsifiedWhere(4839194687019048322u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let start_code = {
@@ -24472,8 +24547,9 @@ x == 6u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(7230273548678969972u64));
-inner
+(ParseError::FalsifiedWhere(7230273548678969972u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24523,8 +24599,9 @@ x == 8u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14903563845775542749u64));
-inner
+(ParseError::FalsifiedWhere(14903563845775542749u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24539,8 +24616,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(1969670610881234889u64));
-inner
+(ParseError::FalsifiedWhere(1969670610881234889u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_byte()?);
@@ -24564,8 +24642,9 @@ x == 8u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9038350950373664822u64));
-inner
+(ParseError::FalsifiedWhere(9038350950373664822u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24580,8 +24659,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(7281717462557989541u64));
-inner
+(ParseError::FalsifiedWhere(7281717462557989541u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24635,8 +24715,9 @@ x == 10u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(15510952803379905659u64));
-inner
+(ParseError::FalsifiedWhere(15510952803379905659u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24651,8 +24732,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14681668243282477517u64));
-inner
+(ParseError::FalsifiedWhere(14681668243282477517u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_byte()?);
@@ -24676,8 +24758,9 @@ x == 10u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(6209434968043366837u64));
-inner
+(ParseError::FalsifiedWhere(6209434968043366837u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24692,8 +24775,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(16474038368490899078u64));
-inner
+(ParseError::FalsifiedWhere(16474038368490899078u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24746,8 +24830,9 @@ x == 12u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(12217686503432178884u64));
-inner
+(ParseError::FalsifiedWhere(12217686503432178884u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24762,8 +24847,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(8399572043096922156u64));
-inner
+(ParseError::FalsifiedWhere(8399572043096922156u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_byte()?);
@@ -24787,8 +24873,9 @@ x == 12u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(7832192330748800109u64));
-inner
+(ParseError::FalsifiedWhere(7832192330748800109u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24803,8 +24890,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(9815657591077818003u64));
-inner
+(ParseError::FalsifiedWhere(9815657591077818003u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24850,8 +24938,9 @@ x == 13u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(2197379665604321609u64));
-inner
+(ParseError::FalsifiedWhere(2197379665604321609u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24866,8 +24955,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(16624020278885696461u64));
-inner
+(ParseError::FalsifiedWhere(16624020278885696461u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_byte()?);
@@ -24891,8 +24981,9 @@ x == 13u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(14485842416732585139u64));
-inner
+(ParseError::FalsifiedWhere(14485842416732585139u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 {
@@ -24907,8 +24998,9 @@ x == 0u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(8179432974518885725u64));
-inner
+(ParseError::FalsifiedWhere(8179432974518885725u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {
@@ -24954,8 +25046,9 @@ x == 14u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(5152282179373241998u64));
-inner
+(ParseError::FalsifiedWhere(5152282179373241998u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let x = (input.read_byte()?, input.read_byte()?, input.read_byte()?, input.read_byte()?);
@@ -24979,8 +25072,9 @@ x == 14u16
 if is_valid {
 inner
 } else {
-log::error!("expect-level value assertion failed: {}", ParseError::FalsifiedWhere(13780055874544357936u64));
-inner
+(ParseError::FalsifiedWhere(13780055874544357936u64)).fallback_value(inner, |err| {
+log::error!("data-level parse error suppressed by Permit: {}", err);
+})?
 }
 };
 let length = {

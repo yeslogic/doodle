@@ -404,6 +404,23 @@ pub(crate) mod traits {
         Ok(ret)
     }
 
+    pub(super) fn try_promote_all_from_null<O, I, T, E>(orig: I, count: usize) -> Result<Vec<T>, E>
+    where
+        T: TryPromote<O, Error = E> + FromNull,
+        I: IntoIterator<Item = Option<O>>,
+    {
+        let mut ret = Vec::with_capacity(count);
+        for raw in orig {
+            match raw {
+                Some(raw) => ret.push(T::try_promote(&raw)?),
+                _ => {
+                    ret.push(T::from_null());
+                }
+            };
+        }
+        Ok(ret)
+    }
+
     pub(super) fn promote_vec<O, T>(orig_slice: &[O]) -> Vec<T>
     where
         T: Promote<O>,
@@ -481,7 +498,8 @@ pub(crate) mod traits {
 use traits::{
     _Ref, FromNull, Promote, PromoteView, TryFromRef, TryPromote, TryPromoteView, promote_all,
     promote_all_ok, promote_from_null, promote_opt, promote_vec, promote_vec_view,
-    try_promote_from_null, try_promote_opt, try_promote_opt_view, try_promote_vec,
+    try_promote_all_from_null, try_promote_from_null, try_promote_opt, try_promote_opt_view,
+    try_promote_vec,
 };
 
 #[macro_use]
@@ -1188,6 +1206,7 @@ pub mod obj {
     proxy!(OpentypeMarkArray<'a> = MarkArr);
     proxy!(OpentypeBaseArray<'a> = BaseArr);
     proxy!(OpentypeLigatureArray<'a> = LigArr);
+    proxy!(OpentypePairSet<'input> = PairS);
     proxy!(OpentypeClassDef = ClsDef);
     proxy!(OpentypeDeviceOrVariationIndexTable = DevTable);
     proxy!(OpentypeVariationAxisRecord = AxisRec);
@@ -1212,7 +1231,6 @@ pub mod obj {
     proxy!(OpentypeVdmxGroup = VdmxGroup);
     proxy!(OpentypeVarDsim<'a> = Dsim);
     proxy!(OpentypeSvgDocumentList<'a> = SvgDocList);
-
     proxy!(OpentypeCpalPaletteType => PalTypeArray);
 
     impl CommonObject for PalTypeArray {
@@ -1276,15 +1294,11 @@ pub mod obj {
     }
 
     proxy!(OpentypePaintTable<'input> = PaintTbl);
-
     proxy!(OpentypeColorLine<'a> = ColorLine);
     proxy!(OpentypeVarColorLine<'a> = VarColorLine);
-
     proxy!(OpentypeAffine2x3 = Affine2x3);
     proxy!(OpentypeVarAffine2x3 = VarAffine2x3);
-
     proxy!(OpentypeLayerList<'input> = LayerList);
-
     proxy!(OpentypeClipList<'input> = ClipList);
     proxy!(OpentypeClipBox = ClipBox);
 }
@@ -4547,7 +4561,6 @@ use otf_hdmx::*;
 pub(crate) mod hdmx {
     use super::*;
 
-    // REVIEW - because we used `read_array` in the definition of `OpentypeHdmxDevRecord`, we need to use `read_to_vec` here, which introduces fallibility after-the-fact (compared to `capture_bytes`, which would not)
     impl<'a> TryPromote<OpentypeHdmxDevRecord<'a>> for DeviceRecord {
         type Error = Local<allsorts::error::ParseError>;
 
@@ -4555,7 +4568,7 @@ pub(crate) mod hdmx {
             Ok(DeviceRecord {
                 pixel_size: orig.pixel_size,
                 max_width: orig.max_width,
-                widths: orig.widths.read_to_vec()?,
+                widths: orig.widths.to_vec(),
             })
         }
     }
@@ -4942,8 +4955,15 @@ pub(crate) mod fvar {
         }
     }
 
-    // TODO -
+    // NOTE - the flags field of InstanceRecord is hard-coded to `0` and reserved for future use
     type InstanceFlags = ();
+
+    #[derive(Debug, Clone)]
+    pub struct InstanceRecord {
+        pub(crate) subfamily_nameid: NameId,
+        pub(crate) coordinates: UserTuple,
+        pub(crate) postscript_nameid: Option<NameId>,
+    }
 
     impl Promote<OpentypeInstanceRecord> for InstanceRecord {
         fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
@@ -4953,13 +4973,6 @@ pub(crate) mod fvar {
                 postscript_nameid: promote_opt(&orig.postscript_nameid),
             }
         }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct InstanceRecord {
-        pub(crate) subfamily_nameid: NameId,
-        pub(crate) coordinates: UserTuple,
-        pub(crate) postscript_nameid: Option<NameId>,
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -5405,11 +5418,11 @@ pub mod vmtx {
 
     impl Promote<OpentypeVmtx> for VmtxMetrics {
         fn promote(orig: &OpentypeVmtx) -> Self {
-            // FIXME - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `orig` are misleading
+            // NOTE - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `orig` are misleading
             let mut accum =
                 Vec::with_capacity(orig.long_metrics.len() + orig.left_side_bearings.len());
             for vmet in orig.long_metrics.iter() {
-                // FIXME - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `vmet` are misleading
+                // NOTE - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `vmet` are misleading
                 accum.push(UnifiedBearing::new_vertical(
                     vmet.advance_width,
                     vmet.left_side_bearing,
@@ -7072,6 +7085,7 @@ pub mod otf_layout {
                 pub type OpentypeSinglePosFormat2 = opentype_layout_single_pos_format2<'input>;
 
         pub type OpentypeValueRecord = opentype_layout_value_record;
+        pub type OpentypeValueFormatFlags = opentype_layout_value_format_flags;
 
         pub type OpentypeGposLookupTable = opentype_gpos_lookup_table<'input>;
         pub type OpentypeGsubLookupTable = opentype_gsub_lookup_table<'input>;
@@ -7159,6 +7173,24 @@ pub mod otf_layout {
         }
 
         fn get_args(&self) {}
+    }
+
+    impl<'input> container::DynContainer<Nullable<obj::PairS>> for OpentypePairPosFormat1<'input> {
+        fn count(&self) -> usize {
+            self.pair_set_count as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.pair_sets
+                .iter()
+                .map(|pair_set| pair_set.offset as usize)
+        }
+
+        fn iter_args(
+            &self,
+        ) -> impl Iterator<Item = (OpentypeValueFormatFlags, OpentypeValueFormatFlags)> {
+            std::iter::repeat((self.value_format1, self.value_format2))
+        }
     }
 
     impl<'input> container::MultiContainer<obj::CovTable, 1> for OpentypePairPosFormat2<'input> {
@@ -9407,27 +9439,10 @@ pub(crate) mod layout {
 
         fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
             let coverage = CoverageTable::promote(&fn_reify::reify(orig, Mandatory(obj::CovTable)));
-            // FIXME - implement container traits instead of open-coding parse logic
-            let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
-            for pair_set in orig.pair_sets.iter() {
-                if pair_set.offset == 0 {
-                    pair_sets.push(PairSet::from_null());
-                } else {
-                    let view = orig
-                        .table_scope
-                        .offset(pair_set.offset as usize)
-                        .expect("bad offset to PairSet");
-                    let mut p = Parser::from(view);
-                    let ret = Decoder_opentype_layout_pair_pos_pair_set(
-                        &mut p,
-                        orig.value_format1,
-                        orig.value_format2,
-                    )
-                    .expect("bad PairSet parse");
-                    pair_sets.push(PairSet::try_promote(&ret)?)
-                }
-            }
-
+            let pair_sets = try_promote_all_from_null(
+                fn_reify::reify_all(orig, Nullable(obj::PairS)),
+                container::DynContainer::count(orig),
+            )?;
             Ok(PairPosFormat1 {
                 coverage,
                 pair_sets,

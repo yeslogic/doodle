@@ -14,6 +14,39 @@ pub(crate) const READ_ARRAY_IS_COPY: bool = true;
 // we wish to record certain properties of it abstractly without difficult-to-track hardcoding
 pub(crate) const VIEW_OBJECT_IS_COPY: bool = true;
 
+macro_rules! params {
+    ( $($lt:lifetime),+ , $( $t:expr ),+) => {
+        {
+            let mut tmp = UseParams::new();
+            $(
+                tmp.push_lifetime(RustLt::Parametric(Label::Borrowed(stringify!($lt))));
+            )+
+            $(
+                tmp.push_type($t);
+            )+
+            tmp
+        }
+    };
+    ($lt:lifetime) => {
+        UseParams::from_lt(RustLt::Parametric(Label::Borrowed(stringify!($lt))))
+    };
+    ( $t0:expr, $($t:expr),+ ) => {
+        {
+            let mut tmp = UseParams::from(t0);
+            $(
+                tmp.push_type($t);
+            )+
+            tmp
+        }
+    };
+    ( $t0:expr ) => {
+        UseParams::from_ty($t0)
+    };
+    () => {
+        UseParams::new()
+    };
+}
+
 /// Helper macro for producing RustExprs for method-calls on parser objects (or other receivers), as well as generic function calls
 ///
 /// Used for ease-of-implementation of template-fns that are defined in this module for performing abstract operations using parser objects and prelude functions
@@ -23,18 +56,19 @@ pub(crate) const VIEW_OBJECT_IS_COPY: bool = true;
 /// ```ignore
 /// call!(p, skip_remainder) // $p.skip_remainder()
 /// call!(p, skip_align, align) // $p.skip_align($align)
+/// call!(view, read_array_len :: <U8>)
 /// call!(fn parse_huffman, code_lengths, values) // parse_huffman($code_lengths, $values)
 /// ```
 macro_rules! call {
-    ( $recv:expr, $method:ident ) => {
+   ( $recv:expr, $method:ident ::<$($par:tt),+>  $(, $arg:expr )* ) => {
         RustExpr::MethodCall(
             Box::new($recv),
             mk_method(stringify!($method)),
-            UseParams::new(),
-            Vec::new(),
+            params!($($par),+),
+            vec![$($arg),*]
         )
     };
-    ( $recv:expr, $method:ident, $( $arg:tt ),+ ) => {
+    ( $recv:expr, $method:ident, $( $arg:expr ),+ ) => {
         RustExpr::MethodCall(
             Box::new($recv),
             mk_method(stringify!($method)),
@@ -42,6 +76,15 @@ macro_rules! call {
             vec![$($arg),+]
         )
     };
+       ( $recv:expr, $method:ident ) => {
+        RustExpr::MethodCall(
+            Box::new($recv),
+            mk_method(stringify!($method)),
+            UseParams::new(),
+            Vec::new(),
+        )
+    };
+
     ( fn $ident:ident $(, $arg:expr)* ) => {
         RustExpr::FunctionCall(
             Box::new(RustExpr::Entity(RustEntity::Local(lbl(stringify!($ident))))),
@@ -50,15 +93,8 @@ macro_rules! call {
     };
 }
 
-macro_rules! try_call {
-    ( $x:expr, $y:ident $(, $z:expr )* $(,)? ) => {
-        RustExpr::Try(Box::new(call!( $x, $y $(, $z)* )))
-    };
-    ( fn $ident:ident  $(, $arg:expr )*  ) => {
-        RustExpr::Try(Box::new(
-            call!( fn $ident $(, $arg)* )
-        ))
-    };
+fn try_(expr: RustExpr) -> RustExpr {
+    RustExpr::Try(Box::new(expr))
 }
 
 pub const fn lbl(x: &'static str) -> Label {
@@ -219,9 +255,71 @@ pub fn err_where_unsatisfied(trace: u64) -> RustExpr {
 // !SECTION
 
 // SECTION - Helper functions for prelude-specific AST-constructions
+
+/// RustType for `&mut Parser<...>`, using the provided lifetime parameter (or `'_` if `None`).
+pub fn parser_param_type(parser_lt: Option<&RustLt>) -> RustType {
+    let mut params = RustParams::<RustLt, RustType>::new();
+    if let Some(lt) = parser_lt {
+        params.push_lifetime(lt.clone());
+    } else {
+        params.push_lifetime(RustLt::WILD);
+    }
+    RustType::borrow_of(
+        None,
+        Mut::Mutable,
+        RustType::verbatim("Parser", Some(params)),
+    )
+}
+
+/// RustExpr for `Parser::new(<buffer>)`
+///
+/// `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
+pub fn parser_new(buffer: RustExpr) -> RustExpr {
+    RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("Parser")],
+            lbl("new"),
+        ))),
+        vec![buffer],
+    )
+}
+
+/// RustStmt for `let mut <ident> = Parser::new(<buffer>)`.
+///
+/// The argument `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
+pub fn let_mut_parser_new(ident: &'static str, buffer: RustExpr) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_new(buffer))
+}
+
+/// RustExpr for `Parser::from(<view>)`
+pub fn parser_from(view: RustExpr) -> RustExpr {
+    RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("Parser")],
+            lbl("from"),
+        ))),
+        vec![view],
+    )
+}
+
+/// RustStmt for `let mut <ident> = Parser::from(<view>)`.
+pub fn let_mut_parser_from(ident: &'static str, view: RustExpr) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_from(view))
+}
+
+pub fn reify_view(view_raw: RustExpr) -> RustExpr {
+    // NOTE - View used both for transient parses and persisted values
+    view_raw
+}
+
+/// RustExpr for `<view>.offset(<offset>)?`
+pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
+    try_(call!(view, offset, offset))
+}
+
 /// Model RustExpr for handling [`Format::EndOfInput`] as a Try-pattern (`<..>?`).
 pub fn try_enforce_eos(parser: RustExpr) -> RustExpr {
-    try_call!(parser, finish)
+    try_(call!(parser, finish))
 }
 
 /// Model RustExpr for handling `Format::SkipRemainder` in the Parser model.
@@ -231,7 +329,7 @@ pub fn skip_remainder(parser: RustExpr) -> RustExpr {
 
 /// Model RustExpr for handling `Format::Align(n)` in the Parser model (Try-call).
 pub fn try_skip_align(parser: RustExpr, n: usize) -> RustExpr {
-    try_call!(parser, skip_align, RustExpr::num_lit(n))
+    try_(call!(parser, skip_align, RustExpr::num_lit(n)))
 }
 
 /// Model RustExpr for handling `Format::Pos` in the Parser model.
@@ -251,41 +349,38 @@ pub fn read_from_view(view: RustExpr, len: RustExpr) -> RustExpr {
 
 /// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model.
 pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian>) -> RustExpr {
-    // NOTE - these are separate hardcoded methods rather than a single turbofish-qualified
-    // `read_array::<T>` call for parity with the non-generic primitive-kind methods on View;
-    // `RustExpr::MethodCall` itself does support turbofish now (`RustExpr::call_method_turbofish`),
-    // and is used for the FixedFormat case (see `read_fixed_array_from_view`, below).
-    match kind {
-        BaseKind::U8 => try_call!(view, read_array_u8, len),
-        BaseKind::U16BE => try_call!(view, read_array_u16be, len),
-        BaseKind::U32BE => try_call!(view, read_array_u32be, len),
-        BaseKind::U64BE => try_call!(view, read_array_u64be, len),
-        BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
-            unimplemented!("little-endian read-array parses not yet implemented")
-        }
-    }
+    // NOTE - we check that `kind` is big-endian here to avoid an internal panic below, as `MarkerType::from_base_kind_endian` is unimplemented for little-endian kinds (which are unsupported in allsorts)
+    assert!(
+        kind.is_be(),
+        "read_array_from_view: cannot read little-endian kinds (kind={:?})",
+        kind
+    );
+    read_fixed_array_from_view(view, len, MarkerType::from_base_kind_endian(kind))
 }
 
-/// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model,
-/// for the `FixedFormat`-kinded case where `elem_ty` is the generated struct-type of the
-/// (statically-verified fixed-size, all-primitive-field) format being read as an array element.
+/// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model generically,
+/// where `elem_ty` is either a valid MarkerType or the generated struct-type of the
+/// (statically-verified fixed-size, all-primitive-field) format being read as an array element in the `FixedFormat` case.
 ///
 /// Relies on `View::as_read_array::<T>` (see `parser/view.rs`), which is generic over any
 /// `T: ReadUnchecked`; the emitted call will only type-check once `elem_ty` actually implements
 /// that trait (see the trait-impl-generation work in `codegen/model/traits.rs`).
-pub fn read_fixed_array_from_view(view: RustExpr, len: RustExpr, elem_ty: RustType) -> RustExpr {
-    view.call_method_turbofish("as_read_array", [elem_ty], [len])
-        .wrap_try()
+pub fn read_fixed_array_from_view(
+    view: RustExpr,
+    len: RustExpr,
+    elem_ty: impl Into<RustType>,
+) -> RustExpr {
+    try_(call!(view, as_read_array::<elem_ty>, len))
 }
 
 /// Model RustExpr for setup of `Format::Slice` parse-context in the Parser model.
 pub fn try_open_slice(parser: RustExpr, sz: RustExpr) -> RustExpr {
-    try_call!(parser, start_slice, sz)
+    try_(call!(parser, start_slice, sz))
 }
 
 /// Model RustExpr for post-parse teardown of `Format::Slice` parse-context in the Parser model.
 pub fn try_close_slice(parser: RustExpr) -> RustExpr {
-    try_call!(parser, end_slice)
+    try_(call!(parser, end_slice))
 }
 
 /// Model RustExpr for setup of `Format::Peek` parse-context in the Parser model.
@@ -295,7 +390,7 @@ pub fn open_peek(parser: RustExpr) -> RustExpr {
 
 /// Model RustExpr for post-parse teardown of `Format::Peek` in the Parser model.
 pub fn try_close_peek(parser: RustExpr) -> RustExpr {
-    try_call!(parser, close_peek_context)
+    try_(call!(parser, close_peek_context))
 }
 
 /// Model RustExpr or setup of `Format::PeekNot` parse-context in the Parser model.
@@ -305,22 +400,22 @@ pub fn open_peek_not(parser: RustExpr) -> RustExpr {
 
 /// Model RustExpr for post-parse teardown of `Format::PeekNot` in the Parser model (if the anti-pattern is not seen).
 pub fn try_close_peek_not(parser: RustExpr) -> RustExpr {
-    try_call!(parser, close_peek_not_context)
+    try_(call!(parser, close_peek_not_context))
 }
 
 /// Model RustExpr for handling `Format::WithRelativeOffset` in the Parser model (seeking to absolute-offset `target`).
 pub fn try_seek_to_target(parser: RustExpr, target: RustExpr) -> RustExpr {
-    try_call!(parser, advance_or_seek, target)
+    try_(call!(parser, advance_or_seek, target))
 }
 
 /// Model RustExpr for setup of `Format::Bits` parse-context in the Parser model.
 pub fn ent_bits(parser: RustExpr) -> RustExpr {
-    try_call!(parser, enter_bits_mode)
+    try_(call!(parser, enter_bits_mode))
 }
 
 /// Model RustExpr for post-parse teardown of `Format::Bits` in the Parser model.
 pub fn esc_bits(parser: RustExpr) -> RustExpr {
-    try_call!(parser, escape_bits_mode)
+    try_(call!(parser, escape_bits_mode))
 }
 
 pub fn rem_bytes(parser: RustExpr) -> RustExpr {
@@ -333,9 +428,8 @@ pub fn start_alt(parser: RustExpr) -> RustExpr {
 }
 
 pub fn try_next_alt(parser: RustExpr, next_is_final: bool) -> RustExpr {
-    try_call!(parser, next_alt, RustExpr::bool_lit(next_is_final))
+    try_(call!(parser, next_alt, RustExpr::bool_lit(next_is_final)))
 }
-
 // !SECTION
 
 // SECTION - boilerplate patterns based on incidental implementation details of codegen process
@@ -407,53 +501,6 @@ pub fn match_case_err_bind(lab: &'static str) -> MatchCaseLHS {
         Box::new(RustPattern::CatchAll(Some(lbl(lab)))),
     ))
 }
-
-/// RustExpr for `Parser::new(<buffer>)`
-///
-/// `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
-pub fn parser_new(buffer: RustExpr) -> RustExpr {
-    RustExpr::FunctionCall(
-        Box::new(RustExpr::Entity(RustEntity::Scoped(
-            vec![lbl("Parser")],
-            lbl("new"),
-        ))),
-        vec![buffer],
-    )
-}
-
-/// RustStmt for `let mut <ident> = Parser::new(<buffer>)`.
-///
-/// The argument `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
-pub fn let_mut_parser_new(ident: &'static str, buffer: RustExpr) -> RustStmt {
-    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_new(buffer))
-}
-
-/// RustExpr for `Parser::from(<view>)`
-pub fn parser_from(view: RustExpr) -> RustExpr {
-    RustExpr::FunctionCall(
-        Box::new(RustExpr::Entity(RustEntity::Scoped(
-            vec![lbl("Parser")],
-            lbl("from"),
-        ))),
-        vec![view],
-    )
-}
-
-/// RustStmt for `let mut <ident> = Parser::from(<view>)`.
-pub fn let_mut_parser_from(ident: &'static str, view: RustExpr) -> RustStmt {
-    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_from(view))
-}
-
-pub fn reify_view(view_raw: RustExpr) -> RustExpr {
-    // NOTE - View used both for transient parses and persisted values
-    view_raw
-}
-
-/// RustExpr for `<view>.offset(<offset>)?`
-pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
-    view.call_method_with("offset", [offset]).wrap_try()
-}
-
 // !SECTION
 
 // SECTION - helper functions for various kinds of error-handling patterns
@@ -483,7 +530,7 @@ pub fn permit_err_fallback_value(value: RustExpr, error: RustExpr) -> RustExpr {
     } else {
         error
     };
-    try_call!(error, fallback_value, value, log_fn)
+    try_(call!(error, fallback_value, value, log_fn))
 }
 
 // !SECTION
@@ -501,7 +548,7 @@ pub fn repeat_between_finished(
     min: RustExpr,
     max: RustExpr,
 ) -> RustExpr {
-    try_call!(fn repeat_between_finished, out_of_reps, len, min, max )
+    try_(call!(fn repeat_between_finished, out_of_reps, len, min, max ))
 }
 
 pub fn parse_huffman(code_lengths: RustExpr, opt_values_expr: Option<RustExpr>) -> RustExpr {
@@ -552,3 +599,223 @@ pub fn phantom_data() -> RustExpr {
 }
 
 // !SECTION
+
+/// Micro integration-test to ensure that the current syntax for the `call!` macro is sound and works as expected
+///
+/// exercises the `MethodCall` syntax for the combinatorial cases of:
+/// - +/- argument(s)
+/// - +/- lifetime parameter (turbofish)
+/// - +/- type parameter (turbofish)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn call_macro_simple_method() {
+        let recv = RustExpr::local("x");
+        let actual = call!(recv, frobnicate);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && args.len() == 0
+            && params.is_empty()
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_simple_method_with_args() {
+        let recv = RustExpr::local("x");
+        let arg0 = RustExpr::u32lit(1);
+        let arg1 = RustExpr::str_lit("foo");
+        let actual = call!(recv, frobnicate, arg0, arg1);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && params.is_empty()
+            && args.len() == 2
+            && let RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(n))) = &args[0]
+            && *n == 1
+            && let RustExpr::PrimitiveLit(RustPrimLit::String(str)) = &args[1]
+            && *str == "foo"
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_lt_param() {
+        let recv = RustExpr::local("x");
+        let actual = call!(recv, frobnicate::<'a>);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && matches!(&params.lt_params[..], [RustLt::Parametric(lab)] if *lab == "'a")
+            && args.is_empty()
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_ty_param() {
+        let recv = RustExpr::local("x");
+        let ty = PrimType::Bool;
+        let actual = call!(recv, frobnicate::<ty>);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && params.lt_params.is_empty()
+            && let RustType::Atom(AtomType::Prim(pt)) = &params.ty_params[0]
+            && matches!(pt, PrimType::Bool)
+            && args.is_empty()
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_ty_param_inline() {
+        let recv = RustExpr::local("x");
+        let actual = call!(recv, frobnicate::<(PrimType::Bool)>);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && params.lt_params.is_empty()
+            && let RustType::Atom(AtomType::Prim(pt)) = &params.ty_params[0]
+            && matches!(pt, PrimType::Bool)
+            && args.is_empty()
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_lt_ty_param() {
+        let recv = RustExpr::local("x");
+        let ty = PrimType::Bool;
+        let actual = call!(recv, frobnicate::<'a, ty>);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && matches!(&params.lt_params[..], [RustLt::Parametric(lab)] if *lab == "'a")
+            && let RustType::Atom(AtomType::Prim(pt)) = &params.ty_params[0]
+            && matches!(pt, PrimType::Bool)
+            && args.is_empty()
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_lt_param_args() {
+        let recv = RustExpr::local("x");
+        let arg0 = RustExpr::u32lit(1);
+        let actual = call!(recv, frobnicate::<'a>, arg0);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && matches!(&params.lt_params[..], [RustLt::Parametric(lab)] if *lab == "'a")
+            && args.len() == 1
+            && let RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(n))) = &args[0]
+            && *n == 1
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_ty_param_args() {
+        let recv = RustExpr::local("x");
+        let ty = PrimType::Bool;
+        let arg0 = RustExpr::u32lit(1);
+        let actual = call!(recv, frobnicate::<ty>, arg0);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && params.lt_params.is_empty()
+            && let RustType::Atom(AtomType::Prim(pt)) = &params.ty_params[0]
+            && matches!(pt, PrimType::Bool)
+            && args.len() == 1
+            && let RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(n))) = &args[0]
+            && *n == 1
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+
+    #[test]
+    fn call_macro_lt_ty_param_args() {
+        let recv = RustExpr::local("x");
+        let ty = PrimType::Bool;
+        let arg0 = RustExpr::u32lit(1);
+        let actual = call!(recv, frobnicate::<'a, ty>, arg0);
+        if let RustExpr::MethodCall(
+            obj,
+            MethodSpecifier::Arbitrary(SubIdent::ByName(ident)),
+            params,
+            args,
+        ) = &actual
+            && matches!(obj.as_ref(), RustExpr::Entity(RustEntity::Local(str)) if str == "x")
+            && *ident == "frobnicate"
+            && matches!(&params.lt_params[..], [RustLt::Parametric(lab)] if *lab == "'a")
+            && let RustType::Atom(AtomType::Prim(pt)) = &params.ty_params[0]
+            && matches!(pt, PrimType::Bool)
+            && args.len() == 1
+            && let RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(n))) = &args[0]
+            && *n == 1
+        {
+            return;
+        }
+        panic!("unexpected: {actual:#?}");
+    }
+}

@@ -1926,28 +1926,42 @@ pub mod base {
         u64le, U64LE, 8, U64Le;
     }
 
-    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
     /// Parses a u8 value and performs a bitwise cast to i8.
     pub fn i8() -> Format {
-        map_numeric(u8(), |v| num::cast_bitwise(MachineRep::I8, v))
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I8)),
+            Box::new(map_numeric(u8(), |v| num::cast_bitwise(MachineRep::I8, v))),
+        )
     }
 
-    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
     /// Parses a big-endian u16 value and performs a bitwise cast to i16.
     pub fn i16be() -> Format {
-        map_numeric(u16be(), |v| num::cast_bitwise(MachineRep::I16, v))
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I16BE)),
+            Box::new(map_numeric(u16be(), |v| {
+                num::cast_bitwise(MachineRep::I16, v)
+            })),
+        )
     }
 
-    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
     /// Parses a big-endian u32 value and performs a bitwise cast to i32.
     pub fn i32be() -> Format {
-        map_numeric(u32be(), |v| num::cast_bitwise(MachineRep::I32, v))
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I32BE)),
+            Box::new(map_numeric(u32be(), |v| {
+                num::cast_bitwise(MachineRep::I32, v)
+            })),
+        )
     }
 
-    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
     /// Parses a big-endian u64 value and performs a bitwise cast to i64.
     pub fn i64be() -> Format {
-        map_numeric(u64be(), |v| num::cast_bitwise(MachineRep::I64, v))
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I64BE)),
+            Box::new(map_numeric(u64be(), |v| {
+                num::cast_bitwise(MachineRep::I64, v)
+            })),
+        )
     }
 }
 pub use base::{bit, i8, i16be, i32be, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};

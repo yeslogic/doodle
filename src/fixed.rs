@@ -4,7 +4,7 @@ use crate::record_fmt::RecordFormat;
 use crate::{BaseKind, CommonOp, Endian, Format, FormatModule, FormatRef, Label, StyleHint};
 use anyhow::{Result as AResult, anyhow};
 
-// REVIEW - cases that are unhandled: bit-flags records, nested fixedformats, unimplemented marker-types (i.e. signed integer-ops)
+// REVIEW - cases that are unhandled: bit-flags records, nested fixedformats
 
 impl From<BaseKind<Endian>> for SpineElem {
     fn from(kind: BaseKind<Endian>) -> Self {
@@ -179,6 +179,7 @@ fn as_indirect(format: &Format) -> Option<BaseKind<Endian>> {
     }
 }
 
+// ANCHOR - as-base-kind-read
 /// Recognizes the `Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), ..)` wrapper
 /// that every base-kind constructor in [`crate::helper`] produces (see `helper::u8`, and the
 /// `endian!`-macro-generated `u16be`/`u32be`/`u64be`/etc.), without needing to inspect or
@@ -186,8 +187,7 @@ fn as_indirect(format: &Format) -> Option<BaseKind<Endian>> {
 ///
 /// # Notes
 ///
-/// Currently does not work properly for signed-integer types, as well as atypical endian-reads
-/// like `U24Be`.
+/// Currently does not work properly for atypical endian-reads like `U24Be`.
 fn as_base_kind_read(format: &Format) -> Option<BaseKind<Endian>> {
     match format {
         Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind)), _) => Some(*kind),
@@ -323,8 +323,6 @@ mod tests {
     }
 
     #[test]
-    // NOTE - This is a regression so the panic is documenting the current behavior - the eventual goal is for this to pass
-    #[should_panic]
     fn as_base_kind_read_accepts_signed() {
         let f = i32be();
         assert!(as_base_kind_read(&f).is_some());

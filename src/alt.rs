@@ -16,7 +16,7 @@ use crate::{
     IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
     typecheck::error::UnificationError,
     validation::Condition,
-    valuetype::{Container, SignedIntType},
+    valuetype::{BaseNumType, Container, SignedIntType},
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -1006,7 +1006,10 @@ impl FormatModuleExt {
                                 }
                             }
                             let elt = match kind {
-                                FixedReadKind::Base(kind) => ValueTypeExt::Base((*kind).into()),
+                                FixedReadKind::Base(kind) => match BaseNumType::from(*kind) {
+                                    BaseNumType::Unsigned(bt) => ValueTypeExt::Base(bt),
+                                    BaseNumType::Signed(sit) => ValueTypeExt::Signed(sit),
+                                },
                                 // NOTE - eligibility (fixed-size, all-primitive-fields) of the
                                 // referenced format is not (re-)validated here: `FormatRef`s
                                 // embedded in a `FixedReadKind` are only ever produced by a

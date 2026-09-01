@@ -1120,12 +1120,15 @@ mod svg {
                     let close_start = chars.len() - close_len;
                     if &chars[close_start..].iter().collect::<String>() != CLOSE_TAG {
                         log::warn!("SVG document does not end with </svg> tag");
-                        // FIXME - we arbitrarily decide to show the last 16 bytes
+                        // FIXME[epic=magic-const]  - arbitrary local bookending const
+                        const TRAILING_BYTES_SHOWN: usize = 16;
+                        let last_ix = chars.len() - 1;
+                        let trailer_start_ix = last_ix.saturating_sub(TRAILING_BYTES_SHOWN);
                         return doc.glue(
                             LineBreak,
                             toks(format!(
                                 "..{}",
-                                String::from_iter(&svg_info.data[(chars.len() - 1) - 16..])
+                                String::from_iter(&svg_info.data[trailer_start_ix..])
                             )),
                         );
                     }
@@ -3230,7 +3233,7 @@ mod layout {
             )
         }
 
-        // FIXME[magic] - arbitrary local bookending const
+        // FIXME[epic=magic-const] - arbitrary local bookending const
         const MARK_ARRAY_BOOKEND: usize = 2;
         arrayfmt::display_items_inline(
             &mark_array.mark_records,
@@ -3648,7 +3651,7 @@ mod kern {
                     |n| toks(format!("(..{n}..)")),
                 ))
             },
-            conf.bookend_size / 2, // FIXME - magic constant adjustment
+            conf.bookend_size / 2, // FIXME[epic=magic-const] - magic constant adjustment
             |start, stop| {
                 toks(format!("(skipping kerning array rows {start}..{stop})"))
                     .indent_by(ELISION_DELTA)

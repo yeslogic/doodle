@@ -38,17 +38,6 @@ pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
 }
 
 fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-    // readarray-eligible once `as_base_kind_read` can resolve `FormatRef::call()` indirection:
-    // `axis_tag: tag.call()` is the sole blocker (`tag` itself resolves to a bare `u32be()`);
-    // `axis_name_id`/`axis_ordering` are already bare `u16be()`. `axis_record` is currently
-    // inline -- a new `FormatRef` (e.g. `opentype.stat.axis_record`) would need to be defined
-    // for it. Unlike most sites in this file, this one needs *no* `from_here`: the whole target
-    // of this function's `read_phantom_view_offset32` call site (in `table()`) is nothing but
-    // this array (`design_axis_count` is supplied from the caller, exactly mirroring the
-    // pre-migration shape of `cpal.rs::color_record_array`) -- so this can go straight to
-    // `pseudo_record([("offset", u32be())], with_view(table_view.offset(var("offset")),
-    // read_array(var("design_axis_count"), axis_record_ref)))`, following the migrated
-    // `cpal.rs::table` pattern exactly (commit f9835b9).
     let axis_record = module.define_format(
         "opentype.stat.axis_record",
         record([
@@ -62,6 +51,7 @@ fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
         vec![(Label::Borrowed("design_axis_count"), ValueType::U16)],
         record([(
             "design_axes",
+            // NOTE - migrated to `read_array` from `repeat_count(var("design_axis_count"), axis_record)`
             from_here(read_array(var("design_axis_count"), axis_record)),
         )]),
     )
@@ -130,16 +120,9 @@ fn axis_value_table(module: &mut FormatModule, fixed32be: FormatRef) -> FormatRe
         ("axis_count", u16be()),
         ("flags", axis_flags.clone()),
         ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
-        // readarray-eligible once `as_base_kind_read` can see through `Format::Variant`
-        // wrapping: `axis_value_record`'s `value` field is `fixed32be.call()`; `axis_index` is
-        // already a bare `u16be()`. No other blocker. `axis_value_record` is currently an
-        // inline (unregistered) record -- a new `FormatRef` (e.g.
-        // `opentype.stat.axis_value_record`) would need to be defined for it. `axis_value_table`
-        // (this function's enclosing format) does not bind any view of its own even though it's
-        // reached via `read_phantom_view_offset16` from `axis_value_array`, so this would still
-        // need `from_here(read_array(var("axis_count"), axis_value_record_ref))`.
         (
             "axis_values",
+            // NOTE - migrated to `read_array` from `repeat_count(var("axis_count"), axis_value_record)`
             from_here(read_array(var("axis_count"), axis_value_record)),
         ),
     ];

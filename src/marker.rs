@@ -1,5 +1,5 @@
 use crate::FormatRef;
-use crate::valuetype::BaseType;
+use crate::valuetype::{BaseNumType, BaseType, SignedIntType};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Default)]
@@ -32,15 +32,20 @@ impl Endian {
     }
 }
 
+// ANCHOR - basekind-enum
 /// Marker-type for various widths of machine-integer parse-directives,
 /// with support for generic decoration with either `()` or [`Endian`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub enum BaseKind<X: Copy = ()> {
-    // FIXME - add support for U24, as well as signed integer types
+    // FIXME[epic=exotic-int-parse] - add support for U24
     U8,
     U16Ext(X),
     U32Ext(X),
     U64Ext(X),
+    I8,
+    I16Ext(X),
+    I32Ext(X),
+    I64Ext(X),
 }
 
 impl BaseKind {
@@ -55,6 +60,17 @@ impl BaseKind {
     pub const U16LE: BaseKind<Endian> = BaseKind::U16Ext(Endian::Le);
     pub const U32LE: BaseKind<Endian> = BaseKind::U32Ext(Endian::Le);
     pub const U64LE: BaseKind<Endian> = BaseKind::U64Ext(Endian::Le);
+
+    pub const I16: BaseKind<()> = BaseKind::I16Ext(());
+    pub const I32: BaseKind<()> = BaseKind::I32Ext(());
+    pub const I64: BaseKind<()> = BaseKind::I64Ext(());
+
+    // NOTE - LE shortcuts elided for the signed widths: nothing in doodle-formats currently
+    // needs them (OpenType, the only consumer so far, is all big-endian). Add I16LE/I32LE/I64LE
+    // here if/when a little-endian signed format shows up.
+    pub const I16BE: BaseKind<Endian> = BaseKind::I16Ext(Endian::Be);
+    pub const I32BE: BaseKind<Endian> = BaseKind::I32Ext(Endian::Be);
+    pub const I64BE: BaseKind<Endian> = BaseKind::I64Ext(Endian::Be);
 }
 
 impl BaseKind {
@@ -64,6 +80,10 @@ impl BaseKind {
             BaseKind::U16Ext(_) => "U16",
             BaseKind::U32Ext(_) => "U32",
             BaseKind::U64Ext(_) => "U64",
+            BaseKind::I8 => "I8",
+            BaseKind::I16Ext(_) => "I16",
+            BaseKind::I32Ext(_) => "I32",
+            BaseKind::I64Ext(_) => "I64",
         }
     }
 }
@@ -81,7 +101,34 @@ impl BaseKind<Endian> {
             BaseKind::U16Ext(Le) => "U16Le",
             BaseKind::U32Ext(Le) => "U32Le",
             BaseKind::U64Ext(Le) => "U64Le",
+
+            BaseKind::I8 => "I8",
+
+            BaseKind::I16Ext(Be) => "I16Be",
+            BaseKind::I32Ext(Be) => "I32Be",
+            BaseKind::I64Ext(Be) => "I64Be",
+
+            BaseKind::I16Ext(Le) => "I16Le",
+            BaseKind::I32Ext(Le) => "I32Le",
+            BaseKind::I64Ext(Le) => "I64Le",
         }
+    }
+
+    /// Returns `true` if self can be considered big-endian, i.e. if it is either a big-endian type or an endianness-agnostic type (u8/i8).
+    ///
+    /// Returns `false` if self is a multi-byte kind flagged as little-endian.
+    pub const fn is_be(&self) -> bool {
+        matches!(
+            self,
+            BaseKind::U8
+                | BaseKind::U16Ext(Endian::Be)
+                | BaseKind::U32Ext(Endian::Be)
+                | BaseKind::U64Ext(Endian::Be)
+                | BaseKind::I8
+                | BaseKind::I16Ext(Endian::Be)
+                | BaseKind::I32Ext(Endian::Be)
+                | BaseKind::I64Ext(Endian::Be)
+        )
     }
 }
 
@@ -99,17 +146,25 @@ impl<X: Copy> BaseKind<X> {
             BaseKind::U16Ext(..) => std::mem::size_of::<u16>(),
             BaseKind::U32Ext(..) => std::mem::size_of::<u32>(),
             BaseKind::U64Ext(..) => std::mem::size_of::<u64>(),
+            BaseKind::I8 => std::mem::size_of::<i8>(),
+            BaseKind::I16Ext(..) => std::mem::size_of::<i16>(),
+            BaseKind::I32Ext(..) => std::mem::size_of::<i32>(),
+            BaseKind::I64Ext(..) => std::mem::size_of::<i64>(),
         }
     }
 }
 
-impl<X: Copy> From<BaseKind<X>> for BaseType {
+impl<X: Copy> From<BaseKind<X>> for BaseNumType {
     fn from(value: BaseKind<X>) -> Self {
         match value {
-            BaseKind::U8 => BaseType::U8,
-            BaseKind::U16Ext(..) => BaseType::U16,
-            BaseKind::U32Ext(..) => BaseType::U32,
-            BaseKind::U64Ext(..) => BaseType::U64,
+            BaseKind::U8 => BaseNumType::Unsigned(BaseType::U8),
+            BaseKind::U16Ext(..) => BaseNumType::Unsigned(BaseType::U16),
+            BaseKind::U32Ext(..) => BaseNumType::Unsigned(BaseType::U32),
+            BaseKind::U64Ext(..) => BaseNumType::Unsigned(BaseType::U64),
+            BaseKind::I8 => BaseNumType::Signed(SignedIntType::I8),
+            BaseKind::I16Ext(..) => BaseNumType::Signed(SignedIntType::I16),
+            BaseKind::I32Ext(..) => BaseNumType::Signed(SignedIntType::I32),
+            BaseKind::I64Ext(..) => BaseNumType::Signed(SignedIntType::I64),
         }
     }
 }
