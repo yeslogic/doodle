@@ -7,13 +7,17 @@ findings have since been either closed by implementation work or acted on direct
 definitions, and are pruned below rather than re-derived. Status verified against the current
 source, cross-checked via `mcp__cclsp__find_references` on `doodle::helper::read_array`.
 
+Re-checked as of commit `abe64ee` (previously last reviewed at `8d8ff0d`). The 5 commits in
+between (`9e4e6bb`, `f4d1e1a`, `eb81afc`, `9ce426a`, `abe64ee`, plus `aea08b6` in passing) landed
+full signed-BE-primitive support end to end — see "Signed-integer primitives" below, which moves
+from "genuine remaining gap" to "closed".
+
 ## Already migrated (live `read_array(...)` call sites)
 
 | Site | Pattern |
 |---|---|
 | `cpal.rs::table.color_records_array` | `pseudo_record` + `with_view` + `read_array` (the original reference migration) |
 | `cpal.rs::palette_labels_array` / `palette_entry_labels_array` | generic `opentype.rs::read_array_view_offset32` helper |
-| `hdmx.rs::device_record.widths` | `from_here(read_array(..., BaseKind::U8))` |
 | `base.rs::base_tag_list.baseline_tags` | `from_here(read_array(..., tag))` |
 | `stat.rs::design_axes_array.design_axes` | `from_here(read_array(..., axis_record))` |
 | `stat.rs::axis_value_table` Format4 `axis_values` | `from_here(read_array(..., axis_value_record))` |
@@ -21,7 +25,11 @@ source, cross-checked via `mcp__cclsp__find_references` on `doodle::helper::read
 | `colr.rs::var_color_line.color_stops` | `from_here(read_array(..., var_color_stop))` |
 
 `hdmx.rs` was misclassified as zero-qualifying in the original audit (false negative in the first
-pass) — it has since been both correctly identified and migrated.
+pass) — it was migrated to `read_array(..., BaseKind::U8)` for a while, but commit `aea08b6`
+("Implement obj::PairS (PairSet) in otf_metrics") reimplemented `device_record.widths` using
+`capture_bytes` instead, per its inline `NOTE`: `CaptureBytes` makes downstream processing in
+`otf_metrics` infallible in a way `ReadArray` didn't. This is a deliberate opt-out, not a
+regression — treat `hdmx.rs` as no longer carrying a live `read_array` site.
 
 ## Deliberately opted out
 
@@ -30,11 +38,15 @@ pass) — it has since been both correctly identified and migrated.
   `repeat_count`, per the inline `NOTE` at the site: the parsed `Vec<TableRecord>` needs to stay
   fully materialized in memory for `table_links` to consume. `ReadArray` would trade that away for
   a lazy/strided view, which isn't wanted here. Do not re-flag this site.
+- **`hdmx.rs::device_record.widths`** — genuinely eligible (`BaseKind::U8`) and was migrated for a
+  time, but reverted to `capture_bytes` in `aea08b6` so that `generated/api_helper/otf_metrics.rs`
+  can treat the byte-width data infallibly downstream. Do not re-flag this site either.
 
 ## Checker gaps that have been closed (historical, no longer blocking)
 
 The original audit's largest section catalogued sites blocked *solely* by two gaps in
-`analyze_fixed_shape`/`as_base_kind_read`. Both are now resolved in `src/fixed.rs`:
+`analyze_fixed_shape`/`as_base_kind_read`. Both are now resolved in `src/fixed.rs`, and a third gap
+(signed primitives) discovered afterward has since been closed too:
 
 - **`FormatRef::call()` indirection** is now resolved (`as_spine_elem`'s `Format::ItemVar` arm,
   added in `74f8c2c`/`4a7e22d`) — a field like `tag.call()` correctly resolves to `BaseKind::U32BE`
@@ -46,6 +58,20 @@ The original audit's largest section catalogued sites blocked *solely* by two ga
   arm of `as_spine_elem`). It is still **not** resolved for a bare inline `Format::Variant` sitting
   directly in a record field with no `FormatRef` anchor — that arm deliberately requires `self_ref`
   and record fields always pass `None` (see the doc comment on `as_spine_elem`).
+- **Signed-integer primitives** (`i8()`/`i16be()`/`i32be()`/`i64be()`) are now resolved too, landed
+  in the commit batch after this audit was first written (`9e4e6bb` -> `f4d1e1a` -> `eb81afc` ->
+  `9ce426a` -> `abe64ee`, plus `aea08b6` in passing). `BaseKind<X>` gained `I8`/`I16Ext(X)`/
+  `I32Ext(X)`/`I64Ext(X)` sibling variants (`src/marker.rs`); `as_base_kind_read`'s
+  `as_base_kind_read_accepts_signed` test in `src/fixed.rs` — `#[should_panic]` at the time of the
+  first audit — now passes for real. Codegen support landed too: `MarkerType` gained
+  `I8`/`I16Be`/`I32Be`/`I64Be` variants backing both the `ReadUnchecked`-derivation path for
+  `FixedFormat` records with signed fields (`src/codegen/model/traits.rs`) *and* the bare-primitive
+  `ViewFormat::ReadArray` path (`model::read_array_from_view` -> `read_fixed_array_from_view` ->
+  `View::as_read_array::<T>`, which `9ce426a` genericized over any `T: ReadUnchecked` instead of
+  matching per-`BaseKind` as before). Full writeup: `BASEKIND_EXTENSION.md`. This closes the
+  "signed primitives" gap from the original "Genuine remaining gaps" list below — but only its
+  **big-endian** half; see "Little-endian `ReadArray` codegen" further down for the LE asymmetry
+  this batch left untouched for arrays.
 
 Of the original 10 "blocked solely by a gap" sites, 5 were subsequently migrated (`base.rs`
 `baseline_tags`, `stat.rs` ×2, `colr.rs` ×2, all listed above), 1 was checked and explicitly
@@ -57,16 +83,30 @@ unresolved-and-unaccounted-for.
 ## Remaining low-hanging fruit (gap-closed, not yet migrated)
 
 These are now fully eligible under current rules — no remaining architectural blocker — but the
-migration hasn't been done. Each just needs `from_here(read_array(len, elem))` in place of the
-existing `repeat_count`:
+migration hasn't been done. Each just needs `from_here(read_array(len, elem))` (or the
+`with_view`/`pseudo_record` variant, where there's no already-bound `ViewExpr` at the site) in
+place of the existing `repeat_count`:
 
 | Site | Elem kind |
 |---|---|
 | `mvar.rs::table.value_records` | `value_record` (reuse existing `FormatRef`; drop `.call()`) |
 | `cpal.rs::table.color_record_indices` | bare `BaseKind::U16BE` |
+| `post.rs::postv2dot5.offset` | bare `BaseKind::I8` (signed gap closed, see below) |
+| `hmtx.rs::table.left_side_bearings` | bare `BaseKind::I16BE` (signed gap closed) |
+| `gvar.rs::packed_deltas.run.deltas` (`Delta16`/`Delta8` arms) | bare `BaseKind::I16BE` / `BaseKind::I8` (signed gap closed) |
 
 `mvar.rs` still carries the old audit's inline comment describing `tag.call()` as "the sole
 blocker" — that's now stale (the blocker is closed; the site is just unmigrated) but harmless.
+
+The three new signed-primitive rows became eligible only as of `eb81afc`/`9ce426a` — see "Signed-
+integer primitives" under "Checker gaps that have been closed" below. None of them currently
+carry a comment explaining why they're unmigrated (unlike the tried-and-reverted sites), since
+until this commit batch there was a real, correctly-documented blocker. `hmtx.rs`'s
+`long_horizontal_metric` (the `long_metrics` field, mixing `u16be()`+`i16be()`) would also need
+promoting from an inline `record([..])` to a registered `FormatRef` to qualify as `FixedFormat`
+before it can be migrated the same way; `left_side_bearings` (bare `i16be()`) needs no such
+promotion. `vmtx.rs` almost certainly mirrors `hmtx.rs` (top-side-bearings) but wasn't
+independently re-checked.
 
 ## Tried, reverted (real blocker, not just unmigrated)
 
@@ -109,26 +149,14 @@ as "presumed still valid" rather than freshly re-audited.
 
 ## Genuine remaining gaps, by evidence strength
 
-### 1. Signed-integer primitives — live examples, not yet tracked by any epic tag
+Signed-integer primitives (formerly the top item here) are no longer a gap — see "Signed-integer
+primitives" under "Checker gaps that have been closed" above; the live sites it used to block
+(`gvar.rs`, `hmtx.rs`, `post.rs`) moved to "Remaining low-hanging fruit". `post.rs::table`'s
+`postv2dot5` still carries a stale inline comment (`// TODO - ReadArray<'_, I8> would work here if
+we had a model compatible with it`) that should be replaced with a migrated-or-unmigrated note
+once that site is next touched.
 
-`i8()`/`i16be()`/`i32be()`/`i64be()` (`src/helper.rs`) are `map_numeric`-wrapped around the
-corresponding unsigned `EndianParse` read, so `as_base_kind_read` doesn't recognize them
-(`fixed.rs`'s own `as_base_kind_read_accepts_signed` test is `#[should_panic]`, documenting this as
-still-open). This is no longer a theoretical gap — there are concrete, currently-blocked array
-sites:
-
-- `gvar.rs` — `fmt_variant("Delta16", repeat_count(var("run_length"), i16be()))` and the `Delta8`
-  sibling using `i8()` (glyph-variation-data point deltas).
-- `hmtx.rs` — `long_metrics`' inline `long_horizontal_metric` record (`left_side_bearing: i16be()`,
-  which would also need promoting from an inline `record([..])` to a registered `FormatRef` to
-  qualify as `FixedFormat`) and the bare `left_side_bearings: repeat_count(.., i16be())` array.
-- `post.rs` — `offset: repeat_count(var("num_glyphs"), i8())`.
-
-`vmtx.rs` almost certainly mirrors `hmtx.rs` (top-side-bearings) but wasn't independently
-re-checked. Of the remaining gaps, this is the one with the broadest, best-attested live impact —
-worth prioritizing over the other three below if this work resumes.
-
-### 2. Bitflags-derived fields — live examples, tracked via `TODO[epic=adhoc-readarray]`
+### 1. Bitflags-derived fields — live examples, tracked via `TODO[epic=adhoc-readarray]`
 
 A `bit_fields_u16`/`bit_fields_u32` record's only raw read is the packed-bits primitive; every
 exposed field is a derived `Format::Compute` bit-mask, so `analyze_fixed_shape` rejects it outright
@@ -142,7 +170,7 @@ regardless of the indirection/Variant fixes.
   inside `phantom(parse_from_view(.., slice(.., repeat_count(..))))`, so even fixing bitflags
   wouldn't make this a trivial migration the way the other quick-wins above are.
 
-### 3. Nested `FixedFormat` record fields — hypothetical, no live example found
+### 2. Nested `FixedFormat` record fields — hypothetical, no live example found
 
 `analyze_record`'s field-level `as_spine_elem` call only recognizes bare primitives and
 primitive-resolving indirection/Variant; a field that is itself another fixed-shape *record*
@@ -154,19 +182,29 @@ up nothing concrete in the current OpenType tree. Given how often OpenType nests
 sub-records (value records, anchor-adjacent tables), this is plausible to hit eventually, but
 speculative — not worth deeper searching until a concrete site motivates it.
 
-### 4. Little-endian `ReadArray` codegen — hypothetical for OpenType specifically
+### 3. Little-endian `ReadArray` codegen — hypothetical for OpenType specifically, gap reshaped but not closed
 
-`fixed.rs` structurally recognizes LE `BaseKind`s (via the same `CommonOp::EndianParse` tag as BE),
-but the codegen/runtime layer doesn't: `src/codegen/model.rs::read_array_from_view` still has
-`unimplemented!("little-endian read-array parses not yet implemented")` for
-`U16LE`/`U32LE`/`U64LE`, and `src/parser/view.rs` only defines `read_array_u{16,32,64}be` (no `le`
-counterparts) — unlike scalar reads, where `5eb4fbf` added `read_u16le`/`read_u32le`/`read_u64le`
-and removed the equivalent `unimplemented!()` for non-array LE reads. OpenType itself is
-exclusively big-endian, so there is no live site anywhere in this tree that this would unblock;
-flagged only because it's a concrete, already-documented asymmetry (scalar LE works, array LE
-doesn't) that would surface immediately if a little-endian format ever wanted `ReadArray`.
+Still open, but the shape of the gap changed under `9ce426a`/`abe64ee` and is worth re-describing
+accurately. `read_array_from_view` (`src/codegen/model.rs`) no longer has per-`BaseKind`
+`unimplemented!()` match arms at all — `9ce426a` collapsed it to a single generic call through
+`MarkerType::from_base_kind_endian(kind)` into `read_fixed_array_from_view`, which emits
+`view.as_read_array::<elem_ty>(len)`, and `View::as_read_array<T>` (`src/parser/view.rs`) is fully
+generic over any `T: ReadUnchecked` — no more monomorphic `read_array_u16be`/`u32be`/`u64be`
+methods to individually extend with `le` counterparts (`abe64ee` deleted those; only
+`read_array_u24be` survives, kept as a thin wrapper since `MarkerType` has no `U24Be` case to route
+through generically). The LE gap now lives one layer up: `read_array_from_view` asserts
+`kind.is_be()` before calling in, and `MarkerType::from_base_kind_endian` itself panics on any
+`Endian::Le` variant with `"MarkerType models allsorts::binary marker-types, which are all
+big-endian"`. So this is no longer really a "missing codegen arm" so much as "no `MarkerType`/
+`ReadUnchecked` impl exists for LE at all" — an `allsorts`/`smallsorts` limitation (LE isn't a
+concept in OpenType binary data) rather than a `doodle`-side oversight, mirroring how scalar LE
+reads (`5eb4fbf`'s `read_u16le`/`read_u32le`/`read_u64le`) work at the *value* level but were never
+plumbed into the marker-type/`ReadUnchecked` machinery `ReadArray` depends on. OpenType itself is
+exclusively big-endian, so there is still no live site anywhere in this tree that this would
+unblock; flagged only because it's a concrete, already-documented asymmetry that would surface
+immediately if a little-endian format ever wanted `ReadArray`.
 
-### 5. Tuple-shaped elements — unchanged, no live example, not re-investigated
+### 4. Tuple-shaped elements — unchanged, no live example, not re-investigated
 
 `analyze_fixed_shape` still rejects `Format::Tuple` outright (`analyze_fixed_shape_rejects_tuple`
 test, by design — ad-hoc tuples get no generated type to hang a `ReadUnchecked` impl off). No
@@ -186,10 +224,10 @@ audit (none of these were touched by the migrations above):
   `axis_segment_maps` — element's own field is itself a nested array, not a scalar.
 - `colr.rs`'s `affine2x3`/`var_affine2x3` — not used as array elements at all.
 
-## Zero-qualifying files (re-confirmed, `hdmx.rs` removed — see "Already migrated")
+## Zero-qualifying files (re-confirmed; `hdmx.rs` excluded — see "Deliberately opted out", not zero-qualifying)
 
 `var_common.rs`, `svg.rs`, `dsig.rs`, `name.rs`, `head.rs`, `hvar.rs`, `colr.rs` (outside the two
 migrated sites above), and `maxp.rs`/`vhea.rs`/`cvt.rs`/`fpgm.rs`/`prep.rs`. `hhea.rs` presumed
-still empty (unchanged, not re-checked). `hmtx.rs`/`vmtx.rs` remain zero-qualifying *under current
-rules* but are the best-attested live examples for gap 1 above (signed primitives) rather than
-being architecturally dead ends.
+still empty (unchanged, not re-checked). `hmtx.rs`/`vmtx.rs` are no longer zero-qualifying: the
+signed-primitive gap that used to block them is closed (see "Remaining low-hanging fruit"), they
+just haven't been migrated yet.
