@@ -673,6 +673,9 @@ impl FormatModule {
                     );
                 }
             }
+            if let Err(e) = decl.determinations(self) {
+                panic!("Grammar error in {name}: {e}", name = &self.names[ix]);
+            }
         }
         accum
     }
@@ -686,16 +689,18 @@ impl FormatModule {
             f_type,
             batch: None,
         };
-        match decl.solve_type(&self) {
-            Ok(_) => {
-                self.names.push(name);
-                self.decls.push(decl);
-                FormatRef(fmt_id)
-            }
-            Err(e) => {
-                panic!("Failed to solve type for {name}: {e}");
-            }
+        if let Err(e) = decl.solve_type(&self) {
+            panic!("Failed to solve type for {name}: {e}");
         }
+        // `determinations` looks itself up via `module.decls[fmt_id]` (needed to build a
+        // RecurseCtx for the format), so `decl` must already be pushed before calling it -
+        // unlike `solve_type`, which only ever looks up *other*, already-declared items.
+        self.names.push(name);
+        self.decls.push(decl);
+        if let Err(e) = self.decls[fmt_id].determinations(self) {
+            panic!("Grammar error in {name}: {e}", name = &self.names[fmt_id]);
+        }
+        FormatRef(fmt_id)
     }
 
     pub fn get_format_type(&self, level: usize) -> &FormatType {

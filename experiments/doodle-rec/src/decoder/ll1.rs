@@ -6,7 +6,7 @@ use doodle::read::ReadCtxt;
 use super::Value;
 use crate::{
     Format, FormatModule, RecurseCtx,
-    determinations::{Choice, InterpError, PartialFormat, PathTrace, Traversal},
+    determinations::{Choice, Entry, InterpError, PartialFormat, PathTrace, Traversal},
 };
 
 pub struct LL1Interpreter<'a> {
@@ -60,7 +60,7 @@ impl<'a> LL1Interpreter<'a> {
                 let level = ctx
                     .convert_rec_var(*rec_ix)
                     .unwrap_or_else(|| panic!("recursion variable not found in {ctx:?}: {rec_ix}"));
-                if visited.insert(level) {
+                if visited.insert(level) == Entry::Novel {
                     let new_ctx = ctx.enter(*rec_ix);
                     let format = new_ctx.get_format().unwrap();
                     let ret = self.parse_format(format, remnant, new_ctx, input, trace, visited)?;

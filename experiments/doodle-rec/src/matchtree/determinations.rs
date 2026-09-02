@@ -411,19 +411,43 @@ impl Format {
             }
             Format::RecVar(rec_ix) => {
                 let level = ctx.convert_rec_var(*rec_ix).unwrap_or_else(|| {
-                    unreachable!("solve_determinations: {ctx:?} has no recursive variable ~{rec_ix} (visited: {:#?})", visited.seen_levels.iter().copied().collect::<Vec<usize>>());
+                    unreachable!(
+                        "solve_determinations: {ctx:?} has no recursive variable ~{rec_ix} (open: {:#?})",
+                        visited.open_levels().collect::<Vec<usize>>()
+                    );
                 });
-                if visited.insert(level) {
-                    let ctx = ctx.enter(*rec_ix);
-                    let ret = ctx
-                        .get_format()
-                        .unwrap()
-                        .solve_determinations(module, visited, ctx)?;
-                    visited.escape();
-                    Ok(ret)
-                } else {
-                    // REVIEW - loop-breaker fall-back
-                    Ok(Determinations::one())
+                match visited.insert(level) {
+                    Entry::Novel => {
+                        let ctx = ctx.enter(*rec_ix);
+                        let ret = ctx
+                            .get_format()
+                            .unwrap()
+                            .solve_determinations(module, visited, ctx)?;
+                        visited.escape();
+                        Ok(ret)
+                    }
+                    Entry::Guarded => {
+                        // Already open, but guarded (progress made) since it was opened: this is
+                        // ordinary, terminating recursion. Short-circuit rather than re-expand -
+                        // `level`'s own recursive structure is already being (or will be)
+                        // checked in full on its own terms elsewhere.
+                        Ok(Determinations::one())
+                    }
+                    Entry::LeftRecursive => {
+                        // Still unguarded since it was opened - reaching it again would derive
+                        // itself with zero progress. `visited.open_levels()` (outermost first)
+                        // plus this repeated `level` traces the actual cycle.
+                        let top = visited.orig_level.unwrap_or(level);
+                        let cycle = visited
+                            .open_levels()
+                            .chain(std::iter::once(level))
+                            .collect();
+                        Err(GrammarError::LeftRecursion {
+                            top,
+                            cycle,
+                            context: self.clone(),
+                        })
+                    }
                 }
             }
             Format::Byte(set) => Ok(Determinations {
@@ -441,7 +465,13 @@ impl Format {
             Format::Union(formats) => {
                 let mut det = Determinations::one();
                 for format in formats {
-                    let det_format = format.solve_determinations(module, visited, ctx)?;
+                    // Branches are alternatives, not a sequence: a guard reached inside one
+                    // branch must not make its unrelated sibling look guarded too. Cloning
+                    // (rather than `fork`) still carries in whatever this Union's own ancestors
+                    // already opened/guarded, since those remain relevant to every branch.
+                    let mut branch_visited = visited.clone();
+                    let det_format =
+                        format.solve_determinations(module, &mut branch_visited, ctx)?;
                     det = det
                         .union(det_format)
                         .map_err(|e| e.add_context(self.clone()))?;
@@ -466,6 +496,13 @@ impl Format {
                 let mut det_seq = Determinations::zero();
                 for format in formats {
                     let det_format = format.solve_determinations(module, visited, ctx)?;
+                    if !det_format.is_nullable {
+                        // Definitely consumes something: every level still open at this point
+                        // (however it was reached) has now had progress made since it was
+                        // opened, so re-entering any of them later in this sequence is no longer
+                        // left recursion.
+                        visited.guard();
+                    }
                     det_seq = det_seq
                         .merge_seq(det_format)
                         .map_err(|e| e.add_context(self.clone()))?;
@@ -483,50 +520,75 @@ impl Format {
     }
 }
 
-pub(crate) use traversal::Traversal;
+pub(crate) use traversal::{Entry, Traversal};
 mod traversal {
-    use linked_hash_set::LinkedHashSet;
-    /// Semi-mutable traversal state for tracking which format-levels have been seen before and
-    /// which are novel, used to detect cycles (left recursion) while walking a recursive
-    /// [`Format`](crate::Format)/[`Next`](crate::matchtree::Next) without consuming any input.
+    /// Outcome of [`Traversal::insert`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Entry {
+        /// `level` is genuinely new along the current path: proceed to recurse into it.
+        Novel,
+        /// `level` is already open, but has been *guarded* (see [`Traversal::guard`]) since it
+        /// was opened — some definitely-non-nullable step has been taken since then, so this is
+        /// ordinary, terminating recursion, not left recursion. The caller should stop here
+        /// (short-circuit) rather than recurse again, but this is not an error.
+        Guarded,
+        /// `level` is already open and still *unguarded* since it was opened: reaching it again
+        /// would happen with zero progress made — this is left recursion, and the caller should
+        /// report it rather than recurse further.
+        LeftRecursive,
+    }
+
+    /// Semi-mutable traversal state for tracking which format-levels are currently open (being
+    /// expanded) and whether each has been *guarded* yet, used to detect left recursion while
+    /// walking a recursive [`Format`](crate::Format)/[`Next`](crate::matchtree::Next).
     ///
-    /// A `Traversal` is *not* meant to be reused across a byte actually being consumed — once
-    /// input has advanced, any cycle that was merely deferred (guarded by at least one byte) has
-    /// been legitimately broken, and a fresh (or [`reset`](Traversal::reset)/[`fork`](Traversal::fork)ed)
-    /// `Traversal` should be used going forward. Its job is only to catch *unguarded* recursion
-    /// within a single such zero-progress traversal.
+    /// A level is *unguarded* from the moment it's opened until some definitely-non-nullable step
+    /// (see [`guard`](Traversal::guard)) is taken somewhere along the path since it was opened —
+    /// re-entering it while still unguarded is left recursion (it would derive itself with zero
+    /// progress); re-entering it once guarded is ordinary, terminating recursion, since *some*
+    /// progress is guaranteed to have been made every time it recurses.
+    ///
+    /// A `Traversal` is *not* meant to be reused across a byte actually being consumed at
+    /// runtime — once input has actually advanced, any cycle has been legitimately broken, and a
+    /// fresh (or [`reset`](Traversal::reset)/[`fork`](Traversal::fork)ed) `Traversal` should be
+    /// used going forward. Its job is only to catch unguarded recursion within a single
+    /// standalone traversal.
+    #[derive(Clone)]
     pub struct Traversal {
-        /// The format-level this `Traversal` is anchored to, if any.
+        /// The format-level this `Traversal` is anchored to, if any, tracked (and guarded)
+        /// independently of `open` rather than being inserted into it up front, so that
+        /// [`reset`](Traversal::reset) — which only clears `open` — can't accidentally forget it.
         ///
         /// - In static-analysis contexts with a well-defined "format currently being analyzed"
         ///   (e.g. [`FormatDecl::determinations`](super::super::FormatDecl::determinations), or
         ///   the `ItemVar` case of [`solve_determinations`](super::Format::solve_determinations)),
         ///   this is `Some(level)`: the level whose determinations/first-set are being solved.
-        ///   Re-entering that exact level with nothing yet in `seen_levels` is *still* a cycle
-        ///   (the format is left-recursive with respect to itself), so `orig_level` is checked
-        ///   independently of `seen_levels` rather than needing to be inserted into it up front.
         /// - In contexts with no single canonical "current level" — notably while growing a
         ///   [`MatchTree`](crate::matchtree::MatchTree) (see `MatchTreeLevel::grow`), where one
         ///   `Traversal` is used per top-level [`MatchTreeStep`](crate::matchtree::MatchTreeStep)
         ///   construction and may synthesize a step from several unrelated `Next` chains — this
         ///   is `None` (see [`new_unscoped`](Traversal::new_unscoped)), and cycle detection relies
-        ///   purely on the accumulated `seen_levels`.
+        ///   purely on `open`. Note this caller never calls `guard`, so every open level simply
+        ///   stays unguarded for the life of the traversal — equivalent to plain cycle rejection.
         pub(crate) orig_level: Option<usize>,
-        /// Levels entered (via `insert`) since the most recent byte was consumed, in the order
-        /// they were entered — used to detect a level being re-entered before any progress was
-        /// made, and to allow unwinding (`escape`) back out of a subtree without punishing an
-        /// unrelated sibling that legitimately visits the same level.
-        pub(super) seen_levels: LinkedHashSet<usize>,
+        /// Whether `orig_level` (if any) is still unguarded. See the field's docs and `guard`.
+        orig_unguarded: bool,
+        /// Currently-open `(level, still_unguarded)` frames, innermost/most-recently-entered
+        /// last — entered via `insert`, removed via `escape`. A freshly-opened level always
+        /// starts unguarded, regardless of any ancestor's guardedness: whether *it* is
+        /// left-recursive is a question about progress made since *it* was opened, not about
+        /// progress made before it was reached.
+        open: Vec<(usize, bool)>,
     }
 
     impl Traversal {
-        /// Constructs a `Traversal` anchored to `orig_level`: re-entering that exact level before
-        /// any other progress is made is treated as an immediate cycle. Use this whenever there
-        /// is a well-defined single format-level the traversal is being performed on behalf of.
+        /// Constructs a `Traversal` anchored to `orig_level`. Use this whenever there is a
+        /// well-defined single format-level the traversal is being performed on behalf of.
         pub fn new(orig_level: usize) -> Self {
             Self {
                 orig_level: Some(orig_level),
-                seen_levels: LinkedHashSet::new(),
+                orig_unguarded: true,
+                open: Vec::new(),
             }
         }
 
@@ -537,52 +599,79 @@ mod traversal {
         pub fn new_unscoped() -> Self {
             Self {
                 orig_level: None,
-                seen_levels: LinkedHashSet::new(),
+                orig_unguarded: true,
+                open: Vec::new(),
             }
         }
 
         /// Constructs a fresh `Traversal` anchored to the same `orig_level` as `self` (which may
-        /// be `None`), with an empty `seen_levels`. Use this to start a nested traversal that
-        /// should still treat `self`'s originating level as off-limits (e.g. solving the
-        /// determinations of one branch of a `Union` without polluting the outer traversal's
-        /// accumulated `seen_levels` with that branch's internal visits).
+        /// be `None`), with empty/unguarded state otherwise. Use this to start an independent
+        /// nested traversal that should still treat `self`'s originating level as off-limits, but
+        /// must not leak its own progress back into `self` — most importantly, sibling branches
+        /// of a `Union` (alternatives, not a sequence: one branch reaching a guard must not make
+        /// the *next*, unrelated branch look guarded too).
         pub fn fork(&self) -> Self {
             Self {
                 orig_level: self.orig_level,
-                seen_levels: LinkedHashSet::new(),
+                orig_unguarded: true,
+                open: Vec::new(),
             }
         }
 
-        #[expect(dead_code)]
-        /// Returns `true` if the level has not yet been seen (including the anchoring `orig_level`, if any).
-        pub fn is_novel(&self, level: usize) -> bool {
-            self.orig_level != Some(level) && !self.seen_levels.contains(&level)
-        }
-
-        /// Records `level` as entered, returning whether it was novel (`true`) or already
-        /// present — either in `seen_levels`, or equal to `orig_level` — in which case a cycle
-        /// has been detected and the caller should treat this as left recursion rather than
-        /// recursing further.
-        pub fn insert(&mut self, level: usize) -> bool {
+        /// Records `level` as entered. See [`Entry`] for what the caller should do with each
+        /// outcome. A `Novel` result opens `level` (unguarded) for the caller to `escape` later.
+        pub fn insert(&mut self, level: usize) -> Entry {
             if self.orig_level == Some(level) {
-                return false;
+                return if self.orig_unguarded {
+                    Entry::LeftRecursive
+                } else {
+                    Entry::Guarded
+                };
             }
-            self.seen_levels.insert(level)
+            if let Some(&(_, unguarded)) = self.open.iter().find(|(l, _)| *l == level) {
+                return if unguarded {
+                    Entry::LeftRecursive
+                } else {
+                    Entry::Guarded
+                };
+            }
+            self.open.push((level, true));
+            Entry::Novel
         }
 
-        /// Removes the most-recently inserted level (never `orig_level`, which is never itself a
-        /// member of `seen_levels`), to avoid double-counting between branches rather than
-        /// merely witnessing true cycles on a singular path.
+        /// Removes the most-recently inserted level (never `orig_level`, which is tracked
+        /// separately), to avoid double-counting between branches rather than merely witnessing
+        /// true cycles on a singular path.
         pub fn escape(&mut self) -> Option<usize> {
-            self.seen_levels.pop_back()
+            self.open.pop().map(|(level, _)| level)
         }
 
-        /// Clears all `seen_levels` accumulated so far, without disturbing `orig_level`'s
-        /// protection. Intended for callers that track progress differently from the
-        /// insert/escape push-pop discipline (e.g. after a byte has been consumed and any
-        /// `seen_levels` accumulated on the way to it are no longer relevant to what follows).
+        /// Iterates the currently-open levels, oldest (outermost) first — for building a
+        /// human-readable cycle path once a [`Entry::LeftRecursive`] result has been reported.
+        pub fn open_levels(&self) -> impl Iterator<Item = usize> + '_ {
+            self.open.iter().map(|(level, _)| *level)
+        }
+
+        /// Marks every currently-open level, and `orig_level` if anchored, as guarded: call this
+        /// once a definitely-non-nullable step has been taken along the current path (e.g. after
+        /// a non-nullable field of a `Tuple`/`Seq`). Every level open at that moment has now had
+        /// progress made since *its* opening too, transitively, however it was reached — so
+        /// re-entering any of them from this point on is no longer left recursion. Levels opened
+        /// later still start fresh-unguarded: whether *they* are left-recursive is independent of
+        /// how much progress preceded the point they were reached from.
+        pub fn guard(&mut self) {
+            self.orig_unguarded = false;
+            for (_, unguarded) in self.open.iter_mut() {
+                *unguarded = false;
+            }
+        }
+
+        /// Clears all currently-open levels, without disturbing `orig_level`'s guardedness.
+        /// Intended for callers that track progress differently from the insert/escape push-pop
+        /// discipline (e.g. after a byte has been consumed and any levels opened on the way to it
+        /// are no longer relevant to what follows).
         pub fn reset(&mut self) {
-            self.seen_levels.clear();
+            self.open.clear();
         }
     }
 }
@@ -788,7 +877,7 @@ impl<'a> Interpreter<'a> {
                 let level = ctx
                     .convert_rec_var(*rec_ix)
                     .unwrap_or_else(|| panic!("recursion variable not found in {ctx:?}: {rec_ix}"));
-                if visited.insert(level) {
+                if visited.insert(level) == Entry::Novel {
                     let format = &self.module.decls[level].format;
                     let new_ctx = ctx.enter(*rec_ix);
                     let (ctx, ret) = self

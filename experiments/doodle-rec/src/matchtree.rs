@@ -4,7 +4,7 @@ use crate::{Format, FormatModule, RecurseCtx};
 use doodle::{byte_set::ByteSet, read::ReadCtxt};
 
 pub mod determinations;
-use determinations::Traversal;
+use determinations::{Entry, Traversal};
 // pub use forest::MatchForest;
 
 #[derive(Clone, Debug)]
@@ -124,7 +124,7 @@ impl<'a> MatchTreeStep<'a> {
                 ))
             }
             Next::DelayRef(level, next) => {
-                if visited.insert(*level) {
+                if visited.insert(*level) == Entry::Novel {
                     let format = module.get_format(*level);
                     let step = Self::from_format(module, format, next.clone(), ctx, visited);
                     visited.escape();
