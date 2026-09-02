@@ -74,10 +74,14 @@ impl<'a> MatchTreeStep<'a> {
         visited: &mut Traversal,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
-            None => Self::from_next(module, next, ctx, visited),
-            Some((f, fs)) => {
-                Self::from_format(module, f, Rc::new(Next::Sequence(fs, next)), ctx, visited)
-            }
+            None => Self::from_next(module, next, visited),
+            Some((f, fs)) => Self::from_format(
+                module,
+                f,
+                Rc::new(Next::Sequence(fs, ctx, next)),
+                ctx,
+                visited,
+            ),
         }
     }
 
@@ -87,44 +91,51 @@ impl<'a> MatchTreeStep<'a> {
     /// without an intervening byte having been consumed, i.e. within a single top-level call to
     /// this function. Re-entering an already-visited level in that state means the underlying
     /// grammar is left-recursive; see the `Next::DelayRef` arm below.
+    ///
+    /// Unlike [`Self::from_format`], this takes no ambient `ctx`: every non-`Empty`/`Union`
+    /// variant of [`Next`] carries (or, for `DelayRef`, can recover via `FormatModule::get_ctx`)
+    /// the `RecurseCtx` that was actually in effect when it was constructed, which is what must
+    /// be used here - a `Next` value routinely survives across a lookahead-depth boundary (see
+    /// `MatchTreeLevel::grow`), by which point any single ambient ctx passed into this call would
+    /// no longer necessarily match the context each stored `Next` was built under.
     fn from_next(
         module: &'a FormatModule,
         next: Rc<Next<'a>>,
-        ctx: RecurseCtx<'a>,
         visited: &mut Traversal,
     ) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
-                let tree1 = Self::from_next(module, next1.clone(), ctx, visited);
-                let tree2 = Self::from_next(module, next2.clone(), ctx, visited);
+                let tree1 = Self::from_next(module, next1.clone(), visited);
+                let tree2 = Self::from_next(module, next2.clone(), visited);
                 tree1.union(tree2)
             }
-            Next::Cat(f, next) => {
-                MatchTreeStep::<'a>::from_format(module, *f, next.clone(), ctx, visited)
+            Next::Cat(f, ctx, next) => {
+                MatchTreeStep::<'a>::from_format(module, *f, next.clone(), *ctx, visited)
             }
-            Next::Sequence(fields, next) => {
+            Next::Sequence(fields, ctx, next) => {
                 let next = next.clone();
                 match fields.split_first() {
-                    None => Self::from_next(module, next, ctx, visited),
+                    None => Self::from_next(module, next, visited),
                     Some((f, fs)) => Self::from_format(
                         module,
                         f,
-                        Rc::new(Next::Sequence(fs, next)),
-                        ctx,
+                        Rc::new(Next::Sequence(fs, *ctx, next)),
+                        *ctx,
                         visited,
                     ),
                 }
             }
-            Next::Repeat(a, next0) => {
-                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone(), ctx, visited);
+            Next::Repeat(a, ctx, next0) => {
+                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone(), visited);
                 let next1 = next.clone();
                 tree.union(MatchTreeStep::<'a>::from_format(
-                    module, *a, next1, ctx, visited,
+                    module, *a, next1, *ctx, visited,
                 ))
             }
             Next::DelayRef(level, next) => {
                 if visited.insert(*level) == Entry::Novel {
+                    let ctx = module.get_ctx(*level);
                     let format = module.get_format(*level);
                     let step = Self::from_format(module, format, next.clone(), ctx, visited);
                     visited.escape();
@@ -168,25 +179,25 @@ impl<'a> MatchTreeStep<'a> {
                 Self::from_sequential(module, fields, next, ctx, visited)
             }
             Format::Repeat(a) => {
-                let tree = Self::from_next(module, next.clone(), ctx, visited);
+                let tree = Self::from_next(module, next.clone(), visited);
                 tree.union(Self::from_format(
                     module,
                     a,
-                    Rc::new(Next::Repeat(a, next)),
+                    Rc::new(Next::Repeat(a, ctx, next)),
                     ctx,
                     visited,
                 ))
             }
             Format::Maybe(_expr, a) => {
                 let tree_some = Self::from_format(module, a, next.clone(), ctx, visited);
-                let tree_none = Self::from_next(module, next, ctx, visited);
+                let tree_none = Self::from_next(module, next, visited);
                 tree_some.union(tree_none)
             }
-            Format::Compute(_expr) => Self::from_next(module, next, ctx, visited),
+            Format::Compute(_expr) => Self::from_next(module, next, visited),
             Format::RecVar(rec_ix) => {
                 let level = ctx.convert_rec_var(*rec_ix).unwrap();
                 let next = Rc::new(Next::DelayRef(level, next));
-                Self::from_next(module, next, ctx, visited)
+                Self::from_next(module, next, visited)
             }
         }
     }
@@ -292,12 +303,7 @@ impl<'a> MatchTreeLevel<'a> {
     ///
     /// Otherwise, returns a `MatchTree` that is guaranteed to decide on a unique branch for
     /// all input within at most `depth` bytes of lookahead.
-    fn grow(
-        module: &'a FormatModule,
-        nexts: LevelBranch<'a>,
-        depth: usize,
-        ctx: RecurseCtx<'a>,
-    ) -> Option<MatchTree> {
+    fn grow(module: &'a FormatModule, nexts: LevelBranch<'a>, depth: usize) -> Option<MatchTree> {
         if let Some(tree) = Self::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
@@ -307,14 +313,17 @@ impl<'a> MatchTreeLevel<'a> {
             for (i, next) in tmp.into_iter() {
                 // Fresh per top-level step: no bytes are consumed within a single
                 // `from_next` call, so a re-entered level here is genuine left recursion,
-                // not just a level revisited from an independent sibling branch.
+                // not just a level revisited from an independent sibling branch. No ambient
+                // `ctx` is passed - every `next` here carries (or, for `DelayRef`, can recover)
+                // its own correct context, since it may have been constructed under a different
+                // one several depths/`grow` calls ago.
                 let mut visited = Traversal::new_unscoped();
-                let subtree = MatchTreeStep::from_next(module, next, ctx, &mut visited);
+                let subtree = MatchTreeStep::from_next(module, next, &mut visited);
                 tree = tree.merge_step(i, subtree).ok()?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
-                let t = Self::grow(module, nexts, depth - 1, ctx)?;
+                let t = Self::grow(module, nexts, depth - 1)?;
                 branches.push((bs, t));
             }
             Some(MatchTree {
@@ -332,11 +341,19 @@ type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Next<'a> {
     Empty,
+    /// `level` is an absolute `FormatId`, so unlike the other non-`Empty` variants below, no
+    /// separate `RecurseCtx` needs to be carried alongside it - the correct ctx for expanding
+    /// `level`'s format is always recoverable on demand via `FormatModule::get_ctx(level)`,
+    /// exactly as `Format::ItemVar` resolves it.
     DelayRef(usize, Rc<Next<'a>>),
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
-    Cat(&'a Format, Rc<Next<'a>>),
-    Sequence(&'a [Format], Rc<Next<'a>>),
-    Repeat(&'a Format, Rc<Next<'a>>),
+    /// The `RecurseCtx` a variant carries is the context that was in effect when this `Next` was
+    /// constructed, *not* whatever ctx happens to be ambient when it's later expanded - a `Next`
+    /// can survive across a lookahead-depth boundary (i.e. past an actual consumed byte), by
+    /// which point the ambient ctx at the resumption point may differ (see `MatchTreeLevel::grow`).
+    Cat(&'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
+    Sequence(&'a [Format], RecurseCtx<'a>, Rc<Next<'a>>),
+    Repeat(&'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
 }
 
 #[derive(Debug, Clone)]
@@ -376,10 +393,10 @@ impl MatchTree {
     ) -> Option<MatchTree> {
         let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
-            nexts.insert((i, Rc::new(Next::Cat(f, next.clone()))));
+            nexts.insert((i, Rc::new(Next::Cat(f, ctx, next.clone()))));
         }
         const MAX_DEPTH: usize = 80;
-        MatchTreeLevel::grow(module, nexts, MAX_DEPTH, ctx)
+        MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
     }
 }
 
@@ -414,5 +431,39 @@ mod tests {
         let mut visited = Traversal::new_unscoped();
         let tree = MatchTreeStep::from_format(&module, &f, Rc::new(Next::Empty), ctx, &mut visited);
         eprintln!("{tree:?}")
+    }
+
+    #[test]
+    fn build_union_disambiguating_through_recursion() {
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("peanoZ"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("peanoS"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.peano"), peano)]);
+        let peano_ref = frefs[0];
+        let branches = vec![
+            Format::Tuple(vec![peano_ref.call(), Format::Byte(ByteSet::from([b'A']))]),
+            Format::Tuple(vec![peano_ref.call(), Format::Byte(ByteSet::from([b'B']))]),
+        ];
+        // Both branches share an identical, unboundedly-long peano prefix and only diverge on
+        // the byte immediately after it, so disambiguating them is *not* actually decidable
+        // within any fixed lookahead depth - `None` (bounded lookahead exhausted) is the
+        // correct, sound result here, same as it would be for two non-recursive branches with
+        // an unboundedly long common prefix. What this regression-tests is that resolving the
+        // `RecVar` inside peano's body - reached only after `MatchTreeLevel::grow` has crossed
+        // at least one lookahead-depth boundary (past the first consumed 'S'/'Z' byte) - no
+        // longer panics via `ctx.convert_rec_var(_).unwrap()` on a stale/mismatched ambient ctx.
+        let tree = MatchTree::build(&module, &branches, Rc::new(Next::Empty), RecurseCtx::NonRec);
+        assert!(tree.is_none());
     }
 }

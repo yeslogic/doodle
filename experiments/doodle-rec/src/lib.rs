@@ -23,7 +23,7 @@ pub type FormatId = usize;
 /// Local index into a Batch of formats (e.g. 0 would be 'self' in a singleton-batch)
 pub type RecId = usize;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum RecurseCtx<'a> {
     #[default]
     NonRec,
@@ -130,6 +130,27 @@ pub struct FormatDecl {
     pub fmt_id: FormatId,
     f_type: Rc<OnceCell<FormatType>>,
     batch: Option<Span<FormatId>>,
+}
+
+// `f_type` is a lazily-populated type-inference cache, not part of a FormatDecl's logical
+// identity - it's also an `Rc<OnceCell<_>>`, which doesn't implement `PartialEq`/`Hash` at all
+// (correctly so: a `OnceCell`'s value can be set after the FormatDecl has already been hashed
+// into a `HashSet`/`HashMap`, which would corrupt those structures' invariants if the cache
+// state affected the hash). Compare/hash everything else instead.
+impl PartialEq for FormatDecl {
+    fn eq(&self, other: &Self) -> bool {
+        self.format == other.format && self.fmt_id == other.fmt_id && self.batch == other.batch
+    }
+}
+
+impl Eq for FormatDecl {}
+
+impl std::hash::Hash for FormatDecl {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.format.hash(state);
+        self.fmt_id.hash(state);
+        self.batch.hash(state);
+    }
 }
 
 impl FormatDecl {

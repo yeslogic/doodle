@@ -298,7 +298,7 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(fields.as_slice(), next.clone()));
+                    let next = Rc::new(Next::Sequence(fields.as_slice(), ctx, next.clone()));
                     let df = self.compile_format(f, next, ctx)?;
                     decs.push(df);
                 }
@@ -308,7 +308,7 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(fields.as_slice(), next.clone()));
+                    let next = Rc::new(Next::Sequence(fields.as_slice(), ctx, next.clone()));
                     let df = self.compile_format(f, next, ctx)?;
                     decs.push(df);
                 }
@@ -318,7 +318,8 @@ impl<'a> Compiler<'a> {
                 if a.is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let da = self.compile_format(a, Rc::new(Next::Repeat(a, next.clone())), ctx)?;
+                let da =
+                    self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
