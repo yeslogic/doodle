@@ -239,7 +239,10 @@ impl<'a> Compiler<'a> {
         match format {
             Format::ItemVar(level) => {
                 let f = self.module.get_format(*level);
-                let next = if f.depends_on_next(self.module, ctx) {
+                // depends_on_next must be evaluated relative to `level`'s own batch context, not
+                // the enclosing format's `ctx` - a RecVar inside `f` resolves against `level`'s
+                // batch, which need not be (and often isn't) the batch `ctx` belongs to.
+                let next = if f.depends_on_next(self.module, self.module.get_ctx(*level)) {
                     next
                 } else {
                     Rc::new(Next::Empty)

@@ -381,27 +381,66 @@ impl Format {
     }
 
     fn depends_on_next<'a>(&self, module: &'a FormatModule, ctx: RecurseCtx<'a>) -> bool {
+        let mut visited = determinations::Traversal::new_unscoped();
+        self.depends_on_next_with(module, ctx, &mut visited)
+    }
+
+    /// `visited` guards against infinite recursion for a self-/mutually-recursive `RecVar`: a
+    /// level already being analyzed further out on the current path contributes `false` here
+    /// rather than being re-expanded. This can't under-report a `Union`'s own depends_on_next,
+    /// since `union_depends_on_next`'s `MatchTree::build` fallback remains the authority there;
+    /// for `Tuple`/`Seq` it's sound because a recursive format's AST is fixed and self-similar,
+    /// so one level of re-entry before stopping already reaches everything a further unrolling
+    /// would (deeper unrollings only re-encounter the same structure).
+    fn depends_on_next_with<'a>(
+        &self,
+        module: &'a FormatModule,
+        ctx: RecurseCtx<'a>,
+        visited: &mut determinations::Traversal,
+    ) -> bool {
         match self {
             Format::ItemVar(level) => {
                 let ctx = module.get_ctx(*level);
-                module.get_format(*level).depends_on_next(module, ctx)
+                // Level-crossing reference to a different, independently-declared format: not
+                // part of this cycle, so it gets its own fresh traversal (matching
+                // solve_determinations's ItemVar convention).
+                let mut visited = determinations::Traversal::new_unscoped();
+                module
+                    .get_format(*level)
+                    .depends_on_next_with(module, ctx, &mut visited)
             }
             Format::FailWith(..) => false,
             Format::EndOfInput => false,
             Format::Byte(..) => false,
             Format::Compute(..) => false,
-            Format::RecVar(..) => {
-                // REVIEW - are there any recursive formats that *don't* depend on next?
-                // FIXME[epic=hardcoded] - this is a placeholder for future improvements to classification logic
-                // false
-                true
+            Format::RecVar(rec_ix) => {
+                let level = ctx.convert_rec_var(*rec_ix).unwrap_or_else(|| {
+                    unreachable!("depends_on_next: {ctx:?} has no recursive variable ~{rec_ix}")
+                });
+                match visited.insert(level) {
+                    determinations::Entry::Novel => {
+                        let new_ctx = ctx.enter(*rec_ix);
+                        let result = new_ctx
+                            .get_format()
+                            .unwrap()
+                            .depends_on_next_with(module, new_ctx, visited);
+                        visited.escape();
+                        result
+                    }
+                    // Already being analyzed further out on this path (guarded or not doesn't
+                    // matter here, unlike left-recursion checking): whatever this occurrence
+                    // would contribute is already accounted for by that in-progress computation.
+                    _ => false,
+                }
             }
-            Format::Variant(_, f) => f.depends_on_next(module, ctx),
-            Format::Union(branches) => Format::union_depends_on_next(branches, module, ctx),
+            Format::Variant(_, f) => f.depends_on_next_with(module, ctx, visited),
+            Format::Union(branches) => {
+                Format::union_depends_on_next(branches, module, ctx, visited)
+            }
             Format::Repeat(..) => true,
-            Format::Seq(formats) | Format::Tuple(formats) => {
-                formats.iter().any(|f| f.depends_on_next(module, ctx))
-            }
+            Format::Seq(formats) | Format::Tuple(formats) => formats
+                .iter()
+                .any(|f| f.depends_on_next_with(module, ctx, visited)),
             Format::Maybe(..) => true,
         }
     }
@@ -410,10 +449,11 @@ impl Format {
         branches: &'a [Format],
         module: &'a FormatModule,
         ctx: RecurseCtx<'a>,
+        visited: &mut determinations::Traversal,
     ) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for f in branches {
-            if f.depends_on_next(module, ctx) {
+            if f.depends_on_next_with(module, ctx, visited) {
                 return true;
             }
             fs.push(f.clone());
