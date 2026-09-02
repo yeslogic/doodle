@@ -147,6 +147,11 @@ impl FormatDecl {
             None => {
                 visited.insert(self.fmt_id);
                 let f_type = self.format.infer_type(visited, module, self.batch)?;
+                // Once cached, this level is no longer "in progress" - a *different*, later
+                // reference to it (e.g. an unrelated sibling Union branch) should see its real,
+                // now-resolved type via the OnceCell above, not a stale FormatType::Ref cycle
+                // placeholder left over from this now-completed computation.
+                visited.remove(&self.fmt_id);
                 let Ok(_) = self.f_type.set(f_type) else {
                     unreachable!("synchronous TOCTOU!?")
                 };
@@ -203,9 +208,28 @@ impl FormatType {
                 if id0 == id1 {
                     Ok(FormatType::Ref(*id0))
                 } else {
-                    unimplemented!("cross-ref unification not implemented");
+                    // Two *different* levels are both still mid-computation (open on the
+                    // call stack) at this point, and their eventual types can't yet be
+                    // compared - there's no principled way to pick a winner between two
+                    // still-unresolved cycles without real equi-recursive type unification,
+                    // which this doesn't attempt. Erring here (rather than silently picking
+                    // one) is deliberate.
+                    Err(anyhow!(
+                        "cannot unify distinct recursive type placeholders Ref({id0}) and Ref({id1}): \
+                         both are still being computed, so their eventual types can't yet be compared"
+                    ))
                 }
             }
+            // A Ref is a placeholder for a level whose type is still being computed - unifying
+            // it against a concrete type (or a different Ref, handled above) can't fail here for
+            // the same reason `Any` can't: there isn't enough information yet to contradict
+            // `other`. This is a pragmatic simplification, not full equi-recursive unification:
+            // it doesn't verify that the referenced level's *eventual* type is actually
+            // compatible with `other`, including when `other` itself contains a reference back
+            // to this same level (e.g. two sibling Tuple/Seq positions independently reaching
+            // the same open cycle via different, differently-shaped paths).
+            (FormatType::Ref(_), _) => Ok(other.clone()),
+            (_, FormatType::Ref(_)) => Ok(self.clone()),
             (FormatType::Void, _) | (_, FormatType::Void) => Ok(FormatType::Void),
             (FormatType::Base(b1), FormatType::Base(b2)) if b1 == b2 => Ok(FormatType::Base(*b1)),
             (FormatType::Shape(s1), FormatType::Shape(s2)) => {
