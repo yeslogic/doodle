@@ -30,7 +30,6 @@ fn alpha() -> Format {
 /// Rules
 /// - all keys consist of [A-Za-z]+ without spaces or special characters/numbers
 /// - values cannot be strings
-
 /// - all numbers are natural
 /// - trailing commas are mandatory
 fn json_lite(module: &mut FormatModule) -> FormatRef {

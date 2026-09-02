@@ -18,11 +18,13 @@ impl<'a> LL1Interpreter<'a> {
         Self { module }
     }
 
-    pub fn parse_level(
+    pub fn parse_level<'x>(
         &self,
         level: usize,
-        input: ReadCtxt<'a>,
-    ) -> Result<(Value, ReadCtxt), InterpError> {
+        input: ReadCtxt<'x>,
+    ) -> Result<(Value, ReadCtxt<'x>), InterpError>
+    where 'a: 'x
+    {
         let ctx = self.module.get_ctx(level);
         let format = self.module.get_format(level);
         let mut trace = PathTrace::new();
@@ -37,15 +39,17 @@ impl<'a> LL1Interpreter<'a> {
         )
     }
 
-    fn parse_format(
+    fn parse_format<'x>(
         &self,
         format: &'a Format,
         remnant: Rc<PartialFormat<'a>>,
         ctx: RecurseCtx<'a>,
-        input: ReadCtxt<'a>,
+        input: ReadCtxt<'x>,
         trace: &mut PathTrace,
         visited: &mut Traversal,
-    ) -> Result<(Value, ReadCtxt<'a>), InterpError> {
+    ) -> Result<(Value, ReadCtxt<'x>), InterpError>
+    where 'a: 'x
+    {
         match format {
             Format::ItemVar(level) => {
                 let f = self.module.get_format(*level);
@@ -88,7 +92,9 @@ impl<'a> LL1Interpreter<'a> {
                     Ok((Value::U8(b), input))
                 } else {
                     Err(InterpError::DeadEnd {
-                        start: visited.orig_level,
+                        start: visited
+                            .orig_level
+                            .expect("LL1Interpreter's Traversal is always level-anchored via Traversal::new"),
                         trace: trace.clone(),
                         byte: b,
                         expects: *bs,
@@ -108,7 +114,7 @@ impl<'a> LL1Interpreter<'a> {
                 let mut branches: Vec<ByteSet> = Vec::with_capacity(formats.len());
                 let mut accept = None;
                 for (ix, branch) in formats.iter().enumerate() {
-                    let mut _visited = Traversal::new(visited.orig_level);
+                    let mut _visited = visited.fork();
                     let dets = branch
                         .solve_determinations(self.module, &mut _visited, ctx)
                         .unwrap();
@@ -185,7 +191,7 @@ impl<'a> LL1Interpreter<'a> {
                     unreachable!("bad repeat of nullable format: {format:?}");
                 }
                 let dets_next = {
-                    let mut visited = Traversal::new(visited.orig_level);
+                    let mut visited = visited.fork();
                     remnant
                         .clone()
                         .solve_determinations(self.module, &mut visited, ctx)

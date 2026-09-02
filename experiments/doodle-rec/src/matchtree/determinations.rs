@@ -271,6 +271,8 @@ pub struct Determinations {
 
 impl Determinations {
     /// Additive (i.e. sequencing) identity element
+    ///
+    /// Namely, `Self::merge_seq(x, Self::zero()) == Self::merge_seq(Self::zero(), x) == x` should hold for all `x`.
     pub const fn zero() -> Self {
         Self {
             first_set: ByteSet::empty(),
@@ -281,6 +283,8 @@ impl Determinations {
     }
 
     /// Multiplicative (i.e. disjunction) identity element
+    ///
+    /// Namely, `Self::union(x, Self::one()) == x` should hold for all `x`.
     pub const fn one() -> Self {
         Self {
             first_set: ByteSet::empty(),
@@ -482,40 +486,101 @@ impl Format {
 pub(crate) use traversal::Traversal;
 mod traversal {
     use linked_hash_set::LinkedHashSet;
-    /// Semi-mutable traversal state for tracking which format-levels have been seen before and which are novel
+    /// Semi-mutable traversal state for tracking which format-levels have been seen before and
+    /// which are novel, used to detect cycles (left recursion) while walking a recursive
+    /// [`Format`](crate::Format)/[`Next`](crate::matchtree::Next) without consuming any input.
+    ///
+    /// A `Traversal` is *not* meant to be reused across a byte actually being consumed — once
+    /// input has advanced, any cycle that was merely deferred (guarded by at least one byte) has
+    /// been legitimately broken, and a fresh (or [`reset`](Traversal::reset)/[`fork`](Traversal::fork)ed)
+    /// `Traversal` should be used going forward. Its job is only to catch *unguarded* recursion
+    /// within a single such zero-progress traversal.
     pub struct Traversal {
-        pub(crate) orig_level: usize,
+        /// The format-level this `Traversal` is anchored to, if any.
+        ///
+        /// - In static-analysis contexts with a well-defined "format currently being analyzed"
+        ///   (e.g. [`FormatDecl::determinations`](super::super::FormatDecl::determinations), or
+        ///   the `ItemVar` case of [`solve_determinations`](super::Format::solve_determinations)),
+        ///   this is `Some(level)`: the level whose determinations/first-set are being solved.
+        ///   Re-entering that exact level with nothing yet in `seen_levels` is *still* a cycle
+        ///   (the format is left-recursive with respect to itself), so `orig_level` is checked
+        ///   independently of `seen_levels` rather than needing to be inserted into it up front.
+        /// - In contexts with no single canonical "current level" — notably while growing a
+        ///   [`MatchTree`](crate::matchtree::MatchTree) (see `MatchTreeLevel::grow`), where one
+        ///   `Traversal` is used per top-level [`MatchTreeStep`](crate::matchtree::MatchTreeStep)
+        ///   construction and may synthesize a step from several unrelated `Next` chains — this
+        ///   is `None` (see [`new_unscoped`](Traversal::new_unscoped)), and cycle detection relies
+        ///   purely on the accumulated `seen_levels`.
+        pub(crate) orig_level: Option<usize>,
+        /// Levels entered (via `insert`) since the most recent byte was consumed, in the order
+        /// they were entered — used to detect a level being re-entered before any progress was
+        /// made, and to allow unwinding (`escape`) back out of a subtree without punishing an
+        /// unrelated sibling that legitimately visits the same level.
         pub(super) seen_levels: LinkedHashSet<usize>,
     }
 
     impl Traversal {
+        /// Constructs a `Traversal` anchored to `orig_level`: re-entering that exact level before
+        /// any other progress is made is treated as an immediate cycle. Use this whenever there
+        /// is a well-defined single format-level the traversal is being performed on behalf of.
         pub fn new(orig_level: usize) -> Self {
             Self {
-                orig_level,
+                orig_level: Some(orig_level),
+                seen_levels: LinkedHashSet::new(),
+            }
+        }
+
+        /// Constructs a `Traversal` with no anchoring format-level. Use this where cycle-tracking
+        /// is needed but there is no single "current level" to guard up front (e.g. across the
+        /// several `Next` chains considered while growing one `MatchTree` step) — every level
+        /// that needs protecting must instead be explicitly `insert`ed as it's entered.
+        pub fn new_unscoped() -> Self {
+            Self {
+                orig_level: None,
+                seen_levels: LinkedHashSet::new(),
+            }
+        }
+
+        /// Constructs a fresh `Traversal` anchored to the same `orig_level` as `self` (which may
+        /// be `None`), with an empty `seen_levels`. Use this to start a nested traversal that
+        /// should still treat `self`'s originating level as off-limits (e.g. solving the
+        /// determinations of one branch of a `Union` without polluting the outer traversal's
+        /// accumulated `seen_levels` with that branch's internal visits).
+        pub fn fork(&self) -> Self {
+            Self {
+                orig_level: self.orig_level,
                 seen_levels: LinkedHashSet::new(),
             }
         }
 
         #[expect(dead_code)]
-        /// Returns `true` if the level has not yet been seen (including the original level)
+        /// Returns `true` if the level has not yet been seen (including the anchoring `orig_level`, if any).
         pub fn is_novel(&self, level: usize) -> bool {
-            level != self.orig_level && !self.seen_levels.contains(&level)
+            self.orig_level != Some(level) && !self.seen_levels.contains(&level)
         }
 
-        /// Immutable insert that returns the updated state and whether the level was novel
+        /// Records `level` as entered, returning whether it was novel (`true`) or already
+        /// present — either in `seen_levels`, or equal to `orig_level` — in which case a cycle
+        /// has been detected and the caller should treat this as left recursion rather than
+        /// recursing further.
         pub fn insert(&mut self, level: usize) -> bool {
-            if level == self.orig_level {
+            if self.orig_level == Some(level) {
                 return false;
             }
             self.seen_levels.insert(level)
         }
 
-        /// Removes the most-recently inserted level, to avoid double-counting between branches rather than
+        /// Removes the most-recently inserted level (never `orig_level`, which is never itself a
+        /// member of `seen_levels`), to avoid double-counting between branches rather than
         /// merely witnessing true cycles on a singular path.
         pub fn escape(&mut self) -> Option<usize> {
             self.seen_levels.pop_back()
         }
 
+        /// Clears all `seen_levels` accumulated so far, without disturbing `orig_level`'s
+        /// protection. Intended for callers that track progress differently from the
+        /// insert/escape push-pop discipline (e.g. after a byte has been consumed and any
+        /// `seen_levels` accumulated on the way to it are no longer relevant to what follows).
         pub fn reset(&mut self) {
             self.seen_levels.clear();
         }
@@ -745,7 +810,9 @@ impl<'a> Interpreter<'a> {
                     Ok((ctx, remnant))
                 } else {
                     Err(InterpError::DeadEnd {
-                        start: visited.orig_level,
+                        start: visited.orig_level.expect(
+                            "Interpreter's Traversal is always level-anchored via Traversal::new",
+                        ),
                         trace: trace.clone(),
                         byte,
                         expects: *bs,
@@ -773,7 +840,9 @@ impl<'a> Interpreter<'a> {
                     }
                 }
                 Err(InterpError::DeadEnd {
-                    start: visited.orig_level,
+                    start: visited.orig_level.expect(
+                        "Interpreter's Traversal is always level-anchored via Traversal::new",
+                    ),
                     trace: trace.clone(),
                     byte,
                     expects: accepts,

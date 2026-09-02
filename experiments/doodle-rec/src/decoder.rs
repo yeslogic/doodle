@@ -130,6 +130,17 @@ pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
+    /// Maps a recursive batch member's module-level `FormatId` to the `Program::decoders` slot
+    /// it was most recently compiled to, so `Format::RecVar` can resolve a sibling batch member
+    /// to the correct `Decoder::CallRec` target instead of conflating the two index spaces.
+    ///
+    /// NOTE: this is keyed purely by `FormatId`, so if the same recursive batch is ever
+    /// instantiated more than once under different `next` continuations (which
+    /// `Format::depends_on_next`'s hardcoded `true` for `RecVar` makes likely), the later
+    /// instantiation's slots silently overwrite the earlier one's here, and `RecVar` references
+    /// belonging to the earlier instantiation would incorrectly resolve into the later one's
+    /// slots. Not exercised by any current caller, but a real gap.
+    level_slot: HashMap<FormatId, usize>,
     compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize, Batch)>,
 }
 
@@ -137,11 +148,13 @@ impl<'a> Compiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
         let program = Program::new();
         let decoder_map = HashMap::new();
+        let level_slot = HashMap::new();
         let compile_queue = Vec::new();
         Compiler {
             module,
             program,
             decoder_map,
+            level_slot,
             compile_queue,
         }
     }
@@ -198,6 +211,7 @@ impl<'a> Compiler<'a> {
         for (ix, d) in decls.into_iter().enumerate() {
             let t = d.solve_type(self.module).unwrap().clone();
             self.program.decoders.push((Decoder::FAIL, t));
+            self.level_slot.insert(d.fmt_id, n + ix);
             let next = if ix == which_next {
                 next.clone()
             } else {
@@ -249,8 +263,14 @@ impl<'a> Compiler<'a> {
             Format::RecVar(batch_ix) => {
                 let new_ctx = ctx.enter(*batch_ix);
                 let level = new_ctx.get_level().unwrap();
-                // REVIEW - do we need to do any work here?
-                Ok(Decoder::CallRec(level, *batch_ix))
+                // `level` is the module-level FormatId of the referenced batch member, not a
+                // Program::decoders slot (those are two different index spaces) - resolve it
+                // through `level_slot`, which queue_compile_batch populates for every member of
+                // the batch this RecVar belongs to.
+                let slot = *self.level_slot.get(&level).unwrap_or_else(|| {
+                    panic!("RecVar({batch_ix}) resolved to level {level}, which has no compiled Program slot yet")
+                });
+                Ok(Decoder::CallRec(slot, *batch_ix))
             }
             Format::FailWith(msg) => Ok(Decoder::FailWith(msg.clone())),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
