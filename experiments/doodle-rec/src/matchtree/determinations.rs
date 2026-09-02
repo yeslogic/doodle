@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use doodle::{prelude::ByteSet, read::ReadCtxt};
+use doodle::prelude::ByteSet;
 
 use crate::{Format, FormatDecl, FormatId, FormatModule, RecurseCtx};
 
@@ -682,8 +682,6 @@ mod traversal {
 pub(crate) enum PartialFormat<'a> {
     /// `ε`
     Empty,
-    /// A full-format followed by a remnant
-    Cat(&'a Format, Rc<PartialFormat<'a>>),
     /// A sequence of full-formats followed by a remnant
     Sequence(&'a [Format], Rc<PartialFormat<'a>>),
     /// Repeat the specified format zero or more times before processing a remnant
@@ -699,13 +697,6 @@ impl<'a> PartialFormat<'a> {
     ) -> Result<Determinations, GrammarError<FormatKind<'a>>> {
         match self.as_ref() {
             PartialFormat::Empty => Ok(Determinations::zero()),
-            PartialFormat::Cat(format, remnant) => {
-                let det_format = format.solve_determinations(module, visited, ctx)?;
-                let det_remnant = remnant.clone().solve_determinations(module, visited, ctx)?;
-                det_format
-                    .merge_seq(det_remnant)
-                    .map_err(|e| e.add_context(self.clone().into()))
-            }
             PartialFormat::Sequence(formats, remnant) => {
                 let det_formats = {
                     let mut det_seq = Determinations::zero();
@@ -737,10 +728,6 @@ impl<'a> PartialFormat<'a> {
             }
         }
     }
-}
-
-pub struct Interpreter<'a> {
-    module: &'a FormatModule,
 }
 
 pub type PathTrace = Vec<Choice>;
@@ -802,233 +789,6 @@ impl std::fmt::Display for InterpError {
 }
 
 impl std::error::Error for InterpError {}
-
-impl<'a> Interpreter<'a> {
-    pub fn new(module: &'a FormatModule) -> Self {
-        Self { module }
-    }
-
-    pub fn run_level(
-        &self,
-        level: usize,
-        input: ReadCtxt<'a>,
-    ) -> (PathTrace, ReadCtxt<'a>, Option<InterpError>) {
-        let mut ctx = self.module.get_ctx(level);
-        let format = self.module.get_format(level);
-        let mut parse = Rc::new(PartialFormat::Cat(format, Rc::new(PartialFormat::Empty)));
-        let mut trace = Vec::new();
-        let mut input = input;
-        loop {
-            if let Some((byte, new_input)) = input.read_byte() {
-                let mut visited = Traversal::new(level);
-                let result =
-                    self.parse_byte_from_partial_format(parse, byte, &mut trace, &mut visited, ctx);
-                match result {
-                    Err(e) => return (trace, input, Some(e)),
-                    Ok((new_ctx, new_parse)) => {
-                        input = new_input;
-                        parse = new_parse;
-                        // NOTE - this is bugged but it should work for our JSON-lite
-                        ctx = new_ctx;
-                        continue;
-                    }
-                }
-            } else {
-                let mut visited = Traversal::new(level);
-                match parse
-                    .clone()
-                    .solve_determinations(self.module, &mut visited, ctx)
-                {
-                    Err(_) => panic!("failed to solve determinations: {:?}", parse),
-                    Ok(dets) => {
-                        if dets.is_nullable {
-                            return (trace, input, None);
-                        } else {
-                            return (
-                                trace,
-                                input,
-                                Some(InterpError::BadEpsilon {
-                                    expects: dets.first_set,
-                                }),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn parse_byte_from_format(
-        &self,
-        f: &'a Format,
-        remnant: Rc<PartialFormat<'a>>,
-        byte: u8,
-        trace: &mut PathTrace,
-        visited: &mut Traversal,
-        ctx: RecurseCtx<'a>,
-    ) -> Result<(RecurseCtx<'a>, Rc<PartialFormat<'a>>), InterpError> {
-        match f {
-            Format::ItemVar(level) => {
-                let new_ctx = self.module.get_ctx(*level);
-                let format = &self.module.decls[*level].format;
-                self.parse_byte_from_format(format, remnant, byte, trace, visited, new_ctx)
-            }
-            Format::RecVar(rec_ix) => {
-                let level = ctx
-                    .convert_rec_var(*rec_ix)
-                    .unwrap_or_else(|| panic!("recursion variable not found in {ctx:?}: {rec_ix}"));
-                if visited.insert(level) == Entry::Novel {
-                    let format = &self.module.decls[level].format;
-                    let new_ctx = ctx.enter(*rec_ix);
-                    let (ctx, ret) = self
-                        .parse_byte_from_format(format, remnant, byte, trace, visited, new_ctx)?;
-                    visited.reset();
-                    Ok((ctx, ret))
-                } else {
-                    unreachable!("left-recursion")
-                }
-            }
-            Format::FailWith(msg) => {
-                return Err(InterpError::Fail {
-                    message: msg.clone(),
-                });
-            }
-            Format::EndOfInput => return Err(InterpError::ExpectsEnd),
-            Format::Byte(bs) => {
-                if bs.contains(byte) {
-                    Ok((ctx, remnant))
-                } else {
-                    Err(InterpError::DeadEnd {
-                        start: visited.orig_level.expect(
-                            "Interpreter's Traversal is always level-anchored via Traversal::new",
-                        ),
-                        trace: trace.clone(),
-                        byte,
-                        expects: *bs,
-                    })
-                }
-            }
-            Format::Compute(_) => {
-                self.parse_byte_from_partial_format(remnant, byte, trace, visited, ctx)
-            }
-            Format::Variant(_, format) => {
-                self.parse_byte_from_format(format, remnant, byte, trace, visited, ctx)
-            }
-            Format::Union(branches) => {
-                let mut accepts = ByteSet::empty();
-                for (ix, branch) in branches.iter().enumerate() {
-                    let dets = branch
-                        .solve_determinations(self.module, visited, ctx)
-                        .unwrap();
-                    if dets.first_set.contains(byte) {
-                        trace.push(Choice::UnionBranch(ix));
-                        return self
-                            .parse_byte_from_format(branch, remnant, byte, trace, visited, ctx);
-                    } else {
-                        accepts = accepts.union(&dets.first_set);
-                    }
-                }
-                Err(InterpError::DeadEnd {
-                    start: visited.orig_level.expect(
-                        "Interpreter's Traversal is always level-anchored via Traversal::new",
-                    ),
-                    trace: trace.clone(),
-                    byte,
-                    expects: accepts,
-                })
-            }
-            Format::Repeat(format) => {
-                let dets = format
-                    .solve_determinations(self.module, visited, ctx)
-                    .unwrap();
-                if dets.first_set.contains(byte) {
-                    trace.push(Choice::RepeatYes);
-                    let new_remnant = self.parse_byte_from_format(
-                        format,
-                        Rc::new(PartialFormat::Repeat(format, remnant)),
-                        byte,
-                        trace,
-                        visited,
-                        ctx,
-                    )?;
-                    Ok(new_remnant)
-                } else {
-                    trace.push(Choice::RepeatNo);
-                    self.parse_byte_from_partial_format(remnant, byte, trace, visited, ctx)
-                }
-            }
-            Format::Seq(formats) | Format::Tuple(formats) => {
-                let (format, rest) = formats.split_first().unwrap();
-                self.parse_byte_from_format(
-                    format,
-                    Rc::new(PartialFormat::Sequence(rest, remnant)),
-                    byte,
-                    trace,
-                    visited,
-                    ctx,
-                )
-            }
-            Format::Maybe(expr, format) => {
-                let present = expr.eval().unwrap_bool();
-                if present {
-                    self.parse_byte_from_format(format, remnant, byte, trace, visited, ctx)
-                } else {
-                    self.parse_byte_from_partial_format(remnant, byte, trace, visited, ctx)
-                }
-            }
-        }
-    }
-
-    fn parse_byte_from_partial_format(
-        &self,
-        parse: Rc<PartialFormat<'a>>,
-        byte: u8,
-        trace: &mut PathTrace,
-        visited: &mut Traversal,
-        ctx: RecurseCtx<'a>,
-    ) -> Result<(RecurseCtx<'a>, Rc<PartialFormat<'a>>), InterpError> {
-        match parse.as_ref() {
-            PartialFormat::Empty => return Err(InterpError::NoParse),
-            PartialFormat::Cat(f, remnant) => {
-                self.parse_byte_from_format(f, remnant.clone(), byte, trace, visited, ctx)
-            }
-            PartialFormat::Sequence(formats, remnant) => {
-                if formats.is_empty() {
-                    self.parse_byte_from_partial_format(remnant.clone(), byte, trace, visited, ctx)
-                } else {
-                    let (format, rest) = formats.split_first().unwrap();
-                    self.parse_byte_from_format(
-                        format,
-                        Rc::new(PartialFormat::Sequence(rest, remnant.clone())),
-                        byte,
-                        trace,
-                        visited,
-                        ctx,
-                    )
-                }
-            }
-            PartialFormat::Repeat(format, remnant) => {
-                let dets = format
-                    .solve_determinations(self.module, visited, ctx)
-                    .unwrap();
-                if !dets.first_set.contains(byte) {
-                    trace.push(Choice::RepeatNo);
-                    self.parse_byte_from_partial_format(remnant.clone(), byte, trace, visited, ctx)
-                } else {
-                    trace.push(Choice::RepeatYes);
-                    self.parse_byte_from_format(
-                        format,
-                        Rc::new(PartialFormat::Repeat(format, remnant.clone())),
-                        byte,
-                        trace,
-                        visited,
-                        ctx,
-                    )
-                }
-            }
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
