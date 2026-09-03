@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
 mod compat;
-use compat::{FragmentBuilder, FragmentExt as _, Precedence, cond_paren};
+use compat::{Precedence, cond_paren};
 
 use crate::{Arith, Expr, Format, FormatModule, IntRel, RecurseCtx, Unary, decoder::Value};
 pub(crate) use doodle::output::Fragment;
-use doodle::output::Symbol;
+use doodle::output::{FragmentBuilder, Symbol};
 
 pub struct Flags {
     omit_implied_values: bool,
