@@ -435,6 +435,26 @@ impl<'a> Compiler<'a> {
                 )?);
                 Ok(Decoder::PeekNot(da))
             }
+            Format::Slice(count, a) => {
+                let n = count.eval_usize();
+                let da = Box::new(self.compile_format(
+                    a,
+                    Rc::new(Next::Empty),
+                    ctx,
+                    batch_slot_start,
+                )?);
+                Ok(Decoder::Slice(n, da))
+            }
+            Format::WithRelativeOffset(base, offset, a) => {
+                let abs_offset = base.eval_usize() + offset.eval_usize();
+                let da = Box::new(self.compile_format(
+                    a,
+                    Rc::new(Next::Empty),
+                    ctx,
+                    batch_slot_start,
+                )?);
+                Ok(Decoder::WithRelativeOffset(abs_offset, da))
+            }
         }
     }
 }
@@ -639,6 +659,14 @@ pub enum Decoder {
     /// Fails if the inner decoder successfully parses; otherwise succeeds with unit, at the
     /// original (unadvanced) position.
     PeekNot(Box<Decoder>),
+    /// Restricts the inner decoder to exactly `usize` bytes, discarding any leftover; the outer
+    /// position always advances by exactly that many bytes, regardless of how many the inner
+    /// decoder actually consumed.
+    Slice(usize, Box<Decoder>),
+    /// Parses the inner decoder at the given absolute buffer offset, without advancing the outer
+    /// position at all (the offset is already fully resolved at compile time - both `base` and
+    /// `offset` are compile-time-constant since `Expr` has no `Var`).
+    WithRelativeOffset(usize, Box<Decoder>),
 }
 
 pub(crate) mod error;
@@ -793,6 +821,22 @@ impl Decoder {
                 }),
                 Err(_) => Ok((Value::Tuple(vec![]), input)),
             },
+            Decoder::Slice(n, a) => {
+                let (slice, rest) = input.split_at(*n).ok_or(DecodeError::SliceOverrun {
+                    needed: *n,
+                    offset: input.offset,
+                })?;
+                let (v, _leftover) = a.parse(program, slice)?;
+                Ok((v, rest))
+            }
+            Decoder::WithRelativeOffset(abs_offset, a) => {
+                let seek_input = input.seek_to(*abs_offset).ok_or(DecodeError::BadSeek {
+                    target: *abs_offset,
+                    len: input.input.len(),
+                })?;
+                let (v, _) = a.parse(program, seek_input)?;
+                Ok((v, input))
+            }
         }
     }
 }
@@ -961,9 +1005,11 @@ mod tests {
             | Decoder::EndOfInput
             | Decoder::Byte(_)
             | Decoder::Compute(_) => {}
-            Decoder::Variant(_, d) | Decoder::Peek(d) | Decoder::PeekNot(d) => {
-                collect_callrec_slots(d, out)
-            }
+            Decoder::Variant(_, d)
+            | Decoder::Peek(d)
+            | Decoder::PeekNot(d)
+            | Decoder::Slice(_, d)
+            | Decoder::WithRelativeOffset(_, d) => collect_callrec_slots(d, out),
             Decoder::Branch(_, ds)
             | Decoder::Seq(ds)
             | Decoder::Tuple(ds)
@@ -1129,6 +1175,79 @@ mod tests {
         assert!(matches!(value, Value::Branch(1, _)));
         assert_eq!(remaining.offset, 5);
 
+        Ok(())
+    }
+
+    #[test]
+    fn slice_restricts_and_skips_leftover() -> AResult<()> {
+        let f = Format::Tuple(vec![
+            Format::Slice(
+                Box::new(Expr::U8(3)),
+                Box::new(Format::Byte(ByteSet::from([b'a']))),
+            ),
+            Format::Byte(ByteSet::from([b'X'])),
+        ]);
+        let program = Compiler::compile_program(&FormatModule::new(), &f, RecurseCtx::NonRec)?;
+        // The slice is 3 bytes ("a??"), but the inner format only consumes the first ('a') -
+        // the other two are leftover and skipped, so the outer stream picks up at offset 3 with
+        // the mandatory 'X' field, not offset 1.
+        let (value, remaining) = program.run(ReadCtxt::new(b"a??X"))?;
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert!(matches!(fields[0], Value::U8(b'a')));
+        assert!(matches!(fields[1], Value::U8(b'X')));
+        assert_eq!(remaining.offset, 4);
+
+        // Too few bytes left for the 3-byte slice.
+        assert!(program.run(ReadCtxt::new(b"a?")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn with_relative_offset_self_referential_recvar() -> AResult<()> {
+        // A batch where one member's body jumps (via a compile-time-constant absolute offset,
+        // since Expr has no Var - real OpenType-style data-dependent offsets aren't expressible
+        // yet) to a fixed position holding a *different*, self-recursive batch member, reached
+        // through RecVar (not ItemVar, per the established lesson: ItemVar resets its own ctx
+        // via module.get_ctx regardless of what's ambient, which would mask a ctx bug here).
+        // Proves the offset jump doesn't disturb ctx resolution (RecVar(1) still finds the right
+        // sibling and its own further self-recursion still works) or the outer stream position
+        // (unaffected by the jump entirely).
+        let wrapper = Format::Tuple(vec![
+            Format::Byte(ByteSet::from([b'#'])),
+            Format::WithRelativeOffset(
+                Box::new(Expr::U8(0)),
+                Box::new(Expr::U8(3)),
+                Box::new(Format::RecVar(1)),
+            ),
+        ]);
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("wrapper"), wrapper),
+            (Label::Borrowed("peano"), peano),
+        ]);
+        let program = Compiler::compile_program(&module, &frefs[0].call(), RecurseCtx::NonRec)?;
+
+        // byte 0 = '#' (the marker); bytes 1,2 = padding, never read directly; bytes 3.. = "SSZ"
+        // (peano's own encoding) at the jump target.
+        let (_value, remaining) = program.run(ReadCtxt::new(b"#--SSZ"))?;
+        // The outer stream only ever consumed the marker byte - the offset jump doesn't move it,
+        // regardless of how many bytes the jump target itself consumed.
+        assert_eq!(remaining.offset, 1);
         Ok(())
     }
 }

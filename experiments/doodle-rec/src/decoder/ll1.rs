@@ -148,6 +148,64 @@ mod tests {
             "expected a clean NoValidBranch error (not a left-recursion panic), got {result:?}"
         );
     }
+
+    #[test]
+    fn slice_restricts_and_skips_leftover() {
+        let f = Format::Tuple(vec![
+            Format::Slice(
+                Box::new(Expr::U8(3)),
+                Box::new(Format::Byte(ByteSet::from([b'a']))),
+            ),
+            Format::Byte(ByteSet::from([b'X'])),
+        ]);
+        let mut module = FormatModule::new();
+        let main = module.declare_format(Label::Borrowed("main"), f);
+        let interp = LL1Interpreter::new(&module);
+        let (value, remaining) = interp
+            .parse_level(main.get_level(), ReadCtxt::new(b"a??X"))
+            .expect("parses");
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert!(matches!(fields[0], Value::U8(b'a')));
+        assert!(matches!(fields[1], Value::U8(b'X')));
+        assert_eq!(remaining.offset, 4);
+    }
+
+    #[test]
+    fn with_relative_offset_self_referential_recvar() {
+        let wrapper = Format::Tuple(vec![
+            Format::Byte(ByteSet::from([b'#'])),
+            Format::WithRelativeOffset(
+                Box::new(Expr::U8(0)),
+                Box::new(Expr::U8(3)),
+                Box::new(Format::RecVar(1)),
+            ),
+        ]);
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("wrapper"), wrapper),
+            (Label::Borrowed("peano"), peano),
+        ]);
+        let interp = LL1Interpreter::new(&module);
+        let (_value, remaining) = interp
+            .parse_level(frefs[0].get_level(), ReadCtxt::new(b"#--SSZ"))
+            .expect("parses");
+        assert_eq!(remaining.offset, 1);
+    }
 }
 
 pub struct LL1Interpreter<'a> {
@@ -535,6 +593,36 @@ impl<'a> LL1Interpreter<'a> {
                     Ok(_) => Err(InterpError::PeekNotMatched),
                     Err(_) => Ok((Value::Tuple(vec![]), input)),
                 }
+            }
+            Format::Slice(count, format0) => {
+                let n = count.eval_usize();
+                let (slice, rest) = input
+                    .split_at(n)
+                    .ok_or(InterpError::SliceOverrun { needed: n })?;
+                let (val, _leftover) = self.parse_format(
+                    format0,
+                    Rc::new(PartialFormat::Empty),
+                    ctx,
+                    slice,
+                    trace,
+                    visited,
+                )?;
+                Ok((val, rest))
+            }
+            Format::WithRelativeOffset(base, offset, format0) => {
+                let abs_offset = base.eval_usize() + offset.eval_usize();
+                let seek_input = input
+                    .seek_to(abs_offset)
+                    .ok_or(InterpError::BadSeek { target: abs_offset })?;
+                let (val, _) = self.parse_format(
+                    format0,
+                    Rc::new(PartialFormat::Empty),
+                    ctx,
+                    seek_input,
+                    trace,
+                    visited,
+                )?;
+                Ok((val, input))
             }
         }
     }

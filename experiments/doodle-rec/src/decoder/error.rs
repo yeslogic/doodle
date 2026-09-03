@@ -26,6 +26,14 @@ pub enum DecodeError {
     PeekNotMatched {
         offset: usize,
     },
+    SliceOverrun {
+        needed: usize,
+        offset: usize,
+    },
+    BadSeek {
+        target: usize,
+        len: usize,
+    },
 }
 
 impl std::fmt::Display for DecodeError {
@@ -68,6 +76,15 @@ impl std::fmt::Display for DecodeError {
             }
             Self::PeekNotMatched { offset } => {
                 write!(f, "peek-not target unexpectedly matched at offset {offset}")
+            }
+            Self::SliceOverrun { needed, offset } => {
+                write!(
+                    f,
+                    "slice of {needed} bytes would overrun buffer (offset = {offset})"
+                )
+            }
+            Self::BadSeek { target, len } => {
+                write!(f, "cannot seek to offset {target} (buffer length = {len})")
             }
         }
     }

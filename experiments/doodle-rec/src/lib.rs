@@ -360,6 +360,14 @@ pub enum Format {
     Peek(Box<Format>),
     /// Attempts to parse a format and fails if it succeeds; yields unit on success (non-match).
     PeekNot(Box<Format>),
+
+    /// Restricts a format to a sub-stream of exactly `count` bytes (compile-time-constant, same
+    /// `Expr`-has-no-`Var` caveat as [`Format::RepeatCount`]), skipping any leftover bytes in the
+    /// sub-stream once the inner format has matched.
+    Slice(Box<Expr>, Box<Format>),
+    /// Matches a format at an absolute byte offset (`base + offset`, both compile-time-constant)
+    /// relative to the start of the buffer, without advancing the outer stream position.
+    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Format>),
 }
 
 impl Format {
@@ -456,6 +464,20 @@ impl Format {
                 Ok(FormatType::Shape(TypeShape::Seq(Box::new(t))))
             }
             Format::Peek(inner) => inner.infer_type(visited, module, batch),
+            Format::Slice(count, inner) => {
+                if !count.infer_type()?.is_numeric() {
+                    return Err(anyhow!("Slice count expression must be numeric"));
+                }
+                inner.infer_type(visited, module, batch)
+            }
+            Format::WithRelativeOffset(base, offset, inner) => {
+                if !base.infer_type()?.is_numeric() || !offset.infer_type()?.is_numeric() {
+                    return Err(anyhow!(
+                        "WithRelativeOffset base/offset expressions must be numeric"
+                    ));
+                }
+                inner.infer_type(visited, module, batch)
+            }
             Format::PeekNot(_inner) => Ok(FormatType::UNIT),
         }
     }
@@ -537,6 +559,10 @@ impl Format {
             // target never sees, and so can never depend on, the enclosing `next`. Peek/PeekNot
             // themselves don't consume input either, so there's nothing here for `next` to affect.
             Format::Peek(..) | Format::PeekNot(..) => false,
+            // Slice and WithRelativeOffset both compile their inner format against a fresh
+            // Next::Empty too (bounded sub-stream / absolute jump, neither continues into
+            // whatever comes after in the *outer* stream), same reasoning as Peek/PeekNot.
+            Format::Slice(..) | Format::WithRelativeOffset(..) => false,
         }
     }
 
@@ -590,6 +616,8 @@ impl Format {
                 Self::repeat_bounds(f.match_bounds(module), min.eval_usize(), max.eval_usize())
             }
             Format::Peek(_) | Format::PeekNot(_) => Bounds::exact(0),
+            Format::Slice(count, _) => Bounds::exact(count.eval_usize()),
+            Format::WithRelativeOffset(..) => Bounds::exact(0),
         }
     }
 

@@ -629,6 +629,41 @@ impl Format {
                 format.solve_determinations(module, &mut peek_visited, ctx)?;
                 Ok(Determinations::zero())
             }
+            Format::Slice(count, format) => {
+                // Unlike Peek, a non-empty slice consumes real bytes from the *same* stream this
+                // traversal is already tracking - not a hypothetical lookahead-only exploration -
+                // so `visited` is shared (like `Tuple`/`Seq`'s own fields), not cloned; still
+                // traversed even for a zero-length slice, since the inner format genuinely gets
+                // decoded (against an empty sub-buffer) at parse time either way.
+                let n = count.eval_usize();
+                let det_inner = format.solve_determinations(module, visited, ctx)?;
+                if n == 0 {
+                    Ok(Determinations::zero())
+                } else {
+                    // If the inner format could itself be satisfied with zero bytes, the slice's
+                    // actual first byte is unconstrained (anything left over is simply skipped),
+                    // so the outer grammar can't assume anything about it either.
+                    let first_set = if det_inner.is_nullable {
+                        ByteSet::full()
+                    } else {
+                        det_inner.first_set
+                    };
+                    Ok(Determinations {
+                        first_set,
+                        is_productive: true,
+                        is_nullable: false,
+                        should_not_follow_set: ByteSet::empty(),
+                    })
+                }
+            }
+            Format::WithRelativeOffset(_base, _offset, format) => {
+                // Same isolation reasoning as Peek: bytes really are consumed at the jump target,
+                // but at a position unrelated to the current stream cursor, so any progress made
+                // there shouldn't count as progress toward *this* position's own cycles.
+                let mut jump_visited = visited.clone();
+                format.solve_determinations(module, &mut jump_visited, ctx)?;
+                Ok(Determinations::zero())
+            }
         }
     }
 }
@@ -871,6 +906,12 @@ pub enum InterpError {
     PeekNotMatched,
     /// Every branch of a `Format::UnionNondet` failed to parse at this position.
     NoValidBranch,
+    SliceOverrun {
+        needed: usize,
+    },
+    BadSeek {
+        target: usize,
+    },
 }
 
 impl std::fmt::Display for InterpError {
@@ -905,6 +946,12 @@ impl std::fmt::Display for InterpError {
             }
             InterpError::NoValidBranch => {
                 write!(f, "no branch of a nondeterministic union matched")
+            }
+            InterpError::SliceOverrun { needed } => {
+                write!(f, "slice of {needed} bytes would overrun buffer")
+            }
+            InterpError::BadSeek { target } => {
+                write!(f, "cannot seek to offset {target}")
             }
         }
     }

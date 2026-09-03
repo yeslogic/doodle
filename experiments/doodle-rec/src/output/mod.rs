@@ -111,6 +111,9 @@ impl<'module> PPrinter<'module> {
             },
             Format::Peek(format) => self.compile_decoded_value(value, format, ctx),
             Format::PeekNot(_format) => self.compile_value(value),
+            Format::Slice(_, format) | Format::WithRelativeOffset(_, _, format) => {
+                self.compile_decoded_value(value, format, ctx)
+            }
         }
     }
 
@@ -524,6 +527,29 @@ impl<'module> PPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::Slice(count, format) => {
+                let frag_count = self.compile_expr(count, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format("slice", Some(&[frag_count]), format, ctx, prec),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::WithRelativeOffset(base, offset, format) => {
+                let frag_base = self.compile_expr(base, Precedence::ATOM);
+                let frag_offset = self.compile_expr(offset, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "offset",
+                        Some(&[frag_base, frag_offset]),
+                        format,
+                        ctx,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
             Format::Compute(expr) => cond_paren(
                 Fragment::cat(
                     Fragment::String("compute ".into()),

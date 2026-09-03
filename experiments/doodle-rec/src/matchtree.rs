@@ -250,6 +250,9 @@ impl<'a> MatchTreeStep<'a> {
                 let tree2 = Self::from_next(module, next2.clone(), visited);
                 tree1.peek_not(tree2)
             }
+            Next::Slice(count, inside, next0) => {
+                Self::from_slice(module, *count, inside.clone(), next0.clone(), visited)
+            }
             Next::DelayRef(level, next) => {
                 if visited.insert(*level) == Entry::Novel {
                     let ctx = module.get_ctx(*level);
@@ -324,6 +327,38 @@ impl<'a> MatchTreeStep<'a> {
                 Rc::new(Next::RepeatMax(max, format, ctx, next)),
                 visited,
             )
+        }
+    }
+
+    /// Constructs a [MatchTreeStep] that accepts a `count`-byte slice restricting `inner` (the
+    /// slice's own not-yet-fully-consumed continuation, starting as `Next::Cat(f, ctx, Empty)` -
+    /// `Empty`, not the outer `next`, since bytes left over within the slice are skipped, not
+    /// passed on to whatever's inside), followed by `next` (what comes after the whole slice).
+    fn from_slice(
+        module: &'a FormatModule,
+        count: usize,
+        inner: Rc<Next<'a>>,
+        next: Rc<Next<'a>>,
+        visited: &mut Traversal,
+    ) -> MatchTreeStep<'a> {
+        if count > 0 {
+            let mut tree = Self::from_next(module, inner, visited);
+            tree.accept = false;
+            if tree.branches.is_empty() {
+                // `inner` doesn't itself branch on any byte (e.g. it's already fully satisfied,
+                // or otherwise indifferent) - the slice's own byte-budget isn't used up yet
+                // though, so any byte here is consumed by the slice regardless, with nothing
+                // further required of it.
+                let next = Rc::new(Next::Slice(count - 1, Rc::new(Next::Empty), next.clone()));
+                tree.branches.push((ByteSet::full(), next));
+            } else {
+                for (_bs, inside) in tree.branches.iter_mut() {
+                    *inside = Rc::new(Next::Slice(count - 1, inside.clone(), next.clone()));
+                }
+            }
+            tree
+        } else {
+            Self::from_next(module, next, visited)
         }
     }
 
@@ -407,6 +442,17 @@ impl<'a> MatchTreeStep<'a> {
                 let peek = Self::from_format(module, a, Rc::new(Next::Empty), ctx, visited);
                 tree.peek_not(peek)
             }
+            Format::Slice(count, a) => {
+                let inner = Rc::new(Next::Cat(a, ctx, Rc::new(Next::Empty)));
+                Self::from_slice(module, count.eval_usize(), inner, next, visited)
+            }
+            // Opaque to lookahead entirely, matching real doodle's own deliberately-inherited
+            // limitation: an absolute jump doesn't consume any *outer* bytes (match_bounds is
+            // exact(0)), so there's nothing here for lookahead to examine anyway - but this also
+            // means a `WithRelativeOffset` branch inside a `Union` always looks like it
+            // unconditionally matches, which can mask genuine ambiguity with its sibling
+            // branches. Not attempted here, same as upstream.
+            Format::WithRelativeOffset(..) => Self::accept(),
         }
     }
 }
@@ -574,6 +620,15 @@ pub(crate) enum Next<'a> {
     /// fields are.
     Peek(Rc<Next<'a>>, Rc<Next<'a>>),
     PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
+    /// `Slice`'s remaining-byte countdown, same shape/reasoning as `RepeatCount`'s, but neither
+    /// of its two fields needs its own `RecurseCtx` either, for the same reason `Peek`/`PeekNot`
+    /// above don't: both `inside` (the slice's own not-yet-fully-consumed inner continuation) and
+    /// `outer` (what follows the whole slice) are already-built `Next` subtrees, not raw
+    /// `&'a Format`, so whatever ctx they need was already stamped in when *they* were built.
+    Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
+    // No `WithRelativeOffset` variant: `MatchTree` treats it as opaque to lookahead entirely
+    // (see `Format::WithRelativeOffset`'s `from_format` arm), matching real doodle's own,
+    // deliberately-inherited limitation - it never builds any `Next` continuation for it at all.
 }
 
 #[derive(Debug, Clone)]
@@ -726,5 +781,48 @@ mod tests {
         // `None` is correct, the point is no panic.
         let tree = MatchTree::build(&module, &branches, Rc::new(Next::Empty), RecurseCtx::NonRec);
         assert!(tree.is_none());
+    }
+
+    #[test]
+    fn slice_ctx_across_depth_boundary() {
+        // Same shape/reasoning as repeat_count_ctx_across_depth_boundary: `Slice(1, RecVar(0))`
+        // embedded directly inside the batch's own body means resolving that `RecVar` depends on
+        // the ctx captured when `Format::Slice`'s own `from_format` arm builds its initial
+        // `Next::Cat(a, ctx, Empty)` surviving intact through `Next::Slice`'s countdown once that
+        // survives a lookahead-depth boundary (forced by the second byte, "SZ").
+        let wrapper = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("stop"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("more"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::Slice(Box::new(Expr::U8(1)), Box::new(Format::RecVar(0))),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.wrapper"), wrapper)]);
+        let wrapper_ref = frefs[0];
+        let branches = vec![
+            Format::Tuple(vec![
+                wrapper_ref.call(),
+                Format::Byte(ByteSet::from([b'A'])),
+            ]),
+            Format::Tuple(vec![
+                wrapper_ref.call(),
+                Format::Byte(ByteSet::from([b'B'])),
+            ]),
+        ];
+        // Unlike the RepeatCount analog above, this *is* decidable: `Slice(1, RecVar(0))` caps
+        // the entire nested peano value to exactly 1 byte of lookahead (whatever comes after
+        // that byte, inside the slice, is leftover and discarded at runtime, but MatchTree only
+        // ever needs to look at that one byte here) - so the whole thing resolves in bounded
+        // depth. `Some` is itself part of what this test demonstrates: proof the ctx survived
+        // correctly enough to reach a real, decided tree, not just "didn't panic, gave up".
+        let tree = MatchTree::build(&module, &branches, Rc::new(Next::Empty), RecurseCtx::NonRec);
+        assert!(tree.is_some());
     }
 }
