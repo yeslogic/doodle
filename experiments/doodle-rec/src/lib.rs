@@ -333,6 +333,12 @@ pub enum Format {
     // Union-Based
     Variant(Label, Box<Format>),
     Union(Vec<Format>),
+    /// Like [`Format::Union`], but the branches are not required to be mutually exclusive - tried
+    /// in order via backtracking rather than disambiguated ahead of time via `MatchTree`. The
+    /// fallback for a `Union` shape `MatchTree` genuinely cannot decide (a real, reachable ceiling
+    /// - bounded lookahead is fundamentally insufficient when branches share an unboundedly long
+    /// recursive common prefix, not just an implementation gap).
+    UnionNondet(Vec<Format>),
 
     // Sequential
     Repeat(Box<Format>),
@@ -401,7 +407,7 @@ impl Format {
                     inner_type,
                 )]))))
             }
-            Format::Union(branches) => {
+            Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut t = FormatType::Any;
                 for f in branches {
                     t = t.unify(&f.infer_type(visited, module, batch)?)?;
@@ -511,6 +517,16 @@ impl Format {
             Format::Union(branches) => {
                 Format::union_depends_on_next(branches, module, ctx, visited)
             }
+            // Unlike `Union`, `UnionNondet` never goes through `MatchTree` at compile time (it
+            // always compiles to a backtracking `Decoder::Parallel`/`Format::UnionNondet` arm
+            // regardless of whether a `MatchTree` could disambiguate it) - so `union_depends_on_next`'s
+            // `MatchTree::build(...).is_none()` fallback doesn't apply here: that fallback exists
+            // to catch "no branch itself needs `next`, but disambiguating between them still
+            // requires looking into it", which is only a concern for a construct that actually
+            // attempts `MatchTree`-based disambiguation in the first place.
+            Format::UnionNondet(branches) => branches
+                .iter()
+                .any(|f| f.depends_on_next_with(module, ctx, visited)),
             Format::Repeat(..) | Format::RepeatCount(..) | Format::RepeatBetween(..) => true,
             Format::Seq(formats) | Format::Tuple(formats) => formats
                 .iter()
@@ -550,7 +566,7 @@ impl Format {
             Format::FailWith(..) | Format::EndOfInput | Format::Compute(..) => Bounds::exact(0),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_, f) => f.match_bounds(module),
-            Format::Union(branches) => branches
+            Format::Union(branches) | Format::UnionNondet(branches) => branches
                 .iter()
                 .map(|f| f.match_bounds(module))
                 .reduce(Bounds::union)

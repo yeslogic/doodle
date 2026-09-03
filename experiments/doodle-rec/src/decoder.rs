@@ -311,6 +311,15 @@ impl<'a> Compiler<'a> {
                     Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
+            Format::UnionNondet(branches) => {
+                // No MatchTree involved at all - each branch is compiled independently and tried
+                // in order at decode time (Decoder::Parallel), backtracking on failure.
+                let mut ds = Vec::with_capacity(branches.len());
+                for f in branches {
+                    ds.push(self.compile_format(f, next.clone(), ctx, batch_slot_start)?);
+                }
+                Ok(Decoder::Parallel(ds))
+            }
             Format::Tuple(elems) => {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
@@ -607,6 +616,11 @@ pub enum Decoder {
 
     Variant(Label, Box<Decoder>),
     Branch(MatchTree, Vec<Decoder>),
+    /// Tries each branch in order against the same starting position, backtracking on failure;
+    /// the first to succeed wins. Mirrors `doodle::Decoder::Parallel` (the compiled form of
+    /// `doodle::Format::UnionNondet`) exactly - `ReadCtxt` is `Copy`, so there's no explicit
+    /// position save/restore to get right, only the control flow.
+    Parallel(Vec<Decoder>),
 
     While(MatchTree, Box<Decoder>), // Repeat decoder while input matches
 
@@ -681,6 +695,16 @@ impl Decoder {
                 // let (v, input) = d.parse(program, input)?;
                 // Ok(Value::Branch(index, Box::new(v)), input))
                 d.parse(program, input)
+            }
+            Decoder::Parallel(branches) => {
+                for (index, d) in branches.iter().enumerate() {
+                    if let Ok((v, new_input)) = d.parse(program, input) {
+                        return Ok((Value::Branch(index, Box::new(v)), new_input));
+                    }
+                }
+                Err(DecodeError::NoValidBranch {
+                    offset: input.offset,
+                })
             }
             Decoder::Seq(decs) => {
                 let mut input = input;
@@ -940,7 +964,10 @@ mod tests {
             Decoder::Variant(_, d) | Decoder::Peek(d) | Decoder::PeekNot(d) => {
                 collect_callrec_slots(d, out)
             }
-            Decoder::Branch(_, ds) | Decoder::Seq(ds) | Decoder::Tuple(ds) => {
+            Decoder::Branch(_, ds)
+            | Decoder::Seq(ds)
+            | Decoder::Tuple(ds)
+            | Decoder::Parallel(ds) => {
                 for d in ds {
                     collect_callrec_slots(d, out);
                 }
@@ -1032,6 +1059,75 @@ mod tests {
             vec![n2],
             "instantiation at slot {n2} should CallRec itself"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn union_nondet_tries_branches_in_order() -> AResult<()> {
+        // Overlapping first bytes ('a' could start either branch) - not something a MatchTree
+        // could safely disambiguate via lookahead alone without risking wrongly rejecting the
+        // second branch, which is exactly why this needs backtracking rather than Format::Union.
+        let f = Format::UnionNondet(vec![
+            Format::Tuple(vec![
+                Format::Byte(ByteSet::from([b'a'])),
+                Format::Byte(ByteSet::from([b'b'])),
+            ]),
+            Format::Tuple(vec![
+                Format::Byte(ByteSet::from([b'a'])),
+                Format::Byte(ByteSet::from([b'c'])),
+            ]),
+        ]);
+        let program = Compiler::compile_program(&FormatModule::new(), &f, RecurseCtx::NonRec)?;
+
+        let (value, remaining) = program.run(ReadCtxt::new(b"ab"))?;
+        assert!(matches!(value, Value::Branch(0, _)));
+        assert_eq!(remaining.offset, 2);
+
+        let (value, remaining) = program.run(ReadCtxt::new(b"ac"))?;
+        assert!(matches!(value, Value::Branch(1, _)));
+        assert_eq!(remaining.offset, 2);
+
+        assert!(program.run(ReadCtxt::new(b"ad")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn union_nondet_is_the_escape_valve_matchtree_cannot_provide() -> AResult<()> {
+        // The exact scenario matchtree::tests::build_union_disambiguating_through_recursion
+        // proved is *not* decidable via any fixed-depth MatchTree (both branches share an
+        // unboundedly-long recursive peano prefix, only diverging on the byte immediately after
+        // it) - the whole point of this step. Format::Union would fail to compile at all here
+        // ("cannot build match tree"); Format::UnionNondet must still decode it correctly.
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.peano"), peano)]);
+        let peano_ref = frefs[0];
+        let f = Format::UnionNondet(vec![
+            Format::Tuple(vec![peano_ref.call(), Format::Byte(ByteSet::from([b'A']))]),
+            Format::Tuple(vec![peano_ref.call(), Format::Byte(ByteSet::from([b'B']))]),
+        ]);
+        let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
+
+        let (value, remaining) = program.run(ReadCtxt::new(b"SSSZA"))?;
+        assert!(matches!(value, Value::Branch(0, _)));
+        assert_eq!(remaining.offset, 5);
+
+        let (value, remaining) = program.run(ReadCtxt::new(b"SSSZB"))?;
+        assert!(matches!(value, Value::Branch(1, _)));
+        assert_eq!(remaining.offset, 5);
 
         Ok(())
     }

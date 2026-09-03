@@ -344,7 +344,12 @@ impl<'a> MatchTreeStep<'a> {
             Format::EndOfInput => Self::accept(),
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next, ctx, visited),
-            Format::Union(branches) => {
+            // `UnionNondet` never actually gets compiled via `MatchTree` (see `Compiler::
+            // compile_format`'s arm) - this treats it identically to `Union` purely for the
+            // benefit of *other* code that needs to know what bytes this format could start
+            // with for its own lookahead purposes (e.g. a sibling field's `depends_on_next`
+            // check, or an outer `Union` containing this as one of its own branches).
+            Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
                     tree = tree.union(Self::from_format(module, f, next.clone(), ctx, visited));

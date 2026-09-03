@@ -88,6 +88,66 @@ mod tests {
                 .is_err()
         );
     }
+
+    #[test]
+    fn union_nondet_tries_branches_in_order() {
+        let f = Format::UnionNondet(vec![
+            Format::Tuple(vec![
+                Format::Byte(ByteSet::from([b'a'])),
+                Format::Byte(ByteSet::from([b'b'])),
+            ]),
+            Format::Tuple(vec![
+                Format::Byte(ByteSet::from([b'a'])),
+                Format::Byte(ByteSet::from([b'c'])),
+            ]),
+        ]);
+        let mut module = FormatModule::new();
+        let main = module.declare_format(Label::Borrowed("main"), f);
+        let interp = LL1Interpreter::new(&module);
+
+        let (value, remaining) = interp
+            .parse_level(main.get_level(), ReadCtxt::new(b"ac"))
+            .expect("second branch should match after the first backtracks");
+        assert!(matches!(value, Value::Branch(1, _)));
+        assert_eq!(remaining.offset, 2);
+
+        assert!(
+            interp
+                .parse_level(main.get_level(), ReadCtxt::new(b"ad"))
+                .is_err()
+        );
+    }
+
+    /// Regression test for the `visited`/`trace` isolation `Format::UnionNondet`'s arm needs:
+    /// both branches reference the same recursive batch member (`RecVar(1)`) directly, and are
+    /// both doomed to fail *inside* that nested parse (not in a later sibling field, and not
+    /// after any byte has been consumed - `Format::Byte`'s own arm calls `visited.reset()` on a
+    /// *successful* match, which would incidentally wipe a still-open level anyway and mask the
+    /// bug this test targets), so the first branch's `RecVar` arm hits its `?` before ever
+    /// reaching `visited.escape()`. If the second branch's attempt shared that same (now
+    /// stale-open) `visited` instead of a fresh clone, its own `RecVar(1)` would see
+    /// `Entry::LeftRecursive`/`Guarded` instead of `Novel` and hit the
+    /// `unreachable!("left recursion")` panic in that arm - so the assertion here is
+    /// deliberately just "this returns an `Err`, not a panic", not what the error says.
+    #[test]
+    fn union_nondet_does_not_corrupt_visited_across_branches() {
+        let outer = Format::UnionNondet(vec![Format::RecVar(1), Format::RecVar(1)]);
+        let digit = Format::Byte(ByteSet::from([b'D']));
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("outer"), outer),
+            (Label::Borrowed("digit"), digit),
+        ]);
+        let interp = LL1Interpreter::new(&module);
+        // "X" fails digit's own (only) byte check outright, with zero bytes consumed - both
+        // branches' RecVar(1) call fails *inside* digit's own parse, before any escape() (or an
+        // incidental reset() via a successful byte match) can run.
+        let result = interp.parse_level(frefs[0].get_level(), ReadCtxt::new(b"X"));
+        assert!(
+            matches!(result, Err(InterpError::NoValidBranch)),
+            "expected a clean NoValidBranch error (not a left-recursion panic), got {result:?}"
+        );
+    }
 }
 
 pub struct LL1Interpreter<'a> {
@@ -261,6 +321,35 @@ impl<'a> LL1Interpreter<'a> {
                         }
                     }
                 }
+            }
+            Format::UnionNondet(formats) => {
+                // Real backtracking, unlike `Union`'s first-set-based prediction above: try each
+                // branch in declaration order against the same starting `input` (`ReadCtxt` is
+                // `Copy`, so there's nothing to explicitly restore on failure), first success
+                // wins. `visited`/`trace` are cloned per attempt rather than threaded directly,
+                // and only copied back into the ambient ones on success: `Format::RecVar`'s own
+                // arm above uses `?` after its nested `parse_format` call, so a *failed* branch
+                // can leave `visited` with an unescaped "open" entry - harmless when a failure
+                // always aborts the whole parse (as it does everywhere else in this function),
+                // but not once a sibling branch gets tried afterward, which would otherwise see a
+                // stale "still open" level from a completely unrelated, already-abandoned attempt.
+                for (ix, branch) in formats.iter().enumerate() {
+                    let mut branch_visited = visited.clone();
+                    let mut branch_trace = trace.clone();
+                    if let Ok((val, new_input)) = self.parse_format(
+                        branch,
+                        remnant.clone(),
+                        ctx,
+                        input,
+                        &mut branch_trace,
+                        &mut branch_visited,
+                    ) {
+                        *visited = branch_visited;
+                        *trace = branch_trace;
+                        return Ok((Value::Branch(ix, Box::new(val)), new_input));
+                    }
+                }
+                Err(InterpError::NoValidBranch)
             }
             Format::Repeat(format0) => {
                 let mut values = Vec::new();

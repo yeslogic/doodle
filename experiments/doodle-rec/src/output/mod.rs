@@ -69,7 +69,7 @@ impl<'module> PPrinter<'module> {
                 }
                 _ => panic!("expected variant, found {value}"),
             },
-            Format::Union(formats) => match value {
+            Format::Union(formats) | Format::UnionNondet(formats) => match value {
                 Value::Branch(ix, value) => {
                     let format = &formats[*ix];
                     self.compile_decoded_value(value, format, ctx)
@@ -464,6 +464,11 @@ impl<'module> PPrinter<'module> {
             ),
             Format::Union(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
+            Format::UnionNondet(_) => cond_paren(
+                Fragment::String("_ |...|? _".into()),
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),

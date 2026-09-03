@@ -369,6 +369,32 @@ impl Determinations {
             should_not_follow_set,
         })
     }
+
+    /// Combines the determinations for two branches of a [`Format::UnionNondet`] - the same
+    /// arithmetic as [`Self::union`], but infallible: overlapping first-sets (`AmbiguousFirst`)
+    /// and multiple nullable branches (`MultiNullUnion`) are exactly what `UnionNondet` exists to
+    /// permit (resolved at parse time via backtracking, not statically proven safe here), so
+    /// neither check applies.
+    pub fn union_nondet(self, other: Self) -> Self {
+        let first_set = self.first_set.union(&other.first_set);
+        let should_not_follow_set = {
+            let left = self.should_not_follow_set;
+            let right = other.should_not_follow_set;
+            let mut ret = left.union(&right);
+            if self.is_nullable {
+                ret = ret.union(&other.first_set);
+            } else if other.is_nullable {
+                ret = ret.union(&self.first_set);
+            }
+            ret
+        };
+        Self {
+            first_set,
+            is_productive: self.is_productive || other.is_productive,
+            is_nullable: self.is_nullable || other.is_nullable,
+            should_not_follow_set,
+        }
+    }
 }
 
 impl FormatDecl {
@@ -475,6 +501,20 @@ impl Format {
                     det = det
                         .union(det_format)
                         .map_err(|e| e.add_context(self.clone()))?;
+                }
+                Ok(det)
+            }
+            Format::UnionNondet(formats) => {
+                let mut det = Determinations::one();
+                for format in formats {
+                    // Same branch-isolation reasoning as `Union` above; only the ambiguity
+                    // *checks* differ (`union_nondet` has none - overlapping first-sets and
+                    // multiple nullable branches are exactly what `UnionNondet` permits), but a
+                    // genuine left-recursion cycle reached through any branch is still an error.
+                    let mut branch_visited = visited.clone();
+                    let det_format =
+                        format.solve_determinations(module, &mut branch_visited, ctx)?;
+                    det = det.union_nondet(det_format);
                 }
                 Ok(det)
             }
@@ -829,6 +869,8 @@ pub enum InterpError {
     },
     ExpectsEnd,
     PeekNotMatched,
+    /// Every branch of a `Format::UnionNondet` failed to parse at this position.
+    NoValidBranch,
 }
 
 impl std::fmt::Display for InterpError {
@@ -860,6 +902,9 @@ impl std::fmt::Display for InterpError {
             }
             InterpError::PeekNotMatched => {
                 write!(f, "peek-not target unexpectedly matched")
+            }
+            InterpError::NoValidBranch => {
+                write!(f, "no branch of a nondeterministic union matched")
             }
         }
     }
