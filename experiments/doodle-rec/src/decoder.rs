@@ -142,31 +142,18 @@ pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
-    /// Maps a recursive batch member's module-level `FormatId` to the `Program::decoders` slot
-    /// it was most recently compiled to, so `Format::RecVar` can resolve a sibling batch member
-    /// to the correct `Decoder::CallRec` target instead of conflating the two index spaces.
-    ///
-    /// NOTE: this is keyed purely by `FormatId`, so if the same recursive batch is ever
-    /// instantiated more than once under different `next` continuations (which
-    /// `Format::depends_on_next`'s hardcoded `true` for `RecVar` makes likely), the later
-    /// instantiation's slots silently overwrite the earlier one's here, and `RecVar` references
-    /// belonging to the earlier instantiation would incorrectly resolve into the later one's
-    /// slots. Not exercised by any current caller, but a real gap.
-    level_slot: HashMap<FormatId, usize>,
-    compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize, Batch)>,
+    compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize, Batch, Option<usize>)>,
 }
 
 impl<'a> Compiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
         let program = Program::new();
         let decoder_map = HashMap::new();
-        let level_slot = HashMap::new();
         let compile_queue = Vec::new();
         Compiler {
             module,
             program,
             decoder_map,
-            level_slot,
             compile_queue,
         }
     }
@@ -183,8 +170,8 @@ impl<'a> Compiler<'a> {
         let batch = ctx.as_span();
 
         let t = format.infer_type(&mut visited, module, batch)?;
-        compiler.queue_compile(t, format, Rc::new(Next::Empty), batch);
-        while let Some((f, next, n, batch)) = compiler.compile_queue.pop() {
+        compiler.queue_compile(t, format, Rc::new(Next::Empty), batch, None);
+        while let Some((f, next, n, batch, batch_slot_start)) = compiler.compile_queue.pop() {
             let f_ctx = match batch {
                 Some(span) => RecurseCtx::Recurse {
                     span,
@@ -193,7 +180,7 @@ impl<'a> Compiler<'a> {
                 },
                 None => RecurseCtx::NonRec,
             };
-            let d = compiler.compile_format(f, next, f_ctx)?;
+            let d = compiler.compile_format(f, next, f_ctx, batch_slot_start)?;
             compiler.program.decoders[n].0 = d;
         }
         Ok(compiler.program)
@@ -205,13 +192,23 @@ impl<'a> Compiler<'a> {
         f: &'a Format,
         next: Rc<Next<'a>>,
         batch: Option<Span<usize>>,
+        batch_slot_start: Option<usize>,
     ) -> usize {
         let n = self.program.decoders.len();
         self.program.decoders.push((Decoder::FAIL, t));
-        self.compile_queue.push((f, next, n, batch));
+        self.compile_queue
+            .push((f, next, n, batch, batch_slot_start));
         n
     }
 
+    /// Queues every member of a recursive batch for compilation, all sharing one contiguous run
+    /// of `Program::decoders` slots starting at the returned instantiation's own `n` (queued as
+    /// each member's `batch_slot_start`) - `Format::RecVar(batch_ix)` later resolves directly to
+    /// `batch_slot_start + batch_ix` (see `compile_format`'s `RecVar` arm), rather than through a
+    /// lookup table, specifically so that two independent instantiations of the same batch (under
+    /// different `next` continuations - the same batch can be queued here more than once, since
+    /// `Format::depends_on_next` can make two `ItemVar` call sites key `decoder_map` differently)
+    /// never share, and can't clobber, each other's slot mapping.
     fn queue_compile_batch(
         &mut self,
         decls: &'a [FormatDecl],
@@ -223,14 +220,13 @@ impl<'a> Compiler<'a> {
         for (ix, d) in decls.into_iter().enumerate() {
             let t = d.solve_type(self.module).unwrap().clone();
             self.program.decoders.push((Decoder::FAIL, t));
-            self.level_slot.insert(d.fmt_id, n + ix);
             let next = if ix == which_next {
                 next.clone()
             } else {
                 Rc::new(Next::Empty)
             };
             self.compile_queue
-                .push((&d.format, next, n + ix, Some(span)));
+                .push((&d.format, next, n + ix, Some(span), Some(n)));
         }
         n + which_next
     }
@@ -239,14 +235,20 @@ impl<'a> Compiler<'a> {
         let module = FormatModule::new();
         let mut compiler = Compiler::new(&module);
         let ctx = RecurseCtx::NonRec;
-        compiler.compile_format(format, Rc::new(Next::Empty), ctx)
+        compiler.compile_format(format, Rc::new(Next::Empty), ctx, None)
     }
 
+    /// `batch_slot_start`, if `Some`, is the `Program::decoders` slot the *current recursive
+    /// batch instantiation's* first member was queued at (see `queue_compile_batch`) - every
+    /// recursive call within one instantiation's compilation passes it through unchanged; only
+    /// `Format::ItemVar` (which starts a fresh instantiation, queued for later rather than
+    /// compiled via direct recursion) doesn't need to thread it further.
     fn compile_format(
         &mut self,
         format: &'a Format,
         next: Rc<Next<'a>>,
         ctx: RecurseCtx<'a>,
+        batch_slot_start: Option<usize>,
     ) -> AResult<Decoder> {
         match format {
             Format::ItemVar(level) => {
@@ -268,7 +270,7 @@ impl<'a> Compiler<'a> {
                             let batch = &self.module.decls[span.start..=span.end];
                             self.queue_compile_batch(batch, level - span.start, next.clone(), span)
                         }
-                        None => self.queue_compile(t, f, next.clone(), None),
+                        None => self.queue_compile(t, f, next.clone(), None, None),
                     };
                     self.decoder_map.insert((*level, next.clone()), n);
                     n
@@ -276,29 +278,32 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Call(n))
             }
             Format::RecVar(batch_ix) => {
-                let new_ctx = ctx.enter(*batch_ix);
-                let level = new_ctx.get_level().unwrap();
-                // `level` is the module-level FormatId of the referenced batch member, not a
-                // Program::decoders slot (those are two different index spaces) - resolve it
-                // through `level_slot`, which queue_compile_batch populates for every member of
-                // the batch this RecVar belongs to.
-                let slot = *self.level_slot.get(&level).unwrap_or_else(|| {
-                    panic!("RecVar({batch_ix}) resolved to level {level}, which has no compiled Program slot yet")
+                // Validate `batch_ix` against `ctx` the same way the pre-existing code did
+                // (`enter` panics on an out-of-range index or a non-recursive ctx), but resolve
+                // the actual `Program::decoders` slot via `batch_slot_start` - direct arithmetic
+                // over the *current instantiation's* own slot range, not a lookup keyed only by
+                // the abstract (instantiation-independent) module-level FormatId, which is what
+                // let two instantiations of the same batch clobber each other's slots.
+                let level = ctx.enter(*batch_ix).get_level().unwrap();
+                let batch_slot_start = batch_slot_start.unwrap_or_else(|| {
+                    panic!(
+                        "RecVar({batch_ix}) (resolved to level {level}) used outside any batch instantiation"
+                    )
                 });
-                Ok(Decoder::CallRec(slot, *batch_ix))
+                Ok(Decoder::CallRec(batch_slot_start + batch_ix, *batch_ix))
             }
             Format::FailWith(msg) => Ok(Decoder::FailWith(msg.clone())),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Variant(label, f) => {
-                let d = self.compile_format(f, next.clone(), ctx)?;
+                let d = self.compile_format(f, next.clone(), ctx, batch_slot_start)?;
                 Ok(Decoder::Variant(label.clone(), Box::new(d)))
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Union(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
                 for f in branches {
-                    ds.push(self.compile_format(f, next.clone(), ctx)?);
+                    ds.push(self.compile_format(f, next.clone(), ctx, batch_slot_start)?);
                 }
                 if let Some(tree) = MatchTree::build(self.module, branches, next, ctx) {
                     Ok(Decoder::Branch(tree, ds))
@@ -311,7 +316,7 @@ impl<'a> Compiler<'a> {
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
                     let next = Rc::new(Next::Sequence(fields.as_slice(), ctx, next.clone()));
-                    let df = self.compile_format(f, next, ctx)?;
+                    let df = self.compile_format(f, next, ctx, batch_slot_start)?;
                     decs.push(df);
                 }
                 Ok(Decoder::Tuple(decs))
@@ -321,7 +326,7 @@ impl<'a> Compiler<'a> {
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
                     let next = Rc::new(Next::Sequence(fields.as_slice(), ctx, next.clone()));
-                    let df = self.compile_format(f, next, ctx)?;
+                    let df = self.compile_format(f, next, ctx, batch_slot_start)?;
                     decs.push(df);
                 }
                 Ok(Decoder::Seq(decs))
@@ -330,8 +335,12 @@ impl<'a> Compiler<'a> {
                 if a.is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let da =
-                    self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                let da = self.compile_format(
+                    a,
+                    Rc::new(Next::Repeat(a, ctx, next.clone())),
+                    ctx,
+                    batch_slot_start,
+                )?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
@@ -342,7 +351,12 @@ impl<'a> Compiler<'a> {
                 }
             }
             Format::Maybe(x, a) => {
-                let da = Box::new(self.compile_format(a, Rc::new(Next::Empty), ctx)?);
+                let da = Box::new(self.compile_format(
+                    a,
+                    Rc::new(Next::Empty),
+                    ctx,
+                    batch_slot_start,
+                )?);
                 Ok(Decoder::Maybe(x.clone(), da))
             }
             Format::RepeatCount(count, a) => {
@@ -353,8 +367,12 @@ impl<'a> Compiler<'a> {
                 // distinct `Next::RepeatCount(k, ..)` per remaining count (which would otherwise
                 // force a separate compiled decoder per iteration for any ItemVar inside `a`
                 // whose `depends_on_next` is true).
-                let da =
-                    self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                let da = self.compile_format(
+                    a,
+                    Rc::new(Next::Repeat(a, ctx, next.clone())),
+                    ctx,
+                    batch_slot_start,
+                )?;
                 Ok(Decoder::RepeatCount(n, Box::new(da)))
             }
             Format::RepeatBetween(min_expr, max_expr, a) => {
@@ -364,15 +382,23 @@ impl<'a> Compiler<'a> {
                     "incoherent RepeatBetween: min {min} > max {max}"
                 );
                 if min == max {
-                    let da =
-                        self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                    let da = self.compile_format(
+                        a,
+                        Rc::new(Next::Repeat(a, ctx, next.clone())),
+                        ctx,
+                        batch_slot_start,
+                    )?;
                     return Ok(Decoder::RepeatCount(min, Box::new(da)));
                 }
                 if a.is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let da =
-                    self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                let da = self.compile_format(
+                    a,
+                    Rc::new(Next::Repeat(a, ctx, next.clone())),
+                    ctx,
+                    batch_slot_start,
+                )?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
@@ -383,11 +409,21 @@ impl<'a> Compiler<'a> {
                 }
             }
             Format::Peek(a) => {
-                let da = Box::new(self.compile_format(a, Rc::new(Next::Empty), ctx)?);
+                let da = Box::new(self.compile_format(
+                    a,
+                    Rc::new(Next::Empty),
+                    ctx,
+                    batch_slot_start,
+                )?);
                 Ok(Decoder::Peek(da))
             }
             Format::PeekNot(a) => {
-                let da = Box::new(self.compile_format(a, Rc::new(Next::Empty), ctx)?);
+                let da = Box::new(self.compile_format(
+                    a,
+                    Rc::new(Next::Empty),
+                    ctx,
+                    batch_slot_start,
+                )?);
                 Ok(Decoder::PeekNot(da))
             }
         }
@@ -887,6 +923,116 @@ mod tests {
         assert!(matches!(&fields[0], Value::Tuple(v) if v.is_empty()));
         assert!(matches!(fields[1], Value::U8(b'b')));
         assert_eq!(remaining.offset, 1);
+        Ok(())
+    }
+
+    /// Collects the slot numbers of every `Decoder::CallRec` reachable from `d` (without
+    /// descending into `Decoder::Call`, which points at an independently-compiled slot rather
+    /// than being part of `d`'s own body).
+    fn collect_callrec_slots(d: &Decoder, out: &mut Vec<usize>) {
+        match d {
+            Decoder::CallRec(slot, _) => out.push(*slot),
+            Decoder::Call(_)
+            | Decoder::FailWith(_)
+            | Decoder::EndOfInput
+            | Decoder::Byte(_)
+            | Decoder::Compute(_) => {}
+            Decoder::Variant(_, d) | Decoder::Peek(d) | Decoder::PeekNot(d) => {
+                collect_callrec_slots(d, out)
+            }
+            Decoder::Branch(_, ds) | Decoder::Seq(ds) | Decoder::Tuple(ds) => {
+                for d in ds {
+                    collect_callrec_slots(d, out);
+                }
+            }
+            Decoder::While(_, d)
+            | Decoder::Maybe(_, d)
+            | Decoder::RepeatCount(_, d)
+            | Decoder::RepeatBetween(_, _, _, d) => collect_callrec_slots(d, out),
+        }
+    }
+
+    #[test]
+    fn recvar_resolves_correctly_across_two_batch_instantiations() -> AResult<()> {
+        // A self-recursive batch whose own body is directly byte-disjoint ('Z' vs 'S') is
+        // decidable independent of `next`, so `depends_on_next` (via `union_depends_on_next`'s
+        // `MatchTree::build(..., Next::Empty, ...)` fallback) would be `false` - `decoder_map`
+        // would then key every `ItemVar` reference on the same `Next::Empty` regardless of call
+        // site, so the batch would only ever be compiled once, and this test would exercise
+        // nothing. Wrapping the recursive step in an unconditional `Maybe` forces
+        // `depends_on_next` to be (hardcoded) `true`, so two call sites with different trailing
+        // fields genuinely key `decoder_map` differently, forcing two separate
+        // `queue_compile_batch` instantiations of the same batch.
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::Maybe(Box::new(Expr::Bool(true)), Box::new(Format::RecVar(0))),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.peano"), peano)]);
+        let peano_ref = frefs[0];
+
+        // Two references to the same batch, each followed by a *different* trailing field.
+        let f = Format::Tuple(vec![
+            peano_ref.call(),
+            Format::Byte(ByteSet::from([b'#'])),
+            peano_ref.call(),
+            Format::EndOfInput,
+        ]);
+        let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
+
+        // Decoding still succeeds either way (see note below on why this alone doesn't prove
+        // anything for this particular grammar), so the real assertion inspects the compiled
+        // `Program`'s decoder graph directly: `Decoder::Tuple` at slot 0 must hold
+        // `Decoder::Call(1)` then `Decoder::Call(2)` for the two `ItemVar` references (two
+        // distinct slots proves two separate `queue_compile_batch` instantiations really did
+        // happen, i.e. this test isn't vacuous), and each instantiation's own compiled body
+        // (slots 1 and 2 respectively) must contain a `Decoder::CallRec` pointing back to
+        // *itself* (batch_ix 0 of a 1-member batch always resolves to its own instantiation's
+        // start) - not to the other instantiation's slot, which is exactly what `level_slot`
+        // conflating two instantiations used to risk.
+        //
+        // (An end-to-end decode-behavior differential was tried first and rejected: for this
+        // grammar shape, both instantiations compile to structurally identical decoders - 'Z'
+        // vs 'S' disambiguation never actually depends on what `next` is - so even a genuinely
+        // wrong slot number is silently harmless at runtime here. Direct structural inspection
+        // is what actually pins the fix down.)
+        let Decoder::Tuple(top_fields) = &program.decoders[0].0 else {
+            panic!("expected top-level Tuple decoder");
+        };
+        let (n1, n2) = match (&top_fields[0], &top_fields[2]) {
+            (Decoder::Call(n1), Decoder::Call(n2)) => (*n1, *n2),
+            other => panic!("expected two Decoder::Call, found {other:?}"),
+        };
+        assert_ne!(
+            n1, n2,
+            "the two ItemVar references should have compiled to two separate instantiations"
+        );
+
+        let mut slots1 = Vec::new();
+        collect_callrec_slots(&program.decoders[n1].0, &mut slots1);
+        assert_eq!(
+            slots1,
+            vec![n1],
+            "instantiation at slot {n1} should CallRec itself"
+        );
+
+        let mut slots2 = Vec::new();
+        collect_callrec_slots(&program.decoders[n2].0, &mut slots2);
+        assert_eq!(
+            slots2,
+            vec![n2],
+            "instantiation at slot {n2} should CallRec itself"
+        );
+
         Ok(())
     }
 }
