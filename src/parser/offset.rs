@@ -1,11 +1,20 @@
-use super::error::{OverrunKind, PResult, ParseError, StateError};
+use super::error::{OverrunKind, PResult, ParseError, ParserStateError, StateError};
+use super::util::Answer;
 use std::cmp::Ordering;
 
+// SECTION - ByteOffset
+/// Pure offset-value used as the internal analogue for 'index into a buffer' when parsing.
+///
+/// Represents either a whole-byte offset when processing the buffer normally (in 'bytes-mode'), or a bit offset (in 'bits-mode').
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ByteOffset {
+    /// Whole-byte offset from the start of the buffer in question, implicitly measured in bytes
     Bytes(usize),
+    /// Bit-offset measured as a number of bits advanced relative to an initial byte-offset.
     Bits {
+        /// Byte-offset we were at when we entered bits-mode
         starting_byte: usize,
+        /// Number of individual bits advanced since entering bits-mode
         bits_advanced: usize,
     },
 }
@@ -26,12 +35,33 @@ impl Default for ByteOffset {
 }
 
 impl ByteOffset {
-    pub(crate) const fn from_bytes(nbytes: usize) -> Self {
+    /// Constructs a byte-level offset ([`ByteOffset::Bytes`]) from a raw byte-offset amount.
+    pub const fn from_bytes(nbytes: usize) -> Self {
         Self::Bytes(nbytes)
     }
 
-    /// Calculates the increment value required for self to reach `other`,
-    /// or returns `None` if the operation would constitute a decrement.
+    /// Returns the checked advance-distance from `self` to `other`.
+    ///
+    /// If `other` represents a location that is at or past `self`, the return-value will be the distance between the two locations,
+    /// in whichever unit of advance (i.e. bytes or bits) is applicable to `self`.
+    ///
+    /// If `self` is past `other`, returns `None`.
+    ///
+    /// When the return value is `Some(n)`, it is guaranteed that `self.increment_by(n)` will yield an equivalent location to `other`.
+    ///
+    /// # Notes
+    ///
+    /// The measure of 'equivalence' we are using to determine if `self.increment_by(n)` will yield `other` is asymmetric.
+    ///   - If `self` and `other` are both in bytes-mode, we use pure equality (i.e. `self.increment_by(n)` will yield `other` precisely).
+    ///   - If `self` and `other` are both in bits-mode, the results will be quasi-equal (i.e. structural equality is not implied, but [`Self::abs_bit_offset`] will always agree).
+    ///   - If `self` is in bits-mode and `other` is in bytes-mode, `self.increment_by(n)` will yield a bits-mode offset that is equivalent to `other` under [`Self::abs_bit_offset`].
+    ///   - If `self` is in bytes-mode and `other` is in bits-mode, this method will panic even if `other` represents a whole-byte offset (i.e. `other.bits_advanced().unwrap() % 8 == 0`).
+    ///
+    /// # Panics
+    ///
+    /// If there is no whole-number advance distance from `self` that would yield `other` or equivalent (i.e. when `other` is in bits-mode
+    ///
+    /// and `self` is in bytes-mode), will result in a runtime panic.
     pub(crate) fn checked_delta(self, other: Self) -> Option<usize> {
         if self.is_bit_mode() {
             other.abs_bit_offset().checked_sub(self.abs_bit_offset())
@@ -42,7 +72,14 @@ impl ByteOffset {
         }
     }
 
-    // Calculates the increment value required for self to reach `other`
+    /// Returns the unchecked advance-distance from `self` to `other`.
+    ///
+    /// If `other` represents a location that is at or past `self`, the return-value will be the distance between the two locations.
+    ///
+    /// # Panics
+    /// When no valid answer is possible, as under the following cases:
+    ///   - `self` is past `other`
+    ///   - `other` is a non-whole-byte offset in bits-mode and `self` is in bytes-mode
     pub(crate) fn delta(self, other: Self) -> usize {
         if self.is_bit_mode() {
             other
@@ -64,10 +101,16 @@ impl ByteOffset {
         }
     }
 
+    /// Returns `true` if `self` is in bits-mode.
     pub(crate) fn is_bit_mode(&self) -> bool {
         matches!(self, Self::Bits { .. })
     }
 
+    /// Performs an 'increment by `delta`' operation on `self`, returning a new [`ByteOffset`] value.
+    ///
+    /// If `self` is in bits-mode, `delta` is treated as a number of bits to advance.
+    ///
+    /// If `self` is in bytes-mode, `delta` is treated as a number of bytes to advance.
     pub(crate) fn increment_by(&self, delta: usize) -> Self {
         match *self {
             ByteOffset::Bytes(n_bytes) => Self::Bytes(n_bytes + delta),
@@ -81,8 +124,9 @@ impl ByteOffset {
         }
     }
 
-    /// Increments `self` by `delta` unconditionally, returning the old value
-    /// of `self` before the offset.
+    /// Mutates `self` by performing an 'increment by `delta`' operation, returning its original value before the increment.
+    ///
+    /// Adheres to the same unit semantics as [`Self::increment_by`].
     pub(crate) fn increment_assign_by(&mut self, delta: usize) -> Self {
         let ret = *self;
         match self {
@@ -99,6 +143,11 @@ impl ByteOffset {
         ret
     }
 
+    /// Switches `self` from bytes-mode to bits-mode without advancing.
+    ///
+    /// Returns an error if `self` is already in bits-mode.
+    ///
+    /// Otherwise, returns `Ok(())`.
     pub(crate) fn enter_bits_mode(&mut self) -> Result<(), ParseError> {
         if let ByteOffset::Bytes(n_bytes) = *self {
             *self = ByteOffset::Bits {
@@ -107,29 +156,44 @@ impl ByteOffset {
             };
             Ok(())
         } else {
-            Err(ParseError::InternalError(StateError::BinaryModeError))
+            Err(ParseError::InternalError(StateError::Parser(
+                ParserStateError::BinaryModeError.logged(),
+            )))
         }
     }
 
+    /// Converts a bits-mode `self` back into bytes-mode.
+    ///
+    /// Returns an error of `self` was not in bits-mode.
+    ///
+    /// If the buffer-location represented by `self` was somewhere in the middle
+    /// of a byte, the new value will be the byte-offset of the following byte.
+    ///
+    /// Otherwise, the new value will be the byte-offset of the current byte.
+    ///
+    /// When successful, returns the number of bits advanced from the start of bits-mode.
     pub(crate) fn escape_bits_mode(&mut self) -> Result<usize, ParseError> {
-        if let ByteOffset::Bits {
+        let ByteOffset::Bits {
             starting_byte,
             bits_advanced,
         } = *self
-        {
-            let delta_major = bits_advanced / 8;
-            let delta_minor = bits_advanced % 8;
-            if delta_minor != 0 {
-                *self = ByteOffset::Bytes(starting_byte + delta_major + 1);
-            } else {
-                *self = ByteOffset::Bytes(starting_byte + delta_major);
-            }
-            Ok(bits_advanced)
+        else {
+            return Err(ParseError::InternalError(StateError::Parser(
+                ParserStateError::BinaryModeError.logged(),
+            )));
+        };
+
+        let delta_major = bits_advanced / 8;
+        let delta_minor = bits_advanced % 8;
+        if delta_minor != 0 {
+            *self = ByteOffset::Bytes(starting_byte + delta_major + 1);
         } else {
-            Err(ParseError::InternalError(StateError::BinaryModeError))
+            *self = ByteOffset::Bytes(starting_byte + delta_major);
         }
+        Ok(bits_advanced)
     }
 
+    /// Returns the absolute bit offset of the buffer-location represented by `self`.
     pub(crate) fn abs_bit_offset(&self) -> usize {
         match *self {
             ByteOffset::Bytes(n) => n * 8,
@@ -140,6 +204,7 @@ impl ByteOffset {
         }
     }
 
+    /// Returns the number of bits advanced from the start of bits-mode, or `None` if `self` is in bytes-mode.
     pub(crate) fn bits_advanced(&self) -> Option<usize> {
         match self {
             ByteOffset::Bytes(_n) => None,
@@ -147,6 +212,21 @@ impl ByteOffset {
         }
     }
 
+    /// Normalizes a [`ByteOffset`] into a `(byte_offset, nbits)` tuple.
+    ///
+    /// If self is in bytes-mode, `nbits` will be `None`.
+    ///
+    /// If self is in bits-mode, `nbits` will be `Some(k)` where `k` is the number of bits past `byte_offset` that have been read (`k < 8`),
+    /// and `byte_offset` is the offset of the byte that `self` is currently reading from.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use doodle::parser::offset::ByteOffset;
+    /// assert_eq!(ByteOffset::Bytes(127).as_bytes(), (127, None));
+    /// assert_eq!(ByteOffset::Bits { starting_byte: 42, bits_advanced: 3 }.as_bytes(), (42, Some(3)));
+    /// assert_eq!(ByteOffset::Bits { starting_byte: 1, bits_advanced: 33 }.as_bytes(), (5, Some(1)));
+    /// ```
     pub fn as_bytes(&self) -> (usize, Option<usize>) {
         match *self {
             ByteOffset::Bytes(n) => (n, None),
@@ -177,20 +257,13 @@ impl PartialOrd for ByteOffset {
         }
     }
 }
+// !SECTION - ByteOffset
 
-/// Comined state that tracks an index, or offset, into a buffer being parsed,
-/// and stores a [`ViewStack`] to manage meta-contextual state about subarray-limited (Slice)
-/// and speculative parsing (Peek, PeekNot, Alts/UnionNondet).
-pub(crate) struct BufferOffset {
-    /// The current value of the offset being tracked
-    current_offset: ByteOffset,
-    /// The stack of `Lens` objects in LIFO order
-    view_stack: ViewStack,
-    /// The maximum legal offset, which is one logical position past the final legal index of the buffer (i.e. equal to the buffer length when measured in bytes)
-    max_offset: ByteOffset,
-}
-
-/// Wrapper for a `Vec`-based FILO stack of [`Lens`]es
+/// Control structure that manages a stack of nested [`Lens`]es.
+///
+/// Used to enforce slice-based limits and restore the correct offset when escaping speculative parse contexts,
+/// even when the [`Lens`] containing the endpoint we are enforcing, or checkpoint we are restoring to, is not the
+/// topmost [`Lens`] on the stack.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ViewStack {
     stack: Vec<Lens>,
@@ -198,65 +271,98 @@ pub struct ViewStack {
 
 impl ViewStack {
     /// Creates a new, empty `ViewStack`.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         ViewStack { stack: Vec::new() }
     }
 
-    /// Performs a stack-push operation with the provided `Lens`
-    pub(crate) fn push_lens(&mut self, lens: Lens) {
+    /// Pushes the provided `Lens` onto the top of the stack.
+    pub fn push_lens(&mut self, lens: Lens) {
         self.stack.push(lens)
     }
 
-    /// Returns the upper-bound [`ByteOffset`] implied by a LIFO-order slice of [`Lens`]es.
+    /// Static helper that determines the most-restrictive upper-bound [`ByteOffset`] implied by a slice of [`Lens`]es
+    /// that is implicitly treated as a stack (LIFO order).
     ///
-    /// # Note
-    ///
-    /// If the slice is in non-LIFO order, the result returned by this method will be biased
-    /// to the rightmost `Lens` that imposes an upper-bound, and may be inaccurate.
+    /// Will produce incorrect answers if the slice is in non-LIFO order.
     fn get_limit_from_slice(slice: &[Lens]) -> Answer<ByteOffset> {
-        let (lens, rest) = match slice.split_last() {
-            Some(it) => it,
-            None => {
-                return Answer {
-                    val_or_keep_going: Err(true),
-                }
-            }
+        let Some((lens, rest)) = slice.split_last() else {
+            // NOTE - returning `None` is the desired outcome, and `Answer::Blocked` would be misleading, so we return `Answer::Continue` even though we can't actually continue from this point.
+            return Answer::Continue;
         };
-        // NOTE - because slices must nest, if we find one at any point, nothing further down will occur earlier in the buffer, so we can short-circuit
+        // NOTE - because [`Lens::Slice`]s are always required to nest properly, we can safely assume that the first one we find will always be the most-restrictive, so we can short-circuit the search
         lens.get_endpoint()
             .or_else(|| Self::get_limit_from_slice(rest))
     }
 
-    /// Returns the upper-bound [`ByteOffset`] implied  by a given `ViewStack`.
-    pub(crate) fn get_limit(&self) -> Option<ByteOffset> {
+    /// Returns the upper-bound [`ByteOffset`] implied by a given `ViewStack`.
+    ///
+    /// A return-value of `None` means that no artificial limits are being imposed by the `ViewStack`,
+    /// and that the true end-of-buffer should be used to determine the upper-bound.
+    ///
+    /// If the stack is empty, or if it contains no [`Lens::Slice`]s, will return `None`.
+    ///
+    /// Otherwise, will return the upper-bound of the most-restrictive [`Lens::Slice`] in the stack,
+    /// provided that there are no opaque [`Lens::Seek`] above it (in which case `None` will be returned).
+    pub fn get_limit(&self) -> Option<ByteOffset> {
         let ret = Self::get_limit_from_slice(self.stack.as_slice());
-        // FIXME - introduce caching mechanic
-        ret.as_option()
+        ret.to_option()
     }
 
-    /// Performs a stack-pop operation on an owned `ViewStack`, returning the
-    /// resulting `ViewStack` and the former topmost element.
-    pub(crate) fn escape(mut self) -> (ViewStack, Option<Lens>) {
+    /// Internal helper for unstacking as many elements from the top as necessary to reach the first [`Lens::Slice`] from the top.
+    ///
+    /// Used by [`BufferOffset::close_slice`] to remove the need to recurse, and to avoid discarding the entire stack if
+    /// no slices are found.
+    ///
+    /// This method splits the current stack, keeping only those elements below the topmost slice, and returning
+    /// an iterator over the elements that were removed (with the deepest element at the front of the iterator, and the topmost at the end).
+    fn unstack_slice_context(&mut self) -> impl DoubleEndedIterator<Item = Lens> + use<'_> {
+        let topmost_slice_ix = self
+            .stack
+            .iter()
+            .rposition(|lens| matches!(lens, Lens::Slice { .. }));
+        match topmost_slice_ix {
+            Some(ix) => self.stack.drain(ix..),
+            None => self.stack.drain(0..0),
+        }
+    }
+
+    /// Pops the topmost element of the stack, returning the updated stack and the popped element.
+    ///
+    /// If the stack is empty, will return `(self, None)`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// # use doodle::parser::offset::ViewStack;
+    /// // let mut stack = ViewStack::new();
+    /// // ...some operations that might push elements onto `stack`...
+    /// // let lens: Lens = ...;
+    /// let expected = (stack.clone(), Some(lens.clone()));
+    /// stack.push_lens(lens);
+    /// assert_eq!(stack.pop_lens(), expected);
+    /// ```
+    pub fn pop_lens(mut self) -> (ViewStack, Option<Lens>) {
         let ret = self.stack.pop();
         (self, ret)
     }
 
-    /// Unrolls a `ViewStack`, successively attempting to restore each `Lens` as it is popped.
+    /// Attempts to restore the return-on-success offset-checkpoint for a speculative parse that has succeeded.
     ///
-    /// Returns the ByteOffset that should be restored, and remainder of the `ViewStack`, if any `Lens`
-    /// is considered a 'restore'-point.
+    /// Scans the stack from the top down for the first `Lens` with a valid restore-point (see [`Lens::restore`]),
+    /// then truncates the stack to that point, discarding the matching `Lens` itself along with everything above it,
+    /// and returns the updated [`ViewStack`] along with the unwrapped result of [`Lens::restore`].
     ///
-    /// Otherwise, returns `Err(StateError::NoRestore)`.
+    /// If no Lenses in the stack have a valid restore-point, returns an error.
     ///
     /// # Note
     ///
-    /// In this context, 'restore' is used in apposition to 'recovery'.
+    /// In this context, 'restore' is the dual of 'recovery'.
     ///
-    /// When a speculative parse succeeds, the offset where it was initiated is 'restored' (i.e. after a successful Peek).
+    /// When a speculative parse succeeds, the offset where it was initiated is 'restored' (i.e. when the inner parse of a 'peek' or 'seek' operation is fully processed).
     ///
-    /// When a speculative parse fails,  the offset where it was initiated is 'recovered' (i.e. after a failed parse within a PeekNot, or on some branch of a UnionNondet)
+    /// When a speculative parse fails, the offset where it was initiated is 'recovered' (i.e. upon hitting a parse-failure within a 'peek-not' or 'union-nondet' operation)
     ///
-    /// This convention is adopted at the [`Lens`] and [`crate::parser::Parser`] layer as well.
+    /// This convention is adopted at the [`Lens`] and [`Parser`](crate::parser::Parser) layer as well.
     pub(crate) fn restore(mut self) -> Result<(ByteOffset, ViewStack), StateError> {
         for (ix, lens) in self.stack.iter().enumerate().rev() {
             match lens.restore() {
@@ -269,20 +375,26 @@ impl ViewStack {
                 }
             }
         }
-        Err(StateError::NoRestore)
+        Err(StateError::Parser(ParserStateError::NoRestore.logged()))
     }
 
-    /// Unrolls a `ViewStack`, successively attempting to recover each `Lens` as it is popped.
+    /// Attempts to recover to the return-on-fail offset-checkpoint for a speculative parse that has failed.
     ///
-    /// Returns the ByteOffset that should be recovered, and remainder of the `ViewStack`, if any `Lens`
-    /// is considered a 'recovery'-point.
+    /// Scans the stack from the top down for the first `Lens` with a valid recovery-point (see [`Lens::recover`]),
+    /// then truncates the stack to that point, discarding the matching `Lens` itself along with everything above it,
+    /// and returns the updated [`ViewStack`] along with the unwrapped result of [`Lens::recover`].
     ///
-    /// Otherwise, returns `Err(StateError::NoRecovery)`.
+    /// If no Lenses in the stack have a valid recovery-point, returns an error.
     ///
     /// # Note
     ///
-    /// See the documentation of [`ViewStack::restore`] for the difference between 'restore' and 'recover',
-    /// both as methods and as conventional terms.
+    /// In this context, 'recovery' is the dual of 'restore'.
+    ///
+    /// When a speculative parse fails, the offset where it was initiated is 'recovered' (i.e. upon hitting a parse-failure within a 'peek-not' or 'union-nondet' operation).
+    ///
+    /// When a speculative parse succeeds, the offset where it was initiated is 'restored' (i.e. when the inner parse of a 'peek' or 'seek' operation is fully processed).
+    ///
+    /// This convention is adopted at the [`Lens`] and [`Parser`](crate::parser::Parser) layer as well.
     pub(crate) fn recover(mut self) -> Result<(ByteOffset, ViewStack), StateError> {
         for (ix, lens) in self.stack.iter().enumerate().rev() {
             match lens.recover() {
@@ -295,56 +407,73 @@ impl ViewStack {
                 }
             }
         }
-        Err(StateError::NoRecovery)
+        Err(StateError::Parser(ParserStateError::NoRecovery.logged()))
     }
 }
 
-/// Enumeration over the (four) format-combinators that require special handling,
-/// both for limited-view (Slice) and speculative (Peek, PeekNot, UnionNondet) parsing,
-/// as well as free-context speculative random access (Seek).
+/// Control structure that manages state for individual parse-operations that change how the buffer is viewed or processed.
+///
+/// Used to provide support for various kinds of speculative parses, as well as [`Format::Slice`].
+///
+/// This is the element-type for [`ViewStack`].
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum Lens {
+pub enum Lens {
+    /// Lens generated when processing [`Format::UnionNondet`], to record the original start-offset to re-attempt an alternate branch-parse
+    /// from whenever a given branch-parse fails.
     Alts {
+        /// The original offset at the time when we began processing [`Format::UnionNondet`]
+        ///
+        /// This is a 'recovery'-point, in that we return to it if the current parse we are attempting hits a failure at any point.
         checkpoint: ByteOffset,
     },
+    /// Lens generated when processing [`Format::Peek`], to record the offset we will continue processing the buffer-data from after the peek succeeds
     Peek {
+        /// The original offset at the time when we began processing [`Format::Peek`]
+        ///
+        /// This is a 'restore'-point, in that we return to it when the current parse we are attempting fully succeeds.
         checkpoint: ByteOffset,
     },
+    /// Lens generated when processing [`Format::PeekNot`], to record the offset we will continue processing the buffer-data from after we have confirmed that the inner parse is unsuccessful
     PeekNot {
+        /// The original offset at the time when we began processing [`Format::PeekNot`]
+        ///
+        /// This is a 'recovery'-point, in that we return to it if the current parse we are attempting hits a failure at any point.
         checkpoint: ByteOffset,
     },
-    /// Random-access Seek with a restore-point offset of where we were before, and a control parameter for whether the seek is transparent with respect to subordinate Slices
+    /// Random-access Seek, pushed onto the `ViewStack` whenever a seek is performed.
+    ///
+    /// `Seek` is an engine-level operation (with no one-to-one mapping to a [`Format`]) that
+    /// is conditionally performed by [`BufferOffset::seek_to_offset`]. Otherwise, it is effectively
+    /// a [`Peek`] that happens to start reading from somewhere other than the current checkpointed
+    /// byte-offset.
+    ///
+    /// It contains an extra boolean flag-value, `is_transparent`, which determines whether
+    /// any enclosing [`Lens::Slice`] further down the `ViewStack` are still effectively
+    /// limiting how far into the buffer we are allowed to advance or read.
     Seek {
+        /// Control-flag that determines whether this seek is transparent (when true) or opaque (when false).
+        ///
+        /// A 'transparent' seek is treated as a proximal [`Lens::Peek`], and any [`Lens::Slice`]
+        /// enclosing it (i.e. lower down in the stack) is still actively limiting the upper-bound
+        /// reported by a [`ViewStack`], and enforced by a [`BufferOffset`]. [`ViewStack::get_limit`]
+        /// will ignore any transparent seeks it finds, and continue down the stack until it either
+        /// finds a slice or reaches the bottom of the stack.
+        ///
+        /// An 'opaque' seek is treated as a random-access jump to 'elsewhere' in the
+        /// buffer, and is unrestricted by any enclosing [`Lens::Slice`]. Any [`Lens::Slice`]
+        /// that is constructed **after** the opaque seek (i.e. higher up in the stack) will
+        /// still be active, but the requirement that all [`Lens::Slice`]s in the [`ViewStack`]
+        /// must nest into any further down, will be interrupted by the opaque seek, though
+        /// each half of the stack (above and below the opque seek) will still independently
+        /// enforce their own nesting invariants. More importantly, the reported 'current limit'
+        /// of a [`ViewStack`] will defer to the global maximum-buffer-offset if an opaque
+        /// seek is encountered before any slices when traversing the stack from top-to-bottom.
         is_transparent: bool,
         checkpoint: ByteOffset,
     },
     Slice {
         endpoint: ByteOffset,
     },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[repr(transparent)]
-pub(crate) struct Answer<T> {
-    val_or_keep_going: Result<T, bool>,
-}
-
-impl<T> Answer<T> {
-    fn or_else(self, f: impl FnOnce() -> Answer<T>) -> Answer<T> {
-        match self.val_or_keep_going {
-            Err(false) => Self {
-                val_or_keep_going: Err(false),
-            },
-            Err(true) => f(),
-            Ok(val) => Self {
-                val_or_keep_going: Ok(val),
-            },
-        }
-    }
-
-    fn as_option(self) -> Option<T> {
-        self.val_or_keep_going.ok()
-    }
 }
 
 impl Lens {
@@ -374,21 +503,36 @@ impl Lens {
 
     /// Returns the local upper-bound beyond which parsing is not permissible in the current Lens.
     ///
-    /// If the current Lens does not enforce such a limit, returns `None` instead, to allow back-propagation down the ViewStack
-    /// until one is found or the ViewStack is exhausted.
+    /// If the current Lens directly imposes such a limit (as with [`Lens::Slice`]), returns [`Answer::Found`] with that endpoint.
+    ///
+    /// If the current Lens does not impose a limit, but its presence should not prevent one from being found further
+    /// down the `ViewStack`, returns [`Answer::Continue`] to allow the search to propagate down the stack until one is
+    /// found or the stack is exhausted.
+    ///
+    /// If the current Lens does not impose a limit, but its presence should mask any limit that might otherwise be
+    /// found further down the stack (as with an opaque [`Lens::Seek`]), returns [`Answer::Blocked`] to end the search early.
     pub(crate) fn get_endpoint(&self) -> Answer<ByteOffset> {
         match self {
-            Lens::Slice { endpoint } => Answer {
-                val_or_keep_going: Ok(*endpoint),
-            },
-            Lens::Seek { is_transparent, .. } => Answer {
-                val_or_keep_going: Err(*is_transparent),
-            },
-            _ => Answer {
-                val_or_keep_going: Err(true),
-            },
+            Lens::Slice { endpoint } => Answer::Found(*endpoint),
+            Lens::Seek {
+                is_transparent: false,
+                ..
+            } => Answer::Blocked,
+            _ => Answer::Continue,
         }
     }
+}
+
+/// Comined state that tracks an index, or offset, into a buffer being parsed,
+/// and stores a [`ViewStack`] to manage meta-contextual state about subarray-limited (Slice)
+/// and speculative parsing (Peek, PeekNot, Alts/UnionNondet).
+pub(crate) struct BufferOffset {
+    /// The current value of the offset being tracked
+    current_offset: ByteOffset,
+    /// The stack of `Lens` objects in LIFO order
+    view_stack: ViewStack,
+    /// The maximum legal offset, which is one logical position past the final legal index of the buffer (i.e. equal to the buffer length when measured in bytes)
+    max_offset: ByteOffset,
 }
 
 impl BufferOffset {
@@ -408,6 +552,10 @@ impl BufferOffset {
     }
 
     /// Performs a seek operation, and returns the checkpoint offset if successful, or `Err` if the seek is not allowed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is currently in bit-parsing mode.
     ///
     /// # Note
     ///
@@ -429,8 +577,9 @@ impl BufferOffset {
 
         let checkpoint = self.current_offset;
         if checkpoint.is_bit_mode() {
+            log::warn!("edge-case: seek_to_offset called while in bit-parsing mode");
             // NOTE - this panic is a placeholder until we have a case where Seek and bit-mode parsing coincide, to inform the approach that fits this edge-case
-            unreachable!("cannot perform random byte-access while in bit-parsing mode");
+            unimplemented!("encountered unhandled edge-case of seek-to-offset in bit-parsing mode");
         }
 
         let is_transparent = match self.view_stack.get_limit() {
@@ -505,40 +654,64 @@ impl BufferOffset {
     ///
     /// # Safety
     ///
-    /// When called on a `Lens::Slice` whose endpoint exceeds an extant `Slice` in the
-    /// `ViewStack`, this method may lead to unexpected results, but will not be
-    /// undefined behavior.
+    /// No validation is performed to check whether the `Lens` is well-formed with respect
+    /// to the overall buffer, or the nesting-invariant enforced when multiple [`Lens::Slice`]
+    /// are on the stack simultaneously.
     ///
-    /// When called on a `Lens::Slice` whose endpoint exceeds the maximum buffer offset,
-    /// may lead to future panics due to OOB attempted reads.
+    /// If the [`BufferOffset`] recorded in a [`Lens`] (checkpoint or endpoint) is not a valid
+    /// offset within the corresponding buffer, various standard parsing or state-manipulation
+    /// methods may hit panics or potentially even undefined behavior.
     unsafe fn push_lens(&mut self, lens: Lens) {
         self.view_stack.push_lens(lens);
     }
 
-    /// Pushes a new `Lens::Slice` to the top of the `ViewStack` that ends at offset-delta `slice_len`,
-    /// without validating the upper-bound of said slice against either the most restrictive Slice on the
-    /// ViewStack thusfar, or even the `max_offset` of the `BufferOffset` in question.
+    /// Pushes an unvalidated `Lens::Slice` to the top of the `ViewStack` with an overall length of `slice_len` (i.e.
+    /// whose endpoint is `self.current_offset.increment_by(slice_len)`).
+    ///
+    /// This method does not check that upper-bound of this slice properly nests within any other slices in the stack,
+    /// or even against `self.max_offset` (the true upper-bound of the overall buffer).
     ///
     /// # Note
     ///
-    /// In bits-mode, the slice-len is implicitly assumed to specify a number of bits; in bytes-mode,
+    /// In bits-mode, `slice_len` is implicitly assumed to specify a number of bits; in bytes-mode,
     /// it is implicitly assumed to specify a number of bytes.
-    pub(crate) unsafe fn open_slice_unchecked(&mut self, slice_len: usize) {
-        self.push_lens(Lens::Slice {
+    pub(super) unsafe fn open_slice_unchecked(&mut self, slice_len: usize) {
+        let lens = Lens::Slice {
             endpoint: self.current_offset.increment_by(slice_len),
-        })
+        };
+        unsafe { self.push_lens(lens) }
     }
 
-    /// Skips to the end of the most recently opened slice (if not there already) and removes
-    /// the corresponding `Lens` from the `ViewStack`, popping any intervening `Lens`es that may
-    /// occur.
+    /// Escapes the context of a [`Format::Slice`] by skipping to its endpoint, popping the corresponding
+    /// [`Lens::Slice`] (and any lenses above it) from the [`ViewStack`].
     ///
-    /// Returns the value of the offset after this operation is processed, which will be the upper-bound
-    /// offset of the slice that was escaped.
+    /// Performs a top-down search of the `ViewStack` to find the most recent [`Lens::Slice`],
+    /// setting `self.current_offset` to its endpoint. This invariably restores the byte-or-bit modality
+    /// inherited from the [`ByteOffset`] at the time the slice was created.
     ///
-    /// Will return an appropriate `Err` value if either of the conditions below are met:
-    ///   - There is no slice to close
-    ///   - The current `ByteOffset` has somehow violated the upper-bound imposed by the most recent slice
+    /// Any lenses found above that [`Lens::Slice`] are discarded from the `ViewStack` along with it.
+    ///
+    /// Returns the new value of `current_offset`, which will be the endpoint of the slice that was closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an appropriate `Err` value if any of the conditions below are met:
+    ///   - No active slices were found in the `ViewStack`
+    ///   - A slice was found, but its endpoint is strictly lower than the current `ByteOffset`
+    ///   - A lens discarded above the topmost [`Lens::Slice`] still represents an open speculative
+    ///     parse-state (e.g. [`Lens::Peek`], [`Lens::PeekNot`]) or an opaque [`Lens::Seek`]. These are
+    ///     expected to have already been closed by the time `close_slice` is called (for example, via
+    ///     [`BufferOffset::close_peek`] for a `Lens::Peek`), so finding one still open here can only
+    ///     arise from mismatched open/close calls elsewhere in `Parser` (or the `BufferOffset` methods
+    ///     they delegate to) -- never from malformed or unexpected buffer data.
+    ///
+    /// The last of these conditions signals a bug in the parsing logic itself rather than a recoverable
+    /// data-inconsistency, and is reported as [`ParserStateError::UnfinishedLensAboveSlice`]. Errors of
+    /// this kind are logged unconditionally at the point they are constructed (see
+    /// [`ParserStateError::logged`]), since downstream combinators such as `Permit` or a
+    /// nondeterministic union's branch-retry logic are free to discard the returned `Err` without ever
+    /// surfacing it, and construction time is the only point in the call chain guaranteed to see every
+    /// occurrence.
     ///
     /// # Note
     ///
@@ -548,49 +721,66 @@ impl BufferOffset {
     /// escaped via [`BufferOffset::escape_bits_mode`]. The same would be true in the converse,
     /// except there is no parsing meta-operation that that enters bytes-mode from within bits-mode.
     pub(crate) fn close_slice(&mut self) -> PResult<ByteOffset> {
-        let mut stack = ViewStack::new();
-        std::mem::swap(&mut stack, &mut self.view_stack);
-        match stack.escape() {
-            (stack, Some(Lens::Slice { endpoint })) => {
-                if self.current_offset > endpoint {
-                    return Err(ParseError::InternalError(StateError::SliceOverrun));
+        // Extract the iterator that holds the top-most slice on the stack and any elements above it
+        let mut topmost = self.view_stack.unstack_slice_context();
+
+        // extract the slice we are closing, which should be the first element in the iterator
+        let Some(slice) = topmost.next() else {
+            return Err(ParseError::InternalError(StateError::Parser(
+                ParserStateError::MissingSlice.logged(),
+            )));
+        };
+        let Lens::Slice { endpoint } = slice else {
+            unreachable!(
+                "if the iterator returne dby unstack_slice_context is non-empty, the first element should always be Lens::Slice"
+            );
+        };
+
+        // iterate through the elements above the slice, from top to bottom, and ensure that our parsing-state isn't currently invalid
+        for top in topmost.rev() {
+            match top {
+                Lens::Slice { .. } => unreachable!(
+                    "only one slice should appear in the iterator returned by unstack_slice_context"
+                ),
+                Lens::Alts { checkpoint } => {
+                    // NOTE - we are handling non-det unions transparently, because we don't ever explicitly escape their state unless we fail a branch and need to try the next one
+                    log::info!(
+                        "BufferOffset::close_slice: found a non-det union (<-@{checkpoint}) within the slice we are closing (@{endpoint}->) (@{})",
+                        self.current_offset
+                    );
+                    continue;
                 }
-                self.current_offset = endpoint;
-                self.view_stack = stack;
-                Ok(endpoint)
-            }
-            (stack, Some(Lens::Alts { .. })) => {
-                // NOTE - if we nest a non-det union within a slice, we are closing it implicitly by precluding further fallthrough
-                self.view_stack = stack;
-                self.close_slice()
-            }
-            (_, None) => Err(ParseError::InternalError(StateError::MissingSlice)),
-            (_, Some(Lens::PeekNot { checkpoint })) => {
-                unreachable!(
-                    "[STATE]: close-slice @{}: unexpected PeekNot <-@{}",
-                    self.current_offset, checkpoint
-                );
-            }
-            (_, Some(Lens::Peek { checkpoint })) => {
-                unreachable!(
-                    "[STATE]: close-slice @{}: unexpected Peek <-@{}",
-                    self.current_offset, checkpoint
-                );
-            }
-            (
-                _,
-                Some(Lens::Seek {
-                    is_transparent,
+                Lens::Seek {
+                    is_transparent: false,
+                    ..
+                }
+                | Lens::PeekNot { .. }
+                | Lens::Peek { .. } => {
+                    return Err(ParseError::InternalError(StateError::Parser(
+                        ParserStateError::UnfinishedLensAboveSlice(top).logged(),
+                    )));
+                }
+                Lens::Seek {
+                    is_transparent: true,
                     checkpoint,
-                }),
-            ) => {
-                // NOTE - this panic is here for the same reason as the Peek/PeekNot cases above, but may be removed if this case naturally crops up
-                unreachable!(
-                    "[STATE]: close-slice @{}: unexpected Seek[is_transparent: {}] <-@{}",
-                    self.current_offset, is_transparent, checkpoint
-                )
+                } => {
+                    log::info!(
+                        "BufferOffset::close_slice: found a transparent Seek (<-@{checkpoint}) within the slice we are closing (@{endpoint}->) (@{})",
+                        self.current_offset
+                    );
+                    continue;
+                }
             }
         }
+
+        if self.current_offset > endpoint {
+            // return the appropriate state-error if we somehow managed to overrun the slice, which should typically never happen
+            return Err(ParseError::InternalError(StateError::Parser(
+                ParserStateError::SliceOverrun.logged(),
+            )));
+        }
+        self.current_offset = endpoint;
+        Ok(endpoint)
     }
 
     /// Creates and pushes a new [`Lens::Peek`] to the internal `ViewStack`.
@@ -614,17 +804,26 @@ impl BufferOffset {
         self.view_stack.push_lens(parallel);
     }
 
-    /// Performs a [`ViewStack::restore`] operation on the internal ViewStack, replacing
-    /// the current offset and ViewStack's values with the return-value of that method call.
+    /// Gracefully closes a speculative parse (generally, [`Lens::Peek`]).
     ///
-    /// If the `restore` operation returns an `Err`, will instead return the same error instead;
-    /// if such an `Err` value is returned, `self` will be left in a semi-indeterminate state,
-    /// and recovery from such an error is not possible.
+    /// Internally, this method calls [`ViewStack::restore`] on its held view-stack. Upon success,
+    /// `current_offset` will be set to the value returned by [`ViewStack::restore`], namely the
+    /// buffer-offset as of the time that the speculative parse was first opened.
+    ///
+    /// # Errors
+    ///
+    /// Proppagates any error returned by `ViewStack::restore` back to the caller.
+    ///
+    /// If an error is returned, no guarantees can be made about the internal state of the `BufferOffset`,
+    /// and the caller should not assume that the error-state can be recovered from.
     ///
     /// # Note
     ///
-    /// Though the method is called `close_peek`, it is also applicable for closing `Seek` Lenses as well.
-    /// As a result, it may need to be called more than once to close the `Peek`` below a `Seek`.
+    /// Despite the name `close_peek`, this method is the proper close-method for both [`Lens::Peek`] and [`Lens::Seek`] (the latter of which has
+    /// no open- close-method of its own).
+    ///
+    /// This design ensures that, no matter which internal decision is made by [`Parser::advance_or_seek`](crate::parser::Parser::advance_or_seek),
+    /// [`close_peek`] is the correct method to call after the corresponding speculative parse is finished.
     pub(crate) fn close_peek(&mut self) -> Result<(), StateError> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);
@@ -634,7 +833,7 @@ impl BufferOffset {
         Ok(())
     }
 
-    /// Performs an [`ViewStack::recover`] operation upon reaching a parse-failure, unwinding the internal ViewStack until a fail-safe `Lens` is popped.
+    /// Performs an [`ViewStack::recover`] operation upon reaching a parse-failure, unwinding the internal ViewStack until a fail-safe (recovery-point) `Lens` is found and discarded.
     ///
     /// If the ViewStack is empty, or is exhausted before such a Lens is found, will return `Err` with the appropriate
     /// `StateError` value. In such a case, `self` will be left in a semi-indeterminate state, and there is no way to

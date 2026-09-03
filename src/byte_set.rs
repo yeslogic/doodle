@@ -3,6 +3,8 @@ use std::{fmt, ops};
 
 use serde::ser::{Serialize, SerializeSeq, SerializeStruct, Serializer};
 
+pub mod pretty_print;
+
 /// Compact, allocation-free set of `u8`s.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ByteSet {
@@ -14,6 +16,13 @@ const fn min_set_bit(x: u64) -> Option<u8> {
     match x.trailing_zeros() {
         64 => None,
         i => Some(i as u8),
+    }
+}
+
+const fn max_set_bit(x: u64) -> Option<u8> {
+    match x.leading_zeros() {
+        64 => None,
+        i => Some((63 - i) as u8),
     }
 }
 
@@ -33,10 +42,24 @@ impl ByteSet {
         ByteSet::empty()
     }
 
-    /// Construct a ByteSet that consists of all bytes `i` such that bit `i % 64` is set
+    /// Construct a ByteSet that contains all bytes `B` such that bit `B % 64` is set
     /// in the binary representation of the 64-bit value at index `i / 4` of the argument array `bits`.
+    ///
+    /// For indexing purposes, this method treats the LSB of each 64-bit value as (relative) index 0, and its MSB as index 63.
+    ///
+    /// In contrast, index 0 of `bits` represents the lowest range of bytes (0..64).
     pub const fn from_bits(bits: [u64; 4]) -> ByteSet {
         ByteSet { bits }
+    }
+
+    /// Constructs a ByteSet that is the union of the two ByteSets `a` and `b`.
+    pub const fn union(&self, b: &Self) -> Self {
+        Self::from_bits([
+            self.bits[0] | b.bits[0],
+            self.bits[1] | b.bits[1],
+            self.bits[2] | b.bits[2],
+            self.bits[3] | b.bits[3],
+        ])
     }
 
     pub const fn to_bits(&self) -> [u64; 4] {
@@ -77,6 +100,22 @@ impl ByteSet {
         }
         if let Some(i) = min_set_bit(self.bits[3]) {
             return Some(0xc0 + i);
+        }
+        None
+    }
+
+    pub const fn max_elem(&self) -> Option<u8> {
+        if let Some(i) = max_set_bit(self.bits[3]) {
+            return Some(0xc0 + i);
+        }
+        if let Some(i) = max_set_bit(!self.bits[2]) {
+            return Some(0x80 + i);
+        }
+        if let Some(i) = max_set_bit(!self.bits[1]) {
+            return Some(0x40 + i);
+        }
+        if let Some(i) = max_set_bit(!self.bits[0]) {
+            return Some(i);
         }
         None
     }
@@ -153,16 +192,17 @@ impl ByteSet {
         self.map_bits(|bits| !bits)
     }
 
-    pub fn union(&self, other: &ByteSet) -> ByteSet {
-        ByteSet::zip_bits_with(self, other, |bits0, bits1| bits0 | bits1)
-    }
-
     pub fn difference(&self, other: &ByteSet) -> ByteSet {
         ByteSet::zip_bits_with(self, other, |b0, b1| b0 & !b1)
     }
 
-    pub fn intersection(&self, other: &ByteSet) -> ByteSet {
-        ByteSet::zip_bits_with(self, other, |bits0, bits1| bits0 & bits1)
+    pub const fn intersection(&self, other: &ByteSet) -> ByteSet {
+        ByteSet::from_bits([
+            self.bits[0] & other.bits[0],
+            self.bits[1] & other.bits[1],
+            self.bits[2] & other.bits[2],
+            self.bits[3] & other.bits[3],
+        ])
     }
 
     pub fn is_disjoint(&self, other: &ByteSet) -> bool {

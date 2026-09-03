@@ -1,0 +1,59 @@
+use super::*;
+
+pub(crate) fn table(om: &mut OpentypeModule<'_>) -> FormatRef {
+    let tag = om.tag();
+    let item_variation_store = om.item_variation_store();
+    let value_record = value_record(om.module(), tag);
+    om.module().define_format(
+        "opentype.mvar.table",
+        let_view(
+            "table_view",
+            record_auto([
+                ("table_scope", reify_view(vvar("table_view"))),
+                ("major_version", expect_u16be(1)),
+                ("minor_version", expect_u16be(0)),
+                ("__reserved", expect_u16be(0)),
+                ("value_record_size", expect_nonzero::<U16>(u16be())),
+                ("value_record_count", u16be()),
+                // NOTE - `value_record_count == 0` iff `item_variation_store.offset == 0`
+                (
+                    "item_variation_store",
+                    util::read_phantom_view_offset16(
+                        vvar("table_view"),
+                        item_variation_store.call(),
+                    ),
+                ),
+                // NOTE - the spec indicates that the value-record-size field must be used to determine the size of each value record, to allow for future expansion
+                // readarray-eligible once `as_base_kind_read` can resolve `FormatRef::call()`
+                // indirection: `value_record`'s `value_tag: tag.call()` field is the sole
+                // blocker (`tag` resolves to a bare `u32be()`); `delta_set_outer_index`/
+                // `delta_set_inner_index` are already bare `u16be()`. No new `FormatRef` needed
+                // -- `value_record` is already registered, reuse it directly (drop `.call()`).
+                // This field is plain sequential content after several fixed-width fields (the
+                // preceding `item_variation_store` offset field is a phantom, non-consuming
+                // read pointing elsewhere, not a pointer to this array), so it would need
+                // `from_here(read_array(var("value_record_count"), value_record))`.
+                (
+                    "value_records",
+                    repeat_count(var("value_record_count"), value_record.call()),
+                ),
+            ]),
+        ),
+    )
+}
+
+/// MVar value record format definition
+///
+/// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/mvar#table-formats
+fn value_record(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+    // Only a select set of valueTags are explicitly defined in the spec: https://learn.microsoft.com/en-us/typography/opentype/spec/mvar#value-tags
+    // Private tags are also permitted but are mandated to begin with an uppercase letter and contain only `[A-Z0-9]`
+    module.define_format(
+        "opentype.mvar.value_record",
+        record_auto([
+            ("value_tag", tag.call()),
+            ("delta_set_outer_index", u16be()),
+            ("delta_set_inner_index", u16be()),
+        ]),
+    )
+}

@@ -1,17 +1,18 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use anyhow::{anyhow, Result as AResult};
-use doodle::codegen::{generate_code, ToFragment};
+use anyhow::{Result as AResult, anyhow};
 use doodle::Format;
+use doodle::codegen::{ToFragment, generate_code};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
+use doodle::FormatModule;
 use doodle::decoder::Compiler;
 use doodle::read::ReadCtxt;
 use doodle::typecheck;
-use doodle::FormatModule;
 
 mod format;
 
@@ -46,6 +47,8 @@ enum Command {
         output: FormatOutput,
         #[arg(long, default_value = None)]
         dest: Option<PathBuf>,
+        #[arg(long)]
+        png_tag_only: bool,
     },
     /// Decode a binary file
     File {
@@ -61,6 +64,7 @@ enum Command {
     },
     /// Typecheck the main FormatModule
     TypeCheck,
+    Census,
 }
 
 const SELECTORS: &[(&[&str], FormatSelector)] = &[
@@ -75,6 +79,7 @@ const SELECTORS: &[(&[&str], FormatSelector)] = &[
     (&["gzip"], FormatSelector::Gzip),
     (&["jpeg", "jpg"], FormatSelector::Jpeg),
     (&["mp4", "mpeg4"], FormatSelector::Mp4),
+    (&["numbers"], FormatSelector::Numbers),
     (&["peano"], FormatSelector::Peano),
     (&["png"], FormatSelector::Png),
     (&["riff"], FormatSelector::Riff),
@@ -97,6 +102,7 @@ enum FormatSelector {
     Gzip,
     Jpeg,
     Mp4,
+    Numbers,
     Opentype,
     Peano,
     Png,
@@ -115,19 +121,62 @@ thread_local! {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
+    let level = if cfg!(debug_assertions) {
+        log::Level::Debug
+    } else {
+        log::Level::Error
+    };
+    stderrlog::new()
+        .module(module_path!())
+        .verbosity(level)
+        .init()
+        .unwrap();
+
     match Command::parse() {
-        Command::Format { output, dest } => {
+        Command::Census => {
             let mut module = FormatModule::new();
             let format = format::main(&mut module).call();
-
-            match output {
-                FormatOutput::Debug => println!("{module:?}"),
-                FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
-                FormatOutput::Rust => {
-                    print_generated_code(&module, &format, dest);
+            let results = run_census(&format, &module);
+            let mut data = Vec::new();
+            if let Some(res) = results {
+                for (name, contents) in res {
+                    let accum: Vec<&'static str> = contents.store.into_iter().collect();
+                    data.push((name.to_string(), accum));
                 }
             }
-
+            println!("{}", serde_json::to_string_pretty(&data).unwrap());
+            Ok(())
+        }
+        Command::Format {
+            output,
+            dest,
+            png_tag_only,
+        } => {
+            if png_tag_only {
+                let mut module = FormatModule::new();
+                let format = format::png::png_tag(&mut module).call();
+                match output {
+                    FormatOutput::Debug => println!("{module:?}"),
+                    FormatOutput::Json => {
+                        serde_json::to_writer(std::io::stdout(), &module).unwrap()
+                    }
+                    FormatOutput::Rust => {
+                        print_generated_code(&module, &format, dest);
+                    }
+                }
+            } else {
+                let mut module = FormatModule::new();
+                let format = format::main(&mut module).call();
+                match output {
+                    FormatOutput::Debug => println!("{module:?}"),
+                    FormatOutput::Json => {
+                        serde_json::to_writer(std::io::stdout(), &module).unwrap()
+                    }
+                    FormatOutput::Rust => {
+                        print_generated_code(&module, &format, dest);
+                    }
+                }
+            }
             Ok(())
         }
         Command::File {
@@ -140,8 +189,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             let format = match as_format {
                 None => format::main(&mut module).call(),
                 Some(selector) => {
-                    let base = format::base::main(&mut module);
-
                     let normalized = selector.to_lowercase();
                     let Some(selected) = SELECTOR_MAP
                         .try_with(|map| map.get(normalized.as_str()).copied())
@@ -152,37 +199,38 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         return Err(anyhow!("Unknown format specifier `{normalized}`").into());
                     };
                     match selected {
-                        FormatSelector::Deflate => format::deflate::main(&mut module, &base).call(),
+                        FormatSelector::Deflate => format::deflate::main(&mut module).call(),
                         FormatSelector::Zlib => {
-                            let deflate = format::deflate::main(&mut module, &base);
-                            format::zlib::main(&mut module, &base, deflate).call()
+                            let deflate = format::deflate::main(&mut module);
+                            format::zlib::main(&mut module, deflate).call()
                         }
-                        FormatSelector::Tiff => format::tiff::main(&mut module, &base).call(),
-                        FormatSelector::Utf8Text => format::text::main(&mut module, &base).0.call(),
-                        FormatSelector::Gif => format::gif::main(&mut module, &base).call(),
+                        FormatSelector::Tiff => format::tiff::main(&mut module).call(),
+                        FormatSelector::Utf8Text => format::text::main(&mut module).0.call(),
+                        FormatSelector::Gif => format::gif::main(&mut module).call(),
                         FormatSelector::Gzip => {
-                            let deflate = format::deflate::main(&mut module, &base);
-                            format::gzip::main(&mut module, deflate, &base).call()
+                            let deflate = format::deflate::main(&mut module);
+                            format::gzip::main(&mut module, deflate).call()
                         }
                         FormatSelector::Jpeg => {
-                            let tiff = format::tiff::main(&mut module, &base);
-                            format::jpeg::main(&mut module, &base, &tiff).call()
+                            let tiff = format::tiff::main(&mut module);
+                            format::jpeg::main(&mut module, tiff).call()
                         }
-                        FormatSelector::Mp4 => format::mpeg4::main(&mut module, &base).call(),
+                        FormatSelector::Numbers => format::numbers::main(&mut module).call(),
+                        FormatSelector::Mp4 => format::mpeg4::main(&mut module).call(),
                         FormatSelector::Peano => format::peano::main(&mut module).call(),
                         FormatSelector::Png => {
-                            let deflate = format::deflate::main(&mut module, &base);
-                            let zlib = format::zlib::main(&mut module, &base, deflate);
-                            let (text, utf8nz) = format::text::main(&mut module, &base);
-                            format::png::main(&mut module, zlib, text, utf8nz, &base).call()
+                            let deflate = format::deflate::main(&mut module);
+                            let zlib = format::zlib::main(&mut module, deflate);
+                            let (text, utf8nz) = format::text::main(&mut module);
+                            format::png::main(&mut module, zlib, text, utf8nz).call()
                         }
-                        FormatSelector::Riff => format::riff::main(&mut module, &base).call(),
-                        FormatSelector::Rle => format::run_length::main(&mut module, &base).call(),
-                        FormatSelector::Tar => format::tar::main(&mut module, &base).call(),
+                        FormatSelector::Riff => format::riff::main(&mut module).call(),
+                        FormatSelector::Rle => format::run_length::main(&mut module).call(),
+                        FormatSelector::Tar => format::tar::main(&mut module).call(),
                         FormatSelector::TarGz => {
-                            let deflate = format::deflate::main(&mut module, &base);
-                            let gzip = format::gzip::main(&mut module, deflate, &base);
-                            let tar = format::tar::main(&mut module, &base);
+                            let deflate = format::deflate::main(&mut module);
+                            let gzip = format::gzip::main(&mut module, deflate);
+                            let tar = format::tar::main(&mut module);
                             use doodle::helper::*;
                             module
                                 .define_format(
@@ -205,30 +253,42 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                                 )
                                 .call()
                         }
-                        FormatSelector::Elf => format::elf::main(&mut module, &base).call(),
-                        FormatSelector::Waldo => format::waldo::main(&mut module, &base).call(),
-                        FormatSelector::Opentype => {
-                            format::opentype::main(&mut module, &base).call()
-                        }
+                        FormatSelector::Elf => format::elf::main(&mut module).call(),
+                        FormatSelector::Waldo => format::waldo::main(&mut module).call(),
+                        FormatSelector::Opentype => format::opentype_standalone(&mut module).call(),
                     }
                 }
             };
             let program = Compiler::compile_program(&module, &format)?;
 
             let input = fs::read(filename)?;
-            let (value, _) = program.run(ReadCtxt::new(&input))?;
-
             match output {
-                FileOutput::Debug => println!("{value:?}"),
-                FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
-                FileOutput::Tree if !trace => {
-                    doodle::output::tree::print_decoded_value(&module, &value, &format);
+                FileOutput::Debug => {
+                    let (value, _) = program.run(ReadCtxt::new(&input))?;
+                    println!("{value:?}");
+                }
+                FileOutput::Json => {
+                    if trace {
+                        let (p_value, _) = program.run_with_loc(ReadCtxt::new(&input))?;
+                        serde_json::to_writer(std::io::stdout(), &p_value).unwrap()
+                    } else {
+                        let (value, _) = program.run(ReadCtxt::new(&input))?;
+                        serde_json::to_writer(std::io::stdout(), &value).unwrap()
+                    }
                 }
                 FileOutput::Tree => {
-                    let (p_value, _) = program.run_with_loc(ReadCtxt::new(&input))?;
-                    doodle::output::tree::print_parsed_decoded_value(&module, &p_value, &format);
+                    if trace {
+                        let (p_value, _) = program.run_with_loc(ReadCtxt::new(&input))?;
+                        doodle::output::tree::print_parsed_decoded_value(
+                            &module, &p_value, &format,
+                        );
+                    } else {
+                        let (value, _) = program.run(ReadCtxt::new(&input))?;
+                        doodle::output::tree::print_decoded_value(&module, &value, &format);
+                    }
                 }
                 FileOutput::Flat => {
+                    let (value, _) = program.run(ReadCtxt::new(&input))?;
                     doodle::output::flat::print_decoded_value(&module, &value, &format);
                 }
             }
@@ -247,7 +307,10 @@ fn check_all(module: &FormatModule) -> AResult<()> {
     for (level, f) in module.iter_formats() {
         if let Some(vt) = typecheck(module, &f).map_err(|err| anyhow!("{err}"))? {
             let mod_vt = module.get_format_type(level);
-            assert_eq!(&vt, mod_vt);
+            assert!(
+                vt.unify(&mod_vt).is_ok(),
+                "incompatible typings:\ntc: {vt:?}\nmodule: {mod_vt:?}"
+            );
         }
     }
     Ok(())
@@ -271,7 +334,7 @@ fn print_generated_code(
                 || (path.is_file()
                     && path
                         .file_name()
-                        .is_some_and(|s| s.to_string_lossy().contains("gencode.rs")))
+                        .is_some_and(|s| s.to_string_lossy().contains("gencode")))
             {
                 let f = std::fs::File::create(path).unwrap_or_else(|err| panic!("error: {err}"));
                 write_to(f, content).expect("failed to write");
@@ -286,8 +349,214 @@ fn print_generated_code(
 }
 
 #[test]
+/// Tests that there are no errors or panics encountered when generating code from the root format definition.
 fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
     let _ = generate_code(&module, &format);
+}
+
+#[test]
+fn test_types() -> Result<(), anyhow::Error> {
+    let mut module = FormatModule::new();
+    let _ = format::main(&mut module);
+    check_all(&module)
+}
+
+/// Utility module for crawling a format tree and collecting the set of formats used within it.
+mod census {
+    use doodle::ViewFormat;
+
+    use super::*;
+    use std::collections::BTreeSet;
+
+    /// Population-data for a tree rooted in a given format, represented as a set of strings.
+    pub struct FormatPop {
+        pub store: BTreeSet<&'static str>,
+    }
+
+    impl FormatPop {
+        /// Constructs an empty population-set.
+        pub fn new() -> Self {
+            FormatPop {
+                store: BTreeSet::new(),
+            }
+        }
+
+        /// Adds a member to the population-set, if it is not present already.
+        fn add_format(&mut self, format: &'static str) {
+            self.store.insert(format);
+        }
+    }
+
+    /// Crawls a format tree, adding each encountered format of sufficient complexity to the population-set.
+    ///
+    /// Typically, the formats that end up in the population-set (as opposed to being silently ignored) are those that
+    /// add a significant layer of complexity to the parse and which are more likely to cause bugs in the interpreter or
+    /// generated code if mishandled.
+    pub fn crawl(format: &Format, module: &FormatModule, pop: &mut FormatPop) {
+        match format {
+            Format::ItemVar(level, ..) => {
+                let format = module.get_format(*level);
+                crawl(format, module, pop);
+            }
+            Format::Fail => (),
+            Format::EndOfInput => (),
+            Format::Align(_) => (),
+            Format::Byte(..) => (),
+            Format::Variant(_, format) => {
+                crawl(format, module, pop);
+            }
+            Format::Phantom(inner) => {
+                crawl(inner, module, pop);
+            }
+            Format::Union(formats) => {
+                for f in formats {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::UnionNondet(formats) => {
+                pop.add_format("UnionNondet");
+                for f in formats {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::Tuple(formats) | Format::Sequence(formats) => {
+                for f in formats {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::Repeat(format) => crawl(format, module, pop),
+            Format::Repeat1(format) => crawl(format, module, pop),
+            Format::RepeatCount(_, format) => crawl(format, module, pop),
+            Format::RepeatBetween(.., format) => {
+                pop.add_format("RepeatBetween");
+                crawl(format, module, pop);
+            }
+            Format::RepeatUntilLast(_, format) => {
+                pop.add_format("RepeatUntilLast");
+                crawl(format, module, pop);
+            }
+            Format::RepeatUntilSeq(_, format) => {
+                pop.add_format("RepeatUntilSeq");
+                crawl(format, module, pop);
+            }
+            Format::AccumUntil(.., format) => {
+                pop.add_format("AccumUntil");
+                crawl(format, module, pop);
+            }
+            Format::ForEach(.., format) => {
+                pop.add_format("ForEach");
+                crawl(format, module, pop);
+            }
+            Format::Maybe(_, format) => {
+                pop.add_format("Maybe");
+                crawl(format, module, pop);
+            }
+            Format::Peek(format) => {
+                pop.add_format("Peek");
+                crawl(format, module, pop);
+            }
+            Format::PeekNot(format) => {
+                pop.add_format("PeekNot");
+                crawl(format, module, pop);
+            }
+            Format::Slice(_, format) => {
+                pop.add_format("Slice");
+                crawl(format, module, pop);
+            }
+            Format::Bits(format) => {
+                pop.add_format("Bits");
+                crawl(format, module, pop);
+            }
+            Format::WithRelativeOffset(.., format) => {
+                pop.add_format("WithRelativeOffset");
+                crawl(format, module, pop);
+            }
+            Format::Map(format, ..) => crawl(format, module, pop),
+            Format::Where(format, ..) => crawl(format, module, pop),
+            Format::Compute(_) => (),
+            Format::Let(.., format) => crawl(format, module, pop),
+            Format::Match(.., items) => {
+                for (_, f) in items {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::Dynamic(_, dyn_format, format) => {
+                match dyn_format {
+                    doodle::DynFormat::Huffman(..) => pop.add_format("Dynamic@Huffman"),
+                };
+                crawl(format, module, pop);
+            }
+            Format::Apply(..) => (),
+            Format::Pos => (),
+            Format::SkipRemainder => (),
+            Format::DecodeBytes(.., format) => {
+                pop.add_format("DecodeBytes");
+                crawl(format, module, pop);
+            }
+            Format::LetFormat(f0, _, f1) | Format::MonadSeq(f0, f1) => {
+                crawl(f0, module, pop);
+                crawl(f1, module, pop);
+            }
+            Format::Permit(format, ..) | Format::Hint(.., format) => crawl(format, module, pop),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(format) => crawl(format, module, pop),
+            Format::LiftedOption(Some(format)) => crawl(format, module, pop),
+            Format::LiftedOption(None) => (),
+            Format::LetView(.., format) => crawl(format, module, pop),
+            Format::WithView(.., view_format) => match view_format {
+                ViewFormat::CaptureBytes(..) => pop.add_format("WithView@CaptureBytes"),
+                ViewFormat::ReadArray(..) => pop.add_format("WithView@ReadArray"),
+                ViewFormat::ReifyView => pop.add_format("WithView@ReifyView"),
+            },
+            Format::ParseFromView(.., format) => {
+                pop.add_format("ParseFromView");
+                crawl(format, module, pop);
+            }
+        }
+    }
+}
+
+/// Returns the most relevant identifying string for a `Format`.
+///
+/// A `Format::ItemVar` returns the name of the format at the given level.
+/// A `Format::Variant` returns the name of the variant in question.
+///
+/// All other format inputs will result in a panic.
+fn get_name<'a>(f: &Format, module: &'a FormatModule) -> &'a str {
+    match f {
+        Format::ItemVar(level, ..) => module.get_name(*level),
+        Format::Variant(_, f) => get_name(f, module),
+        _ => unreachable!("unexpected branch"),
+    }
+}
+
+/// Returns a `BTreeMap` of `FormatPop`s for each format in `f`.
+///
+/// Assumes that `f` is the top-level format containing a `Format::UnionNondet` over high-level format variants.
+///
+fn run_census<'a>(
+    entrypoint: &Format,
+    module: &'a FormatModule,
+) -> Option<BTreeMap<&'a str, census::FormatPop>> {
+    match entrypoint {
+        Format::ItemVar(level, ..) => {
+            let format = module.get_format(*level);
+            run_census(format, module)
+        }
+        Format::UnionNondet(formats) => {
+            let mut pops = std::collections::BTreeMap::new();
+            for f in formats {
+                let name = get_name(f, module);
+                let mut pop = census::FormatPop::new();
+                census::crawl(f, module, &mut pop);
+                pops.insert(name, pop);
+            }
+            Some(pops)
+        }
+        Format::LetFormat(f0, _, f1) => run_census(f0, module).or_else(|| run_census(f1, module)),
+        Format::Hint(_, f) => run_census(f, module),
+        _ => None,
+    }
 }

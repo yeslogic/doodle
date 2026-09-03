@@ -3,34 +3,48 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
-use std::ops::Add;
+use std::iter::repeat_n;
 use std::rc::Rc;
 
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use codegen::typed_format::{GenType, TypedFormat};
 use serde::Serialize;
 
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
+use crate::numeric::core::{Expr as NumExpr, VOID};
 use crate::read::ReadCtxt;
 
+pub mod alt;
 pub mod bounds;
 pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
-pub mod disjoint;
+
+pub mod dep_ref;
+pub(crate) mod fixed;
+pub use dep_ref::DepFormat;
+
 pub mod error;
 pub mod helper;
 pub mod loc_decoder;
-
+pub mod marker;
+pub use marker::{BaseKind, Endian, FixedReadKind};
+pub mod numeric;
 pub mod output;
 pub mod parser;
-pub mod precedence;
+mod precedence;
 pub mod prelude;
 pub mod read;
 
+mod scope;
+
 mod typecheck;
-pub use typecheck::{typecheck, IntWidth, TCError, TCResult};
+pub use typecheck::{TCResult, base_set, error::TCError, typecheck};
+mod util;
+pub(crate) use util::IxHeap;
+
+pub(crate) mod validation;
 
 pub type Label = std::borrow::Cow<'static, str>;
 
@@ -41,9 +55,12 @@ impl<T> IntoLabel for T where T: Into<Label> {}
 pub(crate) mod pattern;
 pub use pattern::Pattern;
 
-pub enum ValueKind {
-    Value(ValueType),
-    Format(ValueType),
+#[derive(Debug, Clone)]
+pub enum ValueKind<T> {
+    /// A local 'view' of an input buffer (e.g. `ReadScope`).
+    View,
+    Value(T),
+    Format(T),
 }
 
 pub(crate) mod valuetype;
@@ -52,6 +69,7 @@ pub use valuetype::{BaseType, TypeHint, ValueType};
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
     match vt {
         ValueType::Any | ValueType::Empty => None,
+        ValueType::ViewObj | ValueType::PhantomData(..) => None,
         ValueType::Base(b) => Some(match b {
             BaseType::Bool => Expr::Bool(false),
             BaseType::U8 => Expr::U8(0),
@@ -60,6 +78,12 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             BaseType::U64 => Expr::U64(0),
             BaseType::Char => Expr::AsChar(Box::new(Expr::U32(0))),
         }),
+        ValueType::NumericHole => Some(Expr::Numeric(Box::new(NumExpr::Const(
+            numeric::TypedConst::from_u8(0),
+        )))),
+        ValueType::Signed(t) => Some(Expr::Numeric(Box::new(NumExpr::Const(
+            numeric::TypedConst::new(-1, (*t).into()),
+        )))),
         ValueType::Tuple(ts) => {
             let mut xs = Vec::with_capacity(ts.len());
             for t in ts {
@@ -79,10 +103,7 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             Some(Expr::Variant(lbl.clone(), Box::new(mk_value_expr(branch)?)))
         }
         ValueType::Seq(t) => Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?])),
-        ValueType::Option(t) => Some(Expr::Variant(
-            Label::from("Some"),
-            Box::new(mk_value_expr(t)?),
-        )),
+        ValueType::Option(t) => Some(Expr::LiftOption(Some(Box::new(mk_value_expr(t)?)))),
     }
 }
 
@@ -136,6 +157,8 @@ pub enum Expr {
     RecordProj(Box<Expr>, Label),
     Variant(Label, Box<Expr>),
     Seq(Vec<Expr>),
+
+    Numeric(Box<NumExpr>),
 
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Destructure(Box<Expr>, Pattern, Box<Expr>),
@@ -208,19 +231,23 @@ pub enum ProjKind {
 
 impl Expr {
     // FIXME: is this still an inherent method, or should we have a UD -> TC phase and use get_type_info instead?
-    fn infer_type(&self, scope: &TypeScope<'_>) -> AResult<ValueType> {
+    fn infer_type(&self, scope: &TypeScope<'_, ValueType>) -> AResult<ValueType> {
         match self {
             Expr::Var(name) => match scope.get_type_by_name(name) {
                 ValueKind::Value(t) => Ok(t.clone()),
+                ValueKind::View => Err(anyhow!(
+                    "expected ValueKind::Value, found ValueKind::View for var {name}"
+                )),
                 ValueKind::Format(_t) => Err(anyhow!(
                     "expected ValueKind::Value, found ValueKind::Format for var {name}"
                 )),
             },
             Expr::Bool(_b) => Ok(ValueType::Base(BaseType::Bool)),
-            Expr::U8(_n) => Ok(ValueType::Base(BaseType::U8)),
-            Expr::U16(_n) => Ok(ValueType::Base(BaseType::U16)),
-            Expr::U32(_n) => Ok(ValueType::Base(BaseType::U32)),
-            Expr::U64(_n) => Ok(ValueType::Base(BaseType::U64)),
+            Expr::U8(_n) => Ok(ValueType::U8),
+            Expr::U16(_n) => Ok(ValueType::U16),
+            Expr::U32(_n) => Ok(ValueType::U32),
+            Expr::U64(_n) => Ok(ValueType::U64),
+            Expr::Numeric(n_tree) => n_tree.infer_type(scope),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
@@ -272,14 +299,16 @@ impl Expr {
             }
             Expr::Lambda(..) => Err(anyhow!("infer_type encountered unexpected lambda")),
 
-            Expr::IntRel(_rel, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
+            Expr::IntRel(_rel, x, y) => {
+                let (t0, t1) = (x.infer_type(scope)?, y.infer_type(scope)?);
+                if t0.unify(&t1).as_ref().is_ok_and(ValueType::is_numeric) {
                     Ok(ValueType::Base(BaseType::Bool))
+                } else {
+                    Err(anyhow!(
+                        "mismatched operand types for {_rel:?}: {t0:?}, {t1:?}"
+                    ))
                 }
-                (x, y) => Err(anyhow!(
-                    "mismatched operand types for {_rel:?}: {x:?}, {y:?}"
-                )),
-            },
+            }
             Expr::Arith(_arith @ (Arith::BoolAnd | Arith::BoolOr), x, y) => {
                 match (x.infer_type(scope)?, y.infer_type(scope)?) {
                     (ValueType::Base(BaseType::Bool), ValueType::Base(BaseType::Bool)) => {
@@ -291,100 +320,128 @@ impl Expr {
                 }
             }
 
-            Expr::Arith(_arith, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
-                    Ok(ValueType::Base(b1))
-                }
-                (x, y) => Err(anyhow!(
-                    "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
-                )),
-            },
+            Expr::Arith(_arith, x, y) => {
+                let (t1, t2) = (x.infer_type(scope)?, y.infer_type(scope)?);
+                t1.unify(&t2).map_err(|e| anyhow!("{e}")).and_then(|t0| {
+                    if t0.is_numeric() {
+                        Ok(t0)
+                    } else {
+                        Err(anyhow!(
+                            "mismatched operand types for {_arith:?}: {t1:?}, {t2:?}"
+                        ))
+                    }
+                })
+            }
             Expr::Unary(_op @ UnaryOp::BoolNot, x) => match x.infer_type(scope)? {
                 ValueType::Base(BaseType::Bool) => Ok(ValueType::Base(BaseType::Bool)),
                 x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
             },
             Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => {
-                match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(b)),
-                    x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
+                let t = x.infer_type(scope)?;
+                if t.is_numeric() {
+                    Ok(t)
+                } else {
+                    Err(anyhow!("unexpected operand type for {_op:?}: {t:?}"))
                 }
             }
-
             Expr::AsU8(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
+                t if t.is_numeric() => Ok(ValueType::U8),
                 x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
             },
             Expr::AsU16(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
+                t if t.is_numeric() => Ok(ValueType::U16),
                 x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
             },
             Expr::AsU32(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
+                t if t.is_numeric() => Ok(ValueType::U32),
                 x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
             },
             Expr::AsU64(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U64)),
+                t if t.is_numeric() => Ok(ValueType::U64),
                 x => Err(anyhow!("cannot convert {x:?} to U64")),
             },
             Expr::AsChar(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
+                t if t.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
                 x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
             },
             Expr::U16Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U16))
-                    }
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8]) => Ok(ValueType::U16),
                     _ => Err(anyhow!("unsound byte-level type cast U16Be(_ : {_t:?})")),
                 }
             }
             Expr::U16Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U16))
-                    }
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8]) => Ok(ValueType::U16),
                     _ => Err(anyhow!("unsound byte-level type cast U16Le(_ : {_t:?})")),
                 }
             }
             Expr::U32Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U32))
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8]) => {
+                        Ok(ValueType::U32)
                     }
                     _ => Err(anyhow!("unsound byte-level type cast U32Be(_ : {_t:?})")),
                 }
             }
             Expr::U32Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U32))
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8]) => {
+                        Ok(ValueType::U32)
                     }
                     _ => Err(anyhow!("unsound byte-level type cast U32Le(_ : {_t:?})")),
                 }
             }
-            Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
+            Expr::U64Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U64))
-                    }
-                    other => Err(anyhow!(
-                        "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
-                    )),
+                match _t.try_as_tuple_type() {
+                    Ok(
+                        [
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                        ],
+                    ) => Ok(ValueType::U64),
+                    _ => Err(anyhow!("unsound byte-level type cast U64Be(_ : {_t:?})")),
+                }
+            }
+            Expr::U64Le(bytes) => {
+                let _t = bytes.infer_type(scope)?;
+                match _t.try_as_tuple_type() {
+                    Ok(
+                        [
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                        ],
+                    ) => Ok(ValueType::U64),
+                    _ => Err(anyhow!("unsound byte-level type cast U64Le(_ : {_t:?})")),
                 }
             }
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
-                ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
+                // FIXME[epic=seqlen-always-u32] - this ought to be NumericHole, but there are several Expr/Format-level hardcoded U32 type-assumptions on Expr args that would also need to be fixed in tandem
+                ValueType::Seq(_t) => Ok(ValueType::SEQ_LEN_T),
                 other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
             },
             Expr::SeqIx(seq, index) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let index_type = index.infer_type(scope)?;
-                    if index_type != ValueType::Base(BaseType::U32) {
+                    // FIXME[epic=seqlen-always-u32] - this should share whatever type SeqLen gets
+                    if index_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SeqIx `index` param: expected U32, found {index_type:?}"
                         ));
@@ -393,16 +450,17 @@ impl Expr {
                 }
                 other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
             },
+            // FIXME[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
             Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
-                    if start_type != ValueType::Base(BaseType::U32) {
+                    if start_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeq `start` param: expected U32, found {start_type:?}"
                         ));
                     }
-                    if length_type != ValueType::Base(BaseType::U32) {
+                    if length_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeq length must be numeric, found {length_type:?}"
                         ));
@@ -411,16 +469,17 @@ impl Expr {
                 }
                 other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
             },
+            // FIXME[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
             Expr::SubSeqInflate(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
-                    if start_type != ValueType::Base(BaseType::U32) {
+                    if start_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeqInflate `start` param: expected U32, found {start_type:?}"
                         ));
                     }
-                    if length_type != ValueType::Base(BaseType::U32) {
+                    if length_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeqInflate length must be numeric, found {length_type:?}"
                         ));
@@ -452,7 +511,7 @@ impl Expr {
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
                         match expr
                             .infer_type(&child_scope)?
-                            .unwrap_tuple_type()?
+                            .try_into_tuple_type()?
                             .as_mut_slice()
                         {
                             [accum_result, ValueType::Seq(t2)] => {
@@ -520,18 +579,22 @@ impl Expr {
                 let start_type = start.infer_type(scope)?;
                 let end_type = end.infer_type(scope)?;
 
-                if !matches!(start_type, ValueType::Base(b) if b.is_numeric()) {
+                if !start_type.is_numeric() {
                     return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
-                } else if start_type != end_type {
-                    return Err(anyhow!(
-                        "EnumFromTo: start and end do not agree: {start_type:?} != {end_type:?}"
-                    ));
                 }
 
-                Ok(ValueType::Seq(Box::new(start_type)))
+                // NOTE - we don't need to specifically check for `end_type` being numeric because the unification will effectively test that
+                let Ok(t) = start_type.unify(&end_type) else {
+                    return Err(anyhow!(
+                        "EnumFromTo: start and end do not agree: {start_type:?} ∩ {end_type:?} = ∅"
+                    ));
+                };
+
+                Ok(ValueType::Seq(Box::new(t)))
             }
+            // REVIEW[epic=dup32] - is there a better way to handle this?
             Expr::Dup(count, expr) => {
-                if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
+                if count.infer_type(scope)? != ValueType::U32 {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
                 }
                 let t = expr.infer_type(scope)?;
@@ -546,7 +609,7 @@ impl Expr {
                 let rhs_type = rhs.infer_type(scope)?;
                 match (&lhs_type, &rhs_type) {
                     (ValueType::Seq(t1), ValueType::Seq(t2)) => {
-                        let elem_t = t1.unify(&t2)?;
+                        let elem_t = t1.unify(t2)?;
                         Ok(ValueType::Seq(Box::new(elem_t)))
                     }
                     (ValueType::Seq(..), other) => {
@@ -555,11 +618,9 @@ impl Expr {
                     (other, ValueType::Seq(..)) => {
                         Err(anyhow!("Append: lhs is not Seq: {other:?}"))
                     }
-                    (lhs_type, rhs_type) => {
-                        return Err(anyhow!(
-                            "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
-                        ));
-                    }
+                    (lhs_type, rhs_type) => Err(anyhow!(
+                        "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
+                    )),
                 }
             }
         }
@@ -567,7 +628,7 @@ impl Expr {
 
     /// Returns `true` if the evaluation of `self` contains any references to an external variable with a given identifier
     /// of `name`. This occurs when the expression contains `Expr::Var(name)` that it does not itself provide a local binding for
-    /// (e.g. in a pattern-match or lambda head).
+    /// (e.g. via a capture in a pattern-match or lambda head).
     pub fn is_shadowed_by(&self, name: &str) -> bool {
         match self {
             Expr::Var(vname) => vname == name,
@@ -584,6 +645,7 @@ impl Expr {
             Expr::Unary(_, x) => x.is_shadowed_by(name),
             Expr::Dup(x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
             Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) | Expr::U64(_) => false,
+            Expr::Numeric(num_tree) => num_tree.iter_vars().any(|v| v == name),
             Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),
             Expr::TupleProj(tup, _) => tup.is_shadowed_by(name),
             Expr::Record(fs) => {
@@ -647,14 +709,57 @@ impl Expr {
             Expr::U16(n) => Bounds::exact(usize::from(*n)),
             Expr::U32(n) => Bounds::exact(*n as usize),
             Expr::U64(n) => Bounds::exact(*n as usize),
-            Expr::Arith(Arith::Add, a, b) => a.bounds() + b.bounds(),
-            Expr::Arith(Arith::Sub, a, b) => a.bounds() - b.bounds(),
-            Expr::Arith(Arith::Mul, a, b) => a.bounds() * b.bounds(),
-            Expr::Arith(Arith::Div, a, b) => a.bounds() / b.bounds(),
-            Expr::Arith(Arith::BitOr, a, b) => a.bounds() | b.bounds(),
-            Expr::Arith(Arith::BitAnd, a, b) => a.bounds() & b.bounds(),
-            Expr::Arith(Arith::Shl, a, b) => a.bounds() << b.bounds(),
-            Expr::Arith(Arith::Shr, a, b) => a.bounds() >> b.bounds(),
+
+            Expr::AsU8(x) => x
+                .bounds()
+                .clamp(0, u8::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            Expr::AsU16(x) => x
+                .bounds()
+                .clamp(0, u16::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            Expr::AsU32(x) => x
+                .bounds()
+                .clamp(0, u32::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            Expr::AsU64(x) => x
+                .bounds()
+                .clamp(0, u64::MAX as usize)
+                .unwrap_or(Bounds::any()),
+
+            Expr::Arith(arith, a, b) => match arith {
+                Arith::Add => a.bounds() + b.bounds(),
+                Arith::Sub => a.bounds() - b.bounds(),
+                Arith::Mul => a.bounds() * b.bounds(),
+                Arith::Div => a.bounds() / b.bounds(),
+                Arith::BitOr => a.bounds() | b.bounds(),
+                Arith::BitAnd => a.bounds() & b.bounds(),
+                Arith::Shl => a.bounds() << b.bounds(),
+                Arith::Shr => a.bounds() >> b.bounds(),
+                Arith::Rem => Bounds::rem(a.bounds(), b.bounds()),
+                Arith::BoolOr | Arith::BoolAnd => Bounds::any(),
+            },
+
+            Expr::Unary(op, a) => match op {
+                UnaryOp::BoolNot => Bounds::any(),
+                UnaryOp::IntPred => a.bounds() - Bounds::exact(1),
+                UnaryOp::IntSucc => a.bounds() + Bounds::exact(1),
+            },
+
+            Expr::Numeric(n) => {
+                let tmp = n.eval_strict(VOID);
+                if let Ok(sv) = tmp
+                    && sv.is_valid()
+                    && let Some(n) = sv.value.as_usize()
+                {
+                    Bounds::exact(n)
+                } else {
+                    // NOTE - this case doesn't distinguish between temporary overflow/underflow, negative results, and positive results larger than usize::MAX
+                    Bounds::any()
+                }
+            }
+
+            // TODO - consider the remaining cases in this catch-all and determine, of those remaining, which have statically solvable bounds
             _ => Bounds::any(),
         }
     }
@@ -662,9 +767,94 @@ impl Expr {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum DynFormat {
+    /// Huffman(lengths, values)
     Huffman(Box<Expr>, Option<Box<Expr>>),
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum ViewFormat {
+    /// CaptureBytes(N): captures a slice of N bytes from the start of the View
+    CaptureBytes(Box<Expr>),
+    /// ReadArray(M, Kind): captures an array of M elements of the indicated Kind
+    ReadArray(Box<Expr>, FixedReadKind),
+    /// ReifyView: produces a value-element that encapsulates the View-object
+    ReifyView,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum ViewExpr {
+    Var(Label),
+    /// Offset(BaseView, OffsetExpr): advances the start of BaseView by a number of byte-positions equal to the numeric value of OffsetExpr (which can be any numeric type)
+    Offset(Box<ViewExpr>, Box<Expr>),
+}
+
+impl ViewExpr {
+    pub fn get_base(&self) -> &Label {
+        match self {
+            ViewExpr::Var(name) => name,
+            ViewExpr::Offset(base, _) => base.get_base(),
+        }
+    }
+
+    pub fn var(name: impl IntoLabel) -> Self {
+        ViewExpr::Var(name.into())
+    }
+
+    pub fn offset(self, offset: Expr) -> Self {
+        ViewExpr::Offset(Box::new(self), Box::new(offset))
+    }
+
+    pub fn check_type(&self, scope: &TypeScope<'_, ValueType>) -> AResult<()> {
+        match self {
+            ViewExpr::Var(ident) => match scope.get_type_by_name(ident) {
+                ValueKind::View => Ok(()),
+                ValueKind::Value(_t) => Err(anyhow!("expected View, found Value({_t:?}")),
+                ValueKind::Format(_t) => Err(anyhow!("expected View, found FOrmat({_t:?}")),
+            },
+            ViewExpr::Offset(view_expr, expr) => {
+                let t = expr.infer_type(scope)?;
+                if t.is_numeric() {
+                    view_expr.check_type(scope)
+                } else {
+                    Err(anyhow!(
+                        "non-numeric type for offset-expr in ViewExpr: {t:?}"
+                    ))
+                }
+            }
+        }
+    }
+
+    pub fn check_type_ext(&self, scope: &TypeScope<'_, alt::ValueTypeExt>) -> AResult<()> {
+        match self {
+            ViewExpr::Var(ident) => match scope.get_type_by_name(ident) {
+                ValueKind::View => Ok(()),
+                ValueKind::Value(_t) => Err(anyhow!("expected View, found Value({_t:?}")),
+                ValueKind::Format(_t) => Err(anyhow!("expected View, found FOrmat({_t:?}")),
+            },
+            ViewExpr::Offset(view_expr, expr) => {
+                let t = expr.infer_type_ext(scope)?;
+                if t.is_numeric() {
+                    view_expr.check_type_ext(scope)
+                } else {
+                    Err(anyhow!(
+                        "non-numeric type for offset-expr in ViewExpr: {t:?}"
+                    ))
+                }
+            }
+        }
+    }
+}
+
+/// Operations we want to treat as semi-first-class in downstream processing,
+/// without forcing us to add new primitives into the Format layer.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "tag", content = "args")]
+pub enum CommonOp {
+    // FIXME[epic=signed-parse] - add in expressivity for signed-integer parsing as commonop
+    EndianParse(BaseKind<Endian>),
+}
+
+/// The input is a UTF-8 encoded string, and the output is a UTF-8 encoded string
 // NOTE - as currently defined, StyleHint could easily be Copy, but it would be a breaking change if we later had to remove that trait
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "tag", content = "args")]
@@ -675,571 +865,17 @@ pub enum StyleHint {
         old_style: bool,
     },
     AsciiStr,
+    AsciiChar,
+    Common(CommonOp),
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) enum FieldLabel<Name> {
-    Anonymous,
-    Ephemeral(Name),
-    Permanent { in_capture: Name, in_value: Name },
-}
+pub(crate) mod record_fmt;
+pub(crate) use record_fmt::{OwnedRecordFormat, RecordBuilder};
 
-pub(crate) struct RecordFormat<'a> {
-    flat: Vec<(FieldLabel<&'a Label>, &'a Format)>,
-}
+pub mod format;
+pub use format::Format;
 
-impl<'a> std::ops::Deref for RecordFormat<'a> {
-    type Target = Vec<(FieldLabel<&'a Label>, &'a Format)>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.flat
-    }
-}
-
-impl<'a> TryFrom<&'a Format> for RecordFormat<'a> {
-    type Error = anyhow::Error;
-
-    fn try_from(format: &'a Format) -> Result<Self, Self::Error> {
-        let mut builder = RecordBuilder::init();
-        builder.accum(format)?;
-        Ok(builder.finish())
-    }
-}
-
-impl<'a> RecordFormat<'a> {
-    pub(crate) fn lookup_value_field(&self, field_name: &Label) -> Option<(&'a Format, &'a Label)> {
-        for (label, format) in &self.flat {
-            match label {
-                FieldLabel::Permanent {
-                    in_value,
-                    in_capture,
-                } if *in_value == field_name => {
-                    return Some((format, in_capture));
-                }
-                _ => continue,
-            }
-        }
-        None
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct RecordBuilder<'a> {
-    labels: Vec<Option<&'a Label>>,
-    formats: Vec<&'a Format>,
-    res: Option<&'a Vec<(Label, Expr)>>,
-}
-
-impl<'a> RecordBuilder<'a> {
-    pub const fn init() -> Self {
-        Self {
-            labels: Vec::new(),
-            formats: Vec::new(),
-            res: None,
-        }
-    }
-
-    pub fn step(&mut self, format: &'a Format) -> AResult<Option<&'a Format>> {
-        match format {
-            Format::Hint(StyleHint::Record { .. }, inner) => self.step(inner),
-            Format::LetFormat(f, name, inner) => {
-                self.labels.push(Some(name));
-                self.formats.push(f);
-                Ok(Some(inner))
-            }
-            Format::MonadSeq(f, inner) => {
-                self.labels.push(None);
-                self.formats.push(f);
-                Ok(Some(inner))
-            }
-            Format::Compute(expr) => match &**expr {
-                Expr::Record(res) => {
-                    assert!(self.res.replace(res).is_none());
-                    Ok(None)
-                }
-                other => Err(anyhow!("expected Record, found {other:?}")),
-            },
-            other => Err(anyhow!("unexpected non-Record-shape format: {other:?}")),
-        }
-    }
-
-    pub fn accum(&mut self, format: &'a Format) -> AResult<()> {
-        let mut node = format;
-        while let Some(inner) = self.step(node)? {
-            node = inner;
-        }
-        Ok(())
-    }
-
-    pub fn finish(self) -> RecordFormat<'a> {
-        let mut flat = Vec::with_capacity(self.labels.len());
-        let mut kept = std::collections::BTreeMap::new();
-        for (lab, r_expr) in self.res.unwrap() {
-            match r_expr {
-                Expr::Var(var) => kept.insert(var, lab),
-                other => {
-                    unreachable!("non-variable expression in format-record construction: {other:?}")
-                }
-            };
-        }
-        for (label, format) in Iterator::zip(self.labels.into_iter(), self.formats.into_iter()) {
-            let f_label = match label {
-                None => FieldLabel::Anonymous,
-                Some(in_capture) => {
-                    // there is no check for shadowing here, so we hope that is avoided.
-                    match kept.get(in_capture) {
-                        Some(in_value) => FieldLabel::Permanent {
-                            in_capture,
-                            in_value,
-                        },
-                        None => FieldLabel::Ephemeral(in_capture),
-                    }
-                }
-            };
-            flat.push((f_label, format));
-        }
-        RecordFormat { flat }
-    }
-}
-
-/// Binary format descriptions
-///
-/// # Binary formats as regular expressions
-///
-/// Given a language of [regular expressions]:
-///
-/// ```text
-/// r ∈ Regexp ::=
-///   | ∅           empty set
-///   | ε           empty byte string
-///   | .           any byte
-///   | b           literal byte
-///   | r|r         alternation
-///   | r r         concatenation
-///   | r*          Kleene star
-/// ```
-///
-/// We can use these to model a subset of our binary format descriptions:
-///
-/// ```text
-/// ⟦ _ ⟧ : Format ⇀ Regexp
-/// ⟦ Fail ⟧                                = ∅
-/// ⟦ Byte({}) ⟧                            = ∅
-/// ⟦ Byte(!{}) ⟧                           = .
-/// ⟦ Byte({b}) ⟧                           = b
-/// ⟦ Byte({b₀, ... bₙ}) ⟧                  = b₀ | ... | bₙ
-/// ⟦ Union([]) ⟧                           = ∅
-/// ⟦ Union([(l₀, f₀), ..., (lₙ, fₙ)]) ⟧    = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
-/// ⟦ Tuple([]) ⟧                           = ε
-/// ⟦ Tuple([f₀, ..., fₙ]) ⟧                = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧
-/// ⟦ Repeat(f) ⟧                           = ⟦ f ⟧*
-/// ⟦ Repeat1(f) ⟧                          = ⟦ f ⟧ ⟦ f ⟧*
-/// ⟦ RepeatCount(n, f) ⟧                   = ⟦ f ⟧ ... ⟦ f ⟧
-///                                           ╰── n times ──╯
-/// ```
-///
-/// Note that the data dependency present in record formats means that these
-/// formats no longer describe regular languages.
-///
-/// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-#[serde(tag = "tag", content = "data")]
-pub enum Format {
-    /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>), // FIXME - do the exprs here need type(+) info?
-    /// A format that never matches
-    Fail,
-    /// Matches if the end of the input has been reached
-    EndOfInput,
-    /// Skips bytes if necessary to align the current offset to a multiple of N
-    Align(usize),
-    /// Matches a byte in the given byte set
-    Byte(ByteSet),
-    /// Wraps the value from the inner format in a variant
-    Variant(Label, Box<Format>),
-    /// Matches the union of all the formats, which must have the same type
-    Union(Vec<Format>),
-    /// Nondeterministic unions, where the formats are not mutually exclusive
-    UnionNondet(Vec<Format>),
-    /// Matches a sequence of concatenated formats
-    Tuple(Vec<Format>),
-    /// Matches a fixed-length sequence of homogeneously-typed formats
-    Sequence(Vec<Format>),
-    /// Repeat a format zero-or-more times
-    Repeat(Box<Format>),
-    /// Repeat a format one-or-more times
-    Repeat1(Box<Format>),
-    /// Repeat a format an exact number of times
-    RepeatCount(Box<Expr>, Box<Format>),
-    /// Repeat a format at least N and at most M times
-    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by its last item
-    RepeatUntilLast(Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by the sequence
-    RepeatUntilSeq(Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
-    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])
-    AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Format>),
-    /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
-    ForEach(Box<Expr>, Label, Box<Format>),
-    /// Parse a format if and only if the given expression evaluates to true, otherwise skip
-    Maybe(Box<Expr>, Box<Format>),
-    /// Parse a format without advancing the stream position afterwards
-    Peek(Box<Format>),
-    /// Attempt to parse a format and fail if it succeeds
-    PeekNot(Box<Format>),
-    /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
-    Slice(Box<Expr>, Box<Format>),
-    /// Parse bitstream
-    Bits(Box<Format>),
-    /// Matches a format at a byte offset relative to the given base address
-    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Format>),
-    /// Map a value with a lambda expression
-    Map(Box<Format>, Box<Expr>),
-    /// Assert that a boolean condition holds on a value
-    Where(Box<Format>, Box<Expr>),
-    /// Compute a value
-    Compute(Box<Expr>),
-    /// Let binding
-    Let(Label, Box<Expr>, Box<Format>),
-    /// Pattern match on an expression
-    Match(Box<Expr>, Vec<(Pattern, Format)>),
-    /// Format generated dynamically
-    Dynamic(Label, DynFormat, Box<Format>),
-    /// Apply a dynamic format from a named variable in the scope
-    Apply(Label),
-    /// Current byte-offset relative to start-of-buffer (as a U64(?))
-    Pos,
-    /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
-    SkipRemainder,
-    /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
-    DecodeBytes(Box<Expr>, Box<Format>),
-    /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
-    LetFormat(Box<Format>, Label, Box<Format>),
-    /// Process one format without capturing the resultant value, and then process the a second format as normal
-    MonadSeq(Box<Format>, Box<Format>),
-    /// Encapsulation of a Format with a structurally significant artifact of what it represents or how it was constructed
-    Hint(StyleHint, Box<Format>),
-    /// Wrap the result of `format` in `Some` if `Some(format)`, yield `None` if `None`
-    LiftedOption(Option<Box<Format>>),
-}
-
-impl Format {
-    pub const EMPTY: Format = Format::Tuple(Vec::new());
-
-    pub const ANY_BYTE: Format = Format::Byte(ByteSet::full());
-
-    pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::Union(
-            fields
-                .into_iter()
-                .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
-                .collect(),
-        )
-    }
-
-    pub(crate) fn to_record_format(&self) -> RecordFormat<'_> {
-        RecordFormat::try_from(self).unwrap()
-    }
-
-    /// Old-style record where every field is preserved and the constructed record uses the same names as the individual parse-bindings.
-    pub fn record<Name: IntoLabel, I>(fields: I) -> Format
-    where
-        I: IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
-    {
-        // NOTE - reverse-order so `.pop()` removes the earliest remaining entry
-        let mut rev_fields = fields
-            .into_iter()
-            .rev()
-            .map(|(name, format)| (Some((name, true)), format))
-            .collect::<Vec<(Option<(Name, bool)>, Format)>>();
-        let accum = Vec::with_capacity(rev_fields.len());
-        Format::Hint(
-            StyleHint::Record { old_style: true },
-            Box::new(Format::__chain_record(accum, &mut rev_fields)),
-        )
-    }
-
-    pub(crate) fn __chain_record<Name: IntoLabel>(
-        mut captured: Vec<(Label, Expr)>,
-        remaining: &mut Vec<(Option<(Name, bool)>, Format)>,
-    ) -> Format {
-        if remaining.is_empty() {
-            Format::Compute(Box::new(Expr::Record(captured)))
-        } else {
-            let this = remaining.pop().unwrap();
-            let (label, format) = this;
-            match label {
-                None => Format::MonadSeq(
-                    Box::new(format),
-                    Box::new(Format::__chain_record(captured, remaining)),
-                ),
-                Some((name, is_persist)) => {
-                    let name: Label = name.into();
-                    if is_persist {
-                        captured.push((name.clone(), Expr::Var(name.clone())));
-                    }
-                    Format::LetFormat(
-                        Box::new(format),
-                        name,
-                        Box::new(Format::__chain_record(captured, remaining)),
-                    )
-                }
-            }
-        }
-    }
-}
-
-impl Format {
-    /// Conservative bounds for number of byte-positions advanced after a format is matched (i.e. parsed)
-    fn match_bounds(&self, module: &FormatModule) -> Bounds {
-        match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).match_bounds(module),
-            Format::Fail => Bounds::exact(0),
-            Format::EndOfInput => Bounds::exact(0),
-            Format::SkipRemainder => Bounds::any(),
-            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
-            Format::Align(n) => Bounds::new(0, n - 1),
-            Format::Byte(_) => Bounds::exact(1),
-            Format::Variant(_label, f) => f.match_bounds(module),
-            Format::Union(branches) | Format::UnionNondet(branches) => branches
-                .iter()
-                .map(|f| f.match_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Tuple(fields) => fields
-                .iter()
-                .map(|f| f.match_bounds(module))
-                .reduce(Bounds::add)
-                .unwrap_or(Bounds::exact(0)),
-            Format::Repeat(_) => Bounds::any(),
-            Format::Repeat1(f) => f.match_bounds(module) * Bounds::at_least(1),
-            Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => {
-                f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds()))
-            }
-            Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::at_least(1),
-            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
-            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.match_bounds(module)),
-            Format::Peek(_) => Bounds::exact(0),
-            Format::PeekNot(_) => Bounds::exact(0),
-            Format::Slice(expr, _) => expr.bounds(),
-            Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
-            Format::WithRelativeOffset(..) => Bounds::exact(0),
-            Format::Map(f, _expr) => f.match_bounds(module),
-            Format::Where(f, _expr) => f.match_bounds(module),
-            Format::Compute(_) | Format::Pos => Bounds::exact(0),
-            Format::Let(_name, _expr, f) => f.match_bounds(module),
-            Format::Match(_, branches) => branches
-                .iter()
-                .map(|(_, f)| f.match_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Dynamic(_name, _dynformat, f) => f.match_bounds(module),
-            Format::Apply(_) => Bounds::at_least(1),
-            // FIXME - do we have any way of approximating this better?
-            Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
-            // NOTE - because we are parsing a sequence of bytes, we do not interact with the actual buffer
-            Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
-            Format::LetFormat(first, _, second) | Format::MonadSeq(first, second) => {
-                first.match_bounds(module) + second.match_bounds(module)
-            }
-            Format::Hint(.., inner) => inner.match_bounds(module),
-            Format::LiftedOption(opt) => match opt {
-                None => Bounds::exact(0),
-                Some(f) => f.match_bounds(module),
-            },
-            Format::Sequence(fmts) => {
-                let mut total = Bounds::exact(0);
-                for fmt in fmts.iter() {
-                    let bounds = fmt.match_bounds(module);
-                    total = total + bounds;
-                }
-                total
-            }
-        }
-    }
-
-    /// Conservative bounds for number of bytes that may be read in order to fully parse the given Format, regardless of how many
-    /// are consumed as opposed to being left untouched in the buffer.
-    pub(crate) fn lookahead_bounds(&self, module: &FormatModule) -> Bounds {
-        match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).lookahead_bounds(module),
-            Format::Fail => Bounds::exact(0),
-            Format::EndOfInput => Bounds::exact(0),
-            // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
-            Format::SkipRemainder => Bounds::any(),
-            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
-            Format::Align(n) => Bounds::new(0, n - 1),
-            Format::Byte(_) => Bounds::exact(1),
-            Format::Variant(_label, f) => f.lookahead_bounds(module),
-            Format::Union(branches) | Format::UnionNondet(branches) => branches
-                .iter()
-                .map(|f| f.lookahead_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Tuple(fields) => fields
-                .iter()
-                .map(|f| f.lookahead_bounds(module))
-                .reduce(Bounds::add)
-                .unwrap_or(Bounds::exact(0)),
-            Format::Repeat(_) => Bounds::any(),
-            // FIXME - do we have any way of approximating this better?
-            Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
-            Format::Repeat1(f) => f.lookahead_bounds(module) * Bounds::at_least(1),
-            Format::RepeatCount(expr, f) => f.lookahead_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => {
-                f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds())
-            }
-            Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::at_least(1),
-            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
-            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds(module)),
-            Format::Peek(f) => f.lookahead_bounds(module),
-            Format::PeekNot(f) => f.lookahead_bounds(module),
-            Format::Slice(expr, _) => expr.bounds(),
-            Format::Bits(f) => f.lookahead_bounds(module).bits_to_bytes(),
-            // REVIEW - do we have a way of approximating this better?
-            Format::WithRelativeOffset(..) => Bounds::any(),
-            Format::Map(f, _expr) => f.lookahead_bounds(module),
-            Format::Where(f, _expr) => f.lookahead_bounds(module),
-            Format::Compute(_) | Format::Pos => Bounds::exact(0),
-            Format::Let(_name, _expr, f) => f.lookahead_bounds(module),
-            Format::Match(_, branches) => branches
-                .iter()
-                .map(|(_, f)| f.lookahead_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds(module),
-            Format::Apply(_) => Bounds::at_least(1),
-            Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
-            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => Bounds::union(
-                f0.lookahead_bounds(module),
-                f0.match_bounds(module) + f.lookahead_bounds(module),
-            ),
-            Format::Hint(_, f) => f.lookahead_bounds(module),
-            Format::LiftedOption(opt) => match opt {
-                None => Bounds::exact(0),
-                Some(f) => f.lookahead_bounds(module),
-            },
-            Format::Sequence(fmts) => {
-                let mut sum_match = Bounds::exact(0);
-                let mut max_lookahead = Bounds::exact(0);
-                for fmt in fmts.iter() {
-                    max_lookahead =
-                        Bounds::union(max_lookahead, sum_match + fmt.lookahead_bounds(module));
-                    sum_match = sum_match + fmt.match_bounds(module);
-                }
-                max_lookahead
-            }
-        }
-    }
-
-    /// Returns `true` if the format could match the empty byte string
-    fn is_nullable(&self, module: &FormatModule) -> bool {
-        self.match_bounds(module).min == 0
-    }
-
-    /// True if the compilation of this format depends on the format that follows it
-    fn depends_on_next(&self, module: &FormatModule) -> bool {
-        match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).depends_on_next(module),
-            Format::Fail => false,
-            Format::EndOfInput => false,
-            // NOTE - compiling SkipRemainder doesn't depend on the next format because the next format can only ever match the empty byte string at that point
-            Format::SkipRemainder => false,
-            Format::Align(..) => false,
-            Format::Byte(..) => false,
-            Format::Variant(_label, f) => f.depends_on_next(module),
-            Format::Union(branches) | Format::UnionNondet(branches) => {
-                Format::union_depends_on_next(branches, module)
-            }
-            Format::Tuple(fmts) | Format::Sequence(fmts) => {
-                fmts.iter().any(|f| f.depends_on_next(module))
-            }
-            Format::Repeat(..) | Format::Repeat1(..) | Format::RepeatBetween(..) => true,
-            Format::RepeatCount(..) | Format::RepeatUntilLast(..) | Format::RepeatUntilSeq(..) => {
-                false
-            }
-            Format::AccumUntil(..) => false,
-            Format::Maybe(..) => true,
-            Format::Peek(..) | Format::PeekNot(..) => false,
-            Format::Slice(..) => false,
-            Format::Bits(..) => false,
-            Format::WithRelativeOffset(..) => false,
-            Format::Map(f, _expr) => f.depends_on_next(module),
-            Format::Where(f, _expr) => f.depends_on_next(module),
-            Format::Compute(..) | Format::Pos => false,
-            Format::Let(_name, _expr, f) => f.depends_on_next(module),
-            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
-            Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
-            Format::Apply(..) => false,
-            Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
-            Format::DecodeBytes(_bytes, _f) => false,
-            Format::MonadSeq(first, second) | Format::LetFormat(first, _, second) => {
-                first.depends_on_next(module) || second.depends_on_next(module)
-            }
-            Format::Hint(_, f) => f.depends_on_next(module),
-            Format::LiftedOption(opt) => opt.as_ref().is_some_and(|f| f.depends_on_next(module)),
-        }
-    }
-
-    fn union_depends_on_next(branches: &[Format], module: &FormatModule) -> bool {
-        let mut fs = Vec::with_capacity(branches.len());
-        for f in branches {
-            if f.depends_on_next(module) {
-                return true;
-            }
-            fs.push(f.clone());
-        }
-        MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
-    }
-}
-
-impl Format {
-    /// Returns `true` if values associated to this format should be handled as single ASCII characters
-    pub fn is_ascii_char_format(&self, module: &FormatModule) -> bool {
-        match self {
-            // NOTE - currently only true for named formats matching 'base\.ascii-char.*'
-            Format::ItemVar(level, _args) => module.get_name(*level).starts_with("base.ascii-char"),
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if values associated to this format should be handled as multi-character ASCII strings
-    pub fn is_ascii_string_format(&self, module: &FormatModule) -> bool {
-        match self {
-            Format::ItemVar(level, _args) => {
-                let fmt_name = module.get_name(*level);
-                // REVIEW - consider different heuristic for short-circuit
-                if fmt_name.contains("ascii-string") || fmt_name.contains("asciiz-string") {
-                    return true;
-                }
-                module.get_format(*level).is_ascii_string_format(module)
-            }
-            Format::Tuple(formats) => {
-                !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(module))
-            }
-            Format::Repeat(format)
-            | Format::Repeat1(format)
-            | Format::RepeatCount(_, format)
-            | Format::RepeatUntilLast(_, format)
-            | Format::RepeatUntilSeq(_, format) => format.is_ascii_char_format(module),
-            Format::Slice(_, format) => format.is_ascii_string_format(module),
-            // NOTE there may be other cases we should consider ASCII
-            _ => false,
-        }
-    }
-
-    pub fn is_record_format(&self) -> bool {
-        // we take it on faith that a format is a record iff it is hinted as such
-        match self {
-            Format::Hint(StyleHint::Record { .. }, _) => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct FormatRef(usize);
 
 impl FormatRef {
@@ -1248,11 +884,24 @@ impl FormatRef {
     }
 
     pub fn call(&self) -> Format {
-        Format::ItemVar(self.0, vec![])
+        Format::ItemVar(self.0, Vec::new(), Vec::new())
     }
 
+    // REVIEW - do we need it to be `Vec` or is `impl IntoIterator<Item = Expr>` better?
     pub fn call_args(&self, args: Vec<Expr>) -> Format {
-        Format::ItemVar(self.0, args)
+        Format::ItemVar(self.0, args, Vec::new())
+    }
+
+    pub fn call_views(&self, views: Vec<ViewExpr>) -> Format {
+        Format::ItemVar(self.0, Vec::new(), views)
+    }
+
+    pub fn call_args_views(&self, args: Vec<Expr>, views: Vec<ViewExpr>) -> Format {
+        Format::ItemVar(self.0, args, views)
+    }
+
+    pub fn call_view(&self, view: ViewExpr) -> Format {
+        Format::ItemVar(self.0, vec![], vec![view])
     }
 }
 
@@ -1260,6 +909,7 @@ impl FormatRef {
 pub struct FormatModule {
     names: Vec<Label>,
     args: Vec<Vec<(Label, ValueType)>>,
+    views: IxHeap<Vec<Label>>,
     formats: Vec<Format>,
     format_types: Vec<ValueType>,
 }
@@ -1269,6 +919,7 @@ impl FormatModule {
         FormatModule {
             names: Vec::new(),
             args: Vec::new(),
+            views: IxHeap::new(),
             formats: Vec::new(),
             format_types: Vec::new(),
         }
@@ -1284,9 +935,31 @@ impl FormatModule {
         args: Vec<(Label, ValueType)>,
         format: Format,
     ) -> FormatRef {
+        self.define_format_args_views(name, args, vec![], format)
+    }
+
+    pub fn define_format_views(
+        &mut self,
+        name: impl IntoLabel,
+        views: Vec<Label>,
+        format: Format,
+    ) -> FormatRef {
+        self.define_format_args_views(name, vec![], views, format)
+    }
+
+    pub fn define_format_args_views(
+        &mut self,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
+        views: Vec<Label>,
+        format: Format,
+    ) -> FormatRef {
         let mut scope = TypeScope::new();
         for (arg_name, arg_type) in &args {
             scope.push(arg_name.clone(), arg_type.clone());
+        }
+        for view_name in &views {
+            scope.push_view(view_name.clone());
         }
         let format_type = match self.infer_format_type(&scope, &format) {
             Ok(t) => t,
@@ -1295,22 +968,151 @@ impl FormatModule {
         let level = self.names.len();
         self.names.push(name.into());
         self.args.push(args);
+        self.views.push(views);
         self.formats.push(format);
         self.format_types.push(format_type);
         FormatRef(level)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`.
+    ///
+    /// This is the no-args, no-views convenience form of [`Self::define_format_phantom_rec_args_views`].
+    pub fn define_format_phantom_rec(
+        &mut self,
+        name: impl IntoLabel,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_phantom_rec_args(name, vec![], outer, inner)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`, with arguments but no views.
+    ///
+    /// See [`Self::define_format_phantom_rec_args_views`] for the full behavior.
+    pub fn define_format_phantom_rec_args(
+        &mut self,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_phantom_rec_args_views(name, args, vec![], outer, inner)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`, with views but no arguments.
+    ///
+    /// See [`Self::define_format_phantom_rec_args_views`] for the full behavior.
+    pub fn define_format_phantom_rec_views(
+        &mut self,
+        name: impl IntoLabel,
+        views: Vec<Label>,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_phantom_rec_args_views(name, vec![], views, outer, inner)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`.
+    ///
+    /// Ordinary [`Self::define_format_args_views`] cannot define a format that refers to its own
+    /// [`FormatRef`], because the level a format will occupy is only known (and only valid to look
+    /// up) once registration has completed, whereas type-checking the format happens beforehand.
+    /// This method allows exactly one, deliberately constrained form of self-reference: a reference
+    /// to the format's own (about-to-be-assigned) level that occurs *only* underneath a
+    /// [`Format::Phantom`] wrapper.
+    ///
+    /// `inner` is given a [`FormatRef`] for the level this call will register, and must produce the
+    /// `Format` that ends up wrapped in `Format::Phantom`; it may invoke that `FormatRef` (via
+    /// [`FormatRef::call`] or its sibling methods) any number of times. `outer` then receives the
+    /// resulting `Format::Phantom(..)` node and weaves it into the format to be registered, e.g. by
+    /// embedding (and, since `Format` is `Clone`, possibly duplicating) it into one or more
+    /// branches of a record or alternation.
+    ///
+    /// The recursion is safe to register because every processing pathway that descends into a
+    /// `Format` for purposes other than naming/typing treats `Format::Phantom`'s contents as opaque
+    /// (no bytes are read on its account), so confining the self-reference there guarantees it can
+    /// never be the cause of unbounded data-driven recursion. It does *not*, on its own, guarantee
+    /// that every later stage that walks into `Phantom` for type- or name-resolution purposes
+    /// already tolerates a self-reference found there; some such stages may need adjustment of
+    /// their own before a format defined this way can be successfully elaborated/compiled/generated.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the constructed format fails to type-check.
+    pub fn define_format_phantom_rec_args_views(
+        &mut self,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
+        views: Vec<Label>,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        let level = self.names.len();
+        let self_ref = FormatRef(level);
+
+        // Reserve the slot before `inner`/`outer` run, so that the self-reference they embed
+        // (which can only ever be reached through the `Phantom` wrapper applied below) resolves
+        // to a real registration rather than indexing past the end of the module's tables.
+        //
+        // `args`/`views` are real and final already (the caller supplies them up front), but the
+        // format and its inferred type are necessarily provisional at this point - the placeholder
+        // type `ValueType::Any` is never actually inspected: the only thing that consults
+        // `format_types[level]` before it is overwritten below is the `ItemVar` case of
+        // `infer_format_type`, when it reaches the self-reference, and the enclosing
+        // `Format::Phantom` arm only wraps that result in `ValueType::PhantomData` without
+        // examining its shape.
+        self.names.push(name.into());
+        self.args.push(args.clone());
+        self.views.push(views.clone());
+        self.formats.push(Format::EMPTY);
+        self.format_types.push(ValueType::Any);
+
+        let phantom_param = inner(self_ref);
+        let format = outer(Format::Phantom(Box::new(phantom_param)));
+
+        let mut scope = TypeScope::new();
+        for (arg_name, arg_type) in &args {
+            scope.push(arg_name.clone(), arg_type.clone());
+        }
+        for view_name in &views {
+            scope.push_view(view_name.clone());
+        }
+        let format_type = match self.infer_format_type(&scope, &format) {
+            Ok(t) => t,
+            Err(msg) => panic!("{msg}"),
+        };
+
+        self.formats[level] = format;
+        self.format_types[level] = format_type;
+
+        self_ref
     }
 
     pub fn get_name(&self, level: usize) -> &str {
         &self.names[level]
     }
 
+    /// Iterates through every format defined in this module, constructing an invocation for each
+    /// with an appropriate array of arguments with the expected `ValueType`s.
     pub fn iter_formats(&self) -> impl Iterator<Item = (usize, Format)> + '_ {
         (0..self.formats.len()).filter_map(|ix| {
             let mut x_args = Vec::with_capacity(self.args[ix].len());
             for (_, vt) in self.args[ix].iter() {
                 x_args.push(mk_value_expr(vt)?);
             }
-            Some((ix, Format::ItemVar(ix, x_args)))
+            match self.views[ix].len() {
+                0 => Some((ix, Format::ItemVar(ix, x_args, Vec::new()))),
+                n => {
+                    let x_views = repeat_n(ViewExpr::var("dummy"), n).collect();
+                    Some((
+                        ix,
+                        Format::LetView(
+                            Label::Borrowed("dummy"),
+                            Box::new(Format::ItemVar(ix, x_args, x_views)),
+                        ),
+                    ))
+                }
+            }
         })
     }
 
@@ -1318,7 +1120,11 @@ impl FormatModule {
         &self.args[level]
     }
 
-    fn get_format(&self, level: usize) -> &Format {
+    fn get_view_args(&self, level: usize) -> &[Label] {
+        &self.views[level]
+    }
+
+    pub fn get_format(&self, level: usize) -> &Format {
         &self.formats[level]
     }
 
@@ -1328,13 +1134,21 @@ impl FormatModule {
 
     fn infer_format_type(&self, scope: &TypeScope<'_>, f: &Format) -> AResult<ValueType> {
         match f {
-            Format::ItemVar(level, arg_exprs) => {
+            Format::ItemVar(level, arg_exprs, arg_views) => {
                 let arg_names = self.get_args(*level);
                 if arg_names.len() != arg_exprs.len() {
                     return Err(anyhow!(
                         "Expected {} arguments, found {}",
                         arg_names.len(),
                         arg_exprs.len()
+                    ));
+                }
+                let view_names = self.get_view_args(*level);
+                if view_names.len() != arg_views.len() {
+                    return Err(anyhow!(
+                        "Expected {} views, found {}",
+                        view_names.len(),
+                        arg_views.len(),
                     ));
                 }
                 for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
@@ -1346,16 +1160,22 @@ impl FormatModule {
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
                 match bytes_type {
-                    ValueType::Seq(bt) if matches!(*bt, ValueType::Base(BaseType::U8)) => {
+                    ValueType::Seq(bt) if matches!(*bt, ValueType::U8) => {
                         self.infer_format_type(scope, f)
                     }
-                    other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
+                    other => Err(anyhow!(
+                        "DecodeBytes first argument type should be Seq(U8), found {other:?} instead"
+                    )),
                 }
+            }
+            Format::ParseFromView(view, f) => {
+                view.check_type(scope)?;
+                self.infer_format_type(scope, f)
             }
             Format::Fail => Ok(ValueType::Empty),
             Format::SkipRemainder | Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
-            Format::Byte(_bs) => Ok(ValueType::Base(BaseType::U8)),
+            Format::Byte(_bs) => Ok(ValueType::U8),
             Format::Variant(label, f) => Ok(ValueType::Union(BTreeMap::from([(
                 label.clone(),
                 self.infer_format_type(scope, f)?,
@@ -1378,15 +1198,15 @@ impl FormatModule {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
-            Format::RepeatCount(count, a) => {
-                match count.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => {
-                        let t = self.infer_format_type(scope, a)?;
-                        Ok(ValueType::Seq(Box::new(t)))
-                    }
-                    other => Err(anyhow!("RepeatCount first argument type should be numeric, found {other:?} instead")),
+            Format::RepeatCount(count, a) => match count.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => {
+                    let t = self.infer_format_type(scope, a)?;
+                    Ok(ValueType::Seq(Box::new(t)))
                 }
-            }
+                other => Err(anyhow!(
+                    "RepeatCount first argument type should be numeric, found {other:?} instead"
+                )),
+            },
             Format::Sequence(formats) => {
                 let mut elem_t = ValueType::Any;
                 for f in formats {
@@ -1394,56 +1214,60 @@ impl FormatModule {
                 }
                 Ok(ValueType::Seq(Box::new(elem_t)))
             }
-            Format::RepeatBetween(min, max, a) => {
-                match min.infer_type(scope)? {
-                    ref t0 @ ValueType::Base(b0) if b0.is_numeric() => {
-                        match max.infer_type(scope)? {
-                            ValueType::Base(b1) if b0 == b1 => {
-                                let t = self.infer_format_type(scope, a)?;
-                                Ok(ValueType::Seq(Box::new(t)))
-                            }
-                            other => Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
-                        }
-                    }
-                    other => Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
-                }
-            }
-            Format::RepeatUntilLast(lambda_elem, a) => {
-                match lambda_elem.as_ref() {
-                    Expr::Lambda(head, expr) => {
+            Format::RepeatBetween(min, max, a) => match min.infer_type(scope)? {
+                ref t0 @ ValueType::Base(b0) if b0.is_numeric() => match max.infer_type(scope)? {
+                    ValueType::Base(b1) if b0 == b1 => {
                         let t = self.infer_format_type(scope, a)?;
-                        let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(head.clone(), t.clone());
-                        let ret_type = expr.infer_type(&child_scope)?;
-                        match ret_type {
-                            ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
-                            other => Err(anyhow!("RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead")),
-                        }
+                        Ok(ValueType::Seq(Box::new(t)))
                     }
-                    other => Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
-                }
-            }
-            Format::RepeatUntilSeq(lambda_seq, a) => {
-                match lambda_seq.as_ref() {
-                    Expr::Lambda(head, expr) => {
-                        let t = self.infer_format_type(scope, a)?;
-                        let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(head.clone(), ValueType::Seq(Box::new(t.clone())));
-                        let ret_type = expr.infer_type(&child_scope)?;
-                        match ret_type {
-                            ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
-                            other => Err(anyhow!("RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead")),
-                        }
+                    other => Err(anyhow!(
+                        "RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})"
+                    )),
+                },
+                other => Err(anyhow!(
+                    "RepeatBetween first argument type should be numeric, found {other:?} instead"
+                )),
+            },
+            Format::RepeatUntilLast(lambda_elem, a) => match lambda_elem.as_ref() {
+                Expr::Lambda(head, expr) => {
+                    let t = self.infer_format_type(scope, a)?;
+                    let mut child_scope = TypeScope::child(scope);
+                    child_scope.push(head.clone(), t.clone());
+                    let ret_type = expr.infer_type(&child_scope)?;
+                    match ret_type {
+                        ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                        other => Err(anyhow!(
+                            "RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead"
+                        )),
                     }
-                    other => Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
                 }
-            }
+                other => Err(anyhow!(
+                    "RepeatUntilLast first argument type should be lambda, found {other:?} instead"
+                )),
+            },
+            Format::RepeatUntilSeq(lambda_seq, a) => match lambda_seq.as_ref() {
+                Expr::Lambda(head, expr) => {
+                    let t = self.infer_format_type(scope, a)?;
+                    let mut child_scope = TypeScope::child(scope);
+                    child_scope.push(head.clone(), ValueType::Seq(Box::new(t.clone())));
+                    let ret_type = expr.infer_type(&child_scope)?;
+                    match ret_type {
+                        ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                        other => Err(anyhow!(
+                            "RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead"
+                        )),
+                    }
+                }
+                other => Err(anyhow!(
+                    "RepeatUntilSeq first argument type should be lambda, found {other:?} instead"
+                )),
+            },
             Format::AccumUntil(lambda_acc_seq, lambda_acc_val, init, vt, a) => {
                 match lambda_acc_seq.as_ref() {
                     Expr::Lambda(head, expr) => {
                         let t = self.infer_format_type(scope, a)?;
                         // Check that the initial accumulator value's type unifies with the type-claim
-                        let _acc_type = init.infer_type(&scope)?.unify(vt.as_ref())?;
+                        let _acc_type = init.infer_type(scope)?.unify(vt.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         let t_seq = ValueType::Seq(Box::new(t.clone()));
                         let vt_acc_seq = ValueType::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
@@ -1454,20 +1278,27 @@ impl FormatModule {
                                 match lambda_acc_val.as_ref() {
                                     Expr::Lambda(head, expr) => {
                                         let mut child_scope = TypeScope::child(&child_scope);
-                                        let vt_acc_elem = ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
+                                        let vt_acc_elem =
+                                            ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
                                         child_scope.push(head.clone(), vt_acc_elem);
                                         // we just need to check that these types unify, the value is unimportant
-                                        let _ret_type = expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
+                                        let _ret_type =
+                                            expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
                                         Ok(vt_acc_seq)
                                     }
-                                    other => return Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
+                                    other => Err(anyhow!(
+                                        "AccumUntil second argument type should be lambda, found {other:?} instead"
+                                    )),
                                 }
                             }
-                            other => Err(anyhow!("AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead")),
+                            other => Err(anyhow!(
+                                "AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead"
+                            )),
                         }
-
                     }
-                    other => Err(anyhow!("AccumUntil first argument type should be lambda, found {other:?} instead")),
+                    other => Err(anyhow!(
+                        "AccumUntil first argument type should be lambda, found {other:?} instead"
+                    )),
                 }
             }
             Format::Maybe(x, a) => match x.infer_type(scope)? {
@@ -1517,6 +1348,11 @@ impl FormatModule {
                 child_scope.push(name.clone(), t);
                 self.infer_format_type(&child_scope, format)
             }
+            Format::LetView(name, format) => {
+                let mut child_scope = TypeScope::child(scope);
+                child_scope.push_view(name.clone());
+                self.infer_format_type(&child_scope, format)
+            }
             Format::LetFormat(f0, name, f) => {
                 let t0 = self.infer_format_type(scope, f0)?;
                 let mut new_scope = TypeScope::child(scope);
@@ -1528,8 +1364,13 @@ impl FormatModule {
                 self.infer_format_type(scope, f0)?;
                 self.infer_format_type(scope, f)
             }
-            Format::Hint(_hint, f) => {
-                self.infer_format_type(scope, f)
+            Format::Hint(_hint, f) => self.infer_format_type(scope, f),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(f) => self.infer_format_type(scope, f),
+            Format::Permit(f, expr) => {
+                let t0 = expr.infer_type(scope)?;
+                let t = self.infer_format_type(scope, f)?;
+                Ok(t0.unify(&t)?)
             }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
@@ -1549,10 +1390,10 @@ impl FormatModule {
             }
             Format::Dynamic(name, dynformat, format) => {
                 match dynformat {
-                    DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
+                    DynFormat::Huffman(lengths_expr, opt_values_expr) => {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) => match &*t {
-                                ValueType::Base(BaseType::U8) | ValueType::Base(BaseType::U16) => {}
+                                &ValueType::U8 | &ValueType::U16 => {}
                                 other => {
                                     return Err(anyhow!(
                                         "Huffman: expected U8 or U16, found {other:?}"
@@ -1563,19 +1404,33 @@ impl FormatModule {
                                 return Err(anyhow!("Huffman: expected Seq, found {other:?}"));
                             }
                         }
-                        // FIXME check opt_values_expr type
+                        if let Some(values_expr) = opt_values_expr {
+                            match values_expr.infer_type(scope)? {
+                                ValueType::Seq(t) => match &*t {
+                                    &ValueType::U8 | &ValueType::U16 => {}
+                                    other => {
+                                        return Err(anyhow!(
+                                            "Huffman: expected U8 or U16, found {other:?}"
+                                        ));
+                                    }
+                                },
+                                other => {
+                                    return Err(anyhow!("Huffman: expected Seq, found {other:?}"));
+                                }
+                            }
+                        }
                     }
                 }
                 let mut child_scope = TypeScope::child(scope);
-                child_scope.push_format(name.clone(), ValueType::Base(BaseType::U16));
+                child_scope.push_format(name.clone(), ValueType::U16);
                 self.infer_format_type(&child_scope, format)
             }
             Format::Apply(name) => match scope.get_type_by_name(name) {
                 ValueKind::Format(t) => Ok(t.clone()),
+                ValueKind::View => Err(anyhow!("Apply: expected format, found View")),
                 ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
             },
-            // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
-            Format::Pos => Ok(ValueType::Base(BaseType::U64)),
+            Format::Pos => Ok(ValueType::NumericHole),
             Format::ForEach(expr, lbl, format) => {
                 let expr_t = expr.infer_type(scope)?;
                 let elem_t = match expr_t {
@@ -1593,6 +1448,58 @@ impl FormatModule {
                     Some(inner_f) => self.infer_format_type(scope, inner_f)?,
                 };
                 Ok(ValueType::Option(Box::new(inner_type)))
+            }
+            Format::WithView(view, v_format) => match v_format {
+                ViewFormat::CaptureBytes(len) => {
+                    view.check_type(scope)?;
+                    match len.infer_type(scope)? {
+                        t if t.is_numeric() => {}
+                        other => {
+                            return Err(anyhow!(
+                                "CaptureBytes@0: expected numeric, found {other:?}"
+                            ));
+                        }
+                    }
+                    // NOTE[epic=view-format] - in the current base-model design and implementation, CaptureBytes captures a `Seq<U8>`
+                    Ok(ValueType::Seq(Box::new(ValueType::U8)))
+                }
+                ViewFormat::ReadArray(len, kind) => {
+                    view.check_type(scope)?;
+                    match len.infer_type(scope)? {
+                        t if t.is_numeric() => {}
+                        other => {
+                            return Err(anyhow!("ReadArray@0: expected numeric, found {other:?}"));
+                        }
+                    }
+                    // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
+                    let ty = match kind {
+                        FixedReadKind::Base(bk) => ValueType::Base(BaseType::from(*bk)),
+                        FixedReadKind::FixedFormat(format_ref) => {
+                            let level = format_ref.get_level();
+                            // As in `typecheck::infer_var_view_format`, a `FixedFormat`
+                            // reference is only valid if the referenced format is fixed-size
+                            // and composed entirely of primitive fields (see
+                            // `fixed::analyze_fixed_shape`); this is a precondition on
+                            // construction, not a recoverable error.
+                            fixed::analyze_fixed_shape(self, *format_ref).unwrap_or_else(|e| {
+                                panic!(
+                                    "format `{}` is not eligible for FixedFormat ReadArray: {e}",
+                                    self.get_name(level),
+                                )
+                            });
+                            self.get_format_type(level).clone()
+                        }
+                    };
+                    Ok(ValueType::Seq(Box::new(ty)))
+                }
+                ViewFormat::ReifyView => {
+                    view.check_type(scope)?;
+                    Ok(ValueType::ViewObj)
+                }
+            },
+            Format::Phantom(inner) => {
+                let inner_t = self.infer_format_type(scope, &**inner)?;
+                Ok(ValueType::PhantomData(Box::new(inner_t)))
             }
         }
     }
@@ -1750,16 +1657,17 @@ impl<'a> MatchTreeStep<'a> {
         } else {
             let mut branches = Vec::new();
             for (bs1, next1) in self.branches.into_iter() {
+                let mut diff = bs1;
                 for (bs2, next2) in &peek.branches {
                     let common = bs1.intersection(bs2);
-                    let diff = bs1.difference(bs2);
                     if !common.is_empty() {
                         let next = Rc::new(Next::PeekNot(next1.clone(), next2.clone()));
                         branches.push((common, next));
                     }
-                    if !diff.is_empty() {
-                        branches.push((diff, next1.clone()));
-                    }
+                    diff = diff.difference(bs2);
+                }
+                if !diff.is_empty() {
+                    branches.push((diff, next1.clone()));
                 }
             }
             self.branches = branches;
@@ -1815,9 +1723,7 @@ impl<'a> MatchTreeStep<'a> {
         let (min, max) = min_max;
         assert!(
             min <= max,
-            "min-max pair ({}, {}) incoherent (min > max)",
-            min,
-            max
+            "min-max pair ({min}, {max}) incoherent (min > max)",
         );
         if min == max {
             Self::from_repeat_count(module, min, format, next)
@@ -1858,7 +1764,7 @@ impl<'a> MatchTreeStep<'a> {
                 let next = Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone()));
                 tree.branches.push((ByteSet::full(), next));
             } else {
-                for (_bs, ref mut inside) in tree.branches.iter_mut() {
+                for (_bs, inside) in tree.branches.iter_mut() {
                     *inside = Rc::new(Next::Slice(n - 1, inside.clone(), next.clone()));
                 }
             }
@@ -1911,8 +1817,9 @@ impl<'a> MatchTreeStep<'a> {
                 let min = *n;
                 let max = *m;
                 if min == max {
-                    // FIXME - this is technically allowable but we don't expect to get here...
-                    unreachable!("RepeatBetween(x, y, ..) precludes x == y");
+                    log::warn!("RepeatBetween({min}, {max}) converted to RepeatCount({min})");
+                    let next1 = Next::RepeatCount(min, *a, next0.clone());
+                    return Self::from_next(module, Rc::new(next1));
                 }
                 if min > 0 {
                     Self::from_mt_format(
@@ -1987,6 +1894,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Align(_) => {
                 Self::accept() // FIXME
             }
+            TypedFormat::Phantom(..) => Self::accept(),
             TypedFormat::SkipRemainder => Self::accept(),
             TypedFormat::Byte(bs) => Self::branch(*bs, next),
             TypedFormat::Variant(_, _label, f) => Self::from_gt_format(module, f, next.clone()),
@@ -2043,7 +1951,7 @@ impl<'a> MatchTreeStep<'a> {
             ),
             TypedFormat::RepeatCount(_, expr, a) => {
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     {
                         let next = next.clone();
                         if n > 0 {
@@ -2075,7 +1983,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::RepeatBetween(_, xmin, xmax, a) => {
                 let min_bounds = xmin.bounds();
                 let max_bounds = xmax.bounds();
-                match (min_bounds.is_exact(), max_bounds.is_exact()) {
+                match (min_bounds.as_exact(), max_bounds.as_exact()) {
                     (Some(min), Some(max)) => match min.cmp(&max) {
                         Ordering::Less => {
                             if min > 0 {
@@ -2117,11 +2025,13 @@ impl<'a> MatchTreeStep<'a> {
                             }
                         }
                         Ordering::Greater => {
-                            panic!("incoherent repeat-between: min {} > max {}", min, max)
+                            panic!("incoherent repeat-between: min {min} > max {max}")
                         }
                     },
                     _ => {
-                        unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
+                        unreachable!(
+                            "inexact repeat-between bounds (not technically a problem but not what the combinator was designed for..."
+                        );
                     }
                 }
             }
@@ -2157,7 +2067,7 @@ impl<'a> MatchTreeStep<'a> {
                     Rc::new(Next::Empty),
                 ));
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     Self::from_slice(module, n, inside, next)
                 } else {
                     Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
@@ -2169,14 +2079,17 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::WithRelativeOffset(_, _base_addr, _offset, _a) => {
                 Self::accept() // FIXME
             }
-            TypedFormat::Map(_, f, _expr) | TypedFormat::Where(_, f, _expr) => {
+            TypedFormat::Map(_, f, _) | TypedFormat::Where(_, f, _) => {
                 Self::from_gt_format(module, f, next)
             }
-            TypedFormat::DecodeBytes(..) | TypedFormat::Compute(..) => {
-                Self::from_next(module, next)
-            }
-            TypedFormat::Pos => Self::from_next(module, next),
+
+            TypedFormat::DecodeBytes(..)
+            | TypedFormat::ParseFromView(..)
+            | TypedFormat::Compute(..) => Self::from_next(module, next),
+
+            TypedFormat::Pos(_) => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::LetView(_, _name, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
@@ -2191,6 +2104,10 @@ impl<'a> MatchTreeStep<'a> {
                 Self::from_gt_format(module, f0, next0)
             }
             TypedFormat::Hint(_, _hint, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::Permit(_, f, _expr) => Self::from_gt_format(module, f, next),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(_, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::WithView(_, _ident, _vf) => Self::from_next(module, next),
         }
     }
 
@@ -2201,14 +2118,16 @@ impl<'a> MatchTreeStep<'a> {
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         match f {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 Self::from_format(module, module.get_format(*level), next)
             }
+            Format::Phantom(..) => Self::accept(),
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::SkipRemainder => Self::accept(),
             Format::Align(n) => Self::from_align(module, next, *n),
             Format::DecodeBytes(_bytes, _f) => Self::from_next(module, next),
+            Format::ParseFromView(_view, _f) => Self::from_next(module, next),
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
             Format::Union(branches) | Format::UnionNondet(branches) => {
@@ -2257,7 +2176,7 @@ impl<'a> MatchTreeStep<'a> {
             ),
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     Self::from_repeat_count(module, n, a, next.clone())
                 } else {
                     Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
@@ -2266,19 +2185,21 @@ impl<'a> MatchTreeStep<'a> {
             Format::RepeatBetween(xmin, xmax, a) => {
                 let min_bounds = xmin.bounds();
                 let max_bounds = xmax.bounds();
-                match (min_bounds.is_exact(), max_bounds.is_exact()) {
+                match (min_bounds.as_exact(), max_bounds.as_exact()) {
                     (Some(min), Some(max)) => match min.cmp(&max) {
                         Ordering::Less => {
                             Self::from_repeat_between(module, (min, max), a, next.clone())
                         }
                         Ordering::Equal => Self::from_repeat_count(module, min, a, next.clone()),
                         Ordering::Greater => {
-                            panic!("incoherent repeat-between: min {} > max {}", min, max)
+                            panic!("incoherent repeat-between: min {min} > max {max}")
                         }
                     },
                     _ => {
                         // FIXME: if there is a cleaner way to address this case, attempt to apply it
-                        unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
+                        unreachable!(
+                            "inexact repeat-between bounds (not technically a problem but not what the combinator was designed for..."
+                        );
                     }
                 }
             }
@@ -2312,7 +2233,7 @@ impl<'a> MatchTreeStep<'a> {
                     Rc::new(Next::Empty),
                 ));
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     Self::from_slice(module, n, inside, next)
                 } else {
                     Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
@@ -2329,6 +2250,14 @@ impl<'a> MatchTreeStep<'a> {
             Format::Pos => Self::from_next(module, next),
             Format::Compute(_expr) => Self::from_next(module, next),
             Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
+            Format::LetView(_name, f) => {
+                // FIXME - does the construction of a view-binding affect our matchtree?
+                Self::from_format(module, f, next)
+            }
+            // REVIEW - it isn't fully clear whether Permit should affect the matchtree in some way...
+            Format::Permit(f, _) => Self::from_format(module, f, next),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(f) => Self::from_format(module, f, next),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
@@ -2345,6 +2274,8 @@ impl<'a> MatchTreeStep<'a> {
             Format::Hint(_hint, f) => Self::from_format(module, f, next),
             Format::LiftedOption(None) => Self::from_next(module, next),
             Format::LiftedOption(Some(f)) => Self::from_format(module, f, next),
+            // REVIEW - is this a sound implementation?
+            Format::WithView(_ident, _vf) => Self::from_next(module, next),
         }
     }
 
@@ -2523,13 +2454,13 @@ impl MatchTree {
     }
 }
 
-pub struct TypeScope<'a> {
-    parent: Option<&'a TypeScope<'a>>,
+pub struct TypeScope<'a, T = ValueType> {
+    parent: Option<&'a TypeScope<'a, T>>,
     names: Vec<Label>,
-    types: Vec<ValueKind>,
+    types: Vec<ValueKind<T>>,
 }
 
-impl<'a> TypeScope<'a> {
+impl<'a, T> TypeScope<'a, T> {
     fn new() -> Self {
         let parent = None;
         let names = Vec::new();
@@ -2541,7 +2472,7 @@ impl<'a> TypeScope<'a> {
         }
     }
 
-    fn child(parent: &'a TypeScope<'a>) -> Self {
+    fn child(parent: &'a TypeScope<'a, T>) -> Self {
         let parent = Some(parent);
         let names = Vec::new();
         let types = Vec::new();
@@ -2552,17 +2483,22 @@ impl<'a> TypeScope<'a> {
         }
     }
 
-    fn push(&mut self, name: Label, t: ValueType) {
+    fn push(&mut self, name: Label, t: T) {
         self.names.push(name);
         self.types.push(ValueKind::Value(t));
     }
 
-    fn push_format(&mut self, name: Label, t: ValueType) {
+    fn push_format(&mut self, name: Label, t: T) {
         self.names.push(name);
         self.types.push(ValueKind::Format(t));
     }
 
-    fn get_type_by_name(&self, name: &str) -> &ValueKind {
+    fn push_view(&mut self, name: Label) {
+        self.names.push(name);
+        self.types.push(ValueKind::View);
+    }
+
+    fn get_type_by_name(&self, name: &str) -> &ValueKind<T> {
         for (i, n) in self.names.iter().enumerate().rev() {
             if n == name {
                 return &self.types[i];
@@ -2610,5 +2546,75 @@ mod test {
             (Label::Borrowed("z"), Value::U8(10)),
         ]);
         assert_eq!(expected, ret);
+    }
+
+    #[test]
+    fn format_phantom_rec_registers_and_decodes() {
+        use crate::helper::*;
+
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.recursive",
+            |phantom_field| {
+                Format::record(vec![
+                    (Label::Borrowed("tag"), u8()),
+                    (Label::Borrowed("child"), phantom_field),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+
+        // Registration must have replaced the `ValueType::Any` placeholder with a real type.
+        let level = self_ref.get_level();
+        assert!(!matches!(module.get_format_type(level), ValueType::Any));
+
+        let prog = super::decoder::Compiler::compile_program(&module, &self_ref.call()).unwrap();
+        let buf = ReadCtxt::new(&[42u8]);
+        let (ret, _) = prog.run(buf).unwrap();
+        match ret {
+            Value::Record(fields) => {
+                assert_eq!(fields[0], (Label::Borrowed("tag"), Value::U8(42)));
+            }
+            other => panic!("expected a record, found {other:?}"),
+        }
+    }
+
+    fn assert_bounds<B>(e: Expr, expected: B)
+    where
+        Bounds: From<B>,
+    {
+        let bounds = e.bounds();
+        assert_eq!(Bounds::from(expected), bounds);
+    }
+
+    #[test]
+    fn test_expr_bounds() {
+        use crate::helper::*;
+        use crate::numeric::helper as n;
+
+        // monic const expression
+        assert_bounds(Expr::U8(42), 42u8);
+
+        // arithmetic operations in doodle grammar
+        assert_bounds(add(Expr::U8(1), Expr::U8(2)), 3u8);
+        assert_bounds(mul(Expr::U8(1), Expr::U8(2)), 2u8);
+        assert_bounds(div(Expr::U8(8), Expr::U8(2)), 4u8);
+        assert_bounds(sub(Expr::U8(8), Expr::U8(2)), 6u8);
+
+        // rem works only when both bounds are exact, but const expressions should always have exact-bounds
+        assert_bounds(rem(Expr::U8(5), Expr::U8(2)), 1u8);
+
+        // embedded numeric subtrees
+        assert_bounds(numeric(n::lift_const(5000u32)), 5000u32);
+        assert_bounds(
+            numeric(n::binop_auto(
+                numeric::BasicBinOp::Add,
+                n::lift_const(1u32),
+                n::auto_const(2u32),
+            )),
+            3u32,
+        )
+
+        // STUB - add more cases to test
     }
 }

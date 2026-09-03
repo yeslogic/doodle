@@ -6,10 +6,14 @@ pub(crate) mod analysis;
 pub(crate) mod rebind;
 pub(crate) mod resolve;
 
+use crate::numeric::elaborator::IntType as ExtIntType;
+use crate::numeric::elaborator::PrimInt as ExtPrimInt;
+
+use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 use crate::output::{Fragment, FragmentBuilder};
 
-use crate::precedence::{cond_paren, Precedence};
-use crate::{BaseType, IntoLabel, Label, ValueType};
+use crate::precedence::{Precedence, cond_paren};
+use crate::{BaseKind, BaseType, Endian, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -48,7 +52,9 @@ impl ToFragment for AllowAttr {
 }
 
 pub(crate) enum ModuleAttr {
+    /// Module-level `#![allow(...)]`
     Allow(AllowAttr),
+    /// Module-level `#![cfg_attr(rustfmt, rustfmt::skip)]`
     // REVIEW - this feels a bit like a hack since it is a hard-coded one-off
     RustFmtSkip,
 }
@@ -261,19 +267,23 @@ impl std::ops::BitOr<TraitSet> for TraitSet {
 }
 
 impl TraitSet {
+    /// Returns true if `self` contains all traits in `subset`
+    pub fn contains(self, subset: TraitSet) -> bool {
+        self & subset == subset
+    }
+
     pub fn into_label_vec(self) -> Vec<Label> {
-        match self {
-            TraitSet::Empty => vec![],
-            TraitSet::Debug => vec![Label::from("Debug")],
-            TraitSet::Clone => vec![Label::from("Clone")],
-            TraitSet::DebugClone => vec![Label::from("Debug"), Label::from("Clone")],
-            TraitSet::Copy => vec![Label::from("Copy"), Label::from("Clone")],
-            TraitSet::DebugCopy => vec![
-                Label::from("Debug"),
-                Label::from("Copy"),
-                Label::from("Clone"),
-            ],
+        let mut labels = Vec::with_capacity((self as u8).count_ones() as usize);
+        if self.contains(Self::Debug) {
+            labels.push(Label::from("Debug"));
         }
+        if self.contains(Self::Copy) {
+            labels.push(Label::from("Copy"));
+        }
+        if self.contains(Self::Clone) {
+            labels.push(Label::from("Clone"));
+        }
+        labels
     }
 
     pub fn into_attr(self) -> RustAttr {
@@ -282,22 +292,23 @@ impl TraitSet {
 }
 
 impl RustItem {
+    /// Returns the attributes to be attached to the declaration `decl` based on the traits in `traits`
+    fn generate_attrs(decl: &RustDecl, traits: TraitSet) -> Vec<RustAttr> {
+        match decl {
+            RustDecl::TypeDef(..) => vec![traits.into_attr()],
+            RustDecl::Function(_) => Vec::new(),
+            RustDecl::TraitImpl(_) => Vec::new(),
+        }
+    }
+
     /// Promotes a standalone declaration to a top-level item with implicitly 'default' visibility (i.e. `pub(self)`).
     ///
     /// Attaches the specified set of derive-traits `traits` to the declaration if it is a type definition.
     ///
-    /// Currently, this argument is ignored for functions.
+    /// Equivalent to `from_decl` when called on function declarations or trait impl blocks.
     pub fn from_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
-        let attrs = match decl {
-            RustDecl::TypeDef(..) => vec![traits.into_attr()],
-            RustDecl::Function(_) => Vec::new(),
-        };
-        Self {
-            attrs,
-            vis: Default::default(),
-            doc_comment: None,
-            decl,
-        }
+        let attrs = Self::generate_attrs(&decl, traits);
+        Self::from_parts_no_doc(decl, Default::default(), attrs)
     }
 
     /// Promotes a standalone declaration to a top-level item with explicit 'pub' visibility.
@@ -306,25 +317,34 @@ impl RustItem {
     ///
     /// Currently, this argument is ignored for functions.
     pub fn pub_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
-        let attrs = match decl {
-            RustDecl::TypeDef(..) => vec![traits.into_attr()],
-            RustDecl::Function(_) => Vec::new(),
-        };
+        let attrs = Self::generate_attrs(&decl, traits);
+        Self::from_parts_no_doc(decl, Visibility::Public, attrs)
+    }
+
+    /// Promotes a standalone declaration to a top-level item with the specified visibility and attributes,
+    /// without any accompanying doc-comments.
+    fn from_parts_no_doc(decl: RustDecl, vis: Visibility, attrs: Vec<RustAttr>) -> Self {
         Self {
             attrs,
-            vis: Visibility::Public,
+            vis,
             doc_comment: None,
             decl,
         }
     }
 
-    /// Promotes a type declaration to a top-level item with implicit 'pub(self)' visibility and the default set of derive-traits
-    /// (currently, `Debug` and `Clone`).
+    /// Promotes a type/function declaration or trait-impl to a top-level item with implicit 'pub(self)' visibility.
     ///
-    /// For more fine-control over the traits that are derived, use [`from_decl_with_traits`](Self::from_decl_with_traits).
+    /// For type declarations in particular, attaches the default set of derive-traits (currently, `Debug` and `Clone`).
+    ///
+    /// For more fine-control over the traits that are derived for type-declarations, use [`from_decl_with_traits`](Self::from_decl_with_traits).
     #[inline]
     pub fn from_decl(decl: RustDecl) -> Self {
         Self::from_decl_with_traits(decl, TraitSet::default())
+    }
+
+    /// Given an iterable container of `RustDecl`s, returns an iterable container of `RustItem`s produced via [`from_decl`](Self::from_decl).
+    pub fn from_decls(decls: impl IntoIterator<Item = RustDecl>) -> impl Iterator<Item = Self> {
+        decls.into_iter().map(Self::from_decl)
     }
 
     /// Promotes a type declaration to a top-level item with implicit 'pub(self)' visibility and the default set of derive-traits
@@ -337,6 +357,11 @@ impl RustItem {
         Self::pub_decl_with_traits(decl, TraitSet::default())
     }
 
+    /// Given an existing `RustItem`, returns a new `RustItem` with the specified doc-comment.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the `RustItem` already has a doc-comment.
     pub fn with_comment<Text: IntoLabel>(
         mut self,
         comment: impl IntoIterator<Item = Text>,
@@ -398,26 +423,113 @@ impl ToFragment for DeclDerives {
 }
 
 #[derive(Clone, Debug)]
+pub enum TraitItem {
+    AssocType(Label, Option<Box<DefParams>>, Box<RustType>),
+    /// A trait-associated const definition: `const <name>: <ty> = <expr>;`
+    Const(Label, Box<RustType>, RustExpr),
+    Method(RustFn),
+}
+
+impl ToFragment for TraitItem {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            TraitItem::AssocType(name, params, ty) => Fragment::string("type ")
+                .cat(name.to_fragment())
+                .cat(Fragment::opt(params.as_deref(), DefParams::to_fragment))
+                .cat(Fragment::string(" = "))
+                .cat(ty.to_fragment())
+                .cat(Fragment::Char(';')),
+            TraitItem::Const(name, ty, expr) => Fragment::string("const ")
+                .cat(name.to_fragment())
+                .cat(Fragment::string(": "))
+                .cat(ty.to_fragment())
+                .cat(Fragment::string(" = "))
+                .cat(expr.to_fragment_precedence(Precedence::Top))
+                .cat(Fragment::Char(';')),
+            TraitItem::Method(method) => method.to_fragment(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustTraitImpl {
+    pub(crate) param_bindings: Option<Box<DefParams>>,
+    pub(crate) trait_name: TraitName,
+    pub(crate) trait_params: Option<Box<UseParams>>,
+    pub(crate) on_type: Box<RustType>,
+    pub(crate) body: Vec<TraitItem>,
+}
+
+impl ToFragment for RustTraitImpl {
+    fn to_fragment(&self) -> Fragment {
+        let RustTraitImpl {
+            param_bindings,
+            trait_name,
+            trait_params,
+            on_type,
+            body,
+        } = self;
+        let mut builder = FragmentBuilder::new();
+        builder.push(Fragment::string("impl"));
+        if let Some(bindings) = param_bindings {
+            builder.push(bindings.to_fragment());
+        }
+        builder.push(Fragment::Char(' '));
+        builder.push(trait_name.to_fragment());
+        if let Some(params) = trait_params {
+            builder.push(params.to_fragment());
+        }
+        builder.push(Fragment::string(" for "));
+        builder.push(on_type.to_fragment());
+        builder.push(Fragment::Char(' '));
+        builder.push(<TraitItem as ToFragment>::block_sep(
+            body,
+            Fragment::Char('\n'),
+        ));
+        builder.finalize()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) enum RustDecl {
-    TypeDef(Label, RustTypeDef),
+    TypeDef(Label, RustTypeDecl),
     Function(RustFn),
+    TraitImpl(RustTraitImpl),
 }
 
 impl RustDecl {
+    #[expect(dead_code)]
     pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
-        Self::TypeDef(lab.into(), def)
+        Self::TypeDef(lab.into(), RustTypeDecl { def, lt: None })
+    }
+
+    /// Lifts an iterable container of `RUs`
+    pub fn trait_blocks(
+        trait_impls: impl IntoIterator<Item = RustTraitImpl>,
+    ) -> impl Iterator<Item = RustDecl> {
+        trait_impls.into_iter().map(RustDecl::TraitImpl)
     }
 }
 
 impl ToFragment for RustDecl {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustDecl::TypeDef(name, type_def) => {
-                let keyword = Fragment::string(type_def.keyword_for());
-                Fragment::intervene(keyword, Fragment::Char(' '), name.to_fragment())
-                    .intervene(Fragment::Char(' '), type_def.to_fragment())
+            RustDecl::TypeDef(name, RustTypeDecl { def, lt }) => {
+                let identifier = if let Some(lt) = lt {
+                    name.to_fragment().cat(
+                        lt.to_fragment()
+                            .delimit(Fragment::Char('<'), Fragment::Char('>')),
+                    )
+                } else {
+                    name.to_fragment()
+                };
+                let keyword = Fragment::string(def.keyword_for());
+                keyword
+                    .intervene(Fragment::Char(' '), identifier)
+                    .intervene(Fragment::Char(' '), def.to_fragment())
             }
             RustDecl::Function(fn_def) => fn_def.to_fragment(),
+            RustDecl::TraitImpl(trait_impl) => trait_impl.to_fragment(),
         }
     }
 }
@@ -426,8 +538,8 @@ impl ToFragment for RustDecl {
 /// each of those two components
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RustParams<Lt, Ty> {
-    lt_params: Vec<Lt>,
-    ty_params: Vec<Ty>,
+    pub(crate) lt_params: Vec<Lt>,
+    pub(crate) ty_params: Vec<Ty>,
 }
 
 impl<Lt, Ty> Default for RustParams<Lt, Ty> {
@@ -451,6 +563,17 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
             ty_params: Vec::new(),
         }
     }
+
+    fn is_empty(&self) -> bool {
+        self.lt_params.is_empty() && self.ty_params.is_empty()
+    }
+
+    pub(crate) fn from_lt(lt: Lt) -> Self {
+        Self {
+            lt_params: vec![lt],
+            ty_params: Vec::new(),
+        }
+    }
 }
 
 impl<Lt, Ty> RustParams<Lt, Ty> {
@@ -459,21 +582,16 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
     }
 }
 
-impl ToFragment for RustParams<Label, Label> {
+impl<Lt, Ty> ToFragment for RustParams<Lt, Ty>
+where
+    Lt: ToFragment,
+    Ty: ToFragment,
+{
     fn to_fragment(&self) -> Fragment {
-        let all = self.lt_params.iter().chain(self.ty_params.iter());
-        Fragment::seq(all.map(Label::to_fragment), Some(Fragment::string(", ")))
-            .delimit(Fragment::Char('<'), Fragment::Char('>'))
-    }
-}
-
-impl ToFragment for RustParams<RustLt, RustType> {
-    fn to_fragment(&self) -> Fragment {
-        let all = self
-            .lt_params
-            .iter()
-            .map(RustLt::to_fragment)
-            .chain(self.ty_params.iter().map(RustType::to_fragment));
+        let all = Iterator::chain(
+            self.lt_params.iter().map(Lt::to_fragment),
+            self.ty_params.iter().map(Ty::to_fragment),
+        );
         Fragment::seq(all, Some(Fragment::string(", ")))
             .delimit(Fragment::Char('<'), Fragment::Char('>'))
     }
@@ -485,11 +603,11 @@ pub(crate) struct FnSig {
     /// List of arguments with accompanying type annotations
     args: Vec<(Label, RustType)>,
     /// Return type (assumed to be unit if omitted)
-    ret: Option<RustType>,
+    ret: Option<Box<RustType>>,
 }
 
 impl FnSig {
-    pub fn new(args: Vec<(Label, RustType)>, ret: Option<RustType>) -> Self {
+    pub fn new(args: Vec<(Label, RustType)>, ret: Option<Box<RustType>>) -> Self {
         Self { args, ret }
     }
 }
@@ -506,7 +624,7 @@ impl ToFragment for FnSig {
     fn to_fragment(&self) -> Fragment {
         ToFragment::paren_list(self.args.iter()).intervene(
             Fragment::string(" -> "),
-            Fragment::opt(self.ret.as_ref(), RustType::to_fragment),
+            Fragment::opt(self.ret.as_deref(), RustType::to_fragment),
         )
     }
 }
@@ -522,31 +640,72 @@ pub(crate) struct RustFn {
     sig: FnSig,
     /// List of statements comprising the body of the function
     body: Vec<RustStmt>,
+    /// Whether this function is declared `unsafe fn` rather than `fn` (e.g. for implementing a
+    /// trait method with an `unsafe` signature, such as `ReadUnchecked::read_unchecked`).
+    is_unsafe: bool,
 }
 
 impl RustFn {
-    pub fn new(name: Label, params: Option<DefParams>, sig: FnSig, body: Vec<RustStmt>) -> Self {
+    pub fn new<L: IntoLabel>(
+        name: L,
+        params: Option<DefParams>,
+        sig: FnSig,
+        body: Vec<RustStmt>,
+    ) -> Self {
         Self {
-            name,
+            name: name.into(),
             params,
             sig,
             body,
+            is_unsafe: false,
+        }
+    }
+
+    pub(crate) fn new_unsafe<L: IntoLabel>(
+        name: L,
+        params: Option<DefParams>,
+        sig: FnSig,
+        body: Vec<RustStmt>,
+    ) -> RustFn {
+        Self {
+            name: name.into(),
+            params,
+            sig,
+            body,
+            is_unsafe: true,
         }
     }
 }
 
 impl ToFragment for RustFn {
     fn to_fragment(&self) -> Fragment {
+        let keyword = if self.is_unsafe {
+            Fragment::string("unsafe fn ")
+        } else {
+            Fragment::string("fn ")
+        };
         let f_name = Fragment::string(self.name.clone());
         let f_params = Fragment::opt(self.params.as_ref(), RustParams::to_fragment);
         let f_sig = self.sig.to_fragment();
         let body = RustStmt::block(self.body.iter());
-        Fragment::string("fn ")
+        keyword
             .cat(f_name)
             .cat(f_params)
             .cat(f_sig)
             .cat(Fragment::Char(' '))
             .cat(body)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct RustTypeDecl {
+    pub(crate) def: RustTypeDef,
+    pub(crate) lt: Option<RustLt>,
+}
+
+impl RustTypeDecl {
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        self.lt.as_ref()
     }
 }
 
@@ -586,6 +745,34 @@ impl RustTypeDef {
     }
 }
 
+/// Set of types that are eligible for `ReadArray<'a, _>`.
+///
+/// Includes native [`MarkerType`]s as well as machine-generated adhoc types that
+/// are the result of successful compilation of `ViewFormat::ReadArray(_len, FixedReadKind::FixedFormat(_t))`
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FixedSizeType {
+    Marker(MarkerType),
+    Adhoc(LocalType),
+}
+
+impl FixedSizeType {
+    pub(crate) fn type_name(&self) -> Label {
+        match self {
+            FixedSizeType::Marker(mt) => Label::Borrowed(mt.name()),
+            FixedSizeType::Adhoc(lt) => Label::Owned(lt.to_fragment().to_string()),
+        }
+    }
+}
+
+impl ToFragment for FixedSizeType {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            FixedSizeType::Marker(mt) => mt.to_fragment(),
+            FixedSizeType::Adhoc(lt) => lt.to_fragment(),
+        }
+    }
+}
+
 /// Entry-type for representing type-level constructions in Rust, for use in function signatures and return types,
 /// the field-types of struct definitions, and expression-level type annotations.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -593,7 +780,9 @@ pub(crate) enum RustType {
     Atom(AtomType),
     AnonTuple(Vec<RustType>),
     /// Catch-all for generics that we may not be able or willing to hardcode
-    Verbatim(Label, UseParams),
+    Verbatim(Label, Option<Box<UseParams>>),
+    ReadArray(RustLt, FixedSizeType),
+    ViewObject(RustLt),
 }
 
 impl RustType {
@@ -606,8 +795,31 @@ impl RustType {
 
     /// Returns the RustType representation of a locally-defined type whose index in the code-generation table
     /// is `ix` and whose identifier is `name`.
-    pub fn defined(ix: usize, name: impl Into<Label>) -> Self {
-        Self::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, name.into())))
+    pub fn defined(ix: usize, name: impl Into<Label>, params: UseParams) -> Self {
+        let params = if params.is_empty() {
+            None
+        } else {
+            Some(Box::new(params))
+        };
+        Self::Atom(AtomType::TypeRef(LocalType::LocalDef(
+            ix,
+            name.into(),
+            params,
+        )))
+    }
+
+    pub fn as_local_type(&self) -> Option<&LocalType> {
+        match self {
+            RustType::Atom(AtomType::TypeRef(lt)) => Some(lt),
+            _ => None,
+        }
+    }
+
+    pub fn as_decl_index(&self) -> Option<usize> {
+        match self {
+            RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, ..))) => Some(*ix),
+            _ => None,
+        }
     }
 
     /// Maps the provided RustType according to the transformation `T -> Vec<T>`
@@ -624,14 +836,14 @@ impl RustType {
     /// Returns a RustType given a verbatim string-form of the type-level constructor to use,
     /// with an optional list of generic arguments to parameterize it with.
     pub fn verbatim(con: impl Into<Label>, params: Option<UseParams>) -> Self {
-        Self::Verbatim(con.into(), params.unwrap_or_default())
+        Self::Verbatim(con.into(), params.map(Box::new))
     }
 
     /// Predicate function that determines whether values of RustType `self` should be borrowed
     /// before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
     pub fn should_borrow_for_arg(&self) -> bool {
         match self {
-            RustType::Atom(ref atom_type) => match atom_type {
+            RustType::Atom(atom_type) => match atom_type {
                 AtomType::Comp(ct) => match ct {
                     // REVIEW - this may lead to code divergence and may not be stable...
                     CompType::Vec(..) => true,
@@ -641,20 +853,29 @@ impl RustType {
                     CompType::RawSlice(..) => {
                         unreachable!("raw slice should always be behind a ref")
                     }
+                    CompType::PhantomData(..) => {
+                        unreachable!("phantom-data should not be used as argument")
+                    }
                 },
                 AtomType::TypeRef(local) => match local {
                     // REVIEW - shallow wrappers around vec should be treated as if vec, but that is difficult to achieve without more state-info from generation process
                     LocalType::LocalDef(_ix, ..) => false,
                     LocalType::External(..) => false,
                 },
-                AtomType::Prim(..) => false,
+                AtomType::Prim(..) | AtomType::Signed(..) => false,
             },
             // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
             RustType::AnonTuple(_elts) => false,
             RustType::Verbatim(..) => false,
+            // FIXME - is this correct?
+            RustType::ReadArray(..) => !READ_ARRAY_IS_COPY,
+            RustType::ViewObject(..) => false,
         }
     }
 
+    /// Converts any special-cases of `RustType` that should be borrowed before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
+    ///
+    /// Returns `ty` if no conversion is necessary (i.e. the type need not be borrowed or has no special-case rules), and a borrow of `ty` for lifetime `lt` and mutability `m` otherwise.
     pub fn selective_borrow(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
         if ty.should_borrow_for_arg() {
             Self::borrow_of(lt, m, ty)
@@ -678,7 +899,8 @@ impl RustType {
         )))
     }
 
-    fn try_as_prim(&self) -> Option<PrimType> {
+    /// Returns `Some(PrimType)` if `self` is a primitive type, and `None` otherwise.
+    pub fn try_as_prim(&self) -> Option<PrimType> {
         match self {
             RustType::Atom(AtomType::Prim(pt)) => Some(*pt),
             _ => None,
@@ -726,6 +948,53 @@ impl RustType {
             this => this,
         }
     }
+
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            RustType::Atom(atom_type) => atom_type.lt_param(),
+            RustType::AnonTuple(rust_types) => rust_types.iter().find_map(|t| t.lt_param()),
+            RustType::Verbatim(_, rust_params) => rust_params.as_deref()?.lt_params.first(),
+            RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => Some(lt),
+        }
+    }
+
+    pub(crate) fn alpha_convert_lifetime(&mut self, new_lt: RustLt) {
+        match self {
+            RustType::Atom(atom_type) => atom_type.alpha_convert_lifetime(new_lt),
+            RustType::AnonTuple(rust_types) => rust_types
+                .iter_mut()
+                .for_each(|t| t.alpha_convert_lifetime(new_lt.clone())),
+            RustType::Verbatim(_, rust_params) => {
+                if let Some(rust_params) = rust_params.as_deref_mut() {
+                    assert_eq!(rust_params.lt_params.len(), 1);
+                    rust_params.lt_params[0] = new_lt;
+                }
+            }
+            RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => *lt = new_lt,
+        }
+    }
+
+    pub(crate) fn try_as_num(&self) -> Option<NumType> {
+        match self {
+            RustType::Atom(at) => match at {
+                AtomType::Prim(PrimType::Unsigned(ut)) => Some(NumType::U(*ut)),
+                AtomType::Signed(it) => Some(NumType::I(*it)),
+                AtomType::Prim(_other) => None,
+                AtomType::Comp(..) | AtomType::TypeRef(..) => None,
+            },
+            RustType::AnonTuple(..)
+            | RustType::ReadArray(..)
+            | RustType::Verbatim(..)
+            | RustType::ViewObject(..) => None,
+        }
+    }
+}
+
+fn hotswap_lt(params: &mut Option<Box<UseParams>>, new_lt: RustLt) {
+    if let Some(params) = params.as_deref_mut() {
+        assert_eq!(params.lt_params.len(), 1);
+        params.lt_params[0] = new_lt;
+    }
 }
 
 impl RustType {
@@ -739,6 +1008,7 @@ impl RustType {
         match self {
             RustType::Atom(at) => match at {
                 AtomType::Prim(..) => true,
+                AtomType::Signed(..) => true,
                 // Without passing around high-level type-maps, we can't check any externally-defined or local ad-hoc types for Copy-safety
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
@@ -749,11 +1019,14 @@ impl RustType {
                     CompType::RawSlice(_) => {
                         unreachable!("raw slice should not exist outside of ref context")
                     }
+                    CompType::PhantomData(..) => true,
                 },
             },
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
             // Without lexical analysis rules, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
             RustType::Verbatim(..) => false,
+            RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
+            RustType::ViewObject(..) => VIEW_OBJECT_IS_COPY,
         }
     }
 }
@@ -771,15 +1044,22 @@ impl ToFragment for RustType {
                 }
                 elems.delimit(Fragment::Char('('), Fragment::Char(')'))
             }
-            RustType::Verbatim(con, params) => con.to_fragment().cat(params.to_fragment()),
+            RustType::Verbatim(con, params) => con
+                .to_fragment()
+                .cat(Fragment::opt(params.as_deref(), RustParams::to_fragment)),
+            RustType::ReadArray(lt, mt) => {
+                let params = RustParams {
+                    lt_params: vec![lt.clone()],
+                    ty_params: vec![mt.clone()],
+                };
+                Fragment::string("ReadArray").cat(params.to_fragment())
+            }
+            RustType::ViewObject(lt) => {
+                let params = UseParams::from_lt(lt.clone());
+                // REVIEW[epic=hardcoded] - using crate::parser::view::View for View-Objects
+                Fragment::string("View").cat(params.to_fragment())
+            }
         }
-    }
-}
-
-impl ToFragmentExt for RustType {
-    // FIXME - this impl is only to fix test cases
-    fn to_fragment_precedence(&self, _prec: Precedence) -> Fragment {
-        self.to_fragment()
     }
 }
 
@@ -836,7 +1116,7 @@ fn remap(input: Label) -> Label {
         | "static" | "struct" | "super" | "trait" | "true" | "type" | "unsafe" | "use"
         | "where" | "while" | "abstract" | "become" | "box" | "do" | "final" | "macro"
         | "override" | "priv" | "try" | "typeof" | "unsized" | "virtual" | "yield" => {
-            Label::from(format!("r#{}", input))
+            Label::from(format!("r#{input}"))
         }
         _ => input,
     }
@@ -895,6 +1175,13 @@ impl RustVariant {
             RustVariant::Tuple(_, elts) => elts.iter().all(RustType::can_be_copy),
         }
     }
+
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            RustVariant::Unit(_) => None,
+            RustVariant::Tuple(_, elts) => elts.iter().find_map(RustType::lt_param),
+        }
+    }
 }
 
 impl ToFragment for RustVariant {
@@ -916,27 +1203,53 @@ where
 {
     TypeRef(LocalType),
     Prim(PrimType),
+    Signed(MachineSint),
     Comp(CompType<T, U>),
+}
+
+impl AtomType {
+    fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            AtomType::TypeRef(local_type) => match local_type {
+                LocalType::LocalDef(_, _, params) => params.as_deref()?.lt_params.first(),
+                _ => None,
+            },
+            AtomType::Prim(..) | AtomType::Signed(..) => None,
+            AtomType::Comp(ct) => ct.lt_param(),
+        }
+    }
+
+    fn alpha_convert_lifetime(&mut self, new_lt: RustLt) {
+        match self {
+            AtomType::TypeRef(local_type) => match local_type {
+                LocalType::LocalDef(_, _, params) => hotswap_lt(params, new_lt),
+                _ => (),
+            },
+            AtomType::Prim(..) | AtomType::Signed(..) => (),
+            AtomType::Comp(ct) => ct.alpha_convert_lifetime(new_lt),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum LocalType {
-    LocalDef(usize, Label),
+    LocalDef(usize, Label, Option<Box<UseParams>>),
     External(Label),
-}
-
-impl AsRef<Label> for LocalType {
-    fn as_ref(&self) -> &Label {
-        match self {
-            LocalType::External(lab) | LocalType::LocalDef(_, lab) => lab,
-        }
-    }
 }
 
 impl ToFragment for LocalType {
     fn to_fragment(&self) -> Fragment {
         match self {
-            Self::LocalDef(_, lab) | Self::External(lab) => lab.to_fragment(),
+            Self::LocalDef(_, lab, params) => {
+                if let Some(params) = params
+                    && !params.is_empty()
+                {
+                    lab.to_fragment().cat(params.to_fragment())
+                } else {
+                    lab.to_fragment()
+                }
+            }
+            Self::External(lab) => lab.to_fragment(),
         }
     }
 }
@@ -950,7 +1263,135 @@ where
         match self {
             AtomType::TypeRef(local_type) => local_type.to_fragment(),
             AtomType::Prim(pt) => pt.to_fragment(),
+            AtomType::Signed(p_ext) => p_ext.to_fragment(),
             AtomType::Comp(ct) => ct.to_fragment(),
+        }
+    }
+}
+
+/// Representatives for `smallsorts::binary::*` marker-types.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
+pub(crate) enum MarkerType {
+    U8,
+    U16Be,
+    U32Be,
+    U64Be,
+}
+
+impl MarkerType {
+    #[expect(unused)]
+    pub const fn get_fixed_size(self) -> usize {
+        match self {
+            MarkerType::U8 => size_of::<u8>(),
+            MarkerType::U16Be => size_of::<u16>(),
+            MarkerType::U32Be => size_of::<u32>(),
+            MarkerType::U64Be => size_of::<u64>(),
+        }
+    }
+
+    /// The bare identifier of the `smallsorts::binary::*` marker-type this variant represents.
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            MarkerType::U8 => "U8",
+            MarkerType::U16Be => "U16Be",
+            MarkerType::U32Be => "U32Be",
+            MarkerType::U64Be => "U64Be",
+        }
+    }
+
+    /// Converts an endian-qualified [`BaseKind`] into the corresponding marker-type.
+    ///
+    /// Panics on a little-endian `kind`, as the runtime does not yet support little-endian
+    /// primitive reads (mirroring the `unimplemented!` arms in `model::read_array_from_view`
+    /// and `decoder::read_base` for the same case).
+    pub(crate) fn from_base_kind_endian(kind: BaseKind<Endian>) -> Self {
+        match kind {
+            BaseKind::U8 => MarkerType::U8,
+            BaseKind::U16Ext(Endian::Be) => MarkerType::U16Be,
+            BaseKind::U32Ext(Endian::Be) => MarkerType::U32Be,
+            BaseKind::U64Ext(Endian::Be) => MarkerType::U64Be,
+            BaseKind::U16Ext(Endian::Le)
+            | BaseKind::U32Ext(Endian::Le)
+            | BaseKind::U64Ext(Endian::Le) => {
+                unimplemented!("little-endian read-array parses not yet implemented")
+            }
+        }
+    }
+}
+
+impl From<BaseKind> for MarkerType {
+    fn from(bk: BaseKind) -> Self {
+        match bk {
+            BaseKind::U8 => MarkerType::U8,
+            BaseKind::U16 => MarkerType::U16Be,
+            BaseKind::U32 => MarkerType::U32Be,
+            BaseKind::U64 => MarkerType::U64Be,
+        }
+    }
+}
+
+impl ToFragment for MarkerType {
+    fn to_fragment(&self) -> Fragment {
+        Fragment::string(self.name())
+    }
+}
+
+/// Names the imported `smallsorts::binary::*` marker-type corresponding to `self`, for use as
+/// e.g. an explicit turbofish type-argument (`view.as_read_array::<U16Be>(len)`).
+impl From<MarkerType> for RustType {
+    fn from(mt: MarkerType) -> Self {
+        RustType::imported(mt.name())
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidMarkerTypeError(PrimType);
+
+impl std::fmt::Display for InvalidMarkerTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid marker type: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for InvalidMarkerTypeError {}
+
+impl TryFrom<PrimType> for MarkerType {
+    type Error = InvalidMarkerTypeError;
+
+    fn try_from(pt: PrimType) -> Result<Self, Self::Error> {
+        match pt {
+            PrimType::Unsigned(mu) => Ok(mu.into()),
+            _ => Err(InvalidMarkerTypeError(pt)),
+        }
+    }
+}
+
+impl From<MachineUint> for MarkerType {
+    fn from(mu: MachineUint) -> Self {
+        match mu {
+            MachineUint::U8 => MarkerType::U8,
+            MachineUint::U16 => MarkerType::U16Be,
+            MachineUint::U32 => MarkerType::U32Be,
+            MachineUint::U64 => MarkerType::U64Be,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MachineUint {
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+impl MachineUint {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            MachineUint::U8 => "u8",
+            MachineUint::U16 => "u16",
+            MachineUint::U32 => "u32",
+            MachineUint::U64 => "u64",
         }
     }
 }
@@ -958,21 +1399,22 @@ where
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
 pub(crate) enum PrimType {
     Unit,
-    U8,
-    U16,
-    U32,
-    U64,
     Bool,
     Char,
+    Unsigned(MachineUint),
     Usize,
 }
 
 impl PrimType {
+    pub const U8: PrimType = PrimType::Unsigned(MachineUint::U8);
+    pub const U16: PrimType = PrimType::Unsigned(MachineUint::U16);
+    pub const U32: PrimType = PrimType::Unsigned(MachineUint::U32);
+    pub const U64: PrimType = PrimType::Unsigned(MachineUint::U64);
+}
+
+impl PrimType {
     fn is_numeric(&self) -> bool {
-        matches!(
-            self,
-            PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize
-        )
+        matches!(self, PrimType::Unsigned(..) | PrimType::Usize)
     }
 
     fn compare_width(pt0: PrimType, pt1: PrimType) -> Option<Ordering> {
@@ -1013,15 +1455,71 @@ impl ToFragment for PrimType {
     fn to_fragment(&self) -> Fragment {
         Fragment::string(match self {
             PrimType::Unit => "()",
-            PrimType::U8 => "u8",
-            PrimType::U16 => "u16",
-            PrimType::U32 => "u32",
-            PrimType::U64 => "u64",
             PrimType::Bool => "bool",
             PrimType::Char => "char",
             PrimType::Usize => "usize",
+            PrimType::Unsigned(mu) => mu.to_static_str(),
         })
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MachineSint {
+    I8,
+    I16,
+    I32,
+    I64,
+}
+
+impl MachineSint {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            MachineSint::I8 => "i8",
+            MachineSint::I16 => "i16",
+            MachineSint::I32 => "i32",
+            MachineSint::I64 => "i64",
+        }
+    }
+}
+
+impl std::fmt::Display for MachineSint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
+}
+
+impl ToFragment for MachineSint {
+    fn to_fragment(&self) -> Fragment {
+        Fragment::string(self.to_static_str())
+    }
+}
+
+impl From<ExtIntType> for AtomType {
+    fn from(value: ExtIntType) -> Self {
+        let ExtIntType::Prim(ext_prim) = value;
+        match ext_prim {
+            ExtPrimInt::U8 => AtomType::Prim(PrimType::U8),
+            ExtPrimInt::U16 => AtomType::Prim(PrimType::U16),
+            ExtPrimInt::U32 => AtomType::Prim(PrimType::U32),
+            ExtPrimInt::U64 => AtomType::Prim(PrimType::U64),
+            ExtPrimInt::I8 => AtomType::Signed(MachineSint::I8),
+            ExtPrimInt::I16 => AtomType::Signed(MachineSint::I16),
+            ExtPrimInt::I32 => AtomType::Signed(MachineSint::I32),
+            ExtPrimInt::I64 => AtomType::Signed(MachineSint::I64),
+        }
+    }
+}
+
+/// Given a lifetime identifier (including leading tick), constructs a `RustLt` using that identifier.
+///
+/// # Example
+///
+/// ```ignore
+/// let x = lt("'_");
+/// assert_eq!(lt, RustLt::WILD);
+/// ```
+pub fn lt(ident: impl IntoLabel) -> RustLt {
+    RustLt::Parametric(ident.into())
 }
 
 /// AST type for Rust Lifetimes
@@ -1029,6 +1527,19 @@ impl ToFragment for PrimType {
 pub enum RustLt {
     /// Label contents should contain leading `'`
     Parametric(Label),
+}
+
+impl RustLt {
+    #[allow(dead_code)]
+    pub const WILD: Self = RustLt::Parametric(Label::Borrowed("'_"));
+}
+
+impl AsRef<Label> for RustLt {
+    fn as_ref(&self) -> &Label {
+        match self {
+            RustLt::Parametric(lab) => lab,
+        }
+    }
 }
 
 impl ToFragment for RustLt {
@@ -1049,6 +1560,37 @@ pub(crate) enum CompType<T = Box<RustType>, U = T> {
     Option(T),
     Result(T, U),
     Borrow(Option<RustLt>, Mut, T),
+    PhantomData(T),
+}
+
+impl CompType {
+    fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            CompType::Vec(t) => t.lt_param(),
+            CompType::RawSlice(t) => t.lt_param(),
+            CompType::Option(t) => t.lt_param(),
+            CompType::Result(t, _) => t.lt_param(),
+            CompType::Borrow(rust_lt, _, t) => rust_lt.as_ref().or_else(|| t.lt_param()),
+            CompType::PhantomData(t) => t.lt_param(),
+        }
+    }
+
+    fn alpha_convert_lifetime(&mut self, new_lt: RustLt) {
+        match self {
+            CompType::Vec(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::RawSlice(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::Option(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::Result(t, _) => {
+                t.alpha_convert_lifetime(new_lt);
+            }
+            CompType::Borrow(Some(rust_lt), _, t) => {
+                *rust_lt = new_lt.clone();
+                t.alpha_convert_lifetime(new_lt);
+            }
+            CompType::Borrow(None, _, t) => t.alpha_convert_lifetime(new_lt),
+            CompType::PhantomData(t) => t.alpha_convert_lifetime(new_lt),
+        }
+    }
 }
 
 impl<T, U> ToFragment for CompType<T, U>
@@ -1083,6 +1625,14 @@ where
                 let f_body = Fragment::intervene(f_aux, Fragment::Char(' '), ty.to_fragment());
                 Fragment::cat(Fragment::Char('&'), f_body)
             }
+            CompType::PhantomData(inner) => {
+                let tmp = inner.to_fragment();
+                // REVIEW - do we import instead of qualifying here?
+                tmp.delimit(
+                    Fragment::string("std::marker::PhantomData<"),
+                    Fragment::Char('>'),
+                )
+            }
         }
     }
 }
@@ -1111,6 +1661,33 @@ impl From<PrimType> for RustType {
     }
 }
 
+impl From<NumType> for RustType {
+    fn from(value: NumType) -> Self {
+        match value {
+            NumType::U(u) => RustType::from(u),
+            NumType::I(i) => RustType::from(i),
+        }
+    }
+}
+
+impl From<MachineUint> for RustType {
+    fn from(value: MachineUint) -> Self {
+        Self::from(AtomType::from(PrimType::Unsigned(value)))
+    }
+}
+
+impl From<MachineSint> for RustType {
+    fn from(value: MachineSint) -> Self {
+        Self::from(AtomType::Signed(value))
+    }
+}
+
+impl From<ExtIntType> for RustType {
+    fn from(value: ExtIntType) -> Self {
+        Self::from(AtomType::from(value))
+    }
+}
+
 impl From<CompType<Box<RustType>>> for RustType {
     fn from(value: CompType<Box<RustType>>) -> Self {
         Self::from(AtomType::from(value))
@@ -1122,13 +1699,20 @@ impl TryFrom<ValueType> for RustType {
 
     fn try_from(value: ValueType) -> Result<Self, Self::Error> {
         match value {
+            // NOTE - this is actually `!`, properly speaking, but `!` can silently coerce to `()` so it oughtn't be a problem
             ValueType::Empty => Ok(RustType::UNIT),
+            // REVIEW[epic=hardcoded] - we have to hardcode a lifetime for now
+            ValueType::ViewObj => Ok(RustType::ViewObject(RustLt::Parametric(Label::Borrowed(
+                DEFAULT_LT,
+            )))),
             ValueType::Base(BaseType::Bool) => Ok(PrimType::Bool.into()),
-            ValueType::Base(BaseType::U8) => Ok(PrimType::U8.into()),
-            ValueType::Base(BaseType::U16) => Ok(PrimType::U16.into()),
-            ValueType::Base(BaseType::U32) => Ok(PrimType::U32.into()),
-            ValueType::Base(BaseType::U64) => Ok(PrimType::U64.into()),
             ValueType::Base(BaseType::Char) => Ok(PrimType::Char.into()),
+            ValueType::U8 => Ok(PrimType::U8.into()),
+            ValueType::U16 => Ok(PrimType::U16.into()),
+            ValueType::U32 => Ok(PrimType::U32.into()),
+            ValueType::U64 => Ok(PrimType::U64.into()),
+            ValueType::Signed(s) => Ok(MachineSint::from(s).into()),
+            ValueType::NumericHole => Err(value),
             ValueType::Tuple(mut vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.drain(..) {
@@ -1145,6 +1729,12 @@ impl TryFrom<ValueType> for RustType {
                 Ok(RustType::Atom(AtomType::Comp(CompType::Option(Box::new(
                     inner,
                 )))))
+            }
+            ValueType::PhantomData(t) => {
+                let inner = Self::try_from(t.as_ref().clone())?;
+                Ok(RustType::Atom(AtomType::Comp(CompType::PhantomData(
+                    Box::new(inner),
+                ))))
             }
             ValueType::Any | ValueType::Record(..) | ValueType::Union(..) => Err(value),
         }
@@ -1179,14 +1769,14 @@ pub(crate) enum RustEntity {
     Scoped(Vec<Label>, Label),
 }
 
-impl RustEntity {
+impl ToFragment for RustEntity {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustEntity::Local(v) => v.to_fragment(),
-            RustEntity::Scoped(path, v) => Fragment::seq(
+            RustEntity::Local(lbl) => lbl.to_fragment(),
+            RustEntity::Scoped(path, lbl) => Fragment::seq(
                 path.iter()
-                    .chain(std::iter::once(v))
-                    .map(|scope| scope.to_fragment()),
+                    .chain(std::iter::once(lbl))
+                    .map(Label::to_fragment),
                 Some(Fragment::string("::")),
             ),
         }
@@ -1216,24 +1806,28 @@ pub(crate) enum RustPrimLit {
     String(Label),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum RustNumLit {
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
     Usize(usize),
+    SomeInt(BigInt),
 }
 
-impl From<RustNumLit> for usize {
-    fn from(value: RustNumLit) -> Self {
-        match value {
+impl TryFrom<RustNumLit> for usize {
+    type Error = <BigInt as TryInto<usize>>::Error;
+
+    fn try_from(value: RustNumLit) -> Result<Self, Self::Error> {
+        Ok(match value {
             RustNumLit::U8(n) => n as usize,
             RustNumLit::U16(n) => n as usize,
             RustNumLit::U32(n) => n as usize,
             RustNumLit::U64(n) => n as usize,
             RustNumLit::Usize(n) => n,
-        }
+            RustNumLit::SomeInt(big) => big.try_into()?,
+        })
     }
 }
 
@@ -1245,6 +1839,7 @@ impl ToFragment for RustNumLit {
             RustNumLit::U32(n) => Fragment::string(format!("{n}u32")),
             RustNumLit::U64(n) => Fragment::string(format!("{n}u64")),
             RustNumLit::Usize(n) => Fragment::string(format!("{n}")),
+            RustNumLit::SomeInt(z) => Fragment::string(z.to_string()),
         }
     }
 }
@@ -1262,14 +1857,23 @@ impl ToFragment for RustPrimLit {
     }
 }
 
+/// Specification of a method to be called on a receiver object.
+///
+/// When using [`MethodSpecifier::Arbitrary`], [`SubIdent::ByName`] should be used, and [`SubIdent::ByPosition`] is not typically valid.
+///
+/// If a [`CommonMethod`] is defined for the method in question, or ought be defined, then [`MethodSpecifier::Common`] should be used over
+/// [`MethodSpecifier::Arbitrary`].
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum MethodSpecifier {
+    /// Any method name
     Arbitrary(SubIdent),
+    /// A specific common method hardcoded into the model
     Common(CommonMethod),
 }
 
 impl MethodSpecifier {
     pub const LEN: Self = Self::Common(CommonMethod::Len);
+    pub const IS_EMPTY: Self = Self::Common(CommonMethod::IsEmpty);
 }
 
 impl From<SubIdent> for MethodSpecifier {
@@ -1287,12 +1891,14 @@ impl From<CommonMethod> for MethodSpecifier {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum CommonMethod {
     Len,
+    IsEmpty,
 }
 
 impl CommonMethod {
     pub(crate) fn try_get_return_primtype(&self) -> Option<PrimType> {
         match self {
             CommonMethod::Len => Some(PrimType::Usize),
+            CommonMethod::IsEmpty => Some(PrimType::Bool),
         }
     }
 }
@@ -1301,6 +1907,7 @@ impl ToFragment for CommonMethod {
     fn to_fragment(&self) -> Fragment {
         match self {
             CommonMethod::Len => Fragment::string("len"),
+            CommonMethod::IsEmpty => Fragment::string("is_empty"),
         }
     }
 }
@@ -1316,15 +1923,15 @@ impl ToFragment for MethodSpecifier {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructExpr {
-    EmptyExpr,
-    RecordExpr(Vec<(Label, Option<RustExpr>)>),
-    TupleExpr(Vec<RustExpr>),
+    Empty,
+    Record(Vec<(Label, Option<RustExpr>)>),
+    Tuple(Vec<RustExpr>),
 }
 
 impl ToFragment for StructExpr {
     fn to_fragment(&self) -> Fragment {
         match self {
-            StructExpr::RecordExpr(fields) => Fragment::seq(
+            StructExpr::Record(fields) => Fragment::seq(
                 fields.iter().map(|(lab, expr)| {
                     Fragment::intervene(
                         lab.to_fragment(),
@@ -1337,8 +1944,8 @@ impl ToFragment for StructExpr {
                 Some(Fragment::string(", ")),
             )
             .delimit(Fragment::string(" { "), Fragment::string(" }")),
-            StructExpr::TupleExpr(elts) => RustExpr::paren_list_prec(elts, Precedence::Top),
-            StructExpr::EmptyExpr => Fragment::Empty,
+            StructExpr::Tuple(elts) => RustExpr::paren_list_prec(elts, Precedence::Top),
+            StructExpr::Empty => Fragment::Empty,
         }
     }
 }
@@ -1359,9 +1966,20 @@ pub(crate) enum OwnedKind {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Lens<T> {
+    /// Type of 'this'-object is directly known
     Ground(T),
+    /// Type of 'this' is the element-type of the given lens-type
+    ///
+    /// (e.g. `ElemOf(Seq(T)) => this :: T`)
     ElemOf(Box<Lens<T>>),
+    /// Type of 'this' is the type of the given field in the provided lens-type
+    ///
+    /// (e.g. `FieldAccess(ByPosition(0), (T, U)) => this :: T`)
     FieldAccess(SubIdent, Box<Lens<T>>),
+    /// Type of 'this' is the parameter of the given lens-type which is implicitly a generic builtin type like `Option<T>`
+    ///
+    /// (e.g. `ParamOf(Option(T)) => this :: T`)
+    ParamOf(Box<Lens<T>>),
 }
 
 impl Lens<RustType> {
@@ -1376,16 +1994,70 @@ impl Lens<RustType> {
     fn elem(&self) -> Lens<RustType> {
         Lens::ElemOf(Box::new(self.clone()))
     }
+
+    fn param(&self) -> Lens<RustType> {
+        Lens::ParamOf(Box::new(self.clone()))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum NumType {
+    U(MachineUint),
+    I(MachineSint),
+}
+
+impl NumType {
+    pub const fn to_static_str(&self) -> &'static str {
+        match self {
+            NumType::U(p) => p.to_static_str(),
+            NumType::I(p) => p.to_static_str(),
+        }
+    }
+}
+
+impl From<ExtPrimInt> for NumType {
+    fn from(value: ExtPrimInt) -> Self {
+        match value {
+            ExtPrimInt::U8 => NumType::U(MachineUint::U8),
+            ExtPrimInt::U16 => NumType::U(MachineUint::U16),
+            ExtPrimInt::U32 => NumType::U(MachineUint::U32),
+            ExtPrimInt::U64 => NumType::U(MachineUint::U64),
+            ExtPrimInt::I8 => NumType::I(MachineSint::I8),
+            ExtPrimInt::I16 => NumType::I(MachineSint::I16),
+            ExtPrimInt::I32 => NumType::I(MachineSint::I32),
+            ExtPrimInt::I64 => NumType::I(MachineSint::I64),
+        }
+    }
+}
+
+impl From<MachineUint> for NumType {
+    fn from(v: MachineUint) -> Self {
+        Self::U(v)
+    }
+}
+
+impl From<MachineSint> for NumType {
+    fn from(v: MachineSint) -> Self {
+        Self::I(v)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
+    /// Vacuous expression used in place of hardcoded `()`
+    Void,
     Entity(RustEntity),
+    ConstNum(crate::numeric::TypedConst, Option<NumType>),
     PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
-    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>), // NOTE - to avoid nesting parentheses, we avoid chaining `FieldAccess` and `FunctionCall` and instead use a distinguished variant
-    FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
-    FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
+    /// When calling a method on a receiver, MethodCall is preferred over FieldAccess + FunctionCall
+    /// `MethodCall(receiver, method, generics, args) -> <receiver>.<method>::<generics>(<args>)`
+    ///
+    /// `generics` is typically empty, in which case no turbofish (`::<...>`) is printed at all.
+    MethodCall(Box<RustExpr>, MethodSpecifier, UseParams, Vec<RustExpr>),
+    FieldAccess(Box<RustExpr>, SubIdent),
+    /// Used for function-calls and tuple-struct constructor expressions
+    FunctionCall(Box<RustExpr>, Vec<RustExpr>),
     Tuple(Vec<RustExpr>),
     Struct(Constructor, StructExpr),
     Owned(OwnedRustExpr),
@@ -1403,12 +2075,73 @@ pub(crate) enum RustExpr {
     ResultOk(Option<Label>, Box<RustExpr>),
     ResultErr(Box<RustExpr>),
     Macro(RustMacro),
+    OwnedOption(Box<RustExpr>, OwnedKind),
+    // WIP - merge candidate with FunctionCall
+    Invoke(FnEntity, Vec<RustExpr>),
+}
+
+/// AST type for 'function entities', which are either identifiers to stdlib/prelude functions
+/// or synthetic functions (e.g. locally defined closures)
+#[derive(Clone, Debug)]
+pub enum FnEntity {
+    /// Function already visible in the local scope via stdlib or prelude imports
+    Specific { fname: RustEntity },
+    /// Function that is defined only within the source-map of the RustModule, and does not otherwise exist
+    Synthetic {
+        fname: RustEntity,
+        // FIXME - NumType here is a holdover from analytic-engine, where FnEntity originated
+        type_params: Vec<NumType>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustMacro {
     Matches(Box<RustExpr>, Vec<RustPattern>),
     Vec(VecExpr),
+    Log(LogFn, LogMessage),
+}
+
+#[derive(Debug, Clone)]
+pub struct LogMessage {
+    pub format_string: Label,
+    pub args: Vec<RustExpr>,
+}
+
+impl ToFragment for LogMessage {
+    fn to_fragment(&self) -> Fragment {
+        let args_fragment = Fragment::seq(
+            self.args
+                .iter()
+                .map(|arg| arg.to_fragment_precedence(Precedence::Top)),
+            Some(Fragment::string(", ")),
+        );
+        Fragment::intervene(
+            Fragment::string(format!("\"{}\"", self.format_string)),
+            Fragment::string(", "),
+            args_fragment,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LogFn {
+    Error,
+    // Warn,
+    // Info,
+    // Debug,
+    // Trace,
+}
+
+impl ToFragment for LogFn {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            LogFn::Error => Fragment::string("log::error!"),
+            // LogFn::Warn => Fragment::string("log::warn!"),
+            // LogFn::Info => Fragment::string("log::info!"),
+            // LogFn::Debug => Fragment::string("log::debug!"),
+            // LogFn::Trace => Fragment::string("log::trace!"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1428,9 +2161,12 @@ impl RustExpr {
 
     pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(true));
 
+    #[expect(dead_code)]
     pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(false));
 
     pub const VEC_NIL: Self = RustExpr::Macro(RustMacro::Vec(VecExpr::Nil));
+
+    pub const ARR_NIL: Self = RustExpr::ArrayLit(Vec::new());
 
     /// Returns `Some(varname)` if `self` is a simple entity-reference to identifier `varname`, and
     /// `None` otherwise.
@@ -1438,6 +2174,13 @@ impl RustExpr {
         match self {
             RustExpr::Entity(RustEntity::Local(v)) => Some(v),
             _ => None,
+        }
+    }
+
+    pub fn lift_option(expr: Option<Self>) -> Self {
+        match expr {
+            Some(expr) => expr.wrap_some(),
+            None => Self::NONE,
         }
     }
 
@@ -1456,7 +2199,7 @@ impl RustExpr {
                 }
             }
             _ => {
-                let match_item = RustControl::Match(scrutinee, body);
+                let match_item = RustControl::Match(Box::new(scrutinee), body);
                 Self::Control(Box::new(match_item))
             }
         }
@@ -1464,10 +2207,6 @@ impl RustExpr {
 
     pub(crate) fn local_tuple<Name: IntoLabel>(locals: impl IntoIterator<Item = Name>) -> Self {
         Self::Tuple(locals.into_iter().map(Self::local).collect())
-    }
-
-    pub fn some(inner: Self) -> Self {
-        Self::local("Some").call_with([inner])
     }
 
     pub fn local(name: impl Into<Label>) -> Self {
@@ -1478,24 +2217,36 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::Usize(num.into())))
     }
 
-    pub fn bool_lit(b: bool) -> Self {
+    #[inline]
+    pub const fn bool_lit(b: bool) -> Self {
         Self::PrimitiveLit(RustPrimLit::Boolean(b))
     }
 
-    pub fn u8lit(num: u8) -> Self {
+    #[inline]
+    pub const fn u8lit(num: u8) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U8(num)))
     }
 
-    pub fn u16lit(num: u16) -> Self {
+    #[inline]
+    pub const fn u16lit(num: u16) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U16(num)))
     }
 
-    pub fn u32lit(num: u32) -> Self {
+    #[inline]
+    pub const fn u32lit(num: u32) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(num)))
     }
 
-    pub fn u64lit(num: u64) -> RustExpr {
+    #[inline]
+    pub const fn u64lit(num: u64) -> RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U64(num)))
+    }
+
+    pub fn cast_as_usize(self) -> Self {
+        Self::Operation(RustOp::AsCast(
+            Box::new(self),
+            RustType::from(PrimType::Usize),
+        ))
     }
 
     pub fn scoped<Name: Into<Label>>(
@@ -1540,15 +2291,15 @@ impl RustExpr {
     pub fn at_pos(self, n: usize) -> Self {
         match self {
             Self::Owned(OwnedRustExpr { expr, kind }) => match kind {
-                OwnedKind::Cloned => unreachable!("tuple-position smart-constructor should not be used on decided-clone expressions"),
+                OwnedKind::Cloned => unreachable!(
+                    "tuple-position smart-constructor should not be used on decided-clone expressions"
+                ),
                 OwnedKind::Copied | OwnedKind::Deref => expr.at_pos(n),
-                OwnedKind::Unresolved(lens) => {
-                    Self::Owned(OwnedRustExpr {
-                        expr: Box::new(expr.at_pos(n)),
-                        kind: OwnedKind::Unresolved(lens.pos(n)),
-                    })
-                },
-            }
+                OwnedKind::Unresolved(lens) => Self::Owned(OwnedRustExpr {
+                    expr: Box::new(expr.at_pos(n)),
+                    kind: OwnedKind::Unresolved(lens.pos(n)),
+                }),
+            },
             other => Self::FieldAccess(Box::new(other), SubIdent::ByPosition(n)),
         }
     }
@@ -1592,15 +2343,38 @@ impl RustExpr {
         RustExpr::Operation(RustOp::PrefixOp(PrefixOperator::BoolNot, Box::new(self)))
     }
 
-    /// Helper method that calls the `as_slice` method on the expression passed in,
-    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
+    #[expect(dead_code)]
+    pub fn gte(self, other: Self) -> Self {
+        RustExpr::Operation(RustOp::InfixOp(
+            InfixOperator::Gte,
+            Box::new(self),
+            Box::new(other),
+        ))
+    }
+
+    #[expect(dead_code)]
+    pub fn eq_to(self, other: Self) -> Self {
+        RustExpr::Operation(RustOp::InfixOp(
+            InfixOperator::Eq,
+            Box::new(self),
+            Box::new(other),
+        ))
+    }
+
+    /// Helper method that transforms a `Vec<T>` (owned or borrowed) to `&[T]` with an inherited lifetime
+    /// unpacking any top-level `RustExpr::Owned` variants to avoid inefficient (and unnecessary)
     /// clone-then-borrow constructs in the generated code.
+    ///
+    /// # Note
+    ///
+    /// This method must also produce valid code even when the receiver expression is already a slice.
     pub fn vec_as_slice(self) -> Self {
         let this = match self {
             Self::Owned(OwnedRustExpr { expr, .. }) => *expr,
-            other => other,
+            other => other.borrow_of(),
         };
-        this.call_method("as_slice")
+        // NOTE - use prelude helper `slice_all` to avoid errant `.as_slice()` method on slice-receiver
+        RustExpr::local("slice_all").call_with([this])
     }
 
     /// Helper method that calls the `len` method on the expression passed in,
@@ -1611,7 +2385,20 @@ impl RustExpr {
             Self::Owned(OwnedRustExpr { expr, .. }) => expr,
             other => Box::new(other),
         };
-        RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
+        RustExpr::MethodCall(this, MethodSpecifier::LEN, UseParams::new(), Vec::new())
+    }
+
+    pub fn vec_is_empty(self) -> Self {
+        let this = match self {
+            Self::Owned(OwnedRustExpr { expr, .. }) => expr,
+            other => Box::new(other),
+        };
+        RustExpr::MethodCall(
+            this,
+            MethodSpecifier::IS_EMPTY,
+            UseParams::new(),
+            Vec::new(),
+        )
     }
 
     /// Invokes `<self>.<name>` as a callable method, passing in an empty list of arguments.
@@ -1629,6 +2416,26 @@ impl RustExpr {
         RustExpr::MethodCall(
             Box::new(self),
             SubIdent::ByName(name.into()).into(),
+            UseParams::new(),
+            args.into_iter().collect(),
+        )
+    }
+
+    /// Invokes `<self>.<name>::<ty_args>` as a callable method (i.e. using turbofish syntax to specify
+    /// explicit generic type-arguments), passing in the argument list produced by iterating over `args`.
+    pub fn call_method_turbofish(
+        self,
+        name: impl Into<Label>,
+        ty_args: impl IntoIterator<Item = RustType>,
+        args: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        RustExpr::MethodCall(
+            Box::new(self),
+            SubIdent::ByName(name.into()).into(),
+            UseParams {
+                lt_params: Vec::new(),
+                ty_params: ty_args.into_iter().collect(),
+            },
             args.into_iter().collect(),
         )
     }
@@ -1655,11 +2462,15 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::String(str.into()))
     }
 
-    /// Attempts to infer and return the (primitive) type of the given `RustExpr`,
-    /// returning `None` if the expression is not a primitive type or otherwise
-    /// cannot be inferred without further context or more complicated heuristics.
-    pub fn try_get_primtype(&self) -> Option<PrimType> {
+    /// Attempts to solve for the PrimType of a given `RustExpr`, for soundness and purity checking
+    /// (when determining whether an expression can have side-effects and therefore can be elided
+    /// if its value is not required).
+    ///
+    /// Returning `None` if the expression cannot be statically determined to have a primitive type,
+    /// or if determining the type is sufficiently complex.
+    fn try_get_primtype(&self) -> Option<PrimType> {
         match self {
+            RustExpr::Void => Some(PrimType::Unit),
             RustExpr::Entity(_) => None,
             RustExpr::PrimitiveLit(p_lit) => match p_lit {
                 RustPrimLit::Boolean(..) => Some(PrimType::Bool),
@@ -1669,14 +2480,22 @@ impl RustExpr {
                     RustNumLit::U32(..) => Some(PrimType::U32),
                     RustNumLit::U64(..) => Some(PrimType::U64),
                     RustNumLit::Usize(..) => Some(PrimType::Usize),
+                    RustNumLit::SomeInt(..) => None,
                 },
                 RustPrimLit::Char(..) => Some(PrimType::Char),
                 RustPrimLit::String(..) => None,
             },
+            RustExpr::ConstNum(_, hint) => match hint {
+                Some(NumType::U(pt)) => Some(PrimType::Unsigned(*pt)),
+                // REVIEW[epic=embedded-num] - depending on how we proceed, this may require changing
+                Some(NumType::I(_)) => None,
+                None => None,
+            },
             RustExpr::Macro(RustMacro::Matches(..)) => Some(PrimType::Bool),
             RustExpr::Macro(RustMacro::Vec(..)) => None,
+            RustExpr::Macro(RustMacro::Log(..)) => Some(PrimType::Unit),
             RustExpr::ArrayLit(..) => None,
-            RustExpr::MethodCall(_recv, _method, _args) => {
+            RustExpr::MethodCall(_recv, _method, _generics, _args) => {
                 match _method {
                     MethodSpecifier::Common(cm) => {
                         // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists, but we don't check this
@@ -1689,7 +2508,9 @@ impl RustExpr {
                         if name.as_ref() == "len" && _args.is_empty() {
                             if cfg!(debug_assertions) {
                                 // REVIEW - is this worth warning about or should it be an acceptable invocation?
-                                eprintln!("WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead...");
+                                eprintln!(
+                                    "WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead..."
+                                );
                             }
                             // REVIEW - we don't really check anything about `_recv`, and really just assume that a `.len()` method will always return `usize`
                             Some(PrimType::Usize)
@@ -1703,8 +2524,7 @@ impl RustExpr {
             RustExpr::FieldAccess(obj, ident) => {
                 match ident {
                     &SubIdent::ByPosition(ix) => match &**obj {
-                        RustExpr::Tuple(tuple)
-                        | RustExpr::Struct(_, StructExpr::TupleExpr(tuple)) => {
+                        RustExpr::Tuple(tuple) | RustExpr::Struct(_, StructExpr::Tuple(tuple)) => {
                             if tuple.len() <= ix {
                                 unreachable!(
                                     "bad tuple-index `_.{ix}` on {}-tuple {:?}",
@@ -1720,7 +2540,7 @@ impl RustExpr {
                         }
                     },
                     SubIdent::ByName(name) => match &**obj {
-                        RustExpr::Struct(_con, StructExpr::RecordExpr(fields)) => {
+                        RustExpr::Struct(_con, StructExpr::Record(fields)) => {
                             for (field, val) in fields {
                                 if field == name {
                                     if let Some(val) = val {
@@ -1767,10 +2587,20 @@ impl RustExpr {
                     }
                 }
             }
-            RustExpr::FunctionCall(..) => {
+            RustExpr::FunctionCall(_fn, _args) => {
                 // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
-                // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                log::info!(
+                    "try_get_primtype: encountered `FunctionCall` expression; fn = {_fn:?}, args = {{RustExpr}}[{}]",
+                    _args.len()
+                );
                 None
+            }
+            RustExpr::Invoke(fn_ent, ..) => {
+                match fn_ent {
+                    // FIXME - as with FunctionCall above, there may be some functions we can predict the return values of, but for now we are just trying to get things working
+                    FnEntity::Specific { .. } => None,
+                    FnEntity::Synthetic { .. } => None,
+                }
             }
             RustExpr::ResultOk(..) | RustExpr::ResultErr(..) => None,
             RustExpr::Owned(OwnedRustExpr { expr, .. }) => match &**expr {
@@ -1797,7 +2627,7 @@ impl RustExpr {
                     if expr
                         .try_get_primtype()
                         .as_ref()
-                        .map_or(false, PrimType::is_numeric)
+                        .is_some_and(PrimType::is_numeric)
                         && out_typ.is_numeric()
                     {
                         Some(out_typ)
@@ -1813,6 +2643,7 @@ impl RustExpr {
             RustExpr::Control(..)
             | RustExpr::Closure(..)
             | RustExpr::Slice(..)
+            | RustExpr::OwnedOption(..)
             | RustExpr::RangeExclusive(..) => None,
         }
     }
@@ -1821,6 +2652,8 @@ impl RustExpr {
     /// if its direct evaluation would be immediately discarded (as with [`RustStmt::Expr`],  or [`RustStmt::Let`] with the `_` identifier).
     pub fn is_pure(&self) -> bool {
         match self {
+            RustExpr::Void => true,
+            RustExpr::ConstNum(_, _) => true,
             RustExpr::Entity(..) => true,
             RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_pure(),
             RustExpr::Macro(RustMacro::Vec(vec_expr)) => match vec_expr {
@@ -1829,11 +2662,14 @@ impl RustExpr {
                 VecExpr::Repeat(x, n) => x.is_pure() && n.is_pure(),
                 VecExpr::List(xs) => xs.iter().all(Self::is_pure),
             },
+            RustExpr::Macro(RustMacro::Log(..)) => false,
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
-            RustExpr::Owned(OwnedRustExpr { expr, .. }) => expr.is_pure(),
-            RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
+            RustExpr::OwnedOption(expr, ..) | RustExpr::Owned(OwnedRustExpr { expr, .. }) => {
+                expr.is_pure()
+            }
+            RustExpr::MethodCall(x, MethodSpecifier::LEN, _, args) => {
                 if args.is_empty() {
                     x.is_pure()
                 } else {
@@ -1842,14 +2678,18 @@ impl RustExpr {
             }
             // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
             RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
+            RustExpr::Invoke(_fn_ent, _args) => {
+                // FIXME - we currently only use invoke for functions in the numeric sub-model, but those are sometimes impure
+                false
+            }
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
             RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
             RustExpr::Struct(_, assigns) => match assigns {
-                StructExpr::RecordExpr(assigns) => assigns
+                StructExpr::Record(assigns) => assigns
                     .iter()
-                    .all(|(_, val)| val.as_ref().map_or(true, Self::is_pure)),
-                StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
-                StructExpr::EmptyExpr => true,
+                    .all(|(_, val)| val.as_ref().is_none_or(Self::is_pure)),
+                StructExpr::Tuple(values) => values.iter().all(|val| val.is_pure()),
+                StructExpr::Empty => true,
             },
             RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => expr.is_pure(),
             // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
@@ -1883,14 +2723,37 @@ impl RustExpr {
     }
 
     /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
-    pub(crate) fn make_persistent(&self) -> Cow<'_, Self> {
+    pub(crate) fn make_persistent<Name: IntoLabel + Clone>(
+        &self,
+        mk_name: impl FnOnce() -> Name,
+    ) -> Cow<'_, Self> {
         match self {
             RustExpr::Entity(..) => Cow::Borrowed(self),
             // REVIEW - consider which non-entity cases are already 'persistent'
-            _ => Cow::Owned(RustExpr::BlockScope(
-                vec![RustStmt::assign("tmp", self.clone())],
-                Box::new(RustExpr::local("tmp")),
-            )),
+            _ => {
+                let name = mk_name();
+                Cow::Owned(RustExpr::BlockScope(
+                    vec![RustStmt::assign(name.clone(), self.clone())],
+                    Box::new(RustExpr::local(name)),
+                ))
+            }
+        }
+    }
+
+    pub(crate) fn use_as_persistent<Name: IntoLabel + Clone>(
+        self,
+        f: impl FnOnce(Self) -> Self,
+        mk_name: impl FnOnce() -> Name,
+    ) -> Self {
+        match self {
+            this @ RustExpr::Entity(..) => f(this),
+            _ => {
+                let name = mk_name();
+                RustExpr::BlockScope(
+                    vec![RustStmt::assign(name.clone(), self)],
+                    Box::new(f(RustExpr::local(name))),
+                )
+            }
         }
     }
 
@@ -1903,32 +2766,41 @@ impl RustExpr {
     pub(crate) fn is_complex(&self) -> bool {
         match self {
             // base cases
+            RustExpr::Void => {
+                // NOTE - we don't expect to encounter void expressions except recursively over expansions
+                false
+            }
             RustExpr::Entity(..) => false,
             RustExpr::PrimitiveLit(..) => false,
+            RustExpr::ConstNum(..) => false,
             RustExpr::BlockScope(stmts, _) => !stmts.is_empty(),
             RustExpr::Control(..) => true,
-            RustExpr::Struct(_, StructExpr::EmptyExpr) => false,
+            RustExpr::Struct(_, StructExpr::Empty) => false,
 
             // Special case - `matches!` macro is an idiomatic conditional expression
             RustExpr::Macro(RustMacro::Matches(..)) => false,
             // Special case - `vec!` will typically be constructed only over simple sub-expressions
             RustExpr::Macro(RustMacro::Vec(..)) => false,
 
+            // Special case - `log::*` macros will never be value-producing in practice
+            RustExpr::Macro(RustMacro::Log(..)) => true,
+
             // REVIEW - is there a better heuristic?
             RustExpr::Closure(..) => true,
 
             // '.any(..)' cases
-            RustExpr::Struct(_, StructExpr::TupleExpr(exprs))
+            RustExpr::Struct(_, StructExpr::Tuple(exprs))
             | RustExpr::ArrayLit(exprs)
             | RustExpr::Tuple(exprs) => exprs.iter().any(RustExpr::is_complex),
 
             // special cases
-            RustExpr::Struct(.., StructExpr::RecordExpr(flds)) => flds
+            RustExpr::Struct(.., StructExpr::Record(flds)) => flds
                 .iter()
                 .any(|(_, val)| val.as_ref().is_some_and(RustExpr::is_complex)),
 
             // single descent cases
             RustExpr::Owned(OwnedRustExpr { expr, .. })
+            | RustExpr::OwnedOption(expr, ..)
             | RustExpr::Try(expr)
             | RustExpr::ResultOk(.., expr)
             | RustExpr::ResultErr(expr)
@@ -1938,11 +2810,15 @@ impl RustExpr {
             | RustExpr::Borrow(expr) => expr.is_complex(),
 
             // 1 + N cases
-            RustExpr::MethodCall(head, _meth, args) => {
+            RustExpr::MethodCall(head, _meth, _generics, args) => {
                 head.is_complex() || args.iter().any(RustExpr::is_complex)
             }
             RustExpr::FunctionCall(fun, args) => {
                 fun.is_complex() || args.iter().any(RustExpr::is_complex)
+            }
+            RustExpr::Invoke(_fn_ent, args) => {
+                // NOTE - we aren't testing on _fn_ent because it is always going to be a function-identifier and not any complex expression
+                args.iter().any(RustExpr::is_complex)
             }
 
             // 1 + 1 cases
@@ -1962,7 +2838,23 @@ impl RustExpr {
     pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
         match self {
             RustExpr::Try(x) => *x,
+            RustExpr::Void => RustExpr::UNIT.wrap_ok(qualifier),
             other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
+        }
+    }
+
+    #[expect(dead_code)]
+    pub fn normalize(&self) -> Cow<'_, Self> {
+        match self {
+            RustExpr::Void => Cow::Owned(RustExpr::UNIT),
+            other => Cow::Borrowed(other),
+        }
+    }
+
+    pub fn into_normal(self) -> Self {
+        match self {
+            RustExpr::Void => RustExpr::UNIT,
+            other => other,
         }
     }
 
@@ -1971,11 +2863,12 @@ impl RustExpr {
     }
 
     pub(crate) fn wrap_some(self) -> RustExpr {
-        match self {
+        match self.into_normal() {
             RustExpr::BlockScope(stmts, tail) => {
                 RustExpr::BlockScope(stmts, Box::new(tail.wrap_some()))
             }
-            _ => RustExpr::local("Some").call_with([self]),
+            // REVIEW - should we have a standalone primitive for Some?
+            this => RustExpr::local("Some").call_with([this]),
         }
     }
 
@@ -1995,18 +2888,18 @@ impl RustExpr {
 
     pub(crate) fn get_const(&self) -> Option<usize> {
         match self {
-            RustExpr::PrimitiveLit(RustPrimLit::Numeric(rnl)) => Some(usize::from(*rnl)),
+            RustExpr::PrimitiveLit(RustPrimLit::Numeric(rnl)) => usize::try_from(rnl.clone()).ok(),
             _ => None,
         }
     }
 
-    pub(crate) fn add(lhs: RustExpr, rhs: RustExpr) -> RustExpr {
-        if lhs.is_pure_numeric_const() && matches!(lhs.get_const(), Some(0)) {
-            rhs
-        } else if rhs.is_pure_numeric_const() && matches!(rhs.get_const(), Some(0)) {
-            lhs
+    pub(crate) fn add(self, other: Self) -> RustExpr {
+        if self.is_pure_numeric_const() && matches!(self.get_const(), Some(0)) {
+            other
+        } else if other.is_pure_numeric_const() && matches!(other.get_const(), Some(0)) {
+            self
         } else {
-            RustExpr::infix(lhs, InfixOperator::Add, rhs)
+            RustExpr::infix(self, InfixOperator::Add, other)
         }
     }
 
@@ -2022,19 +2915,47 @@ impl RustExpr {
         }
     }
 
-    pub(crate) fn owned(loc: RustExpr, expr_type: RustType) -> RustExpr {
+    /// Applies a type-sensitive ownership model to an expression, given its exact type.
+    ///
+    /// For known-`Copy` types, this amounts to a no-op.
+    /// For references to known-`Copy` types, this amounts to a simple deref.
+    /// For owned or referenced `Clone`-but-not-`Copy` types, this amounts to a clone operation.
+    pub(crate) fn owned(self, expr_type: RustType) -> RustExpr {
         let owned = if expr_type.can_be_copy() {
             OwnedRustExpr {
-                expr: Box::new(loc),
+                expr: Box::new(self),
                 kind: OwnedKind::Copied,
             }
         } else {
             OwnedRustExpr {
-                expr: Box::new(loc),
+                expr: Box::new(self),
                 kind: OwnedKind::Unresolved(Lens::Ground(expr_type)),
             }
         };
         RustExpr::Owned(owned)
+    }
+
+    /// Takes a AST-expression with virtual type `Option<&U>` and a type
+    /// representing `Option<U>`, and returns an expression of type `Option<U>`,
+    /// avoiding explicit cloning when unnecessary.
+    pub(crate) fn owned_opt_ref(self, opt_type: RustType) -> RustExpr {
+        fn borrow_param(rt: RustType) -> RustType {
+            match rt {
+                RustType::Atom(AtomType::Comp(CompType::Option(inner))) => CompType::Option(
+                    Box::new(CompType::Borrow(None, Mut::Immutable, inner).into()),
+                )
+                .into(),
+                other => other,
+            }
+        }
+
+        let kind = if opt_type.can_be_copy() {
+            OwnedKind::Deref
+        } else {
+            OwnedKind::Unresolved(Lens::Ground(borrow_param(opt_type)).param())
+        };
+
+        RustExpr::OwnedOption(Box::new(self), kind)
     }
 }
 
@@ -2057,10 +2978,58 @@ impl ToFragment for VecExpr {
     }
 }
 
+impl ToFragment for FnEntity {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            FnEntity::Specific { fname } => fname.to_fragment(),
+            FnEntity::Synthetic { fname, type_params } => fname.to_fragment().cat(
+                Fragment::seq(
+                    type_params
+                        .iter()
+                        .map(|t: &NumType| Fragment::string(t.to_static_str())),
+                    Some(Fragment::String(Cow::Borrowed(", "))),
+                )
+                .delimit(Fragment::Char('<'), Fragment::Char('>')),
+            ),
+        }
+    }
+}
+
+impl ToFragment for RustMacro {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustMacro::Matches(head, pats) => Fragment::string("matches!")
+                .cat(
+                    head.to_fragment_precedence(Precedence::Top)
+                        .cat(Fragment::string(", "))
+                        .cat(Fragment::seq(
+                            pats.iter().map(|p| p.to_fragment()),
+                            Some(Fragment::string(" | ")),
+                        ))
+                        .delimit(Fragment::Char('('), Fragment::Char(')')),
+                )
+                .group(),
+            RustMacro::Vec(vec_expr) => Fragment::string("vec!").cat(vec_expr.to_fragment()),
+            RustMacro::Log(log_fn, log_msg) => log_fn.to_fragment().cat(
+                log_msg
+                    .to_fragment()
+                    .delimit(Fragment::Char('('), Fragment::Char(')')),
+            ),
+        }
+    }
+}
+
 impl ToFragmentExt for RustExpr {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
+            RustExpr::Void => Fragment::Empty,
             RustExpr::Entity(e) => e.to_fragment(),
+            RustExpr::ConstNum(val, hint) => {
+                let num_frag = Fragment::string(val.as_raw_value().to_string());
+                let hint_frag =
+                    Fragment::opt(*hint, |ty: NumType| Fragment::string(ty.to_static_str()));
+                num_frag.cat(hint_frag)
+            }
             RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
             RustExpr::ArrayLit(elts) => Fragment::seq(
                 elts.iter()
@@ -2068,9 +3037,14 @@ impl ToFragmentExt for RustExpr {
                 Some(Fragment::string(", ")),
             )
             .delimit(Fragment::Char('['), Fragment::Char(']')),
-            RustExpr::MethodCall(x, name, args) => cond_paren(
+            RustExpr::MethodCall(x, name, generics, args) => cond_paren(
                 x.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), name.to_fragment())
+                    .cat(if generics.is_empty() {
+                        Fragment::Empty
+                    } else {
+                        Fragment::string("::").cat(generics.to_fragment())
+                    })
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
                 Precedence::Projection,
@@ -2102,28 +3076,37 @@ impl ToFragmentExt for RustExpr {
                 Precedence::INVOKE,
             ),
             RustExpr::Owned(OwnedRustExpr {
-                expr: x,
+                expr,
                 kind: OwnedKind::Cloned,
             }) => cond_paren(
-                x.to_fragment_precedence(Precedence::Projection)
+                expr.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), Fragment::string("clone()")),
+                prec,
+                Precedence::Projection,
+            ),
+            RustExpr::OwnedOption(expr, OwnedKind::Cloned) => cond_paren(
+                expr.to_fragment_precedence(Precedence::Projection)
+                    .intervene(Fragment::Char('.'), Fragment::string("cloned()")),
                 prec,
                 Precedence::Projection,
             ),
             RustExpr::Owned(OwnedRustExpr {
                 kind: OwnedKind::Deref,
                 expr,
-            }) => Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix)),
-            RustExpr::Owned(OwnedRustExpr {
+            }) => Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::PTR_PREFIX)),
+            RustExpr::OwnedOption(expr, OwnedKind::Deref) => expr
+                .to_fragment_precedence(Precedence::Projection)
+                .intervene(Fragment::Char('.'), Fragment::string("copied()")),
+            RustExpr::OwnedOption(expr, OwnedKind::Copied)
+            | RustExpr::Owned(OwnedRustExpr {
                 kind: OwnedKind::Copied,
                 expr,
             }) => expr.to_fragment_precedence(prec),
-            RustExpr::Owned(OwnedRustExpr {
+            RustExpr::OwnedOption(expr, OwnedKind::Unresolved(lens))
+            | RustExpr::Owned(OwnedRustExpr {
                 kind: OwnedKind::Unresolved(lens),
                 expr,
-            }) => {
-                unreachable!("unresolved ownership: ({expr:?}: {lens:?})")
-            }
+            }) => unreachable!("unresolved ownership: ({expr:?}: {lens:?})"),
             RustExpr::FieldAccess(x, name) => x
                 .to_fragment_precedence(Precedence::Projection)
                 .intervene(Fragment::Char('.'), name.to_fragment()),
@@ -2133,20 +3116,15 @@ impl ToFragmentExt for RustExpr {
                 prec,
                 Precedence::INVOKE,
             ),
-            RustExpr::Macro(RustMacro::Matches(head, pats)) => Fragment::string("matches!")
-                .cat(
-                    head.to_fragment_precedence(Precedence::Top)
-                        .cat(Fragment::string(", "))
-                        .cat(Fragment::seq(
-                            pats.iter().map(|p| p.to_fragment()),
-                            Some(Fragment::string(" | ")),
-                        ))
-                        .delimit(Fragment::Char('('), Fragment::Char(')')),
-                )
-                .group(),
-            RustExpr::Macro(RustMacro::Vec(vec_expr)) => {
-                Fragment::string("vec!").cat(vec_expr.to_fragment())
-            }
+            // TODO - merge into FunctionCall
+            RustExpr::Invoke(f_ent, args) => cond_paren(
+                f_ent
+                    .to_fragment()
+                    .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
+                prec,
+                Precedence::INVOKE,
+            ),
+            RustExpr::Macro(m) => m.to_fragment(),
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt
                     .to_fragment_precedence(Precedence::Top)
@@ -2157,10 +3135,10 @@ impl ToFragmentExt for RustExpr {
                 .to_fragment()
                 .cat(contents.to_fragment()),
             RustExpr::Borrow(expr) => {
-                Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::Prefix))
+                Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::PTR_PREFIX))
             }
             RustExpr::BorrowMut(expr) => {
-                Fragment::string("&mut ").cat(expr.to_fragment_precedence(Precedence::Prefix))
+                Fragment::string("&mut ").cat(expr.to_fragment_precedence(Precedence::PTR_PREFIX))
             }
             RustExpr::Try(expr) => expr
                 .to_fragment_precedence(Precedence::Projection)
@@ -2240,35 +3218,37 @@ pub(crate) fn slice_stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], C
             }
             RustStmt::Return(ReturnKind::Keyword, ..) => None,
             RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => {
-                Some((stmts, Cow::Owned(RustExpr::UNIT)))
-            }
-            // REVIEW - is unguarded inheritance of a Control block always correct?
-            RustStmt::Control(ctrl) => {
-                Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone())))))
-            }
+                Some((stmts, Cow::Owned(RustExpr::Void)))
+            } // REVIEW - is unguarded inheritance of a Control block always correct?
+              // RustStmt::Control(ctrl) => {
+              //     Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone())))))
+              // }
         }
     } else {
-        Some((stmts, Cow::Owned(RustExpr::UNIT)))
+        Some((stmts, Cow::Owned(RustExpr::Void)))
     }
 }
 
+/// Given a block of `RustStmt` that do not have any explicit `return` keywords anywhere within,
+/// extract the value of the statement-block as a `RustExpr` (or Void/Unit, if this is the implicit evaluation),
+/// and return it.
+///
+/// Returns `None` if the query is ill-founded, i.e. the block can short-circuit (without `try`).
 pub(crate) fn vec_stmts_to_block(stmts: Vec<RustStmt>) -> Option<(Vec<RustStmt>, RustExpr)> {
     let mut init = stmts;
     let last = match init.pop() {
-        None => RustExpr::UNIT,
+        // if stmts is empty, return Void
+        None => RustExpr::Void,
         Some(stmt) => match stmt {
             RustStmt::Return(ReturnKind::Keyword, ..) => return None,
             RustStmt::Return(_, expr) | RustStmt::Expr(expr) => expr,
-            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::UNIT,
+            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::Void,
             // REVIEW - is unguarded inheritance of a Control block always correct?
-            RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
+            // RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
         },
     };
     Some((init, last))
 }
-
-#[derive(Clone, Debug)]
-pub(crate) struct RustClosure(RustClosureHead, ClosureBody);
 
 #[derive(Clone, Debug)]
 pub(crate) enum ClosureBody {
@@ -2298,9 +3278,44 @@ impl ToFragment for ClosureBody {
 pub(crate) enum RustClosureHead {
     Thunk,
     SimpleVar(Label, Option<RustType>),
+    VarList(Vec<(Label, Option<RustType>)>),
 }
 
+impl ToFragment for RustClosureHead {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustClosureHead::Thunk => Fragment::string("||"),
+            RustClosureHead::SimpleVar(lbl, sig) => lbl
+                .to_fragment()
+                .intervene(
+                    Fragment::string(": "),
+                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
+                )
+                .delimit(Fragment::Char('|'), Fragment::Char('|')),
+            RustClosureHead::VarList(args) => Fragment::seq(
+                args.iter().map(|(lbl, opt_sig)| {
+                    lbl.to_fragment().intervene(
+                        Fragment::string(": "),
+                        Fragment::opt(opt_sig.as_ref(), RustType::to_fragment),
+                    )
+                }),
+                Some(Fragment::string(", ")),
+            )
+            .delimit(Fragment::Char('|'), Fragment::Char('|')),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustClosure(RustClosureHead, ClosureBody);
+
 impl RustClosure {
+    /// Constructs a `RustClosure` from its component parts.
+    pub fn from_parts(head: RustClosureHead, body: ClosureBody) -> Self {
+        Self(head, body)
+    }
+    /// Takes a standalone expression and returns a zero-argument closure (i.e. a thunk)
+    /// that returns it.
     pub fn thunk_expr(expr: RustExpr) -> RustClosure {
         RustClosure(
             RustClosureHead::Thunk,
@@ -2308,6 +3323,8 @@ impl RustClosure {
         )
     }
 
+    /// Takes an iterable container (e.g. array, Vec) of [`RustStmt`]s and returns a
+    /// thunk whose body contains the statements in order.
     pub fn thunk_body(stmts: impl IntoIterator<Item = RustStmt>) -> RustClosure {
         RustClosure(
             RustClosureHead::Thunk,
@@ -2342,21 +3359,6 @@ impl RustClosure {
             RustClosureHead::SimpleVar(head.into(), value_t),
             ClosureBody::Expression(Box::new(body)),
         )
-    }
-}
-
-impl ToFragment for RustClosureHead {
-    fn to_fragment(&self) -> Fragment {
-        match self {
-            RustClosureHead::Thunk => Fragment::string("||"),
-            RustClosureHead::SimpleVar(lbl, sig) => lbl
-                .to_fragment()
-                .intervene(
-                    Fragment::string(": "),
-                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
-                )
-                .delimit(Fragment::Char('|'), Fragment::Char('|')),
-        }
     }
 }
 
@@ -2632,11 +3634,7 @@ impl ReturnKind {
 
 impl From<bool> for ReturnKind {
     fn from(value: bool) -> Self {
-        if value {
-            Self::Keyword
-        } else {
-            Self::Implicit
-        }
+        if value { Self::Keyword } else { Self::Implicit }
     }
 }
 
@@ -2648,11 +3646,11 @@ pub(crate) enum RustStmt {
     Reassign(Label, RustExpr),
     Expr(RustExpr),
     Return(ReturnKind, RustExpr),
-    Control(RustControl),
+    // Control(RustControl),
 }
 
 impl RustStmt {
-    pub const BREAK: Self = Self::Control(RustControl::Break);
+    // pub const BREAK: Self = Self::Control(RustControl::Break);
 
     pub fn assign(name: impl Into<Label>, rhs: RustExpr) -> Self {
         Self::Let(Mut::Immutable, name.into(), None, rhs)
@@ -2679,22 +3677,9 @@ impl RustStmt {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum RustControl<BlockType = Vec<RustStmt>> {
-    Loop(BlockType),
-    While(RustExpr, BlockType),
-    ForIter(Label, RustExpr, BlockType), // element variable name, iterator expression (verbatim), loop contents
-    ForRange0(Label, RustExpr, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
-    If(RustExpr, BlockType, Option<BlockType>),
-    Match(RustExpr, RustMatchBody<BlockType>),
-    Break, // no support for break values or loop labels, yet
-}
-
-pub(crate) type RustMatchCase<BlockType = Vec<RustStmt>> = (MatchCaseLHS, BlockType);
-
-#[derive(Clone, Debug)]
 pub(crate) enum RustCatchAll {
     PanicUnreachable { message: Label },
-    ReturnErrorValue { value: RustExpr },
+    ReturnErrorValue { value: Box<RustExpr> },
 }
 
 impl RustCatchAll {
@@ -2711,9 +3696,22 @@ impl RustCatchAll {
             ),
             RustCatchAll::ReturnErrorValue { value } => (
                 MatchCaseLHS::Pattern(RustPattern::CatchAll(None)),
-                [RustStmt::Return(ReturnKind::Keyword, value.clone())].to_vec(),
+                [RustStmt::Return(ReturnKind::Keyword, (**value).clone())].to_vec(),
             ),
         }
+    }
+}
+
+pub(crate) type RustMatchCase<BlockType = Vec<RustStmt>> = (MatchCaseLHS, BlockType);
+
+impl<T> From<Vec<RustMatchCase<T>>> for RustMatchBody<T> {
+    fn from(value: Vec<RustMatchCase<T>>) -> Self {
+        RustMatchBody::Refutable(
+            value,
+            RustCatchAll::ReturnErrorValue {
+                value: Box::new(RustExpr::scoped(["ParseError"], "ExcludedBranch")),
+            },
+        )
     }
 }
 
@@ -2763,15 +3761,32 @@ impl ToFragment for RustMatchBody {
     }
 }
 
-impl<T> From<Vec<RustMatchCase<T>>> for RustMatchBody<T> {
-    fn from(value: Vec<RustMatchCase<T>>) -> Self {
-        RustMatchBody::Refutable(
-            value,
-            RustCatchAll::ReturnErrorValue {
-                value: RustExpr::scoped(["ParseError"], "ExcludedBranch"),
-            },
-        )
+impl<T> RustMatchBody<T> {
+    fn translate<U: From<T>>(self) -> RustMatchBody<U> {
+        fn from_branches<T, U: From<T>>(branches: Vec<RustMatchCase<T>>) -> Vec<RustMatchCase<U>> {
+            branches
+                .into_iter()
+                .map(|(pat, rhs)| (pat, rhs.into()))
+                .collect()
+        }
+        match self {
+            RustMatchBody::Irrefutable(block) => RustMatchBody::Irrefutable(from_branches(block)),
+            RustMatchBody::Refutable(block, catchall) => {
+                RustMatchBody::Refutable(from_branches(block), catchall)
+            }
+        }
     }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustControl<BlockType = Vec<RustStmt>> {
+    Loop(BlockType),
+    While(Box<RustExpr>, BlockType),
+    ForIter(Label, Box<RustExpr>, BlockType), // element variable name, iterator expression (verbatim), loop contents
+    ForRange0(Label, Box<RustExpr>, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
+    If(Box<RustExpr>, BlockType, Option<BlockType>),
+    Match(Box<RustExpr>, RustMatchBody<BlockType>),
+    Break, // no support for break values or loop labels, yet
 }
 
 impl<T> RustControl<T> {
@@ -2790,23 +3805,6 @@ impl<T> RustControl<T> {
             }
             RustControl::Match(scrutinee, body) => RustControl::Match(scrutinee, body.translate()),
             RustControl::Break => RustControl::Break,
-        }
-    }
-}
-
-impl<T> RustMatchBody<T> {
-    fn translate<U: From<T>>(self) -> RustMatchBody<U> {
-        fn from_branches<T, U: From<T>>(branches: Vec<RustMatchCase<T>>) -> Vec<RustMatchCase<U>> {
-            branches
-                .into_iter()
-                .map(|(pat, rhs)| (pat, rhs.into()))
-                .collect()
-        }
-        match self {
-            RustMatchBody::Irrefutable(block) => RustMatchBody::Irrefutable(from_branches(block)),
-            RustMatchBody::Refutable(block, catchall) => {
-                RustMatchBody::Refutable(from_branches(block), catchall)
-            }
         }
     }
 }
@@ -3040,9 +4038,7 @@ impl ToFragment for RustStmt {
                 };
                 expr.to_fragment_precedence(Precedence::TOP)
                     .delimit(before, after)
-            }
-            RustStmt::Control(ctrl) => ctrl.to_fragment(),
-            // RustStmt::LocalFn(f) => f.to_fragment(),
+            } // RustStmt::Control(ctrl) => ctrl.to_fragment(),
         }
     }
 }
@@ -3096,7 +4092,7 @@ pub trait ToFragment {
     }
 }
 
-trait ToFragmentExt: ToFragment {
+pub(crate) trait ToFragmentExt: ToFragment {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment;
 
     fn delim_list_prec<'a>(
@@ -3145,7 +4141,11 @@ where
 mod test {
     use super::*;
 
-    fn expect_fragment(value: &impl ToFragmentExt, expected: &str) {
+    fn expect_fragment(value: &impl ToFragment, expected: &str) {
+        assert_eq!(&format!("{}", value.to_fragment()), expected)
+    }
+
+    fn expect_fragment_top(value: &impl ToFragmentExt, expected: &str) {
         assert_eq!(
             &format!("{}", value.to_fragment_precedence(Precedence::TOP)),
             expected
@@ -3167,7 +4167,7 @@ mod test {
             "append",
             [RustExpr::BorrowMut(Box::new(RustExpr::local("other")))],
         );
-        expect_fragment(&re, "this.append(&mut other)")
+        expect_fragment_top(&re, "this.append(&mut other)")
     }
 }
 
@@ -3177,13 +4177,29 @@ pub mod short_circuit {
         RustMatchCase, RustOp, RustStmt, StructExpr, VecExpr,
     };
 
+    /// Purity-rank for individual AST items.
+    ///
+    /// This is used to determine whether sub-sections of a function or closure body
+    /// would unintentionally violate operational boundaries (e.g. a return keyword in an inner block)
+    /// and therefore need to be wrapped in a closure to prevent short-circuiting from happening across
+    /// a scope boundary.
     #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
     pub enum EvalPurity {
-        /// Can never constitute a short-circuit
+        /// Rank 0, i.e. fully pure: Regardless of the context in which the item appears, the evaluation does not cause control-flow to short-circuit.
+        ///
+        /// If every sub-item of a block-scope is Pure, it will never require closure indirection.
         Pure = 0,
-        /// Short-circuit if and only if it is the only non-pure term in a terminal value-producing node
+        /// Rank 1, i.e. contains one or more Try operations (but no `return` keywords)
+        ///
+        /// Any expression, statement, or block that contains a mix of Rank-0 and (at least one) Rank-1 sub-nodes will be Rank-1.
+        ///
+        /// Boundary-breaking may be exhibited by Rank-1 items, except for Rank-1 expressions that are terminal (i.e. the implicit return-value)
+        /// within their bounding function-context (whether a standalone function or inline closure).
         Try = 1,
-        /// Explicit `return` keyword -- constitutes a potential short-circuit regardless of context
+        /// Rank 2, i.e. Explicit `return` keyword
+        ///
+        /// Any expression that contains a `return _` statement is Rank-2, and such
+        /// nodes can cause boundary-breaking short-circuits regardless of wider context.
         Return = 2,
     }
 
@@ -3237,7 +4253,7 @@ pub mod short_circuit {
 
     pub trait ValueCheckpoint {
         /// Returns `true` if, as a value-producing AST node, `self` would need to be wrapped in `Ok(..)` in order to
-        /// properly encompass internal short-circuiting.
+        /// properly account for internal short-circuiting (via `?` somewhere in its subtree).
         fn needs_ok(&self) -> bool;
     }
 
@@ -3247,6 +4263,8 @@ pub mod short_circuit {
                 RustExpr::ResultOk(..) => false,
                 RustExpr::BlockScope(.., ret) => ret.needs_ok(),
                 RustExpr::Control(ctrl) => ctrl.needs_ok(),
+                // REVIEW - is this correct?
+                RustExpr::Void => false,
                 _ => true,
             }
         }
@@ -3285,7 +4303,7 @@ pub mod short_circuit {
                 Some(stmt) => match stmt {
                     RustStmt::Let(..) | RustStmt::LetPattern(..) | RustStmt::Reassign(..) => true,
                     RustStmt::Expr(expr) | RustStmt::Return(_, expr) => expr.needs_ok(),
-                    RustStmt::Control(ctrl) => ctrl.needs_ok(),
+                    // RustStmt::Control(ctrl) => ctrl.needs_ok(),
                 },
             }
         }
@@ -3300,7 +4318,7 @@ pub mod short_circuit {
                 | RustStmt::LetPattern(.., expr)
                 | RustStmt::Return(ReturnKind::Implicit, expr) => expr.is_short_circuiting(),
                 RustStmt::Return(ReturnKind::Keyword, ..) => true,
-                RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
+                // RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
             }
         }
     }
@@ -3314,7 +4332,7 @@ pub mod short_circuit {
                 | RustStmt::LetPattern(.., expr)
                 | RustStmt::Return(ReturnKind::Implicit, expr) => expr.check_eval_purity(),
                 RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::Try,
-                RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
+                // RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
             }
         }
     }
@@ -3427,17 +4445,22 @@ pub mod short_circuit {
     impl ShortCircuit for RustExpr {
         fn is_short_circuiting(&self) -> bool {
             match self {
+                RustExpr::Void => false,
                 RustExpr::ArrayLit(exprs) => exprs.is_short_circuiting(),
                 RustExpr::Entity(..) => false,
                 RustExpr::PrimitiveLit(..) => false,
-                RustExpr::MethodCall(recv, _, args) => {
+                RustExpr::ConstNum(..) => false,
+                RustExpr::MethodCall(recv, _, _, args) => {
                     recv.is_short_circuiting() || args.is_short_circuiting()
                 }
                 RustExpr::FieldAccess(expr, ..) => expr.is_short_circuiting(),
-                RustExpr::FunctionCall(.., args) => args.is_short_circuiting(),
+                RustExpr::FunctionCall(.., args) | RustExpr::Invoke(.., args) => {
+                    args.is_short_circuiting()
+                }
                 RustExpr::Tuple(elts) => elts.is_short_circuiting(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.is_short_circuiting(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
@@ -3452,6 +4475,7 @@ pub mod short_circuit {
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_short_circuiting(),
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.is_short_circuiting(),
+                RustExpr::Macro(RustMacro::Log(..)) => false,
                 RustExpr::Control(ctrl) => ctrl.is_short_circuiting(),
                 RustExpr::Closure(..) => false,
                 RustExpr::Index(head, index) => {
@@ -3504,17 +4528,22 @@ pub mod short_circuit {
     impl ShortCircuitExt for RustExpr {
         fn check_eval_purity(&self) -> EvalPurity {
             match self {
+                RustExpr::Void => EvalPurity::Pure,
                 RustExpr::ArrayLit(exprs) => exprs.check_eval_purity(),
                 RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
+                RustExpr::ConstNum(..) => EvalPurity::Pure,
                 RustExpr::Closure(..) => EvalPurity::Pure,
-                RustExpr::MethodCall(recv, _, args) => {
+                RustExpr::MethodCall(recv, _, _, args) => {
                     recv.check_eval_purity() | args.check_eval_purity()
                 }
                 RustExpr::FieldAccess(expr, ..) => expr.check_eval_purity(),
-                RustExpr::FunctionCall(.., args) => args.check_eval_purity(),
+                RustExpr::FunctionCall(.., args) | RustExpr::Invoke(.., args) => {
+                    args.check_eval_purity()
+                }
                 RustExpr::Tuple(elts) => elts.check_eval_purity(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.check_eval_purity(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
@@ -3529,6 +4558,8 @@ pub mod short_circuit {
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.check_eval_purity(),
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.check_eval_purity(),
+                // REVIEW - has side effects but does not short circuit
+                RustExpr::Macro(RustMacro::Log(..)) => EvalPurity::Pure,
                 RustExpr::Control(ctrl) => ctrl.check_eval_purity(),
                 RustExpr::Index(head, index) => {
                     head.check_eval_purity() | index.check_eval_purity()
@@ -3605,9 +4636,9 @@ pub mod short_circuit {
     impl ShortCircuit for StructExpr {
         fn is_short_circuiting(&self) -> bool {
             match self {
-                StructExpr::EmptyExpr => false,
-                StructExpr::TupleExpr(elts) => elts.is_short_circuiting(),
-                StructExpr::RecordExpr(flds) => flds.is_short_circuiting(),
+                StructExpr::Empty => false,
+                StructExpr::Tuple(elts) => elts.is_short_circuiting(),
+                StructExpr::Record(flds) => flds.is_short_circuiting(),
             }
         }
     }
@@ -3615,37 +4646,42 @@ pub mod short_circuit {
     impl ShortCircuitExt for StructExpr {
         fn check_eval_purity(&self) -> EvalPurity {
             match self {
-                StructExpr::EmptyExpr => EvalPurity::Pure,
-                StructExpr::TupleExpr(elts) => elts.check_eval_purity(),
-                StructExpr::RecordExpr(flds) => flds.check_eval_purity(),
+                StructExpr::Empty => EvalPurity::Pure,
+                StructExpr::Tuple(elts) => elts.check_eval_purity(),
+                StructExpr::Record(flds) => flds.check_eval_purity(),
             }
         }
     }
 }
+use num_bigint::BigInt;
 pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {
+    use crate::codegen::rust_ast::LogMessage;
+
     use super::{
-        ClosureBody, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure, RustClosureHead,
-        RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp,
-        RustPattern, RustStmt, StructExpr, VecExpr,
+        ClosureBody, FnEntity, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure,
+        RustClosureHead, RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody,
+        RustMatchCase, RustOp, RustPattern, RustStmt, StructExpr, VecExpr,
     };
 
+    /// A trait for AST nodes that can contain novel bindings to variable identifiers
     pub trait VarBinder {
-        /// Returns `true` if self introduces a binding of `var` that
-        /// shadows the same identifier's bindings from any external scopes.
+        /// Returns `true` if the current node introduces a new binding for the variable `var`, which
+        /// would shadow any existing bindings of the same variable from outer scopes.
         fn binds_var<Name: AsRef<str> + ?Sized>(&self, var: &Name) -> bool;
     }
 
+    /// A trait for AST nodes that can contain references to arbitrarily named variables.
     pub trait VarContainer {
-        /// Returns `true` if an unbound (external) reference is made to a variable
-        /// of the specified identifier.
+        /// Returns `true` if `self` contains at least one unbound (i.e. implicitly external) reference to a variable
+        /// with the specified identifier `var`.
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized;
     }
 
-    impl<'a> VarContainer for [RustStmt] {
+    impl VarContainer for [RustStmt] {
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized,
@@ -3687,9 +4723,9 @@ pub mod var_container {
                 RustStmt::Reassign(binding, value) => {
                     binding == var.as_ref() || value.contains_var_ref(var)
                 }
-                RustStmt::Control(ctrl) => ctrl.contains_var_ref(var),
                 RustStmt::Expr(expr) => expr.contains_var_ref(var),
                 RustStmt::Return(_, expr) => expr.contains_var_ref(var),
+                // RustStmt::Control(ctrl) => ctrl.contains_var_ref(var),
             }
         }
     }
@@ -3735,7 +4771,7 @@ pub mod var_container {
         }
     }
 
-    impl<'a> VarContainer for [RustExpr] {
+    impl VarContainer for [RustExpr] {
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized,
@@ -3764,9 +4800,9 @@ pub mod var_container {
             Name: AsRef<str> + ?Sized,
         {
             match self {
-                StructExpr::EmptyExpr => false,
-                StructExpr::TupleExpr(elts) => elts.contains_var_ref(var),
-                StructExpr::RecordExpr(flds) => {
+                StructExpr::Empty => false,
+                StructExpr::Tuple(elts) => elts.contains_var_ref(var),
+                StructExpr::Record(flds) => {
                     for (lab, expr) in flds.iter() {
                         match expr {
                             Some(expr) => {
@@ -3796,16 +4832,33 @@ pub mod var_container {
         }
     }
 
+    impl VarContainer for FnEntity {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                FnEntity::Specific { fname } | FnEntity::Synthetic { fname, .. } => {
+                    fname.contains_var_ref(var)
+                }
+            }
+        }
+    }
+
     impl VarContainer for RustExpr {
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized,
         {
             match self {
+                RustExpr::Void => false,
                 RustExpr::Entity(ent) => ent.contains_var_ref(var),
                 RustExpr::FieldAccess(expr, ..) => expr.contains_var_ref(var),
                 RustExpr::MethodCall(recv, .., args) => {
                     recv.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
+                }
+                RustExpr::Invoke(fn_ent, args) => {
+                    fn_ent.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
                 }
                 RustExpr::FunctionCall(fun, args) => {
                     fun.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
@@ -3814,6 +4867,7 @@ pub mod var_container {
                 RustExpr::Struct(.., struct_expr) => struct_expr.contains_var_ref(var),
 
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
                 | RustExpr::Borrow(inner)
@@ -3827,8 +4881,12 @@ pub mod var_container {
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.contains_var_ref(var),
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.contains_var_ref(var),
+                RustExpr::Macro(RustMacro::Log(_, LogMessage { args, .. })) => {
+                    args.contains_var_ref(var)
+                }
                 RustExpr::Control(ctrl) => ctrl.contains_var_ref(var),
                 RustExpr::PrimitiveLit(..) => false,
+                RustExpr::ConstNum(..) => false,
                 RustExpr::ArrayLit(rust_exprs) => {
                     rust_exprs.iter().any(|elt| elt.contains_var_ref(var))
                 }
@@ -3885,6 +4943,9 @@ pub mod var_container {
             match &self.0 {
                 RustClosureHead::Thunk => false,
                 RustClosureHead::SimpleVar(head_var, ..) => head_var.as_ref() == var.as_ref(),
+                RustClosureHead::VarList(head_vars, ..) => head_vars
+                    .iter()
+                    .any(|(lbl0, _)| lbl0.as_ref() == lbl0.as_ref()),
             }
         }
     }

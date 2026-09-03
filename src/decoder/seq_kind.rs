@@ -2,13 +2,20 @@ use std::{borrow::Cow, fmt::Debug, ops::Index};
 
 use serde::Serialize;
 
+/// Represents a sequence of values, which is either explicitly constructed
+/// or yielded through an array-generator term (i.e. [`crate::Expr::Dup`]).
 #[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
+#[serde(tag = "tag", content = "data")]
 // NOTE - T must be clone in order for `Dup` to be well-founded, as non-Clone values cannot be duped
 pub enum SeqKind<T: Clone> {
     Strict(Vec<T>),
     Dup(usize, Box<T>),
 }
 
+/// Abstraction over Value-like constructs that can be iterated over
+/// to yield members of type `V`, where `V` is either `Value` or `ParsedValue`.
+///
+/// Used to allow for `IntRange` to be represented without allocating a `Vec` of `Value`/`ParsedValue`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSeq<'a, V: Clone = super::Value> {
     ValueSeq(&'a SeqKind<V>),
@@ -144,7 +151,9 @@ impl<T: Clone> SeqKind<T> {
                     SeqKind::Dup(len, v.clone())
                 } else {
                     // REVIEW - we can either enforce `T: Debug` above, to add in the T-param, or keep it abstract
-                    panic!("sub-seq out of bounds: start-index={start}, len={len} on SeqKind::Dup({n}, _)")
+                    panic!(
+                        "sub-seq out of bounds: start-index={start}, len={len} on SeqKind::Dup({n}, _)"
+                    )
                 }
             }
         }
@@ -177,7 +186,7 @@ impl<T: Clone> Index<usize> for SeqKind<T> {
 
     fn index(&self, index: usize) -> &Self::Output {
         self.get(index)
-            .expect(format!("out of bounds indexing {index:?} (len: {})", self.len()).as_str())
+            .unwrap_or_else(|| panic!("out of bounds indexing {index:?} (len: {})", self.len()))
     }
 }
 

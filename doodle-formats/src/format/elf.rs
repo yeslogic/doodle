@@ -1,14 +1,14 @@
 use std::mem::size_of;
 
-use crate::format::BaseModule;
-use doodle::bounds::Bounds;
-use doodle::{helper::*, IntoLabel, Label};
-use doodle::{BaseType, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{
+    BaseType, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, ValueType,
+    bounds::Bounds, helper::*,
+};
 
 const ISBE_ARG: (Label, ValueType) = (Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool));
-const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::Base(BaseType::U8));
+const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::U8);
 
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule) -> FormatRef {
     // SECTION - common byte-oriented types
 
     fn define_format_endian_aligned<T>(
@@ -20,9 +20,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         module.define_format_args(
             name,
             vec![ISBE_ARG],
-            aligned(
-                if_then_else(var("is_be"), be_version, le_version),
+            align_then(
                 size_of::<T>(),
+                if_then_else(var("is_be"), be_version, le_version),
             ),
         )
     }
@@ -30,61 +30,33 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // SECTION - 32-bit ELF types
 
     // Unsigned Program Address (32-bit)
-    let elf32_addr_endian = define_format_endian_aligned::<u32>(
-        module,
-        "elf.types.elf32-addr",
-        base.u32be(),
-        base.u32le(),
-    );
+    let elf32_addr_endian =
+        define_format_endian_aligned::<u32>(module, "elf.types.elf32-addr", u32be(), u32le());
 
     // Unsigned File Offset (32-bit)
-    let elf32_off_endian = define_format_endian_aligned::<u32>(
-        module,
-        "elf.types.elf32-off",
-        base.u32be(),
-        base.u32le(),
-    );
+    let elf32_off_endian =
+        define_format_endian_aligned::<u32>(module, "elf.types.elf32-off", u32be(), u32le());
     // !SECTION
 
     // SECTION - Common 32-bit/64-bit ELF type definitions
     // Unsigned medium integer (16 bits)
-    let elf_half_endian = define_format_endian_aligned::<u16>(
-        module,
-        "elf.types.elf-half",
-        base.u16be(),
-        base.u16le(),
-    );
+    let elf_half_endian =
+        define_format_endian_aligned::<u16>(module, "elf.types.elf-half", u16be(), u16le());
 
     // Unsigned integer (32-bit)
-    let elf_word_endian = define_format_endian_aligned::<u32>(
-        module,
-        "elf.types.elf-word",
-        base.u32be(),
-        base.u32le(),
-    );
+    let elf_word_endian =
+        define_format_endian_aligned::<u32>(module, "elf.types.elf-word", u32be(), u32le());
     // !SECTION
 
     // SECTION - 64-bit ELF types
-    let elf64_addr_endian = define_format_endian_aligned::<u64>(
-        module,
-        "elf.types.elf64-addr",
-        base.u64be(),
-        base.u64le(),
-    );
+    let elf64_addr_endian =
+        define_format_endian_aligned::<u64>(module, "elf.types.elf64-addr", u64be(), u64le());
 
-    let elf64_off_endian = define_format_endian_aligned::<u64>(
-        module,
-        "elf.types.elf64-off",
-        base.u64be(),
-        base.u64le(),
-    );
+    let elf64_off_endian =
+        define_format_endian_aligned::<u64>(module, "elf.types.elf64-off", u64be(), u64le());
 
-    let elf64_xword_endian = define_format_endian_aligned::<u64>(
-        module,
-        "elf.types.elf64-Xword",
-        base.u64be(),
-        base.u64le(),
-    );
+    let elf64_xword_endian =
+        define_format_endian_aligned::<u64>(module, "elf.types.elf64-Xword", u64be(), u64le());
     // !SECTION
 
     // !SECTION
@@ -101,7 +73,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // REVIEW - const-enum construction to promote magic numbers to proper variants?
     let ei_class = module.define_format(
         "elf.header.ident.class",
-        where_between_u8(base.u8(), ELF_CLASS_NONE, ELF_CLASS_64),
+        where_between_u8(u8(), ELF_CLASS_NONE, ELF_CLASS_64),
     );
 
     // Invalid Data Encoding
@@ -119,7 +91,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let ei_data = module.define_format(
         "elf.header.ident.data",
-        where_between_u8(base.u8(), ELF_DATA_NONE, ELF_DATA_2MSB),
+        where_between_u8(u8(), ELF_DATA_NONE, ELF_DATA_2MSB),
     );
 
     // Invalid Version
@@ -130,14 +102,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let ei_version = module.define_format(
         "elf.header.ident.version",
-        where_between_u8(base.u8(), EV_NONE, EV_CURRENT),
+        where_between_u8(u8(), EV_NONE, EV_CURRENT),
     );
 
     // NOTE: the possible values and interpretations thereof are machine-specific
-    let ei_osabi = module.define_format("elf.header.ident.os-abi", base.u8());
+    let ei_osabi = module.define_format("elf.header.ident.os-abi", u8());
 
     // NOTE: this value distinguishes between different versions of the abi specified by `elf_osabi`, and cannot be interpreted or validated in isolation
-    let ei_abiversion = module.define_format("elf.header.ident.abi-version", base.u8());
+    let ei_abiversion = module.define_format("elf.header.ident.abi-version", u8());
 
     const EI_NIDENT: u32 = 16;
 
@@ -225,7 +197,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "elf.types.elf-addr",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
+            (Label::Borrowed("class"), ValueType::U8),
         ],
         match_variant(
             var("class"),
@@ -248,7 +220,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "elf.types.elf-off",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
+            (Label::Borrowed("class"), ValueType::U8),
         ],
         match_variant(
             var("class"),
@@ -272,7 +244,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "elf.types.elf-full",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
+            (Label::Borrowed("class"), ValueType::U8),
         ],
         match_variant(
             var("class"),
@@ -354,7 +326,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const SHT_SHLIB: u32 = 10; // reserved, unspecified semantics
     #[allow(dead_code)]
     const SHT_DYNSYM: u32 = 11; // symbol hash table (multiple disallowed)
-                                // NOTE - range-gap for [12,13]
+    // NOTE - range-gap for [12,13]
     #[allow(dead_code)]
     const SHT_INIT_ARRAY: u32 = 14; // array of pointers to initialization functions
     #[allow(dead_code)]
@@ -489,7 +461,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         vec![
             ISBE_ARG,
             CLASS_ARG,
-            (Label::Borrowed("shnum"), ValueType::Base(BaseType::U16)),
+            (Label::Borrowed("shnum"), ValueType::U16),
         ],
         repeat_count(
             var("shnum"),
@@ -564,7 +536,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         vec![
             ISBE_ARG,
             CLASS_ARG,
-            (Label::Borrowed("phnum"), ValueType::Base(BaseType::U16)),
+            (Label::Borrowed("phnum"), ValueType::U16),
         ],
         repeat_count(
             var("phnum"),
@@ -575,14 +547,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let elf_section = module.define_format_args(
         "elf.section",
         vec![
-            (Label::Borrowed("type"), ValueType::Base(BaseType::U32)),
-            (Label::Borrowed("size"), ValueType::Base(BaseType::U64)),
+            (Label::Borrowed("type"), ValueType::U32),
+            (Label::Borrowed("size"), ValueType::U64),
         ],
         // FIXME - we can refine this a lot more based on the type passed in
         Format::Match(
             Box::new(var("type")),
             vec![
-                (Pattern::Wildcard, repeat_count(var("size"), base.u8())), // abstract (unrefined) section
+                // REVIEW - does `slice(var("size"), abstract_bytes())` seem better?
+                (Pattern::Wildcard, repeat_count(var("size"), u8())), // abstract (unrefined) section
             ],
         ),
     );

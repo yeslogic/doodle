@@ -2,45 +2,59 @@ use std::borrow::Cow;
 use std::ops::Add;
 use std::rc::Rc;
 
-use super::rust_ast::{PrimType, RustType, RustTypeDef};
+use num_bigint::BigInt;
+
+use super::rust_ast::{PrimType, RustType, RustTypeDecl};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::{Arith, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
+use crate::numeric::core::Bounds as NumBounds;
+use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
+use crate::validation::TypedCondition;
+use crate::{Arith, BaseKind, Endian, FormatRef, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {
     Inline(RustType),
-    Def((usize, Label), RustTypeDef),
+    Def((usize, Label), RustTypeDecl),
 }
 
 impl GenType {
     pub(crate) fn to_rust_type(&self) -> RustType {
         match self {
             GenType::Inline(rt) => rt.clone(),
-            GenType::Def((ix, lbl), _) => RustType::defined(*ix, lbl.clone()),
+            GenType::Def((ix, lbl), RustTypeDecl { lt, .. }) => {
+                let params = match lt {
+                    Some(lt) => RustParams {
+                        lt_params: vec![lt.clone()],
+                        ..Default::default()
+                    },
+                    None => Default::default(),
+                };
+                RustType::defined(*ix, lbl.clone(), params)
+            }
         }
     }
 
-    // pub(crate) fn into_rust_type(self) -> RustType {
-    //     match self {
-    //         GenType::Inline(rt) => rt,
-    //         GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),
-    //     }
-    // }
-
-    /// Attempt to extract the type-index and corresponding name (`Label`) from `self`.
+    /// Attempt to extract the type-index and corresponding name (`Label`) (along with any generic parameters) from `self`.
     ///
     /// Returns `None` if the type in question is not itself a concrete definition (`GenType::Def`)
     /// or an abstract reference to a locally-defined adhoc type (`GenType::Inline` of nested `LocalType::LocalDef`).
-    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label)> {
+    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label, Option<Box<UseParams>>)> {
         match self {
-            GenType::Def((ix, lbl), ..)
-            | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lbl)))) => {
-                Some((*ix, lbl))
-            }
+            GenType::Def((ix, lbl), RustTypeDecl { lt, .. }) => Some((
+                *ix,
+                lbl,
+                lt.clone().map(|lt| Box::new(RustParams::from_lt(lt))),
+            )),
+            GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                ix,
+                lbl,
+                params,
+            )))) => Some((*ix, lbl, params.clone())),
             _ => None,
         }
     }
@@ -50,8 +64,21 @@ impl GenType {
         match self {
             GenType::Inline(rust_type) => rust_type.can_be_copy(),
             // TODO - infer recursive Copy of local definitions, if possible
-            GenType::Def(_, rust_type_def) => rust_type_def.can_be_copy(),
+            GenType::Def(_, rust_type_decl) => rust_type_decl.def.can_be_copy(),
         }
+    }
+
+    #[expect(dead_code)]
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            GenType::Inline(rust_type) => rust_type.lt_param(),
+            GenType::Def(_, rust_type_decl) => rust_type_decl.lt_param(),
+        }
+    }
+
+    pub(crate) fn try_to_num_type(&self) -> Option<super::rust_ast::NumType> {
+        let rust_type = self.to_rust_type();
+        rust_type.try_as_num()
     }
 }
 
@@ -60,16 +87,22 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
         let disc = core::mem::discriminant(self);
         disc.hash(state);
         match self {
-            TypedFormat::FormatCall(_, level, args, _) => {
+            TypedFormat::FormatCall(_, level, args, views, _) => {
                 level.hash(state);
                 args.hash(state);
+                views.hash(state);
             }
             TypedFormat::SkipRemainder
-            | TypedFormat::Pos
+            | TypedFormat::Pos(_)
             | TypedFormat::Fail
             | TypedFormat::EndOfInput => {}
             TypedFormat::DecodeBytes(_, expr, inner) => {
                 expr.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Phantom(_, inner) => inner.hash(state),
+            TypedFormat::ParseFromView(_, view, inner) => {
+                view.hash(state);
                 inner.hash(state);
             }
             TypedFormat::Align(n) => n.hash(state),
@@ -82,7 +115,6 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 branches.hash(state)
             }
             TypedFormat::Tuple(_, elts) => elts.hash(state),
-            // REVIEW - do we want to dodge collision between Tuple and Sequence with a salt, or is this okay?
             TypedFormat::Sequence(_, elts) => elts.hash(state),
             TypedFormat::RepeatCount(_, n, inner) => {
                 n.hash(state);
@@ -127,11 +159,19 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 ofs.hash(state);
                 inner.hash(state);
             }
-            TypedFormat::Map(_, orig, f) | TypedFormat::Where(_, orig, f) => {
+            TypedFormat::Map(_, orig, f) => {
                 orig.hash(state);
                 f.hash(state);
             }
+            TypedFormat::Where(_, orig, cond) => {
+                orig.hash(state);
+                cond.hash(state);
+            }
             TypedFormat::Compute(_, expr) => expr.hash(state),
+            TypedFormat::LetView(_, lb, inner) => {
+                lb.hash(state);
+                inner.hash(state);
+            }
             TypedFormat::Let(_, lb, x, inner) => {
                 lb.hash(state);
                 x.hash(state);
@@ -160,7 +200,19 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 hint.hash(state);
                 f.hash(state);
             }
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(_, f) => {
+                f.hash(state);
+            }
+            TypedFormat::Permit(_, f, dft) => {
+                f.hash(state);
+                dft.hash(state);
+            }
             TypedFormat::LiftedOption(_, opt_f) => opt_f.hash(state),
+            TypedFormat::WithView(_, ident, vf) => {
+                ident.hash(state);
+                vf.hash(state);
+            }
         }
     }
 }
@@ -171,6 +223,7 @@ pub enum TypedFormat<TypeRep> {
         TypeRep,
         usize,
         Vec<(Label, TypedExpr<TypeRep>)>,
+        Vec<(Label, TypedViewExpr<TypeRep>)>,
         Rc<TypedFormat<TypeRep>>,
     ),
     ForEach(
@@ -211,7 +264,7 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     Map(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
-    Where(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    Where(TypeRep, Box<TypedFormat<TypeRep>>, TypedCondition<TypeRep>),
     Compute(TypeRep, Box<TypedExpr<TypeRep>>),
     Let(
         TypeRep,
@@ -231,9 +284,10 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     Apply(TypeRep, Label, Rc<TypedDynFormat<TypeRep>>),
-    Pos,
+    Pos(TypeRep),
     SkipRemainder,
     DecodeBytes(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
+    ParseFromView(TypeRep, TypedViewExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     LetFormat(
         TypeRep,
         Box<TypedFormat<TypeRep>>,
@@ -255,6 +309,12 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     LiftedOption(TypeRep, Option<Box<TypedFormat<TypeRep>>>),
+    LetView(TypeRep, Label, Box<TypedFormat<TypeRep>>),
+    WithView(TypeRep, TypedViewExpr<TypeRep>, TypedViewFormat<TypeRep>),
+    Phantom(TypeRep, Box<TypedFormat<TypeRep>>),
+    #[cfg(feature = "format_enforce")]
+    Enforce(TypeRep, Box<TypedFormat<TypeRep>>),
+    Permit(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
 }
 
 impl TypedFormat<GenType> {
@@ -262,13 +322,14 @@ impl TypedFormat<GenType> {
 
     pub(crate) fn lookahead_bounds(&self) -> Bounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
+            TypedFormat::FormatCall(_gt, _lvl, _args, _views, def) => def.lookahead_bounds(),
 
             TypedFormat::DecodeBytes(_, _, _)
             | TypedFormat::SkipRemainder
-            | TypedFormat::Pos
+            | TypedFormat::Pos(_)
             | TypedFormat::Compute(_, _)
             | TypedFormat::EndOfInput
+            | TypedFormat::ParseFromView(_, _, _)
             | TypedFormat::Fail => Bounds::exact(0),
 
             TypedFormat::Peek(_, inner) | TypedFormat::PeekNot(_, inner) => {
@@ -316,7 +377,8 @@ impl TypedFormat<GenType> {
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
-            | TypedFormat::Let(_, _, _, f) => f.lookahead_bounds(),
+            | TypedFormat::Let(_, _, _, f)
+            | TypedFormat::LetView(_, _, f) => f.lookahead_bounds(),
 
             TypedFormat::Match(_, _, branches) => branches
                 .iter()
@@ -329,23 +391,31 @@ impl TypedFormat<GenType> {
                 f0.lookahead_bounds(),
                 f0.match_bounds() + f.lookahead_bounds(),
             ),
-            TypedFormat::Hint(.., inner) => inner.lookahead_bounds(),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(.., inner) => inner.lookahead_bounds(),
+            TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
+                inner.lookahead_bounds()
+            }
             TypedFormat::LiftedOption(_, f) => f
                 .as_ref()
                 .map_or(Bounds::exact(0), |f| f.lookahead_bounds()),
+            // REVIEW[epic=view-format] - is this correct?
+            TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
+            TypedFormat::Phantom(..) => Bounds::exact(0),
         }
     }
 
     pub(crate) fn match_bounds(&self) -> Bounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.match_bounds(),
+            TypedFormat::FormatCall(_gt, _lvl, _args, _views, def) => def.match_bounds(),
 
             TypedFormat::DecodeBytes(_, _, _)
+            | TypedFormat::ParseFromView(_, _, _)
             | TypedFormat::Compute(_, _)
             | TypedFormat::Peek(_, _)
             | TypedFormat::PeekNot(_, _)
             | TypedFormat::EndOfInput
-            | TypedFormat::Pos
+            | TypedFormat::Pos(_)
             | TypedFormat::Fail => Bounds::exact(0),
 
             TypedFormat::Align(n) => Bounds::new(0, n - 1),
@@ -388,7 +458,8 @@ impl TypedFormat<GenType> {
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
-            | TypedFormat::Let(_, _, _, f) => f.match_bounds(),
+            | TypedFormat::Let(_, _, _, f)
+            | TypedFormat::LetView(_, _, f) => f.match_bounds(),
 
             TypedFormat::Match(_, _, branches) => branches
                 .iter()
@@ -400,10 +471,17 @@ impl TypedFormat<GenType> {
             TypedFormat::LetFormat(_, f0, _, f1) | TypedFormat::MonadSeq(_, f0, f1) => {
                 f0.match_bounds() + f1.match_bounds()
             }
-            TypedFormat::Hint(.., inner) => inner.match_bounds(),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(.., inner) => inner.match_bounds(),
+            TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
+                inner.match_bounds()
+            }
             TypedFormat::LiftedOption(_, f) => {
                 f.as_ref().map_or(Bounds::exact(0), |f| f.match_bounds())
             }
+            // REVIEW[epic=view-format] - is this correct?
+            TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
+            TypedFormat::Phantom(..) => Bounds::exact(0),
         }
     }
 
@@ -423,20 +501,35 @@ impl TypedFormat<GenType> {
         TypedFormat::Tuple(gt, elts)
     }
 
+    /// Provided that no structurally significant Formats intervene, extracts the outermost [`StyleHint`]
+    /// attached to `self`.
+    ///
+    /// If no `StyleHint` is attached to any non-child element of `self`, returns `None`.
+    pub(crate) fn get_hint(&self) -> Option<&StyleHint> {
+        match self {
+            TypedFormat::Hint(_, hint, _) => Some(hint),
+            // STUB - there may be cases we simply haven't thought about yet, so this catch-all isn't necessarily final
+            // FIXME - figure out which cases are truly None and which might be Some
+            _ => None,
+        }
+    }
+
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
             TypedFormat::Fail => None,
-            TypedFormat::SkipRemainder | TypedFormat::EndOfInput | TypedFormat::Align(_) => {
-                Some(Cow::Owned(GenType::from(RustType::UNIT)))
-            }
+            TypedFormat::SkipRemainder
+            | TypedFormat::EndOfInput
+            | TypedFormat::Align(_)
+            | TypedFormat::Phantom(..) => Some(Cow::Owned(GenType::from(RustType::UNIT))),
             TypedFormat::Byte(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
             // REVIEW - forcing Pos to be a U64-valued format
-            TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
-
-            TypedFormat::LetFormat(gt, ..)
+            TypedFormat::Pos(gt)
+            | TypedFormat::LetFormat(gt, ..)
             | TypedFormat::MonadSeq(gt, ..)
             | TypedFormat::Hint(gt, ..)
+            | TypedFormat::Permit(gt, ..)
             | TypedFormat::DecodeBytes(gt, ..)
+            | TypedFormat::ParseFromView(gt, ..)
             | TypedFormat::FormatCall(gt, ..)
             | TypedFormat::Variant(gt, ..)
             | TypedFormat::Union(gt, ..)
@@ -461,10 +554,14 @@ impl TypedFormat<GenType> {
             | TypedFormat::Where(gt, ..)
             | TypedFormat::Compute(gt, ..)
             | TypedFormat::Let(gt, ..)
+            | TypedFormat::LetView(gt, ..)
+            | TypedFormat::WithView(gt, ..)
             | TypedFormat::Match(gt, ..)
             | TypedFormat::Dynamic(gt, ..)
             | TypedFormat::LiftedOption(gt, ..)
             | TypedFormat::Apply(gt, ..) => Some(Cow::Borrowed(gt)),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(gt, ..) => Some(Cow::Borrowed(gt)),
         }
     }
 }
@@ -481,6 +578,67 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
             TypedDynFormat::Huffman(code_lengths, opt_code_values) => {
                 code_lengths.hash(state);
                 opt_code_values.hash(state);
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypedFixedReadKind<TypeRep> {
+    Base(BaseKind<Endian>),
+    /// `TypeRep` is the resolved Rust type of the referenced format -- the same `GenType` its
+    /// own top-level `TypedFormat` node carries (see `Elaborator::elaborate_kind`) -- and
+    /// `FormatRef` identifies which defined format it came from.
+    FixedFormat(TypeRep, FormatRef),
+}
+
+impl<TypeRep> std::hash::Hash for TypedFixedReadKind<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedFixedReadKind::Base(base) => base.hash(state),
+            TypedFixedReadKind::FixedFormat(_gt, format_ref) => format_ref.hash(state),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypedViewFormat<TypeRep> {
+    CaptureBytes(Box<TypedExpr<TypeRep>>),
+    ReadArray(Box<TypedExpr<TypeRep>>, TypedFixedReadKind<TypeRep>),
+    ReifyView,
+}
+
+impl<TypeRep> std::hash::Hash for TypedViewFormat<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedViewFormat::CaptureBytes(len) => {
+                len.hash(state);
+            }
+            TypedViewFormat::ReadArray(len, kind) => {
+                len.hash(state);
+                kind.hash(state);
+            }
+            TypedViewFormat::ReifyView => (),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypedViewExpr<TypeRep> {
+    Var(Label),
+    Offset(Box<TypedViewExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+}
+
+impl<TypeRep> std::hash::Hash for TypedViewExpr<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedViewExpr::Var(l) => l.hash(state),
+            TypedViewExpr::Offset(base, offs) => {
+                base.hash(state);
+                offs.hash(state);
             }
         }
     }
@@ -520,6 +678,7 @@ where
     U16(u16),
     U32(u32),
     U64(u64),
+    Numeric(TypeRep, Box<TypedNumExpr<TypeRep>>),
     Tuple(TypeRep, Vec<TypedExpr<TypeRep, VarId>>),
     TupleProj(TypeRep, Box<TypedExpr<TypeRep, VarId>>, usize),
     Record(TypeRep, Vec<(Label, TypedExpr<TypeRep, VarId>)>),
@@ -643,6 +802,9 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             TypedExpr::U16(n) => n.hash(state),
             TypedExpr::U32(n) => n.hash(state),
             TypedExpr::U64(n) => n.hash(state),
+            TypedExpr::Numeric(_, n) => {
+                n.hash(state);
+            }
             TypedExpr::Tuple(_, ts) => ts.hash(state),
             TypedExpr::TupleProj(_, tup, ix) => {
                 tup.hash(state);
@@ -778,12 +940,15 @@ impl TypedExpr<GenType> {
             | TypedExpr::U32Le(_)
             | TypedExpr::AsU32(_)
             | TypedExpr::U32(_)
+            // FIXME[epic=seqlen-always-u32]: consider revising this hardcoded type-association
             | TypedExpr::SeqLength(_) => Some(Cow::Owned(GenType::from(PrimType::U32))),
             TypedExpr::U64Be(_) | TypedExpr::U64Le(_) | TypedExpr::AsU64(_) | TypedExpr::U64(_) => {
                 Some(Cow::Owned(GenType::from(PrimType::U64)))
             }
             TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
-            TypedExpr::Var(gt, ..)
+
+            TypedExpr::Numeric(gt, ..)
+            | TypedExpr::Var(gt, ..)
             | TypedExpr::Tuple(gt, ..)
             | TypedExpr::TupleProj(gt, ..)
             | TypedExpr::Record(gt, ..)
@@ -811,7 +976,6 @@ impl TypedExpr<GenType> {
     }
 }
 
-// FIXME - same as TypedExpr, requirements of HashMap include Eq and Hash for this type
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedPattern<TypeRep> {
     Binding(TypeRep, Label),
@@ -822,6 +986,8 @@ pub enum TypedPattern<TypeRep> {
     U32(u32),
     U64(u64),
     Int(TypeRep, Bounds),
+    ZConst(TypeRep, BigInt),
+    ZRange(TypeRep, NumBounds),
     Char(char),
     Tuple(TypeRep, Vec<TypedPattern<TypeRep>>),
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
@@ -844,6 +1010,8 @@ impl TypedPattern<GenType> {
             | TypedPattern::Tuple(gt, ..)
             | TypedPattern::Option(gt, ..)
             | TypedPattern::Int(gt, ..)
+            | TypedPattern::ZConst(gt, ..)
+            | TypedPattern::ZRange(gt, ..)
             | TypedPattern::Variant(gt, ..)
             | TypedPattern::Seq(gt, ..) => Cow::Borrowed(gt),
         }
@@ -862,6 +1030,8 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
             TypedPattern::U32(n) => n.hash(state),
             TypedPattern::U64(n) => n.hash(state),
             TypedPattern::Int(_, bounds) => bounds.hash(state),
+            TypedPattern::ZConst(_, z) => z.hash(state),
+            TypedPattern::ZRange(_, range) => range.hash(state),
             TypedPattern::Char(c) => c.hash(state),
             TypedPattern::Tuple(_, tup) => tup.hash(state),
             TypedPattern::Variant(_, lbl, inner) => {
@@ -875,13 +1045,17 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
 }
 
 mod __impls {
-    use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern};
+    use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat};
+    use crate::FixedReadKind;
+    use crate::codegen::typed_format::TypedFixedReadKind;
+    use crate::numeric::elaborator::IntType as ExtIntType;
     use crate::{
+        DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
         codegen::{
-            rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDef},
             IxLabel,
+            rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDecl},
+            typed_format::TypedViewExpr,
         },
-        DynFormat, Expr, Format, Pattern,
     };
 
     impl From<RustType> for GenType {
@@ -890,8 +1064,8 @@ mod __impls {
         }
     }
 
-    impl From<(IxLabel, RustTypeDef)> for GenType {
-        fn from(value: (IxLabel, RustTypeDef)) -> Self {
+    impl From<(IxLabel, RustTypeDecl)> for GenType {
+        fn from(value: (IxLabel, RustTypeDecl)) -> Self {
             let ix = value.0.to_usize();
             let lbl = value.0.into();
             GenType::Def((ix, lbl), value.1)
@@ -900,6 +1074,12 @@ mod __impls {
 
     impl From<PrimType> for GenType {
         fn from(value: PrimType) -> Self {
+            GenType::Inline(RustType::from(value))
+        }
+    }
+
+    impl From<ExtIntType> for GenType {
+        fn from(value: ExtIntType) -> Self {
             GenType::Inline(RustType::from(value))
         }
     }
@@ -926,6 +1106,7 @@ mod __impls {
             .collect()
     }
 
+    #[allow(clippy::boxed_local)]
     fn rebox<T, U: From<T>>(b: Box<T>) -> Box<U> {
         Box::new(U::from(*b))
     }
@@ -951,6 +1132,7 @@ mod __impls {
                 TypedExpr::Destructure(_, head, pattern, expr) => {
                     Expr::Destructure(rebox(head), pattern.into(), rebox(expr))
                 }
+                TypedExpr::Numeric(_, n) => Expr::Numeric(rebox(n)),
                 TypedExpr::Lambda(_, name, inner) => Expr::Lambda(name, rebox(inner)),
                 TypedExpr::IntRel(_, rel, x, y) => Expr::IntRel(rel, rebox(x), rebox(y)),
                 TypedExpr::Arith(_, op, x, y) => Expr::Arith(op, rebox(x), rebox(y)),
@@ -1001,18 +1183,25 @@ mod __impls {
     impl<TypeRep> From<TypedFormat<TypeRep>> for Format {
         fn from(value: TypedFormat<TypeRep>) -> Self {
             match value {
-                TypedFormat::FormatCall(_gt, level, t_args, _) => {
+                TypedFormat::FormatCall(_gt, level, t_args, t_views, _) => {
                     let args = t_args
                         .into_iter()
                         .map(|(_lbl, arg)| Expr::from(arg))
                         .collect();
-                    Format::ItemVar(level, args)
+                    let views = t_views
+                        .into_iter()
+                        .map(|(_lbl, view)| ViewExpr::from(view))
+                        .collect();
+                    Format::ItemVar(level, args, views)
                 }
                 TypedFormat::DecodeBytes(_, expr, inner) => {
                     Format::DecodeBytes(rebox(expr), rebox(inner))
                 }
+                TypedFormat::ParseFromView(_, view, inner) => {
+                    Format::ParseFromView(ViewExpr::from(view), rebox(inner))
+                }
                 TypedFormat::SkipRemainder => Format::SkipRemainder,
-                TypedFormat::Pos => Format::Pos,
+                TypedFormat::Pos(_) => Format::Pos,
                 TypedFormat::Fail => Format::Fail,
                 TypedFormat::EndOfInput => Format::EndOfInput,
                 TypedFormat::Align(n) => Format::Align(n),
@@ -1062,10 +1251,14 @@ mod __impls {
                     Format::WithRelativeOffset(rebox(base_addr), rebox(ofs), rebox(inner))
                 }
                 TypedFormat::Map(_, inner, lambda) => Format::Map(rebox(inner), rebox(lambda)),
-                TypedFormat::Where(_, inner, lambda) => Format::Where(rebox(inner), rebox(lambda)),
+                TypedFormat::Where(_, inner, cond) => Format::Where(rebox(inner), cond.forget()),
                 TypedFormat::Compute(_, expr) => Format::Compute(rebox(expr)),
                 TypedFormat::Let(_, name, val, inner) => {
                     Format::Let(name, rebox(val), rebox(inner))
+                }
+                TypedFormat::LetView(_, name, inner) => Format::LetView(name, rebox(inner)),
+                TypedFormat::WithView(_, view, vf) => {
+                    Format::WithView(ViewExpr::from(view), ViewFormat::from(vf))
                 }
                 TypedFormat::Match(_, head, t_branches) => {
                     let branches = t_branches
@@ -1079,6 +1272,10 @@ mod __impls {
                 }
                 TypedFormat::Apply(_, name, _) => Format::Apply(name),
                 TypedFormat::LiftedOption(_, inner) => Format::LiftedOption(inner.map(rebox)),
+                TypedFormat::Phantom(_, inner) => Format::Phantom(rebox(inner)),
+                #[cfg(feature = "format_enforce")]
+                TypedFormat::Enforce(_, inner) => Format::Enforce(rebox(inner)),
+                TypedFormat::Permit(_, inner, dft) => Format::Permit(rebox(inner), rebox(dft)),
             }
         }
     }
@@ -1088,6 +1285,29 @@ mod __impls {
             match value {
                 TypedDynFormat::Huffman(code_values, opt_code_lengths) => {
                     DynFormat::Huffman(rebox(code_values), opt_code_lengths.map(rebox))
+                }
+            }
+        }
+    }
+
+    impl<TypeRep> From<TypedViewFormat<TypeRep>> for ViewFormat {
+        fn from(value: TypedViewFormat<TypeRep>) -> Self {
+            match value {
+                TypedViewFormat::CaptureBytes(len) => ViewFormat::CaptureBytes(rebox(len)),
+                TypedViewFormat::ReadArray(len, kind) => {
+                    ViewFormat::ReadArray(rebox(len), kind.into())
+                }
+                TypedViewFormat::ReifyView => ViewFormat::ReifyView,
+            }
+        }
+    }
+
+    impl<TypeRep> From<TypedFixedReadKind<TypeRep>> for FixedReadKind {
+        fn from(value: TypedFixedReadKind<TypeRep>) -> Self {
+            match value {
+                TypedFixedReadKind::Base(base_kind) => FixedReadKind::Base(base_kind),
+                TypedFixedReadKind::FixedFormat(_gt, format_ref) => {
+                    FixedReadKind::FixedFormat(format_ref)
                 }
             }
         }
@@ -1104,12 +1324,23 @@ mod __impls {
                 TypedPattern::U32(n) => Pattern::U32(n),
                 TypedPattern::U64(n) => Pattern::U64(n),
                 TypedPattern::Int(_, bounds) => Pattern::Int(bounds),
+                TypedPattern::ZConst(_, z) => Pattern::ZConst(z),
+                TypedPattern::ZRange(_, bounds) => Pattern::ZRange(bounds),
                 TypedPattern::Char(c) => Pattern::Char(c),
                 TypedPattern::Tuple(_, elts) => Pattern::Tuple(revec(elts)),
                 TypedPattern::Variant(_, name, inner) => Pattern::Variant(name, rebox(inner)),
                 TypedPattern::Seq(_, elts) => Pattern::Seq(revec(elts)),
                 TypedPattern::Option(_, Some(inner)) => Pattern::Option(Some(rebox(inner))),
                 TypedPattern::Option(_, None) => Pattern::Option(None),
+            }
+        }
+    }
+
+    impl<TypeRep> From<TypedViewExpr<TypeRep>> for ViewExpr {
+        fn from(value: TypedViewExpr<TypeRep>) -> Self {
+            match value {
+                TypedViewExpr::Var(ident) => ViewExpr::Var(ident),
+                TypedViewExpr::Offset(base, offs) => ViewExpr::Offset(rebox(base), rebox(offs)),
             }
         }
     }

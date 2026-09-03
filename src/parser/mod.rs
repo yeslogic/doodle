@@ -1,13 +1,28 @@
 pub mod error;
 pub mod offset;
+pub mod util;
+pub mod view;
 
-use error::{PResult, ParseError, StateError};
+use error::{DataStateError, PResult, ParseError, ParserStateError, StateError};
 use offset::{BufferOffset, ByteOffset};
+pub use view::View;
 
 /// Stateful parser with an associated buffer and offset-tracker.
 pub struct Parser<'a> {
-    pub(crate) buffer: &'a [u8],
+    pub(crate) buffer: View<'a>,
     pub(crate) offset: BufferOffset,
+}
+
+impl<'a> Parser<'a> {}
+
+impl<'a> From<View<'a>> for Parser<'a> {
+    fn from(view: View<'a>) -> Self {
+        let max_offset = ByteOffset::from_bytes(view.buffer.len());
+        Self {
+            buffer: view,
+            offset: BufferOffset::new(max_offset),
+        }
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -15,9 +30,22 @@ impl<'a> Parser<'a> {
     pub fn new(buffer: &'a [u8]) -> Parser<'a> {
         let max_offset = ByteOffset::from_bytes(buffer.len());
         Self {
-            buffer,
+            buffer: View::new(buffer),
             offset: BufferOffset::new(max_offset),
         }
+    }
+
+    /// Creates a [`View`] starting from the current position in the Parser,
+    /// provided it is in Bytes-mode.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the Parser is currently in bits-mode.
+    pub fn view(&self) -> View<'a> {
+        let (cur_offset, None) = self.offset.get_current_offset().as_bytes() else {
+            panic!("cannot open view while in bits-mode processing");
+        };
+        self.buffer.offset(cur_offset).unwrap()
     }
 
     /// Advances the offset by `offset` positions, as if calling [`Self::read_byte`] that many
@@ -59,19 +87,32 @@ impl<'a> Parser<'a> {
         N: TryInto<usize, Error: std::fmt::Debug> + Copy,
     {
         let dest = dest_offset.try_into().unwrap();
-        let dest_offset = ByteOffset::from_bytes(dest);
+        if dest < self.buffer.start_offset {
+            return Err(ParseError::NegativeIndex {
+                abs_target: dest,
+                abs_buf_start: self.buffer.start_offset,
+            });
+        }
+        let o_dest = dest - self.buffer.start_offset;
+        let dest_offset = ByteOffset::from_bytes(o_dest);
         let is_advance =
             if let Some(delta) = self.offset.get_current_offset().checked_delta(dest_offset) {
                 self.offset.open_peek();
                 self.offset.try_increment(delta)?;
                 true
             } else {
-                self.offset.seek_to_offset(dest, false)?;
+                self.offset.seek_to_offset(o_dest, false)?;
                 false
             };
         Ok(is_advance)
     }
 
+    /// Immediately advances to the furthest offset reachable in the current context.
+    ///
+    /// With in a slice context, this will advance to the end of the slice. Otherwise, it will advance
+    /// to the end of the buffer.
+    ///
+    /// Operationally equivalent to calling [`Self::read_byte`] (discarding the output) until Err is returned.
     pub fn skip_remainder(&mut self) {
         let after_skip = self.offset.current_limit();
         unsafe {
@@ -88,8 +129,19 @@ impl<'a> Parser<'a> {
     /// Otherwise, it will be an entire byte.
     pub fn read_byte(&mut self) -> Result<u8, ParseError> {
         let (ix, sub_bit) = self.offset.try_increment(1)?.as_bytes();
-        let Some(&byte) = self.buffer.get(ix) else {
-            return Err(ParseError::InternalError(StateError::OutOfBoundsRead));
+        let Some(&byte) = self.buffer.buffer.get(ix) else {
+            // `ix` can only be at or past the end of the buffer here, since `try_increment` would
+            // otherwise have rejected the advance; `ix == len` is the well-formed case of trying
+            // to read past the final legal offset (a data-driven, in-bounds condition), while
+            // `ix > len` would indicate that the current offset was already illegally out of
+            // bounds, which should be precluded by proactive enforcement elsewhere.
+            return Err(ParseError::InternalError(
+                if ix == self.buffer.buffer.len() {
+                    StateError::Data(DataStateError::EndOfStreamRead)
+                } else {
+                    StateError::Parser(ParserStateError::IllegalOffsetRead.logged())
+                },
+            ));
         };
         let ret = if let Some(n) = sub_bit {
             let i = n as u8;
@@ -188,11 +240,13 @@ impl<'a> Parser<'a> {
         let end = _current_offset.increment_by(size);
         let current_limit = self.offset.current_limit();
         if end > current_limit {
-            return Err(ParseError::InternalError(StateError::UnstackableSlices {
-                current_offset: _current_offset,
-                current_limit,
-                new_slice_end: end,
-            }));
+            return Err(ParseError::InternalError(StateError::Data(
+                DataStateError::UnstackableSlices {
+                    current_offset: _current_offset,
+                    current_limit,
+                    new_slice_end: end,
+                },
+            )));
         }
         unsafe {
             self.offset.open_slice_unchecked(size);
@@ -314,13 +368,13 @@ impl<'a> Parser<'a> {
     ///
     /// # Panics
     ///
-    /// As currently defined, will panic if we are in bits-mode.
+    /// Will panic if the parser is currently in bits-mode, as there is no sensible answer we can provide,
+    /// and there isn't any clear context where a format that uses `Format::Pos` within `Format::Bits` is well-formed.
     pub fn get_offset_u64(&self) -> u64 {
         match self.get_current_offset() {
             ByteOffset::Bytes(n) => n as u64,
             ByteOffset::Bits { .. } => {
-                // FIXME - this panic should perhaps be eliminated if possible
-                unreachable!("no unequivocal way to compute a byte-offset while in bits-mode");
+                unreachable!("unsound operation: get_offset_u64 called while in bits-mode")
             }
         }
     }

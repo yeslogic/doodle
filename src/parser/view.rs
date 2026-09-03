@@ -1,0 +1,110 @@
+use crate::parser::error::ParseError as DoodleParseError;
+use crate::{
+    alt::prelude::allsorts::{
+        binary::{
+            U8, U16Be, U32Be, U64Be,
+            read::{self, ReadArray, ReadScope},
+        },
+        error::ParseError as AllSortsParseError,
+    },
+    parser::{error::OverrunKind, offset::ByteOffset},
+};
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct View<'a> {
+    pub(crate) buffer: &'a [u8],
+    pub(crate) start_offset: usize,
+}
+
+impl<'a> View<'a> {
+    pub fn new(buffer: &'a [u8]) -> Self {
+        Self {
+            buffer,
+            start_offset: 0,
+        }
+    }
+
+    pub fn get_offset(&self) -> usize {
+        self.start_offset
+    }
+
+    pub fn relative_to_absolute(&self, relative_offset: usize) -> usize {
+        self.start_offset + relative_offset
+    }
+
+    /// Reads a slice of `len` bytes from the View, offset by `offset`.
+    pub fn read_len(&self, len: usize) -> &'a [u8] {
+        &self.buffer[..len]
+    }
+
+    pub fn offset(&self, offset: usize) -> Result<Self, DoodleParseError> {
+        if offset > self.buffer.len() {
+            Err(DoodleParseError::Overrun(OverrunKind::EndOfStream {
+                offset: ByteOffset::from_bytes(self.start_offset + offset),
+                max_offset: ByteOffset::from_bytes(self.start_offset + self.buffer.len()),
+            }))
+        } else {
+            Ok(View {
+                buffer: &self.buffer[offset..],
+                start_offset: self.start_offset + offset,
+            })
+        }
+    }
+
+    pub fn as_read_array<T>(&self, len: usize) -> Result<ReadArray<'a, T>, DoodleParseError>
+    where
+        T: read::ReadUnchecked,
+    {
+        let size = <T as read::ReadUnchecked>::SIZE;
+        let scope = ReadScope::from_parts(self.buffer, self.start_offset);
+        let mut ctxt = scope.ctxt();
+        match ctxt.read_array::<T>(len) {
+            Ok(ret) => Ok(ret),
+            Err(e) => match e {
+                // NOTE - because the error we return relies on local context, it can't be folded into the definition fo `ParseError::from_allsorts_error` cleanly.
+                AllSortsParseError::BadEof => {
+                    Err(DoodleParseError::Overrun(OverrunKind::EndOfStream {
+                        offset: ByteOffset::from_bytes(self.start_offset + len * size),
+                        max_offset: ByteOffset::from_bytes(self.start_offset + self.buffer.len()),
+                    }))
+                }
+                other_err => Err(DoodleParseError::from_allsorts_error(other_err)),
+            },
+        }
+    }
+
+    pub fn read_u16be(&self) -> Result<u16, DoodleParseError> {
+        if self.buffer.len() < 2 {
+            return Err(DoodleParseError::Overrun(OverrunKind::EndOfStream {
+                offset: ByteOffset::from_bytes(self.start_offset + 2),
+                max_offset: ByteOffset::from_bytes(self.start_offset + self.buffer.len()),
+            }));
+        }
+        Ok(u16::from_be_bytes([self.buffer[0], self.buffer[1]]))
+    }
+
+    // NOTE - we need these separate methods because RustExpr::MethodCall doesn't allow turbo-fish type-parameters
+    pub fn read_array_u8(&self, len: usize) -> Result<ReadArray<'a, U8>, DoodleParseError> {
+        self.as_read_array(len)
+    }
+
+    pub fn read_array_u16be(&self, len: usize) -> Result<ReadArray<'a, U16Be>, DoodleParseError> {
+        self.as_read_array(len)
+    }
+
+    pub fn read_array_u32be(&self, len: usize) -> Result<ReadArray<'a, U32Be>, DoodleParseError> {
+        self.as_read_array(len)
+    }
+
+    pub fn read_array_u64be(&self, len: usize) -> Result<ReadArray<'a, U64Be>, DoodleParseError> {
+        self.as_read_array(len)
+    }
+}
+
+impl DoodleParseError {
+    /// Fallback method for casting an `AllSortsParseError` to a [`DoodleParseError`](crate::parser::error::ParseError)
+    fn from_allsorts_error(err: AllSortsParseError) -> Self {
+        // REVIEW - determine whether are any special-case correspondences we would like to map to custom ParseError variants rather than embedding indiscriminately
+        Self::AllsortsError(err)
+    }
+}

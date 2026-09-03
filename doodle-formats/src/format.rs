@@ -1,8 +1,5 @@
-use crate::format::base::BaseModule;
 use doodle::helper::*;
 use doodle::{Format, FormatModule, FormatRef};
-
-pub mod base;
 
 pub mod deflate;
 pub mod elf;
@@ -10,6 +7,7 @@ pub mod gif;
 pub mod gzip;
 pub mod jpeg;
 pub mod mpeg4;
+pub mod numbers;
 pub mod opentype;
 pub mod peano;
 pub mod png;
@@ -21,52 +19,70 @@ pub mod tiff;
 pub mod waldo;
 pub mod zlib;
 
+pub(crate) fn gzipped(gzip: FormatRef, inner_data: Format) -> Format {
+    chain(
+        gzip.call(),
+        "gzip-raw",
+        for_each(
+            var("gzip-raw"),
+            "item",
+            decode_bytes(record_lens(var("item"), &["data", "inflate"]), inner_data),
+        ),
+    )
+}
+
+pub fn opentype_standalone(module: &mut FormatModule) -> FormatRef {
+    let deflate = deflate::main(module);
+    let gzip = gzip::main(module, deflate);
+    let (text, _utf8nz) = text::main(module);
+    let text_or_ztext = utf8_maybe_gzipped(module, text, gzip);
+    opentype::main(module, text_or_ztext)
+}
+
+pub fn utf8_maybe_gzipped(
+    module: &mut FormatModule,
+    text: FormatRef,
+    gzip: FormatRef,
+) -> FormatRef {
+    let ztext = module.define_format("text.gzip", gzipped(gzip, text.call()));
+    module.define_format(
+        "text.maybe_gzip",
+        alts_nondet(vec![("compressed", ztext.call()), ("plain", text.call())]),
+    )
+}
+
 pub fn main(module: &mut FormatModule) -> FormatRef {
-    let base = base::main(module);
+    let deflate = deflate::main(module);
 
-    let deflate = deflate::main(module, &base);
+    let zlib = zlib::main(module, deflate);
 
-    let zlib = zlib::main(module, &base, deflate);
-
-    let tiff = tiff::main(module, &base);
-    let (text, utf8nz) = text::main(module, &base);
-    let gif = gif::main(module, &base);
-    let gzip = gzip::main(module, deflate, &base);
-    let jpeg = jpeg::main(module, &base, &tiff);
-    let mpeg4 = mpeg4::main(module, &base);
+    let tiff = tiff::main(module);
+    let (text, utf8nz) = text::main(module);
+    let gif = gif::main(module);
+    let gzip = gzip::main(module, deflate);
+    let jpeg = jpeg::main(module, tiff);
+    let mpeg4 = mpeg4::main(module);
+    let numbers = numbers::main(module);
     let peano = peano::main(module);
-    let png = png::main(module, zlib, text, utf8nz, &base);
-    let riff = riff::main(module, &base);
-    let tar = tar::main(module, &base);
-    let elf = elf::main(module, &base);
-    let waldo = waldo::main(module, &base);
-    let rle = run_length::main(module, &base);
-    let opentype = opentype::main(module, &base);
+    let png = png::main(module, zlib, text, utf8nz);
+    let riff = riff::main(module);
+    let tar = tar::main(module);
+    let elf = elf::main(module);
+    let waldo = waldo::main(module);
+    let rle = run_length::main(module);
+    // NOTE - ztext would commonly clash with arbitrary gzip so we include it in the forest but not the main alternation
+    let text_or_ztext = utf8_maybe_gzipped(module, text, gzip);
 
-    let tgz = {
-        module.define_format(
-            "tgz.main",
-            chain(
-                gzip.call(),
-                "gzip-raw",
-                for_each(
-                    var("gzip-raw"),
-                    "item",
-                    Format::DecodeBytes(
-                        Box::new(record_lens(var("item"), &["data", "inflate"])),
-                        Box::new(tar.call()),
-                    ),
-                ),
-            ),
-        )
-    };
+    let opentype = opentype::main(module, text_or_ztext);
+
+    let tgz = module.define_format("tgz.main", gzipped(gzip, tar.call()));
 
     module.define_format(
         "main",
         record_auto([
             (
                 "data",
-                union_nondet(vec![
+                alts_nondet(vec![
                     ("waldo", waldo.call()),
                     ("peano", peano.call()),
                     ("gif", gif.call()),
@@ -80,6 +96,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("tar", tar.call()),
                     ("elf", elf.call()),
                     ("opentype", opentype.call()),
+                    ("numbers", numbers.call()),
                     ("rle", rle.call()),
                     ("text", text.call()),
                 ]),
@@ -99,8 +116,6 @@ mod test {
     #[test]
     fn with_relative_offset_format() -> Result<(), DecodeError> {
         let mut module = FormatModule::new();
-        let base = base::main(&mut module);
-
         let mask_bytes = {
             let mut tmp = ByteSet::new();
             tmp.insert(0x7f);
@@ -108,7 +123,7 @@ mod test {
         };
 
         let f = record([
-            ("len", base.u32be()),
+            ("len", u32be()),
             (
                 "mask",
                 with_relative_offset(None, var("len"), Format::Byte(mask_bytes)),
@@ -118,7 +133,7 @@ mod test {
                 repeat_count(
                     var("len"),
                     Format::Map(
-                        Box::new(base.u8()),
+                        Box::new(doodle::helper::u8()),
                         Box::new(lambda("byte", bit_and(var("mask"), var("byte")))),
                     ),
                 ),
@@ -140,15 +155,18 @@ mod test {
         let (output, _) = program.run(ReadCtxt::new(&data))?;
         match output {
             Value::Record(ref fields) => match fields.as_slice() {
-                &[(Cow::Borrowed("len"), ref len), (Cow::Borrowed("mask"), ref mask), (Cow::Borrowed("data"), ref data)] =>
-                {
-                    match len.coerce_mapped_value() {
+                &[
+                    (Cow::Borrowed("len"), ref len),
+                    (Cow::Borrowed("mask"), ref mask),
+                    (Cow::Borrowed("data"), ref data),
+                ] => {
+                    match len.coerce_mapped_value().into_inner() {
                         &Value::U32(n) => assert_eq!(n, 32),
                         other => panic!("Unexpected Value for `len` field: {other:?}"),
                     }
                     assert!(matches!(mask, Value::U8(0x7f)));
                     match data {
-                        Value::Seq(ref seq) => {
+                        Value::Seq(seq) => {
                             assert_eq!(seq.len(), 32);
                             for i in 0..32u8 {
                                 match seq[i as usize] {

@@ -1,6 +1,9 @@
+use crate::alt::{FormatExt, FormatModuleExt, ValueTypeExt};
 use crate::bounds::Bounds;
+use crate::numeric::core::Bounds as NumBounds;
 use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use anyhow::Result as AResult;
+use num_bigint::BigInt;
 use serde::Serialize;
 use std::rc::Rc;
 
@@ -15,6 +18,8 @@ pub enum Pattern {
     U32(u32),
     U64(u64),
     Int(Bounds),
+    ZConst(#[serde(serialize_with = "crate::numeric::core::ser_bigint")] BigInt),
+    ZRange(NumBounds),
     Char(char),
     Tuple(Vec<Pattern>),
     Variant(Label, Box<Pattern>),
@@ -25,6 +30,21 @@ pub enum Pattern {
 impl Pattern {
     pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
 
+    pub fn z_const<N>(n: N) -> Pattern
+    where
+        BigInt: From<N>,
+    {
+        Pattern::ZConst(BigInt::from(n))
+    }
+
+    pub fn z_range<N>(min: N, max: N) -> Pattern
+    where
+        BigInt: From<N>,
+    {
+        Pattern::ZRange(NumBounds::new(min.into(), max.into()))
+    }
+
+    /// Constructs a pattern that matches against literal sequence of bytes.
     pub fn from_bytes(bs: &[u8]) -> Pattern {
         Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
     }
@@ -45,14 +65,16 @@ impl Pattern {
             }
             (Pattern::Wildcard, _) => {}
             (Pattern::Bool(..), ValueType::Base(BaseType::Bool)) => {}
-            (Pattern::U8(..), ValueType::Base(BaseType::U8)) => {}
-            (Pattern::U16(..), ValueType::Base(BaseType::U16)) => {}
-            (Pattern::U32(..), ValueType::Base(BaseType::U32)) => {}
-            (Pattern::U64(..), ValueType::Base(BaseType::U64)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U8)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U16)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U32)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U64)) => {}
+            (Pattern::U8(..), &ValueType::U8) => {}
+            (Pattern::U16(..), &ValueType::U16) => {}
+            (Pattern::U32(..), &ValueType::U32) => {}
+            (Pattern::U64(..), &ValueType::U64) => {}
+            // REVIEW - should we allow `Pattern::Int` to yield matches for ValueType::Signed(..)?
+            (
+                Pattern::Int(..),
+                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), t) if t.is_numeric() => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, Rc::new(t.clone()));
@@ -82,6 +104,54 @@ impl Pattern {
         }
     }
 
+    pub(crate) fn build_scope_ext(
+        &self,
+        scope: &mut TypeScope<'_, ValueTypeExt>,
+        t: Rc<ValueTypeExt>,
+    ) {
+        match (self, t.as_ref()) {
+            (Pattern::Binding(name), t) => {
+                scope.push(name.clone(), t.clone());
+            }
+            (Pattern::Wildcard, _) => {}
+            (Pattern::Bool(..), ValueTypeExt::Base(BaseType::Bool)) => {}
+            (Pattern::U8(..), ValueTypeExt::Base(BaseType::U8)) => {}
+            (Pattern::U16(..), ValueTypeExt::Base(BaseType::U16)) => {}
+            (Pattern::U32(..), ValueTypeExt::Base(BaseType::U32)) => {}
+            (Pattern::U64(..), ValueTypeExt::Base(BaseType::U64)) => {}
+            (
+                Pattern::Int(..),
+                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), t) if t.is_numeric() => {}
+            (Pattern::Tuple(ps), ValueTypeExt::Tuple(ts)) if ps.len() == ts.len() => {
+                for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
+                    p.build_scope_ext(scope, Rc::new(t.clone()));
+                }
+            }
+            (Pattern::Seq(ps), ValueTypeExt::Seq(t)) => {
+                for p in ps {
+                    p.build_scope_ext(scope, Rc::new((**t).clone()));
+                }
+            }
+            (Pattern::Option(None), ValueTypeExt::Option(_)) => {
+                // do nothing
+            }
+            (Pattern::Option(Some(p)), ValueTypeExt::Option(t)) => {
+                p.build_scope_ext(scope, Rc::new((**t).clone()))
+            }
+            (Pattern::Variant(label, p), ValueTypeExt::Union(branches)) => {
+                if let Some(t) = branches.get(label) {
+                    // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
+                    let tmp = Rc::new(t.clone());
+                    p.build_scope_ext(scope, tmp);
+                } else {
+                    panic!("no {label} in {branches:?}");
+                }
+            }
+            (l, r) => panic!("pattern build_scope_ext failed: ({l:?}, {r:?})"),
+        }
+    }
     pub(crate) fn infer_expr_branch_type(
         &self,
         scope: &TypeScope<'_>,
@@ -93,6 +163,16 @@ impl Pattern {
         expr.infer_type(&pattern_scope)
     }
 
+    pub(crate) fn infer_expr_branch_type_ext(
+        &self,
+        scope: &TypeScope<'_, ValueTypeExt>,
+        head_type: Rc<ValueTypeExt>,
+        expr: &Expr,
+    ) -> AResult<ValueTypeExt> {
+        let mut pattern_scope = TypeScope::child(scope);
+        self.build_scope_ext(&mut pattern_scope, head_type);
+        expr.infer_type_ext(&pattern_scope)
+    }
     pub(crate) fn infer_format_branch_type(
         &self,
         scope: &TypeScope<'_>,
@@ -103,6 +183,18 @@ impl Pattern {
         let mut pattern_scope = TypeScope::child(scope);
         self.build_scope(&mut pattern_scope, head_type);
         module.infer_format_type(&pattern_scope, format)
+    }
+
+    pub(crate) fn infer_format_branch_type_ext(
+        &self,
+        scope: &TypeScope<'_, ValueTypeExt>,
+        head_type: Rc<ValueTypeExt>,
+        module: &FormatModuleExt,
+        format: &FormatExt,
+    ) -> AResult<ValueTypeExt> {
+        let mut pattern_scope = TypeScope::child(scope);
+        self.build_scope_ext(&mut pattern_scope, head_type);
+        module.infer_format_ext_type(&pattern_scope, format)
     }
 
     /// Returns `true` if the pattern shadows the given name.
@@ -116,6 +208,8 @@ impl Pattern {
             | Pattern::U32(_)
             | Pattern::U64(_)
             | Pattern::Int(_)
+            | Pattern::ZConst(_)
+            | Pattern::ZRange(_)
             | Pattern::Char(_) => false,
             Pattern::Tuple(ts) => ts.iter().any(|p| p.shadows(name)),
             Pattern::Variant(_, p) => p.shadows(name),

@@ -1,17 +1,20 @@
 use crate::byte_set::ByteSet;
+use crate::validation::TypedCondition;
 use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::codegen::typed_format::{GenType, TypedPattern};
+use crate::codegen::typed_format::{GenType, TypedFixedReadKind, TypedPattern, TypedViewExpr};
 
+use super::rust_ast::NumType;
+use super::typed_format::TypedViewFormat;
 use super::{
-    typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
     GTFormat,
+    typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
 };
-use super::{PrimType, RustType};
+use super::{PrimType, RustLt, RustType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct TypedDecoderExt<TypeRep> {
@@ -52,13 +55,19 @@ impl TypedDecoder<GenType> {
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
             TypedDecoder::Fail => None,
-            TypedDecoder::Align(_) | TypedDecoder::SkipRemainder | TypedDecoder::EndOfInput => {
+            TypedDecoder::Align(_)
+            | TypedDecoder::SkipRemainder
+            | TypedDecoder::EndOfInput
+            | TypedDecoder::Phantom => {
                 Some(Cow::Owned(GenType::Inline(RustType::from(PrimType::Unit))))
             }
             TypedDecoder::Byte(set) => {
                 (!set.is_empty()).then_some(Cow::Owned(GenType::from(PrimType::U8)))
             }
-            TypedDecoder::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
+            TypedDecoder::Pos(nt) => match nt {
+                NumType::U(m_uint) => Some(Cow::Owned(GenType::Inline(RustType::from(*m_uint)))),
+                NumType::I(m_sint) => Some(Cow::Owned(GenType::Inline(RustType::from(*m_sint)))),
+            },
             TypedDecoder::Call(t, ..)
             | TypedDecoder::Variant(t, ..)
             | TypedDecoder::Parallel(t, ..)
@@ -80,6 +89,11 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Where(t, ..)
             | TypedDecoder::Compute(t, ..)
             | TypedDecoder::Let(t, ..)
+            | TypedDecoder::LetView(t, ..)
+            | TypedDecoder::CaptureBytes(t, ..)
+            | TypedDecoder::ReadArray(t, ..)
+            | TypedDecoder::ParseFromView(t, ..)
+            | TypedDecoder::ReifyView(t, ..)
             | TypedDecoder::Match(t, ..)
             | TypedDecoder::Dynamic(t, ..)
             | TypedDecoder::Apply(t, ..)
@@ -89,8 +103,11 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::LetFormat(t, ..)
             | TypedDecoder::MonadSeq(t, ..)
             | TypedDecoder::Hint(t, ..)
+            | TypedDecoder::Permit(t, ..)
             | TypedDecoder::LiftedOption(t, ..)
             | TypedDecoder::AccumUntil(t, ..) => Some(Cow::Borrowed(t)),
+            #[cfg(feature = "format_enforce")]
+            TypedDecoder::Enforce(t, ..) => Some(Cow::Borrowed(t)),
         }
     }
 }
@@ -98,7 +115,14 @@ impl TypedDecoder<GenType> {
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub(crate) enum TypedDecoder<TypeRep> {
-    Call(TypeRep, usize, Vec<(Label, TypedExpr<TypeRep>)>),
+    Call(
+        TypeRep,
+        usize,
+        (
+            Vec<(Label, TypedExpr<TypeRep>)>,
+            Vec<(Label, TypedViewExpr<TypeRep>)>,
+        ),
+    ),
     Fail,
     EndOfInput,
     Align(usize),
@@ -115,6 +139,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
+    /// RepeatBetween: the MatchTree is an N-ary decision-tree where the matching index corresponds to the number of unparsed repetitions left in the limited LL(k) window.
     RepeatBetween(
         TypeRep,
         MatchTree,
@@ -154,7 +179,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Where(
         TypeRep,
         Box<TypedDecoderExt<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        TypedCondition<TypeRep>,
     ),
     Compute(TypeRep, Box<TypedExpr<TypeRep>>),
     Let(
@@ -180,7 +205,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
-    Pos,
+    Pos(NumType),
     ForEach(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -213,6 +238,28 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     Hint(TypeRep, StyleHint, Box<TypedDecoderExt<TypeRep>>),
     LiftedOption(TypeRep, Option<Box<TypedDecoderExt<TypeRep>>>),
+    LetView(TypeRep, Label, Box<TypedDecoderExt<TypeRep>>),
+    CaptureBytes(TypeRep, TypedViewExpr<TypeRep>, Box<TypedExpr<TypeRep>>),
+    ParseFromView(
+        TypeRep,
+        TypedViewExpr<TypeRep>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
+    ReadArray(
+        TypeRep,
+        TypedViewExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
+        TypedFixedReadKind<TypeRep>,
+    ),
+    ReifyView(TypeRep, TypedViewExpr<TypeRep>),
+    Phantom,
+    #[cfg(feature = "format_enforce")]
+    Enforce(TypeRep, Box<TypedDecoderExt<TypeRep>>),
+    Permit(
+        TypeRep,
+        Box<TypedDecoderExt<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -260,20 +307,39 @@ impl<'a> GTCompiler<'a> {
     pub(crate) fn compile_program(
         module: &FormatModule,
         format: &GTFormat,
+        extra: impl IntoIterator<Item = &'a GTFormat>,
     ) -> AResult<TypedProgram<GenType>> {
         let mut compiler = GTCompiler::new(module);
-        // type
+
+        compiler.compile_local_root(format, false)?;
+
+        for extra_f in extra {
+            compiler.compile_local_root(extra_f, true)?;
+        }
+
+        Ok(compiler.program)
+    }
+
+    /// Given a `TypedFormat` that is either an overall root or the local root of
+    /// a disconnected tree within a Format-forest, performs compilation over the
+    /// format in question as well as all of its directly reachable descendants.
+    fn compile_local_root(&mut self, format: &'a GTFormat, is_extra: bool) -> AResult<()> {
         let t = match format.get_type() {
-            None => unreachable!("cannot compile program from Void top-level format-type"),
+            None => unreachable!("cannot compile program from local-root format with Void type"),
             Some(t) => t.into_owned(),
         };
-        // decoder
-        compiler.queue_compile(t, format, None, Rc::new(Next::Empty));
-        while let Some((f, args, next, n)) = compiler.compile_queue.pop() {
-            let d = compiler.compile_gt_format(f, args, next)?;
-            compiler.program.decoders[n].0 = d;
+
+        // skip extra formats that are not ad-hoc
+        if is_extra && t.try_as_adhoc().is_none() {
+            return Ok(());
         }
-        Ok(compiler.program)
+
+        self.queue_compile(t, format, None, Rc::new(Next::Empty));
+        while let Some((f, args, next, n)) = self.compile_queue.pop() {
+            let d = self.compile_gt_format(f, args, next)?;
+            self.program.decoders[n].0 = d;
+        }
+        Ok(())
     }
 
     fn queue_compile(
@@ -289,6 +355,10 @@ impl<'a> GTCompiler<'a> {
         n
     }
 
+    fn __repeat_next(format: &'a GTFormat, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        Rc::new(Next::Repeat(MaybeTyped::Typed(format), next))
+    }
+
     fn compile_gt_format(
         &mut self,
         format: &'a GTFormat,
@@ -296,9 +366,9 @@ impl<'a> GTCompiler<'a> {
         next: Rc<Next<'a>>,
     ) -> AResult<GTDecoderExt> {
         let dec = match format {
-            TypedFormat::FormatCall(gt, level, arg_exprs, deref) => {
-                let this_args = arg_exprs.to_vec();
-                let sig_args = if arg_exprs.is_empty() {
+            TypedFormat::FormatCall(gt, level, arg_exprs, arg_views, deref) => {
+                let this_args = (arg_exprs.to_vec(), arg_views.to_vec());
+                let sig_args = if arg_exprs.is_empty() && arg_views.is_empty() {
                     None
                 } else {
                     Some(
@@ -312,10 +382,17 @@ impl<'a> GTCompiler<'a> {
                                         .into_owned(),
                                 )
                             })
+                            .chain(arg_views.into_iter().map(|(lab, _)| {
+                                (
+                                    lab.clone(),
+                                    GenType::Inline(RustType::ViewObject(RustLt::Parametric(
+                                        Label::Borrowed(super::model::DEFAULT_LT),
+                                    ))),
+                                )
+                            }))
                             .collect(),
                     )
                 };
-
                 let _f = self.module.get_format(*level);
                 let next = if _f.depends_on_next(self.module) {
                     next
@@ -332,19 +409,19 @@ impl<'a> GTCompiler<'a> {
 
                 Ok(TypedDecoder::Call(gt.clone(), n, this_args))
             }
+            TypedFormat::Phantom(_, inner) => {
+                self.compile_gt_format(inner, None, Rc::new(Next::Empty))?;
+                Ok(TypedDecoder::Phantom)
+            }
             TypedFormat::DecodeBytes(gt, expr, f) => {
-                let da = Box::new(self.compile_gt_format(f, None, next)?);
+                let da = Box::new(self.compile_gt_format(f, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::DecodeBytes(gt.clone(), expr.clone(), da))
             }
-            TypedFormat::ForEach(gt, expr, lbl, f) => {
-                let da = Box::new(self.compile_gt_format(f, None, next)?);
-                Ok(TypedDecoder::ForEach(
-                    gt.clone(),
-                    expr.clone(),
-                    lbl.clone(),
-                    da,
-                ))
+            TypedFormat::ParseFromView(gt, view, f) => {
+                let da = Box::new(self.compile_gt_format(f, None, Rc::new(Next::Empty))?);
+                Ok(TypedDecoder::ParseFromView(gt.clone(), view.clone(), da))
             }
+
             TypedFormat::Fail => Ok(TypedDecoder::Fail),
             TypedFormat::EndOfInput => Ok(TypedDecoder::EndOfInput),
             TypedFormat::SkipRemainder => Ok(TypedDecoder::SkipRemainder),
@@ -373,7 +450,10 @@ impl<'a> GTCompiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &fs, next) {
                     Ok(TypedDecoder::Branch(gt.clone(), tree, ds))
                 } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
+                    Err(anyhow!(
+                        "cannot build match tree for {}",
+                        serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
+                    ))
                 }
             }
             TypedFormat::UnionNondet(gt, branches) => {
@@ -425,7 +505,10 @@ impl<'a> GTCompiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
                     Ok(TypedDecoder::Repeat0While(gt.clone(), tree, Box::new(da)))
                 } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
+                    Err(anyhow!(
+                        "cannot build match tree for {}",
+                        serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
+                    ))
                 }
             }
             TypedFormat::Repeat1(gt, a) => {
@@ -443,20 +526,23 @@ impl<'a> GTCompiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
                     Ok(TypedDecoder::Repeat1Until(gt.clone(), tree, Box::new(da)))
                 } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
+                    Err(anyhow!(
+                        "cannot build match tree for {}",
+                        serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
+                    ))
                 }
             }
             TypedFormat::RepeatCount(gt, expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatCount(gt.clone(), expr.clone(), da))
             }
             TypedFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = min_expr.bounds().is_exact() else {
+                let Some(min) = min_expr.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
-                let Some(max) = max_expr.bounds().is_exact() else {
+                let Some(max) = max_expr.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
 
@@ -471,7 +557,7 @@ impl<'a> GTCompiler<'a> {
                     )),
                 )?;
 
-                let tree = {
+                let reps_left_tree = {
                     let mut branches: Vec<Format> = Vec::new();
                     // FIXME: this is inefficient but probably works
                     for count in 0..=max {
@@ -483,36 +569,49 @@ impl<'a> GTCompiler<'a> {
                         branches.push(f_count.into());
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        panic!("cannot build match tree for {:?}", format)
+                        return Err(anyhow!(
+                            "cannot build match tree for {}",
+                            serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
+                        ));
                     };
                     tree
                 };
                 Ok(TypedDecoder::RepeatBetween(
                     gt.clone(),
-                    tree,
+                    reps_left_tree,
                     min_expr.clone(),
                     max_expr.clone(),
                     Box::new(da),
                 ))
             }
             TypedFormat::RepeatUntilLast(gt, expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilLast(gt.clone(), expr.clone(), da))
             }
             TypedFormat::RepeatUntilSeq(gt, expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilSeq(gt.clone(), expr.clone(), da))
             }
             TypedFormat::AccumUntil(gt, cond, update, init, _vt, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::AccumUntil(
                     gt.clone(),
                     cond.clone(),
                     update.clone(),
                     init.clone(),
+                    da,
+                ))
+            }
+            TypedFormat::ForEach(gt, expr, lbl, f) => {
+                let next = Self::__repeat_next(f, next);
+                let da = Box::new(self.compile_gt_format(f, None, next)?);
+                Ok(TypedDecoder::ForEach(
+                    gt.clone(),
+                    expr.clone(),
+                    lbl.clone(),
                     da,
                 ))
             }
@@ -561,12 +660,26 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Map(gt.clone(), da, expr.clone()))
             }
-            TypedFormat::Where(gt, a, expr) => {
+            TypedFormat::Where(gt, a, cond) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
-                Ok(TypedDecoder::Where(gt.clone(), da, expr.clone()))
+                Ok(TypedDecoder::Where(gt.clone(), da, cond.clone()))
             }
             TypedFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
-            TypedFormat::Pos => Ok(TypedDecoder::Pos),
+            TypedFormat::Pos(gt) => {
+                let nt = match gt.try_to_num_type() {
+                    Some(num_t) => match num_t {
+                        NumType::U(_) => num_t,
+                        NumType::I(m_sint) => {
+                            log::debug!("signed-integer type inferred for Format::Pos: {m_sint}");
+                            num_t
+                        }
+                    },
+                    None => {
+                        unreachable!("non-numeric type ascription for Format::Pos: {gt:?}")
+                    }
+                };
+                Ok(TypedDecoder::Pos(nt))
+            }
             TypedFormat::Let(gt, name, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Let(
@@ -575,6 +688,10 @@ impl<'a> GTCompiler<'a> {
                     expr.clone(),
                     da,
                 ))
+            }
+            TypedFormat::LetView(gt, name, a) => {
+                let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
+                Ok(TypedDecoder::LetView(gt.clone(), name.clone(), da))
             }
             TypedFormat::Match(gt, head, branches) => {
                 let branches = branches
@@ -624,7 +741,91 @@ impl<'a> GTCompiler<'a> {
                 };
                 Ok(TypedDecoder::LiftedOption(gt.clone(), inner_dec))
             }
+            TypedFormat::WithView(gt, view, vf) => match vf {
+                TypedViewFormat::CaptureBytes(len) => Ok(TypedDecoder::CaptureBytes(
+                    gt.clone(),
+                    view.clone(),
+                    len.clone(),
+                )),
+                TypedViewFormat::ReadArray(len, kind) => Ok(TypedDecoder::ReadArray(
+                    gt.clone(),
+                    view.clone(),
+                    len.clone(),
+                    kind.clone(),
+                )),
+                TypedViewFormat::ReifyView => Ok(TypedDecoder::ReifyView(gt.clone(), view.clone())),
+            },
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(gt, inner) => {
+                let da = Box::new(self.compile_gt_format(inner, None, next)?);
+                Ok(TypedDecoder::Enforce(gt.clone(), da))
+            }
+            TypedFormat::Permit(gt, inner, expr) => {
+                let da = Box::new(self.compile_gt_format(inner, None, next)?);
+                Ok(TypedDecoder::Permit(gt.clone(), da, expr.clone()))
+            }
         }?;
         Ok(TypedDecoderExt::new(dec, args))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::Write};
+
+    use super::*;
+    use crate::helper::*;
+    use crate::{
+        Expr,
+        codegen::{ToFragment, generate_code},
+    };
+
+    #[test]
+    fn runtime_repeat_behavior_test() {
+        let mut module = FormatModule::new();
+        let inner = module.define_format(
+            "test.inner",
+            record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]),
+        );
+        let outer = module.define_format(
+            "test.outer",
+            record([
+                ("pairs", repeat_count(Expr::U32(2), inner.call())),
+                ("end", is_byte(0xCC)),
+            ]),
+        );
+        let top = outer.call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/runtime_repeat/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
+    }
+
+    #[test]
+    #[ignore = "running this test clobbers the manually-edited test file for permit_state_error"]
+    /// Test to pre-generate a Permit-parse of a slice we will peek within and manually remove the 'close_peek' within to cause a state-error we want to see
+    /// how permit handles.
+    fn permit_slice_no_close_peek_base_codegen() {
+        let mut module = FormatModule::new();
+        let in_permit = module.define_format(
+            "test.in_permit",
+            monad_seq(
+                slice(Expr::U8(6), Format::Peek(Box::new(byte_seq(b"abcd")))),
+                compute(Expr::Bool(true)),
+            ),
+        );
+        let fallback = module.define_format("test.fallback", compute(Expr::UNIT));
+        let outer = module.define_format(
+            "test.main",
+            alts_nondet([
+                ("InPermit", permit(in_permit.call(), Expr::Bool(false))),
+                ("Fallback", fallback.call()),
+            ]),
+        );
+        let top = outer.call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/permit_state_error/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
     }
 }

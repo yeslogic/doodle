@@ -10,7 +10,19 @@ use crate::{
     matchtree::{MatchTree, Next},
 };
 use anyhow::{Result as AResult, anyhow};
-use doodle::{IntWidth, byte_set::ByteSet, read::ReadCtxt};
+use doodle::{byte_set::ByteSet, read::ReadCtxt};
+
+/// Local stand-in for `doodle::IntWidth`, which no longer exists upstream (replaced by the
+/// `src/numeric/` engine as part of refreshing this branch's copy of `doodle` from `main`).
+/// `doodle-rec`'s own `Expr`/`FormatType` numeric model is still a fixed 4-width scheme, so this
+/// is only needed locally to tag operand widths for the precision-match check in `Expr::eval`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IntWidth {
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
+}
 
 mod ll1;
 pub use ll1::LL1Interpreter;

@@ -1,15 +1,13 @@
-use crate::format::BaseModule;
-use doodle::helper::*;
-use doodle::{Expr, FormatModule, FormatRef};
+use doodle::{Expr, FormatModule, FormatRef, helper::*};
 
 /// Graphics Interchange Format (GIF)
 ///
 /// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
 #[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags->table-flag) != 0
-        is_nonzero_u8(record_proj(flags, "table-flag"))
+        record_proj(flags, "table-flag")
     }
 
     fn color_table_len(flags: Expr) -> Expr {
@@ -19,7 +17,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let color_table_entry = module.define_format(
         "gif.color-table-entry",
-        record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]),
+        record_repeat(["r", "g", "b"], u8()),
     );
 
     let color_table = |flags: Expr| {
@@ -34,7 +32,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.subblock",
         record([
             ("len-bytes", not_byte(0x00)),
-            ("data", repeat_count(var("len-bytes"), base.u8())),
+            ("data", repeat_count(var("len-bytes"), u8())),
         ]),
     );
 
@@ -46,7 +44,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.header",
         record([
             ("signature", is_bytes(b"GIF")),
-            ("version", repeat_count(Expr::U8(3), base.ascii_char())), // "87a" | "89a" | ...
+            ("version", seq_repeat(3, ascii_char())),
         ]),
     );
 
@@ -58,21 +56,34 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // NOTE: Global and local Color Tables have to have the same field-names for
     // common fields in order to ensure that the helpers that extract those values
     // are applicable to both cases without any extra work.
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let logical_screen_descriptor_flags = packed_bits_u8(
-        [1, 3, 1, 3],
-        ["table-flag", "color-resolution", "sort-flag", "table-size"],
-    );
+    let logical_screen_descriptor_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gif.logical-screen-descriptor.flags",
+            bit_fields_u8([
+                FlagBit("table-flag"), // Global Color Table (a Global Color Table will follow iff this flag is set)
+                BitsField {
+                    field_name: "color-resolution",
+                    bit_width: 3,
+                }, // Number of bits per primary color available to original image, minus 1
+                FlagBit("sort-flag"), // Indicates whether global color table is sorted (1=true) or unsorted (0=false)
+                BitsField {
+                    field_name: "table-size",
+                    bit_width: 3,
+                }, // Used to determine the number of bytes in the global color table via `2^(n+1)`, which should be specified whether or not GCT flag is set
+            ]),
+        )
+    };
 
     // 18. Logical Screen Descriptor
     let logical_screen_descriptor = module.define_format(
         "gif.logical-screen-descriptor",
         record([
-            ("screen-width", base.u16le()),
-            ("screen-height", base.u16le()),
-            ("flags", logical_screen_descriptor_flags),
-            ("bg-color-index", base.u8()),
-            ("pixel-aspect-ratio", base.u8()),
+            ("screen-width", u16le()),
+            ("screen-height", u16le()),
+            ("flags", logical_screen_descriptor_flags.call()),
+            ("bg-color-index", u8()),
+            ("pixel-aspect-ratio", u8()),
         ]),
     );
 
@@ -88,28 +99,36 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // NOTE: Global and local Color Tables have to have the same field-names for
     // common fields in order to ensure that the helpers that extract those values
     // are applicable to both cases without any extra work.
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let image_descriptor_flags = packed_bits_u8(
-        [1, 1, 1, 2, 3],
-        [
-            "table-flag",
-            "interlace-flag",
-            "sort-flag",
-            "reserved",
-            "table-size",
-        ],
-    );
+    let image_descriptor_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gif.image-descriptor.flags",
+            bit_fields_u8([
+                FlagBit("table-flag"),
+                FlagBit("interlace-flag"),
+                FlagBit("sort-flag"),
+                Reserved {
+                    bit_width: 2,
+                    check_zero: false,
+                },
+                BitsField {
+                    field_name: "table-size",
+                    bit_width: 3,
+                },
+            ]),
+        )
+    };
 
     // 20. Image Descriptor
     let image_descriptor = module.define_format(
         "gif.image-descriptor",
         record([
             ("separator", is_byte(0x2C)),
-            ("image-left-position", base.u16le()),
-            ("image-top-position", base.u16le()),
-            ("image-width", base.u16le()),
-            ("image-height", base.u16le()),
-            ("flags", image_descriptor_flags),
+            ("image-left-position", u16le()),
+            ("image-top-position", u16le()),
+            ("image-width", u16le()),
+            ("image-height", u16le()),
+            ("flags", image_descriptor_flags.call()),
         ]),
     );
 
@@ -120,7 +139,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let table_based_image_data = module.define_format(
         "gif.table-based-image-data",
         record([
-            ("lzw-min-code-size", base.u8()),
+            ("lzw-min-code-size", u8()),
             ("image-data", repeat(subblock.call())),
             ("terminator", block_terminator.call()),
         ]),
@@ -131,16 +150,24 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                        Disposal Method               3 Bits
     //                        User Input Flag               1 Bit
     //                        Transparent Color Flag        1 Bit
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let graphic_control_extension_flags = packed_bits_u8(
-        [3, 3, 1, 1],
-        [
-            "reserved",
-            "disposal-method",
-            "user-input-flag",
-            "transparent-color-flag",
-        ],
-    );
+    let graphic_control_extension_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gif.graphic-control-extension.flags",
+            bit_fields_u8([
+                Reserved {
+                    bit_width: 3,
+                    check_zero: false,
+                },
+                BitsField {
+                    field_name: "disposal-method",
+                    bit_width: 3,
+                },
+                FlagBit("user-input-flag"),
+                FlagBit("transparent-color-flag"),
+            ]),
+        )
+    };
 
     // 23. Graphic Control Extension
     let graphic_control_extension = module.define_format(
@@ -149,9 +176,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0xF9)),
             ("block-size", is_byte(4)),
-            ("flags", graphic_control_extension_flags),
-            ("delay-time", base.u16le()),
-            ("transparent-color-index", base.u8()),
+            ("flags", graphic_control_extension_flags.call()),
+            ("delay-time", u16le()),
+            ("transparent-color-index", u8()),
             ("terminator", block_terminator.call()),
         ]),
     );
@@ -174,14 +201,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0x01)),
             ("block-size", is_byte(12)),
-            ("text-grid-left-position", base.u16le()),
-            ("text-grid-top-position", base.u16le()),
-            ("text-grid-width", base.u16le()),
-            ("text-grid-height", base.u16le()),
-            ("character-cell-width", base.u8()),
-            ("character-cell-height", base.u8()),
-            ("text-foreground-color-index", base.u8()),
-            ("text-background-color-index", base.u8()),
+            ("text-grid-left-position", u16le()),
+            ("text-grid-top-position", u16le()),
+            ("text-grid-width", u16le()),
+            ("text-grid-height", u16le()),
+            ("character-cell-width", u8()),
+            ("character-cell-height", u8()),
+            ("text-foreground-color-index", u8()),
+            ("text-background-color-index", u8()),
             ("plain-text-data", repeat(subblock.call())),
             ("terminator", block_terminator.call()),
         ]),
@@ -194,8 +221,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0xFF)),
             ("block-size", is_byte(11)),
-            ("identifier", repeat_count(Expr::U8(8), base.u8())),
-            ("authentication-code", repeat_count(Expr::U8(3), base.u8())),
+            ("identifier", repeat_count(Expr::U8(8), u8())),
+            ("authentication-code", seq_repeat(3, u8())),
             ("application-data", repeat(subblock.call())),
             ("terminator", block_terminator.call()),
         ]),

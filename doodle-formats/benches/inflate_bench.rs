@@ -1,8 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use doodle::{
+    FormatModule,
     decoder::{Compiler, Program, Value},
     read::ReadCtxt,
-    FormatModule,
 };
 use doodle_formats::format;
 

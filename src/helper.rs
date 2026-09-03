@@ -1,23 +1,35 @@
 use std::collections::BTreeSet;
 
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{ToPrimitive, Unsigned, Zero};
 
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
+pub use crate::marker::BaseKind;
+use crate::validation::{Condition, Severity};
 use crate::{
-    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, StyleHint, TypeHint, UnaryOp,
-    ValueType,
+    Arith, BaseType, Expr, FixedReadKind, Format, IntRel, IntoLabel, Label, OwnedRecordFormat,
+    Pattern, RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
 };
+
+use crate::numeric::core::Expr as NumExpr;
+use crate::numeric::helper as num;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BitFieldKind {
+    /// Bool-typed 1-bit flag value (`0b1 => true, 0b0 => false`)
     FlagBit(&'static str),
+    /// Numeric field value with same type as the original parse (`u8` for `bit_fields_u8`, `u16` for `bit_fields_u16`, ...)
     BitsField {
+        /// Field-name in the output record
         field_name: &'static str,
+        /// Width of the mask, in bits
         bit_width: u8,
     },
+    /// Reserved segments for padding or deliberate skipping
     Reserved {
+        /// Width of the reserved segment, in bits
         bit_width: u8,
+        /// If `true`, check that every bit in the reserved segment is zeroed
         check_zero: bool,
     },
 }
@@ -51,107 +63,10 @@ impl BitFieldKind {
     }
 }
 
-/// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
-/// are `u8`-valued sub-masks of the original byte.
-///
-/// Currently supports only static-string names for the sub-fields.
-///
-/// The order in which the fields are listed, both in the `field_bit_lengths` and `field_names` parameters,
-/// is to be understood as a MSB-to-LSB order partition.
-///
-/// Zero-bit field-lengths are not explicitly supported, but 'just work' as implemented.
-///
-/// # Notes
-///
-/// Requires that the total length of all fields is 8 bits, and panics otherwise.
-///
-/// Due to implementation details, will break if there is a single 8-bit field.
-// TODO - phase out
-pub fn packed_bits_u8<const N: usize>(
-    field_bit_lengths: [u8; N],
-    field_names: [&'static str; N],
-) -> Format {
-    const BINDING_NAME: &str = "packed_bits";
-    #[cfg(debug_assertions)]
-    {
-        let _len: u8 = field_bit_lengths.iter().sum();
-        debug_assert_eq!(
-            _len, 8,
-            "bad packed-bits field-lengths: total length {_len} of {field_bit_lengths:?} != 8"
-        );
-    }
-    let mut fields = Vec::new();
-    let mut high_bits_used = 0;
-    for (nbits, name) in Iterator::zip(field_bit_lengths.into_iter(), field_names.into_iter()) {
-        fields.push((
-            Label::Borrowed(name),
-            mask_bits_u8(var(BINDING_NAME), high_bits_used, nbits),
-        ));
-        high_bits_used += nbits;
-    }
-    map(ANY_BYTE, lambda(BINDING_NAME, Expr::Record(fields)))
-}
-
-/// Ergonomic helper for parsing a 8-bit packed value into a multi-field record with more
-/// context-awareness for determining the interpretation (and semantics) of the various
-/// segments of contiguous bits.
-///
-/// Can be used to to simulate [`packed_bits_u8`], as well as handle flag-bits and explicitly mark reserved (non-recorded)
-/// bits with optional zero-checking.
-pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
-    const BINDING_NAME: &str = "packed_bits";
-    #[cfg(debug_assertions)]
-    {
-        let _len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
-        debug_assert_eq!(
-            _len, 8,
-            "bad packed-bits field-lengths: total width {_len} of {bit_fields:?} != 8"
-        );
-    }
-    let mut fields = Vec::new();
-
-    // mask value that should yield `0` when `&`-ed with the original u16
-    // NOTE - currently, we set this value but don't directly use it
-    let mut _zero_mask: u8 = 0;
-
-    let mut high_bits_used = 0;
-    for bit_field in bit_fields.into_iter() {
-        let nbits = bit_field.bit_width();
-        if let Some(name) = bit_field.field_name() {
-            let raw = mask_bits_u8(var(BINDING_NAME), high_bits_used, nbits);
-            let field_value = if bit_field.is_flag() {
-                is_nonzero_u8(raw)
-            } else {
-                raw
-            };
-            fields.push((Label::Borrowed(name), field_value));
-        } else {
-            if bit_field.check_zero() {
-                _zero_mask &= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
-            }
-        }
-        high_bits_used += nbits;
-    }
-
-    let packed = if _zero_mask != 0 {
-        const PREPACKED: &str = "packed";
-        // NOTE - only bother using where-lambda if zero_mask is non-vacuous
-        where_lambda(
-            ANY_BYTE,
-            PREPACKED,
-            expr_eq(bit_and(var(PREPACKED), Expr::U8(_zero_mask)), Expr::U8(0)),
-        )
-    } else {
-        ANY_BYTE
-    };
-
-    map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
-}
-
 /// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr.
 ///
 /// Will panic if `nbits + high_bits_used > 8`.
-pub fn mask_bits_u8(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+fn mask_bits_u8(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     assert!(
         nbits + high_bits_used <= 8,
         "mask_bits_u8 cannot create mask {nbits} bits out of available {}",
@@ -167,6 +82,9 @@ pub fn mask_bits_u8(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     bit_and(shifted, Expr::U8(mask))
 }
 
+/// Selects `nbits` bits starting from the highest unused bit in an 16-bit packed-field value, returning a U16-typed Expr.
+///
+/// Will panic if `nbits + high_bits_used > 16`.
 fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     assert!(
         nbits + high_bits_used <= 16,
@@ -183,24 +101,134 @@ fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     bit_and(shifted, Expr::U16(mask))
 }
 
-/// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more
-/// context-awareness for determining the interpretation (and semantics) of the various
-/// segments of contiguous bits.
-pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
-    const BINDING_NAME: &str = "packed_bits";
+/// Selects `nbits` bits starting from the highest unused bit in an 32-bit packed-field value, returning a U32-typed Expr.
+///
+/// Will panic if `nbits + high_bits_used > 32`.
+fn mask_bits_u32(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+    assert!(
+        nbits + high_bits_used <= 32,
+        "mask_bits_u32 cannot create mask {nbits} bits out of available {}",
+        32 - high_bits_used
+    );
+    let shift = 32 - (high_bits_used + nbits) as u32;
+    let mask = (1u32 << nbits) - 1;
+    let shifted = if shift == 0 {
+        x
+    } else {
+        shr(x, Expr::U32(shift))
+    };
+    bit_and(shifted, Expr::U32(mask))
+}
+
+/// Ergonomic helper for parsing an 8-bit 'packed' value into a multi-field record, which allows
+/// per-field specification of how to interpret (and what type to ascribe) each
+/// sub-byte sequence.
+///
+/// The fields in question are implicitly non-overlapping, contiguous, and adjacent, and are read from
+/// MSB-to-LSB in the order they are listed in the `bit_fields` array. Each field, in turn, is treated
+/// as an MSB-to-LSB masked bit-sequence, with the width, type, and record-semantics of each field described
+/// using the [`BitFieldKind`] enum.
+///
+/// # Panics
+///
+/// Requires that the total length of all fields is 8 bits, and panics otherwise.
+pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
+    const BINDING_NAME: &str = "_packed_bits";
     #[cfg(debug_assertions)]
     {
         let _len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
         debug_assert_eq!(
-            _len, 16,
-            "bad packed-bits field-lengths: total width {_len} of {bit_fields:?} != 16"
+            _len, 8,
+            "bad packed-bits field-lengths: total width {_len} of {bit_fields:?} != 8"
+        );
+    }
+    let mut fields = Vec::new();
+
+    // mask value that should yield `0` when `&`-ed with the original u8, used to enforce must-be-zero reserved fields
+    // NOTE - currently, we set this value but don't directly use it
+    let mut unset_bits_mask: u8 = 0;
+
+    let mut high_bits_used = 0;
+    for bit_field in bit_fields.into_iter() {
+        let nbits = bit_field.bit_width();
+        if let Some(name) = bit_field.field_name() {
+            let raw = mask_bits_u8(var(BINDING_NAME), high_bits_used, nbits);
+            let field_value = if bit_field.is_flag() {
+                is_nonzero_u8(raw) // bool: 1 = true, 0 - false
+            } else {
+                raw // u8
+            };
+            fields.push((Label::Borrowed(name), compute(field_value)));
+        } else if bit_field.check_zero() {
+            unset_bits_mask |= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
+        }
+        high_bits_used += nbits;
+    }
+
+    // NOTE - only bother using where-lambda if zero_mask is non-vacuous
+    let packed = if unset_bits_mask != 0 {
+        const PREPACKED: &str = "packed";
+        expect_lambda(
+            ANY_BYTE,
+            PREPACKED,
+            expr_eq(
+                bit_and(var(PREPACKED), Expr::U8(unset_bits_mask)),
+                Expr::U8(0),
+            ),
+        )
+    } else {
+        ANY_BYTE
+    };
+
+    record_auto(Iterator::chain(
+        std::iter::once((Label::Borrowed(BINDING_NAME), packed)),
+        fields.into_iter(),
+    ))
+}
+
+/// Special case of [`bit_fields_u8`] for parsing a pair of 4-bit fields.
+///
+/// `hi` is the field storing the high 4 bits, and `lo` the low 4 bits.
+pub fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
+    use BitFieldKind::*;
+    bit_fields_u8([
+        BitsField {
+            field_name: hi,
+            bit_width: 4,
+        },
+        BitsField {
+            field_name: lo,
+            bit_width: 4,
+        },
+    ])
+}
+
+/// Ergonomic helper for parsing a 16-bit 'packed' value into a multi-field record, which allows
+/// per-field specification of how to interpret (and what type to ascribe) each
+/// sub-segment of bits.
+///
+/// The fields in question are implicitly non-overlapping, contiguous, and adjacent, and are read from
+/// MSB-to-LSB in the order they are listed in the `bit_fields` array. Each field, in turn, is treated
+/// as an MSB-to-LSB masked bit-sequence, with the width, type, and record-semantics of each field described
+/// using the [`BitFieldKind`] enum.
+///
+/// # Panics
+///
+/// Requires that the total length of all fields is 16 bits, and panics otherwise.
+pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
+    const BINDING_NAME: &str = "_packed_bits";
+    #[cfg(debug_assertions)]
+    {
+        let len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
+        debug_assert_eq!(
+            len, 16,
+            "bad packed-bits field-lengths: total width {len} of {bit_fields:?} != 16"
         );
     }
     let mut fields = Vec::new();
 
     // mask value that should yield `0` when `&`-ed with the original u16
-    // NOTE - currently, we set this value but don't directly use it
-    let mut _zero_mask: u16 = 0;
+    let mut unset_bits_mask: u16 = 0;
 
     let mut high_bits_used = 0;
     for bit_field in bit_fields.into_iter() {
@@ -212,33 +240,97 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
             } else {
                 raw
             };
-            fields.push((Label::Borrowed(name), field_value));
-        } else {
-            if bit_field.check_zero() {
-                _zero_mask &= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
-            }
+            fields.push((Label::Borrowed(name), compute(field_value)));
+        } else if bit_field.check_zero() {
+            unset_bits_mask |= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
         }
         high_bits_used += nbits;
     }
 
-    let u16be = map(
-        tuple_repeat(2, Format::Byte(ByteSet::full())),
-        lambda("x", Expr::U16Be(Box::new(var("x")))),
-    );
-
-    let packed = if _zero_mask != 0 {
+    let packed = if unset_bits_mask != 0 {
         const PREPACKED: &str = "packed";
         // NOTE - only bother using where-lambda if zero_mask is non-vacuous
-        where_lambda(
-            u16be,
+        expect_lambda(
+            base::u16be(),
             PREPACKED,
-            expr_eq(bit_and(var(PREPACKED), Expr::U16(_zero_mask)), Expr::U16(0)),
+            expr_eq(
+                bit_and(var(PREPACKED), Expr::U16(unset_bits_mask)),
+                Expr::U16(0),
+            ),
         )
     } else {
-        u16be
+        base::u16be()
     };
 
-    map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
+    record_auto(Iterator::chain(
+        std::iter::once((Label::Borrowed(BINDING_NAME), packed)),
+        fields.into_iter(),
+    ))
+}
+
+/// Ergonomic helper for parsing a 32-bit 'packed' value into a multi-field record, which allows
+/// per-field specification of how to interpret (and what type to ascribe) each
+/// sub-segment of bits.
+///
+/// The fields in question are implicitly non-overlapping, contiguous, and adjacent, and are read from
+/// MSB-to-LSB in the order they are listed in the `bit_fields` array. Each field, in turn, is treated
+/// as an MSB-to-LSB masked bit-sequence, with the width, type, and record-semantics of each field described
+/// using the [`BitFieldKind`] enum.
+///
+/// # Panics
+///
+/// Requires that the total length of all fields is 32 bits, and panics otherwise.
+pub fn bit_fields_u32<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
+    const BINDING_NAME: &str = "_packed_bits";
+    #[cfg(debug_assertions)]
+    {
+        let len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
+        debug_assert_eq!(
+            len, 32,
+            "bad packed-bits field-lengths: total width {len} of {bit_fields:?} != 32"
+        );
+    }
+    let mut fields = Vec::new();
+
+    // mask value that should yield `0` when `&`-ed with the original u32
+    let mut unset_bits_mask: u32 = 0;
+
+    let mut high_bits_used = 0;
+    for bit_field in bit_fields.into_iter() {
+        let nbits = bit_field.bit_width();
+        if let Some(name) = bit_field.field_name() {
+            let raw = mask_bits_u32(var(BINDING_NAME), high_bits_used, nbits);
+            let field_value = if bit_field.is_flag() {
+                is_nonzero_u32(raw)
+            } else {
+                raw
+            };
+            fields.push((Label::Borrowed(name), compute(field_value)));
+        } else if bit_field.check_zero() {
+            unset_bits_mask |= ((1u32 << nbits) - 1) << (32 - (high_bits_used + nbits));
+        }
+        high_bits_used += nbits;
+    }
+
+    let packed = if unset_bits_mask != 0 {
+        const PREPACKED: &str = "packed";
+        // NOTE - only bother using where-lambda if zero_mask is non-vacuous
+        expect_lambda(
+            base::u32be(),
+            PREPACKED,
+            expr_eq(
+                bit_and(var(PREPACKED), Expr::U32(unset_bits_mask)),
+                Expr::U32(0),
+            ),
+        )
+    } else {
+        base::u32be()
+    };
+
+    record_auto(Iterator::chain(
+        std::iter::once((Label::Borrowed(BINDING_NAME), packed)),
+        fields.into_iter(),
+    ))
 }
 
 /// Returns an [`Expr`] that refers to a (hopefully) in-scope variable by name.
@@ -282,15 +374,11 @@ pub fn seq(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Sequence(formats.into_iter().collect())
 }
 
-/// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
+/// Sequence composed of the same format processed a constant number of times
 ///
-/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
-pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
-    Format::Union(
-        (branches.into_iter())
-            .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
-            .collect(),
-    )
+/// Suitable as an alternative to `repeat_count` for small, constant counts.
+pub fn seq_repeat(count: usize, format: Format) -> Format {
+    Format::Sequence(std::iter::repeat_n(format, count).collect())
 }
 
 /// Helper-function for [`Format::Match`] that accepts any iterable container `branches` of `(Pattern, Format)` pairs.
@@ -340,10 +428,31 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::Union(Vec::from_iter(branches))
 }
 
-/// Helper-function for constructing a [`Format::Union`] over branches that cannot be deterministically distinguished within a fixed finite lookahead.
+/// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
 ///
-/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`], where the `Name` element becomes
-/// an identifying Variant-name for the resulting branch of the union.
+/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
+pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
+    Format::Union(
+        (branches.into_iter())
+            .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
+            .collect(),
+    )
+}
+
+/// Helper-function for [`Format::UnionNondet`].
+///
+/// Accepts any iterable container of `Format`s.
+///
+/// If the branches in question are all `Format::Variant`, use [`alts_nondet`] instead.
+///
+/// If the given branches can be deterministically distinguished within a fixed finite lookahead, use [`union`] instead.
+pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = Format>) -> Format {
+    Format::UnionNondet(Vec::from_iter(branches))
+}
+
+/// Helper-function for constructing a [`Format::UnionNondet`] over branches that are all [`Format::Variant`].
+///
+/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
 ///
 /// # Notes
 ///
@@ -351,12 +460,53 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
 ///
 /// If there is a potential overlap in the inputs that would be accepted as two distinct branches, the preferred (ideally, more specific) branch
 /// should always appear earlier in the iteration order.
-pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
+pub fn alts_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::UnionNondet(
         (branches.into_iter())
             .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
             .collect(),
     )
+}
+
+/// Helper that takes an iterable container of Record-kinded formats and 'fuses' them, combining their field-parses
+/// in natural order into a flat record.
+///
+/// # Notes
+///
+/// When providing inputs to this helper, it is the caller's responsibility to ensure that fields in early record-formats are not unintentionally
+/// shadowed by later record-formats, and that cross-record references are valid.
+pub fn merge_records(records: impl IntoIterator<Item = Format>) -> Format {
+    let mut combined = OwnedRecordFormat::default();
+    for record in records {
+        let mut builder = RecordBuilder::init();
+        builder.accum(&record).unwrap();
+        let mut record_f: OwnedRecordFormat = builder.finish().into();
+        combined.append(&mut record_f);
+    }
+    combined.into_format()
+}
+
+/// Takes a record-format, a field-name within it, and a function that transforms a field-format, and produces
+/// a new record-format with the same structure but with the associated field remapped. If there are no fields
+/// with the specified name, the original record-format is returned.
+pub fn remap_field(name: &str, remap: impl FnOnce(Format) -> Format, format: Format) -> Format {
+    // REVIEW - is there a way to perform this operation with mutable references instead of ownership (and would that be a good idea anyway?)
+    match format {
+        Format::LetFormat(f, ident, inner) => {
+            if ident == name {
+                Format::LetFormat(Box::new(remap(*f)), ident, inner)
+            } else {
+                Format::LetFormat(f, ident, Box::new(remap_field(name, remap, *inner)))
+            }
+        }
+        Format::MonadSeq(f0, f1) => Format::MonadSeq(f0, Box::new(remap_field(name, remap, *f1))),
+        Format::Hint(StyleHint::Record { old_style }, f) => Format::Hint(
+            StyleHint::Record { old_style },
+            Box::new(remap_field(name, remap, *f)),
+        ),
+        // REVIEW - do we miss any cases with this catch-all?
+        f => f,
+    }
 }
 
 /// Helper-function for [`Format::record`] taking any iterable container of
@@ -379,6 +529,9 @@ pub fn record<Name: IntoLabel>(
 /// capture labels starting with `_` without forcing in-record persistence (e.g. count-fields for
 /// repeat arrays), and capture all other labels with in-record persistence.
 ///
+/// Any label that starts with `#` will be preserved as the verbatim identifier after discarding `#`; this
+/// is useful if we actually want to keep fields that start with `_` or `__` as-is.
+///
 /// # Examples
 ///
 /// ```
@@ -388,20 +541,45 @@ pub fn record<Name: IntoLabel>(
 ///     ("_foo", Format::ANY_BYTE), // will be captured, but not persisted
 ///     ("bar", repeat_count(var("_foo"), Format::ANY_BYTE)), // will be captured and persisted
 ///     ("__baz", Format::ANY_BYTE), // will be discarded without ever being captured
-/// ]); // yields `struct _ { bar: Vec<u8> }`
+///     ("#_qux", Format::ANY_BYTE), // will be preserved as `_qux`
+/// ]); // yields `struct _ { bar: Vec<u8>, _qux: u8 }`
 /// ```
 pub fn record_auto<Name: IntoLabel + AsRef<str>>(
     fields: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
 ) -> Format {
     let fields_persist = fields.into_iter().map(|(label, format)| {
-        if label.as_ref().starts_with("__") {
+        if label.as_ref().starts_with("#") {
+            let tmp = label.as_ref().trim_start_matches("#").to_string();
+            (Some((Label::Owned(tmp), true)), format)
+        } else if label.as_ref().starts_with("__") {
             (None, format)
         } else {
             let is_tmp = label.as_ref().starts_with("_");
-            (Some((label, !is_tmp)), format)
+            (Some((label.into(), !is_tmp)), format)
         }
     });
     record_ext(fields_persist)
+}
+
+/// Like `record_auto`, but instead of constructing a record, we are processing a list of preliminary formats for parameters (or side-effects) in order to
+/// parse the final `format`.
+///
+/// In cases where the only persisted field of `record_auto` would be the last, but we don't actually want a record, we can use `pseudo_record` instead.
+pub fn pseudo_record<Name: IntoLabel + AsRef<str>>(
+    prelim: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
+    format: Format,
+) -> Format {
+    let prelim = prelim.into_iter().map(|(label, format)| {
+        if label.as_ref().starts_with("#") {
+            let tmp = label.as_ref().trim_start_matches("#").to_string();
+            (Some(Label::Owned(tmp)), format)
+        } else if label.as_ref().starts_with("__") {
+            (None, format)
+        } else {
+            (Some(label.into()), format)
+        }
+    });
+    Format::chaining(prelim, format)
 }
 
 /// Bespoke record-constructor for new-style `Format`-level records.
@@ -520,16 +698,21 @@ pub fn if_then_else(cond: Expr, format_true: Format, format_false: Format) -> Fo
 
 /// Helper function for branching between two formats based on a boolean predicate, even when the two formats have different value-types.
 ///
-/// If `cond` evaluates to `true`, will decode into the variant-format `yes(format_yes)`, and otherwise `no(format_no)`.
+/// Takes two pairs consisting of a variant name and its inner format, the first applying to the case where the condition is `true` and the
+/// second applying to the case where the condition is `false`.
 ///
 /// # Notes
 ///
 /// If `format_no` happens to be `Format::EMPTY`, consider using [`cond_maybe`] instead.
-pub fn if_then_else_variant(cond: Expr, format_yes: Format, format_no: Format) -> Format {
+pub fn if_then_else_variant<Name: IntoLabel>(
+    cond: Expr,
+    (variant_yes, format_yes): (Name, Format),
+    (variant_no, format_no): (Name, Format),
+) -> Format {
     if_then_else(
         cond,
-        Format::Variant("yes".into(), Box::new(format_yes)),
-        Format::Variant("no".into(), Box::new(format_no)),
+        Format::Variant(variant_yes.into(), Box::new(format_yes)),
+        Format::Variant(variant_no.into(), Box::new(format_no)),
     )
 }
 
@@ -711,10 +894,32 @@ pub fn shr(value: Expr, places: Expr) -> Expr {
     Expr::Arith(Arith::Shr, Box::new(value), Box::new(places))
 }
 
+/// Computes the length of a Sequence-kinded expression.
+///
+/// # Notes
+///
+/// The default ValueType ascribed to `SeqLength` is currently pinned to `U32`.
+///
+/// - [`crate::Expr::infer_type`] currently assumes `U32` due to limitations in the type inference algorithm
+/// - [`crate::typecheck::TypeChecker::infer_var_expr`] currently assumes `U32`, and a historic effort
+///   to generalize it to the priority-set `[U32 > U8, U16, U64]` was reverted based on polymorphic
+///   unification with `Format::Pos` yielding no clear winner.
 pub fn seq_length(seq: Expr) -> Expr {
     Expr::SeqLength(Box::new(seq))
 }
 
+/// Given an iterable container `elems` of seed-values, and a function that constructs an `Expr` from such seeds,
+/// produces a static `Expr::Seq` containing the resulting expressions in the natural iteration order.
+pub fn expr_lift_seq<T>(elems: impl IntoIterator<Item = T>, f: impl Fn(T) -> Expr) -> Expr {
+    Expr::Seq(elems.into_iter().map(f).collect())
+}
+
+/// Helper-function for [`Expr::SubSeq`].
+///
+/// Produces an `Expr` that evaluates to the `length`-element sub-sequence
+/// of `seq` starting at the (0-based) index `start`.
+///
+/// It is the caller's responsibility to ensure that the sub-sequence is well-defined and in-bounds.
 pub fn sub_seq(seq: Expr, start: Expr, length: Expr) -> Expr {
     Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length))
 }
@@ -781,7 +986,15 @@ pub fn dup(count: Expr, expr: Expr) -> Expr {
 
 /// Composed `Format::Where` and `Expr::Lambda` taking a raw format, an arbitrary name for the lambda expression head, and the lambda body as an Expr.
 pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
-    Format::Where(Box::new(raw), Box::new(lambda(name, body)))
+    Format::Where(Box::new(raw), Condition::from_lambda(lambda(name, body)))
+}
+
+/// Similar to [`where_lambda`], but with `Expect`-level severity instead of `Assert`.
+pub fn expect_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
+    Format::Where(
+        Box::new(raw),
+        Condition::new(lambda(name, body), Severity::Expect),
+    )
 }
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`
@@ -793,7 +1006,7 @@ pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
 /// Does not check that `lower <= upper` as that cannot be statically determined.
 pub fn where_between<N>(format: Format, lower: N, upper: N, inject: impl Fn(N) -> Expr) -> Format
 where
-    N: ToPrimitive + Zero,
+    N: ToPrimitive + Zero + Unsigned,
 {
     let cond = if lower.is_zero() {
         expr_lte(var("x"), inject(upper))
@@ -816,25 +1029,75 @@ where
     where_lambda(format, "x", cond)
 }
 
+/// Numeric validation helper that applies a non-fatal constraint a given format
+/// to yield a value that falls in the inclusive range `lower..=upper`
+///
+/// Attempts to optimize the case of `lower == 0` to avoid vacuous lower bounds on unsigned types.
+///
+/// Syntactically equivalent to [`where_between`] but with `Expect`-level severity instead of `Assert`.
+///
+/// # Notes
+///
+/// Does not check that `lower <= upper` as that cannot be statically determined.
+pub fn expect_between<N>(format: Format, lower: N, upper: N, inject: impl Fn(N) -> Expr) -> Format
+where
+    N: ToPrimitive + Zero + Unsigned,
+{
+    let cond = if lower.is_zero() {
+        expr_lte(var("x"), inject(upper))
+    } else {
+        expr_match(
+            var("x"),
+            [
+                (
+                    Pattern::Int(Bounds::new(
+                        lower.to_usize().unwrap(),
+                        upper.to_usize().unwrap(),
+                    )),
+                    Expr::Bool(true),
+                ),
+                (Pattern::Wildcard, Expr::Bool(false)),
+            ],
+        )
+    };
+    expect_lambda(format, "x", cond)
+}
+
+/// Specialized version of [`where_between`] for `u8`
 pub fn where_between_u8(format: Format, lower: u8, upper: u8) -> Format {
     where_between(format, lower, upper, Expr::U8)
 }
 
+/// Specialized version of [`where_between`] for `u16`
 pub fn where_between_u16(format: Format, lower: u16, upper: u16) -> Format {
     where_between(format, lower, upper, Expr::U16)
 }
 
+/// Specialized version of [`where_between`] for `u32`
 pub fn where_between_u32(format: Format, lower: u32, upper: u32) -> Format {
     where_between(format, lower, upper, Expr::U32)
 }
 
-/// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range,
-/// represented by a value `range` that a `Bounds` value can be constructed from via an `.into()` call.
+/// Specialized version of [`expect_between`] for `u8`
+pub fn expect_between_u8(format: Format, lower: u8, upper: u8) -> Format {
+    expect_between(format, lower, upper, Expr::U8)
+}
+
+/// Specialized version of [`expect_between`] for `u16`
+pub fn expect_between_u16(format: Format, lower: u16, upper: u16) -> Format {
+    expect_between(format, lower, upper, Expr::U16)
+}
+
+/// Specialized version of [`expect_between`] for `u32`
+pub fn expect_between_u32(format: Format, lower: u32, upper: u32) -> Format {
+    expect_between(format, lower, upper, Expr::U32)
+}
+
+/// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range
+/// ([`Bounds`]), based on a value of some type `R` that can natively be converted to [`Bounds`]
+/// (e.g. any 64-bit or smaller unsigned integer-type, or a `RangeInclusive`/`RangeFrom` thereof).
 ///
-/// Unlike [`where_between`], the range in question need not be closed (i.e. bounded both above and below).
-/// In return, there is a loss of flexibility, as the range must be specified via numeric consts, rather than
-/// arbitrary `Expr` values that are not required to be constants.
-///
+/// Unlike [`where_between`], the range in question need not be closed, and need only have a lower bound.
 /// However, the complexity of the test will typically be higher for this helper than for [`where_between`];
 /// this is doubly true for closed ranges whose minimum is `0`, in which case [`where_between`] tests a single
 /// integer comparison.
@@ -845,6 +1108,18 @@ where
     where_lambda(format, "x", is_within(var("x"), range.into()))
 }
 
+/// Similar to [`where_within`], but with `Expect`-level severity instead of `Assert`.
+pub fn expect_within<R>(format: Format, range: R) -> Format
+where
+    R: Into<Bounds>,
+{
+    expect_lambda(format, "x", is_within(var("x"), range.into()))
+}
+
+/// Disjunctive version of [`where_within`] that applies to a collection of range-like value
+/// rather than a single range-generator.
+///
+/// For more details, see [`where_within`] and [`is_within_any`].
 pub fn where_within_any<R>(format: Format, ranges: impl IntoIterator<Item = R>) -> Format
 where
     R: Into<Bounds>,
@@ -852,9 +1127,19 @@ where
     where_lambda(format, "x", is_within_any(var("x"), ranges))
 }
 
+/// Given a `Format`, constructs a parse that only succeeds if it yields a value
+/// that is (numerically) equal to `expected`.
+///
+/// Only works for formats that yield single integral values, and does not work
+/// for tuples, arrays, records, or any non-integral type.
+pub fn expect_eq(format: Format, expected: Expr) -> Format {
+    const IDENT: &str = "actual";
+    where_lambda(format, IDENT, expr_eq(var(IDENT), expected))
+}
+
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times
 pub fn tuple_repeat(count: usize, format: Format) -> Format {
-    let iter = std::iter::repeat(format).take(count);
+    let iter = std::iter::repeat_n(format, count);
     Format::Tuple(iter.collect())
 }
 
@@ -878,7 +1163,7 @@ pub struct U16;
 /// Marker type for [`Expr::U32`]-specific generic trait impls
 pub struct U32;
 
-/// Marker type for [`Expr::U32`]-specific generic trait impls
+/// Marker type for [`Expr::U64`]-specific generic trait impls
 pub struct U64;
 
 macro_rules! impl_zeromarker {
@@ -895,7 +1180,7 @@ macro_rules! impl_zeromarker {
 
 impl_zeromarker!(U8, U16, U32, U64);
 
-/// Given the appropriate Marker-type, returns an Expr that evaluates to `true` if the expression `expr` (of the appropriate type for the Marker passed in)
+/// Returns an Expr that evaluates to `true` if the expression `expr`
 /// is non-zero.
 pub fn is_nonzero<T: ZeroMarker>(expr: Expr) -> Expr {
     expr_ne(expr, T::mk_zero())
@@ -948,14 +1233,44 @@ pub fn where_nonzero<T: ZeroMarker>(format: Format) -> Format {
     where_lambda(format, "x", is_nonzero::<T>(var("x")))
 }
 
-/// Helper for constructing `Format::ForEach`
+/// Shortcut for `expect_lambda` applied over the simple predicate [`is_nonzero`].
+pub fn expect_nonzero<T: ZeroMarker>(format: Format) -> Format {
+    expect_lambda(format, "x", is_nonzero::<T>(var("x")))
+}
+
+/// Helper for constructing [`Format::ForEach`].
+///
+/// For each element `elem` in the sequence `seq`, binds the value of `elem` to
+/// the identifier `name` that is implicitly referenced in `inner`, and parses `inner` once,
+/// accumulating each result into a sequence which is then returned.
 pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
     Format::ForEach(Box::new(seq), name.into(), Box::new(inner))
 }
 
-/// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
-pub fn aligned(f: Format, align: usize) -> Format {
+/// Given an alignment `align` and a Format `f`, constructs a parse that seeks to the nearest offset
+/// that is byte-aligned to a width of `align`, and then parses `f` and yields its result.
+pub fn align_then(align: usize, f: Format) -> Format {
     monad_seq(Format::Align(align), f)
+}
+
+/// Helper for constructing `Format::Align` that aligns to the size (in bytes) of the parametric type `T`.
+///
+/// # Examples
+///
+/// ```
+/// use doodle::helper::align_to_size;
+/// use doodle::Format;
+/// assert!(matches!(align_to_size::<u32>(), Format::Align(4)));
+/// ```
+pub fn align_to_size<T>() -> Format {
+    Format::Align(std::mem::size_of::<T>())
+}
+
+/// Given a format `f` and an alignment `align`, constructs a parse that first parses `f` and then
+/// seeks to the nearest offset that is byte-aligned to a width of `align`, then yielding the
+/// original result of `f`.
+pub fn then_align(f: Format, align: usize) -> Format {
+    chain(f, "x", align_then(align, compute(var("x"))))
 }
 
 /// Helper method for [`Format::LetFormat`]
@@ -968,6 +1283,16 @@ pub fn chain(f0: Format, name: impl IntoLabel, f: Format) -> Format {
 #[inline]
 pub fn monad_seq(f0: Format, f: Format) -> Format {
     Format::MonadSeq(Box::new(f0), Box::new(f))
+}
+
+/// Parses a format but discards its value, returning `()`.
+///
+/// This can be used to use heterogeneously typed formats in contexts
+/// that normally require homogeneous types, if the value is irrelevant
+/// (e.g. applying `peek` or `peek_not` over a union of individual formats that would
+/// not typecheck as-is).
+pub fn void(f: Format) -> Format {
+    monad_seq(f, compute(Expr::UNIT))
 }
 
 /// Helper for destructuring an `Expr`-level tuple-value into a set of locally bound variables.
@@ -1039,17 +1364,12 @@ pub fn unwrap_singleton(expr: Expr) -> Expr {
     )
 }
 
-/// Parses a dependent format `opt_f(x)` if `expr` evaluates to `Some(x)`,
-/// or `fmt_none` when `expr` evaluates to `None`.
+/// Given a value `expr` of type ``Expr@Option<T>` and a format-closure `opt_f` of type `Expr@T -> Format@Option<U>`,
+/// parses a format that is equivalent to `opt_f(x)` if `expr` evaluates to `Some(x)`, and which yields `None` otherwise.
 ///
-/// Implicitly relies on the ValueType of the output of `opt_f` being `Option<U>`,
-/// following the style of monadic bind operations in languages like Haskell.
-///
-/// # Notes
-///
-/// To offer more fine-tuning for the generated output, a `binding_name` parameter is required,
-/// and used as the pattern-binding of `Some(_)` against `expr`, as well as the variable passed
-/// into `opt_f`.
+/// The `binding_name` argument is used for the capture-variable of the `Some(..)` match-branch, as well as the
+/// variable passed into `opt_f`. If `opt_f` relies on any external variables, care should be taken to ensure they are
+/// not shadowed by the `binding_name` identifier.
 pub fn bind_option(
     expr: Expr,
     binding_name: &'static str,
@@ -1064,12 +1384,15 @@ pub fn bind_option(
     )
 }
 
-/// Parses a dependent format `fmt_some(f(x))` if `expr` evaluates to `Some(x)`,
-/// or `fmt_none` when `expr` evaluates to `None`.
+/// Given a value `expr` of type `Expr@Option<T>` and a closure `f` of type `Expr@T -> Format@U`,
+/// returns a Format that parses `f(x) : U` if `expr` evaluates to `Some(x)`, or which yields `None` if
+/// `expr` is `None`.
 ///
-/// The output ValueType of `f` should be the parametric type `U` of whatever `Option<U>`
-/// the call should evaluate to; this following the style of functor-map operations in
-/// languages like Haskell.
+/// The argument `binding_name` is used as the identifier that the held-value of a `Some(_)` variant
+/// is bound to while evaluating `f`.
+///
+/// The ValueType `U` of the Format returned by `f(_)` will determine the ValueType of the overall Format, as `Option<U>`,
+/// as in the natural map operation o the Haskell `Maybe` functor.
 pub fn map_option(
     expr: Expr,
     binding_name: &'static str,
@@ -1082,12 +1405,22 @@ pub fn map_option(
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
 ///
 /// This will result in a runtime panic during parse-evaluation if the index is out of bounds.
+///
+/// # Notes
+///
+/// Under current implementation constraints, an `index` whose Expr-kind is not `U32` may lead to typechecking
+/// failure.
 pub fn index_unchecked(seq: Expr, index: Expr) -> Expr {
     Expr::SeqIx(Box::new(seq), Box::new(index))
 }
 
 /// Performs a guarded index operation on an expression `seq` with an index `index`, returning `Some(elt)`
 /// if the index is in-bounds, or `None` otherwise.
+///
+/// # Notes
+///
+/// Under current implementation constraints, an `index` whose Expr-kind is not `U32` may lead to typechecking
+/// failure.
 pub fn index_checked(seq: Expr, index: Expr) -> Expr {
     let len = seq_length(seq.clone());
     let is_sound = expr_lt(index.clone(), len);
@@ -1159,6 +1492,7 @@ pub fn expr_max(a: Expr, b: Expr) -> Expr {
 /// Convenience tool for cloning a subset of a record-typed Expr's field-set in an arbitrary order
 ///
 /// # Notes
+///
 /// The list of fields must all appear in the original, and should contain no duplicates
 pub fn subset_fields<const N: usize>(original: Expr, field_set: [&'static str; N]) -> Expr {
     let mut accum_fields = Vec::with_capacity(N);
@@ -1275,6 +1609,20 @@ pub fn slice(len: Expr, inner: Format) -> Format {
     Format::Slice(Box::new(len), Box::new(inner))
 }
 
+pub fn any_of(formats: impl IntoIterator<Item = Format>) -> Format {
+    Format::UnionNondet(formats.into_iter().map(void).collect())
+}
+
+/// Helper for parsing a given Format `inner` in such a way that none of the formats
+/// in the list of `negative` are matched.
+///
+/// Can be used for filtering out a specific subset of exceptions to a general rule
+/// without designing a format that explicitly excludes such exceptions in its
+/// definition.
+pub fn excluding(negative: Format, inner: Format) -> Format {
+    monad_seq(Format::PeekNot(Box::new(negative)), inner)
+}
+
 /// Constructs a balanced (i.e. minimized max depth) tree of `bitor`-joined
 /// nodes of type Expr.
 ///
@@ -1365,8 +1713,7 @@ pub fn seq_last_unchecked(seq: Expr) -> Expr {
 
 /// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
 ///
-/// If `x` is not an integral-typed value, will cause a runtime error
-/// when encountered by the interpreter or compiler.
+/// If `x` is not an integral-typed value, will cause a runtime error when encountered by the interpreter or compiler.
 pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
     expr_match(
         x,
@@ -1421,10 +1768,16 @@ pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Fo
     }
 }
 
-/// Gets the current stream-position and casts down from U64->U32
-// REVIEW - Since the typechecker now infers a semi-auto type for Format::Pos rather than forcing U64, the cast may be extraneous...
+/// Gets the current stream-position as an assumptive U32.
+///
+/// # Note
+///
+/// The exact ValueType of the parsed result-value is unspecified,
+/// but it will always automatically coerce to `U32` provided it is
+/// used in a context where `U32` is the only type-ascription that
+/// yields a sound result.
 pub fn pos32() -> Format {
-    map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
+    Format::Pos
 }
 
 pub fn fmt_let(clone_varname: &'static str, orig: Expr, dep_format: Format) -> Format {
@@ -1458,4 +1811,423 @@ pub fn find_by_key(
 /// Repackages a `Seq(U8)` format as an ASCII-string format.
 pub fn mk_ascii_string(x: Format) -> Format {
     Format::Hint(StyleHint::AsciiStr, Box::new(x))
+}
+
+/// Helper for [`Format::LetView`]
+pub fn let_view<Name: IntoLabel>(name: Name, format: Format) -> Format {
+    Format::LetView(name.into(), Box::new(format))
+}
+
+/// Helper for [`Format::WithView`]
+pub fn with_view(view: ViewExpr, view_format: ViewFormat) -> Format {
+    Format::WithView(view, view_format)
+}
+
+/// Helper for `WithView(X, ReifyView)`
+pub fn reify_view(view: ViewExpr) -> Format {
+    Format::WithView(view, ViewFormat::ReifyView)
+}
+
+pub fn vvar(ident: impl IntoLabel) -> ViewExpr {
+    ViewExpr::var(ident)
+}
+
+/// Helper for [`Format::ParseFromView`]
+pub fn parse_from_view(view: ViewExpr, format: Format) -> Format {
+    Format::ParseFromView(view, Box::new(format))
+}
+
+/// Helper for [`ViewFormat::CaptureBytes`].
+pub fn capture_bytes(len: Expr) -> ViewFormat {
+    ViewFormat::CaptureBytes(Box::new(len))
+}
+
+/// Helper for [`Format::DecodeBytes`].
+pub fn decode_bytes(bytes: Expr, format: Format) -> Format {
+    Format::DecodeBytes(Box::new(bytes), Box::new(format))
+}
+
+/// Constructs a View-based parse of `len` bytes as a borrowed buffer-slice, rather than
+/// as a constructed sequence (Vec) of bytes.
+// TODO[epic=first-class-helper-candidate] - consider implementing 'Here' View to obviate the need for a named view
+pub fn from_here(view_format: ViewFormat) -> Format {
+    const VIEW_NAME: &str = "here_view";
+    let_view(VIEW_NAME, with_view(vvar(VIEW_NAME), view_format))
+}
+
+/// Helper for [`from_here`] fused with [`capture_bytes`].
+pub fn capture_bytes_from_here(len: Expr) -> Format {
+    from_here(capture_bytes(len))
+}
+
+/// Helper for [`ViewFormat::ReadArray`].
+///
+/// `kind` accepts either a `BaseKind<Endian>` (for the primitive element-kinds that have always
+/// been supported) or a `FormatRef` (for `FixedReadKind::FixedFormat`, i.e. a struct-shaped
+/// element made up purely of fixed-size primitive fields). Eligibility of a `FormatRef` passed
+/// this way is validated later, at typecheck-time (see `typecheck::infer_var_view_format`),
+/// since this function has no `&FormatModule` access with which to validate it eagerly.
+pub fn read_array(len: Expr, kind: impl Into<FixedReadKind>) -> ViewFormat {
+    ViewFormat::ReadArray(Box::new(len), kind.into())
+}
+
+/// Helper for [`Format::Hint`]
+pub fn hint(hint: StyleHint, format: Format) -> Format {
+    Format::Hint(hint, Box::new(format))
+}
+
+pub mod base {
+    use super::*;
+    use crate::{CommonOp, numeric::MachineRep};
+
+    macro_rules! endian {
+        ( $( $fname:ident, $kind_endian:ident, $size:expr, $op:ident );* $(;)? ) => {
+            $(
+                #[doc = concat!("Stand-in for `BaseKind::", stringify!($kind_endian), "`")]
+                #[doc = concat!("Reads a ", stringify!($op), " value in a neutral context")]
+                pub fn $fname() -> Format {
+                    Format::Hint(
+                        StyleHint::Common(CommonOp::EndianParse(BaseKind::$kind_endian)),
+                        Box::new(map(
+                            tuple_repeat($size, Format::ANY_BYTE),
+                            lambda("x", Expr::$op(Box::new(var("x")))),
+                        ))
+                    )
+                }
+            )*
+        };
+    }
+
+    #[inline(always)]
+    /// Stand-in for `BaseKind::bit`
+    ///
+    /// Reads a single-bit value (as a u8) in a [`Format::Bits`] context.
+    pub const fn bit() -> Format {
+        // REVIEW - do we want a CommonOp for this?
+        Format::ANY_BYTE
+    }
+
+    /// Stand-in for `BaseKind::U8`
+    ///
+    /// Reads a U8 value in a neutral context
+    pub fn u8() -> Format {
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::U8)),
+            Box::new(Format::ANY_BYTE),
+        )
+    }
+
+    endian! {
+        u16be, U16BE, 2, U16Be;
+        u16le, U16LE, 2, U16Le;
+        u32be, U32BE, 4, U32Be;
+        u32le, U32LE, 4, U32Le;
+        u64be, U64BE, 8, U64Be;
+        u64le, U64LE, 8, U64Le;
+    }
+
+    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
+    /// Parses a u8 value and performs a bitwise cast to i8.
+    pub fn i8() -> Format {
+        map_numeric(u8(), |v| num::cast_bitwise(MachineRep::I8, v))
+    }
+
+    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
+    /// Parses a big-endian u16 value and performs a bitwise cast to i16.
+    pub fn i16be() -> Format {
+        map_numeric(u16be(), |v| num::cast_bitwise(MachineRep::I16, v))
+    }
+
+    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
+    /// Parses a big-endian u32 value and performs a bitwise cast to i32.
+    pub fn i32be() -> Format {
+        map_numeric(u32be(), |v| num::cast_bitwise(MachineRep::I32, v))
+    }
+
+    // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
+    /// Parses a big-endian u64 value and performs a bitwise cast to i64.
+    pub fn i64be() -> Format {
+        map_numeric(u64be(), |v| num::cast_bitwise(MachineRep::I64, v))
+    }
+}
+pub use base::{bit, i8, i16be, i32be, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};
+
+pub mod ascii {
+    use super::{mk_ascii_string, *};
+    use std::ops::RangeInclusive;
+
+    /// ByteSet consisting of 0..=127, or the valid ASCII range (including control characters)
+    pub const VALID_ASCII: ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
+
+    /// Range-based definition of ASCII octal digits (0-7).
+    pub const ASCII_OCTAL_RANGE: RangeInclusive<u8> = b'0'..=b'7';
+    // /// Array-base definition of ASCIIo octal digits (0-7.)
+    // pub const ASCII_OCTAL_ARRAY: [u8; 8] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7'];
+
+    /// Range-based definition of ASCII decimal digits (0-9).
+    pub const ASCII_DECIMAL_RANGE: RangeInclusive<u8> = b'0'..=b'9';
+    // /// Array-base definition of ASCII decimal digits (0-9).
+    // pub const ASCII_DECIMAL_ARRAY: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
+
+    /// Array-based definition of ASCII lower-case hexadecimal digits (0-9, a-f).
+    pub const ASCII_HEX_LOWER: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e',
+        b'f',
+    ];
+
+    /// Array-based definition of ASCII upper-case hexadecimal digits (0-9, A-F).
+    pub const ASCII_HEX_UPPER: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
+        b'F',
+    ];
+
+    /// Array-based definition of ASCII hexadecimal digits (0-9, a-f, A-F).
+    pub const ASCII_HEX_ANY: [u8; 22] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
+        b'F', b'a', b'b', b'c', b'd', b'e', b'f',
+    ];
+
+    pub const ASCII_ALPHA_UPPER: RangeInclusive<u8> = b'A'..=b'Z';
+    pub const ASCII_ALPHA_LOWER: RangeInclusive<u8> = b'a'..=b'z';
+
+    /// [`ByteSet`] consisting of ASCII char-codes for `'A'..='Z'` and `'a..='z'`.
+    ///
+    /// ```
+    /// # use doodle::helper::ascii::*;
+    /// # use doodle::byte_set::ByteSet;
+    /// assert_eq!(ASCII_ALPHA_ANY, ByteSet::union(&ByteSet::from(ASCII_ALPHA_UPPER), &ByteSet::from(ASCII_ALPHA_LOWER)));
+    /// ```
+    pub const ASCII_ALPHA_ANY: ByteSet = const {
+        // mask consisting of 26 set bits, for selecting an alphabet-sized range of bytes
+        const ALPHA_MASK: u64 = 0x3FFFFFF;
+
+        // all alphabetic characters live in the range 64..=127,
+        // which is index 1 of the `[u64; 4]` we are building
+
+        // therefore, the lowest byte in the mask we are setting is nominally shifted by 0x40,
+        // so we use this to relativize our 'A'/'a' shift-values,
+        const LH_START: u32 = 0x40;
+
+        const LOWER_A: u32 = 0x61;
+        const UPPER_A: u32 = 0x41;
+
+        const ALPHA_LC: u64 = ALPHA_MASK << (LOWER_A - LH_START);
+        const ALPHA_UC: u64 = ALPHA_MASK << (UPPER_A - LH_START);
+
+        ByteSet::from_bits([0, ALPHA_LC | ALPHA_UC, 0, 0])
+    };
+
+    /// Enumeration of ASCII characters that are considered "printable" (i.e. all non-control, plus tabs and newlines).
+    pub const ASCII_CHAR_STRICT: ByteSet = const {
+        // low-low mask covering range 32..64
+        let ll_mask: u64 = 0xffff_ffff_0000_0000;
+        // low-high mask covering range 64..=127
+        let lh_mask: u64 = 0xffff_ffff_ffff_ffff;
+
+        let nl_mask: u64 = 1 << b'\n';
+        let cr_mask: u64 = 1 << b'\r';
+        let tab_mask: u64 = 1 << b'\t';
+
+        let ctrl_mask: u64 = nl_mask | cr_mask | tab_mask;
+
+        let bits = [ll_mask | ctrl_mask, lh_mask, 0, 0];
+
+        ByteSet::from_bits(bits)
+    };
+
+    pub const ASCII_CHAR_NON_STRICT: ByteSet = ByteSet::full();
+
+    /// A single-byte parse that is hinted to display as ASCII.
+    ///
+    /// Does not enforce that the byte is a valid ASCII character; all bytes will succeed.
+    pub fn ascii_char() -> Format {
+        hint(StyleHint::AsciiChar, Format::Byte(ASCII_CHAR_NON_STRICT))
+    }
+
+    /// A single-byte parse over non-control characters in the valid ASCII range.
+    ///
+    /// Includes newline, tab, and carriage return, as well as all printable ASCII characters
+    /// (32..=126)
+    pub fn ascii_alpha() -> Format {
+        hint(StyleHint::AsciiChar, Format::Byte(ASCII_ALPHA_ANY))
+    }
+
+    /// C-style string format: a NUL-terminated byte-sequence that is hinted to display as ASCII
+    ///
+    /// Even though the name implies the byte-contents is ascii, ASCII validity is not enforced;
+    /// as long as the buffer uses one byte per character (e.g. ISO 8859-1/Latin-1), this format
+    /// can only fail if a terminal NUL is not present.
+    ///
+    /// The raw parse corresponds to `([^\x00]*)\x00`; that is, a possibly-empty run of non-NUL bytes followed by a single null byte, which is consumed but omitted from the parsed value)
+    pub fn asciiz_string() -> Format {
+        mk_ascii_string(chain(
+            repeat(not_byte(0x00)),
+            "chars",
+            monad_seq(is_byte(0x00), compute(var("chars"))),
+        ))
+    }
+
+    pub fn ascii_octal_digit() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_OCTAL_RANGE)),
+        )
+    }
+
+    pub fn ascii_decimal_digit() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_DECIMAL_RANGE)),
+        )
+    }
+
+    pub fn ascii_hex_lower() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_HEX_LOWER)),
+        )
+    }
+
+    pub fn ascii_hex_upper() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_HEX_UPPER)),
+        )
+    }
+
+    pub fn ascii_hex_any() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_HEX_ANY)),
+        )
+    }
+
+    /// Given a format that parses a single character (byte),
+    /// returns a format that parses strings of those characters (which can be empty).
+    pub fn string_of(char_f: Format) -> Format {
+        hint(StyleHint::AsciiStr, repeat(char_f))
+    }
+
+    /// Given a format that parses a single character (byte) and a constant length,
+    /// returns a format that parses `char_f` exactly `len` times with a hint that
+    /// it is nominally an ASCII string.
+    pub fn fixed_len_string(char_f: Format, len: u32) -> Format {
+        hint(StyleHint::AsciiStr, repeat_count(Expr::U32(len), char_f))
+    }
+}
+pub use ascii::{
+    VALID_ASCII, ascii_alpha, ascii_char, ascii_decimal_digit, ascii_hex_any, ascii_hex_lower,
+    ascii_hex_upper, ascii_octal_digit, asciiz_string, fixed_len_string, string_of,
+};
+
+/// Helper for opaque byte-sequences that stand in for uninterpreted or delayed-interpretation
+/// data.
+pub fn opaque_bytes() -> Format {
+    repeat(u8())
+}
+
+/// Helper function for [`Format::Phantom`].
+pub fn phantom(format: Format) -> Format {
+    Format::Phantom(Box::new(format))
+}
+
+// SECTION - helpers related to the embedded `numeric` model
+/// Helper function for [`Format::Compute`] over [`Expr::Numeric`].
+pub fn compute_numeric(n_expr: NumExpr) -> Format {
+    compute(numeric(n_expr))
+}
+
+/// Helper function for [`Expr::Numeric`].
+pub fn numeric(n_expr: NumExpr) -> Expr {
+    Expr::Numeric(Box::new(n_expr))
+}
+
+/// Helper function for parsing a numeric expression and leaving it as a numeric value, without any additional transformation.
+pub fn mk_numeric(f: Format) -> Format {
+    map_numeric(f, |x| x)
+}
+
+/// Helper function for parsing a numeric expression and applying a NumExpr transformation to the resulting value.
+pub fn map_numeric(f: Format, map_fn: impl FnOnce(NumExpr) -> NumExpr) -> Format {
+    const IDENT: &str = "raw";
+    chain(f, IDENT, compute(numeric(map_fn(num::num_var(IDENT)))))
+}
+
+/// Polymorphic (auto-rep) zero-value within the embedded `numeric` model.
+///
+/// # Notes
+///
+/// Should only be used in contexts where the type-inference over the overall expression or format is
+/// guaranteed to resolve it to a specific numeric type, as it does not have an inherent type on its own and will
+/// cause a type-inference failure if it is not resolved by the context.
+pub fn poly_zero() -> Expr {
+    poly_const::<u8>(0)
+}
+
+/// General constructor for polymorphic (auto-rep) numeric constants within the embedded `numeric` model.
+///
+/// # Notes
+///
+/// Should only be used in contexts where the type-inference over the overall expression or format is
+/// guaranteed to resolve it to a specific numeric type, as it does not have an inherent type on its own and will
+/// cause a type-inference failure if it is not resolved by the context.
+pub fn poly_const<N>(n: N) -> Expr
+where
+    num_bigint::BigInt: From<N>,
+{
+    numeric(num::auto_const(n))
+}
+// !SECTION
+
+// SECTION - error marshalling
+
+/// Helper for [`Format::Permit`], which downgrades errors in the interior format to warnings,
+/// and substitutes in a custom value if the parse did not succeed.
+///
+/// The ValueType of the format and the replacement value must be the same.
+pub fn permit(format: Format, if_error: Expr) -> Format {
+    Format::Permit(Box::new(format), Box::new(if_error))
+}
+
+/// Helper for [`Format::Enforce`], which upgrades warnings to errors in the interior format.
+#[cfg(feature = "format_enforce")]
+pub fn enforce(format: Format) -> Format {
+    Format::Enforce(Box::new(format))
+}
+// !SECTION
+
+/// Given a base expression and a mapping from single-value patterns to variant names (along with an optional label for an unknown-value catch-all),
+/// yields an expression that matches on the base expression and interprets it as the implied enum.
+pub fn interpret_as_enum<const N: usize>(
+    expr: Expr,
+    mapping: [(Pattern, &'static str); N],
+    fallthrough: Option<&'static str>,
+) -> Expr {
+    expr_match(
+        expr,
+        mapping
+            .into_iter()
+            .map(|(pat, vname)| (pat, variant(vname, Expr::UNIT)))
+            .chain(fallthrough.map(|vname| {
+                (
+                    Pattern::Binding(Label::Borrowed("other")),
+                    variant(vname, var("other")),
+                )
+            })),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FormatModule;
+
+    #[test]
+    fn is_ascii_char_sanity() {
+        let module = FormatModule::new();
+
+        assert!(ascii_char().is_ascii_char_format(&module));
+        assert!(ascii_alpha().is_ascii_char_format(&module));
+        assert!(!u8().is_ascii_char_format(&module));
+    }
 }

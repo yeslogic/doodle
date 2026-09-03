@@ -1,10 +1,35 @@
 [workspace]
-members = [".", "generated/", "doodle-formats/", "experiments/doodle-rec"]
+members = [
+    ".",
+    "generated/",
+    "doodle-formats/",
+    "smallsorts",
+    "experiments/analytic-engine/",
+    "experiments/analytic-parser",
+    "experiments/doodle-rec",
+]
 
 [package]
 name = "doodle"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+
+[[test]]
+name = "runtime_repeat"
+path = "tests/runtime_repeat/mod.rs"
+test = true
+
+[[test]]
+name = "permit_state_error"
+path = "tests/permit_state_error/mod.rs"
+test = true
+
+[features]
+default = []
+alt = []
+format_enforce = []
+pattern_matches_auto_rep = []
+__unify_mixed_to_int = []
 
 [[bin]]
 name = "doodle"
@@ -17,10 +42,18 @@ proptest = "1.1.0"
 expect-test = "1.4"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 anyhow = "1.0"
 clap = { version = "4.2", features = ["derive"] }
 num-traits = "0.2"
 rustc-hash = "2.1.1"
 cons-rs = "0.7.3"
+smallsorts = { path = "smallsorts/", version = "0.1.0" }
+intmap = "3.1.2"
+smallvec = "1.15.1"
+vec-collections = "0.4.3"
+log = "0.4.29"
+stderrlog = "0.6.0"
+num-bigint = "0.4"
+cfg-if = "1.0.4"

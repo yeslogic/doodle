@@ -1,0 +1,421 @@
+use crate::Label;
+use crate::codegen::rust_ast::RustType;
+use crate::codegen::{
+    rust_ast::{
+        ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr,
+        RustPrimLit,
+    },
+    typed_format::GenType,
+};
+
+use super::{
+    core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp},
+    elaborator::{IntType, MapType, PrimInt, Sig1, Sig2, TypedExpr},
+};
+
+/// Classification-type for the behavior of a binary operation based on its inherent semantics and the value-type signature.
+///
+/// The positional argument representing the type of the output always follows the positional arguments for each operand, and the operand-types
+/// are given in left-to-right order.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum BinOpClass<T> {
+    /// Classification for signatures of the form `A -> A -> A`, i.e. operand-types and output-type are all identical.
+    Pure(T),
+    /// Any operation with signature `A -> A -> B` where `B` is strictly wider than `A`.
+    HomWide(T, T),
+    /// Any operation with signature `A -> B -> C` where `C` is strictly wider than both `A` and `B`.
+    HetWide(T, T, T),
+    /// Classification for signatures of the form `A -> A -> B` where `B` is strictly narrower than `A`.
+    HomLossy(T, T),
+    /// Classification for signatures of the form `A -> B -> C` where either (or both) of `A` and `B` is wider than `C`.
+    HetLossy(T, T, T),
+}
+
+/// Classification-type for the behavior of a unary operation based on its inherent semantics and the value-type signature.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum UnaryOpClass<T> {
+    Pure(T),
+    NonLossy(T, T),
+    Lossy(T, T),
+}
+
+/// Returns the relevant operational class of a binary operation with a given `(left, right, output)` type-signature:
+///   - Pure: the operation's output has the same representation as its inputs, though the operation might yield unrepresentable outcomes for certain value-combinations.
+///   - HomWide: operands have the same type and the operation's output has a strictly wider representation than its inputs, but the operation might still yield unrepresentable outcomes for certain value-combinations (e.g. division or remainder by zero, unsigned subtraction of a greater value from a smaller value).
+///   - HomLossy: operands have the same type and the operation's output has a strictly narrower representation than its inputs, and the operation will yield unrepresentable outputs for a large number of value-combinations.
+///   - HetWide: operands have different types and the operation's output has a strictly wider representation than either input, but the operation might still yield unrepresentable outcomes for certain value-combinations (e.g. division or remainder by zero, unsigned subtraction of a greater value from a smaller value).
+///   - HetLossy: operands have different types and the operation's output has a strictly narrower representation than at least one input, and the operation will yield unrepresentable outputs for a large number of value-combinations.
+///
+/// # Notes
+///
+/// The primary usage of this function is as a heuristic to determine whether a backend function that performs the requested operation has
+/// been implemented via macro-based boilerplating in `crate::numeric::eval`.
+///
+/// Operations that are `HetLossy` or `homLossy` will generally be assumed to have been left out of boilerplating, and will instead be
+/// performed via calls to `eval_fallback` during code-generation.
+///
+/// Any `Pure`, `HomWide`, or `HetWide` operations will be assumed to have an accompanying backend function with a predictable template identifier.
+pub(crate) fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
+    let ((l, r), o) = sig;
+    let l = l.to_prim();
+    let r = r.to_prim();
+    let o = o.to_prim();
+
+    let lrep = MachineRep::from(l);
+    let rrep = MachineRep::from(r);
+    let orep = MachineRep::from(o);
+
+    if lrep == rrep {
+        if orep == lrep {
+            BinOpClass::Pure(l)
+        } else if orep.encompasses(lrep) {
+            BinOpClass::HomWide(l, o)
+        } else {
+            BinOpClass::HomLossy(l, o)
+        }
+    } else if orep.encompasses(lrep) && orep.encompasses(rrep) {
+        BinOpClass::HetWide(l, r, o)
+    } else {
+        BinOpClass::HetLossy(l, r, o)
+    }
+}
+
+/// Returns the relevant operational class of a unary operation with a given `(input, output)` type-signature:
+///   - Pure: the operation's output has the same representation as its input, though the operation might yield unrepresentable outcomes in certain corner-cases
+///   - NonLossy: the operation's output has a strictly wider representation than its input and will never yield unrepresentable outcomes for representable operands
+///   - Lossy: the operation's output has a different representation from its input, and will yield unrepresentable outcomes for certain ranges of representable operands
+///
+/// When `op` is `None`, the signature is assumed to represent a mathematical-value-preserving type-cast operation.
+///
+/// # Notes
+///
+/// The primary usage of this function is as a heuristic to determine whether a backend function that performs the requested operation has
+/// been implemented via macro-based boilerplating in `crate::numeric::eval`.
+///
+/// Operations that are `Lossy` will generally be assumed to have been left out of boilerplating, and will instead be
+/// performed via calls to `eval_unary_fallback` during code-generation.
+///
+/// Any `Pure` or `NonLossy` operations will be assumed to have an accompanying backend function with a predictable template identifier.
+pub(crate) fn classify_unary(
+    op: Option<BasicUnaryOp>,
+    sig: Sig1<IntType>,
+) -> UnaryOpClass<PrimInt> {
+    let (i, o) = sig;
+    let i = i.to_prim();
+    let o = o.to_prim();
+
+    let irep = MachineRep::from(i);
+    let orep = MachineRep::from(o);
+
+    match op {
+        None => {
+            // Cast - no operational influence on OpClass
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if orep.encompasses(irep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+        Some(BasicUnaryOp::AbsVal) => {
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if absval_is_nonlossy(irep, orep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+        Some(BasicUnaryOp::Negate) => {
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if negate_is_nonlossy(irep, orep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+        Some(BasicUnaryOp::IntPred) => {
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if pred_is_nonlossy(irep, orep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+        Some(BasicUnaryOp::IntSucc) => {
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if succ_is_nonlossy(irep, orep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+    }
+}
+
+/// Heuristic for whether `Abs(X: source) -> target` is a non-lossy operation (i.e. a representable input-value will never yield an unrepresentable output-value).
+fn absval_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
+    if source.is_signed() {
+        // Signed -> Unsigned is non-lossy if the target-precision is greater-than-or-equal to target precision
+        matches!(
+            target.compare_width(source),
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater
+        )
+    } else {
+        target.encompasses(source)
+    }
+}
+
+fn negate_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
+    if source.is_signed() {
+        // Neg is effectively a no-op w.r.t the bounds of the input and output, so normal rules apply
+        matches!(
+            target.compare_width(source),
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater
+        )
+    } else {
+        // Unsigned negation is never lossy because we avoid downcasting entirely
+        true
+    }
+}
+
+fn succ_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
+    target.encompasses(source)
+}
+
+fn pred_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
+    target.encompasses(source)
+}
+
+pub(crate) const SYNTHETIC_BINOP: &str = "eval_fallback";
+pub(crate) const SYNTHETIC_UNARY: &str = "eval_unary_fallback";
+
+fn induce_binary_fname(op: BinOp, class: BinOpClass<PrimInt>) -> Label {
+    let base = match op.get_op() {
+        BasicBinOp::Add => "add",
+        BasicBinOp::Sub => "sub",
+        BasicBinOp::Mul => "mul",
+        BasicBinOp::Div => "div",
+        BasicBinOp::Rem => "rem",
+    };
+    let str = match class {
+        BinOpClass::Pure(t) => format!("{}_{}", base, t.to_static_str()),
+        BinOpClass::HomWide(t0, t1) | BinOpClass::HomLossy(t0, t1) => {
+            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+        }
+        BinOpClass::HetWide(t0, t1, t2) | BinOpClass::HetLossy(t0, t1, t2) => format!(
+            "{}_{}_{}_{}",
+            base,
+            t0.to_static_str(),
+            t1.to_static_str(),
+            t2.to_static_str()
+        ),
+    };
+    Label::Owned(str)
+}
+
+fn induce_unary_fname(op: UnaryOp, class: UnaryOpClass<PrimInt>) -> Label {
+    let base = match op.get_op() {
+        BasicUnaryOp::Negate => "neg",
+        BasicUnaryOp::AbsVal => "abs",
+        BasicUnaryOp::IntPred => "pred",
+        BasicUnaryOp::IntSucc => "succ",
+    };
+    let str = match class {
+        UnaryOpClass::Pure(t) => format!("{}_{}", base, t.to_static_str()),
+        UnaryOpClass::NonLossy(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
+            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+        }
+    };
+    Label::Owned(str)
+}
+
+fn induce_cast_fname(class: UnaryOpClass<PrimInt>) -> Label {
+    let base = "cast";
+    let str = match class {
+        UnaryOpClass::NonLossy(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
+            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+        }
+        UnaryOpClass::Pure(_) => unreachable!("pure casts should be elided during synthesis"),
+    };
+    Label::Owned(str)
+}
+
+fn synthesize_unary(op: UnaryOp) -> RustExpr {
+    let ent = {
+        let (qual, meth) = match op.get_op() {
+            BasicUnaryOp::Negate => ("Neg", "neg"),
+            BasicUnaryOp::AbsVal => ("Signed", "abs"),
+            BasicUnaryOp::IntPred => ("Numeric", "pred"),
+            BasicUnaryOp::IntSucc => ("Numeric", "succ"),
+        };
+        RustEntity::Scoped(vec![Label::Borrowed(qual)], Label::Borrowed(meth))
+    };
+    let closure = {
+        let input = Label::Borrowed("x");
+        let invocation = {
+            let fn_spec = FnEntity::Specific { fname: ent };
+            let fn_args = vec![RustExpr::Entity(RustEntity::Local(input.clone()))];
+            RustExpr::Invoke(fn_spec, fn_args)
+        };
+        RustClosure::new_transform(input, None, invocation)
+    };
+    RustExpr::Closure(closure)
+}
+
+fn synthesize_binop(op: BinOp) -> RustExpr {
+    let ent = {
+        let qual = Label::Borrowed("BigInt");
+        let meth = match op.get_op() {
+            BasicBinOp::Add => "checked_add",
+            BasicBinOp::Sub => "checked_sub",
+            BasicBinOp::Mul => "checked_mul",
+            BasicBinOp::Div => "checked_div",
+            BasicBinOp::Rem => "checked_rem",
+        };
+        RustEntity::Scoped(vec![qual], Label::Borrowed(meth))
+    };
+    let closure = {
+        let lhs = Label::Borrowed("x");
+        let rhs = Label::Borrowed("y");
+        let head_args = vec![(lhs.clone(), None), (rhs.clone(), None)];
+        let body = {
+            let fn_spec = FnEntity::Specific { fname: ent };
+            let fn_args = vec![RustExpr::local(lhs), RustExpr::local(rhs)];
+            let invocation = RustExpr::Invoke(fn_spec, fn_args);
+            Box::new(invocation)
+        };
+        RustClosure::from_parts(
+            RustClosureHead::VarList(head_args),
+            ClosureBody::Expression(body),
+        )
+    };
+    RustExpr::Closure(closure)
+}
+
+pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
+    match model {
+        TypedExpr::ElabNumVar(_, name) => RustExpr::Entity(RustEntity::Local(name.clone())),
+        TypedExpr::ElabConst(t, typed_const) => {
+            let const_val = typed_const.clone();
+            let num_type = match t.try_to_num_type() {
+                None => unreachable!("numeric constants must be numeric types"),
+                Some(t) => Some(t),
+            };
+            RustExpr::ConstNum(const_val, num_type)
+        }
+        TypedExpr::ElabBinOp(_, op, lhs, rhs) => {
+            let coerce = |t: GenType| IntType::try_from(t);
+            let lhs = synthesize(lhs);
+            let rhs = synthesize(rhs);
+            let sig = op
+                .sig
+                .clone()
+                .try_map_type(&coerce)
+                .expect("failed to coerce binop signature");
+            match classify_binary(sig) {
+                class @ (BinOpClass::Pure(..)
+                | BinOpClass::HomWide(..)
+                | BinOpClass::HetWide(..)) => RustExpr::Invoke(
+                    FnEntity::Specific {
+                        fname: RustEntity::Local(induce_binary_fname(op.inner, class)),
+                    },
+                    vec![lhs, rhs],
+                )
+                .call_method("eval")
+                .wrap_try(),
+                class @ (BinOpClass::HomLossy(t1 @ t0, t2) | BinOpClass::HetLossy(t0, t1, t2)) => {
+                    RustExpr::Invoke(
+                        FnEntity::Synthetic {
+                            fname: RustEntity::Local(Label::Borrowed(SYNTHETIC_BINOP)),
+                            type_params: vec![
+                                NumType::from(t0),
+                                NumType::from(t1),
+                                NumType::from(t2),
+                            ],
+                        },
+                        vec![
+                            lhs,
+                            rhs,
+                            RustExpr::PrimitiveLit(RustPrimLit::String(induce_binary_fname(
+                                op.inner, class,
+                            ))),
+                            synthesize_binop(op.inner),
+                        ],
+                    )
+                    .call_method("eval")
+                    .wrap_try()
+                }
+            }
+        }
+        TypedExpr::ElabUnaryOp(_, op, input) => {
+            let input = synthesize(input);
+            let coerce = |t: GenType| IntType::try_from(t);
+            let sig = op
+                .sig
+                .clone()
+                .try_map_type(&coerce)
+                .expect("failed to coerce unaryop signature");
+            match classify_unary(Some(op.inner.get_op()), sig) {
+                class @ (UnaryOpClass::Pure(..) | UnaryOpClass::NonLossy(..)) => RustExpr::Invoke(
+                    FnEntity::Specific {
+                        fname: RustEntity::Local(induce_unary_fname(op.inner, class)),
+                    },
+                    vec![input],
+                )
+                .call_method("eval")
+                .wrap_try(),
+                class @ UnaryOpClass::Lossy(t0, t1) => RustExpr::Invoke(
+                    FnEntity::Synthetic {
+                        fname: RustEntity::Local(Label::Borrowed(SYNTHETIC_UNARY)),
+                        type_params: vec![NumType::from(t0), NumType::from(t1)],
+                    },
+                    vec![
+                        input,
+                        RustExpr::PrimitiveLit(RustPrimLit::String(induce_unary_fname(
+                            op.inner, class,
+                        ))),
+                        synthesize_unary(op.inner),
+                    ],
+                )
+                .call_method("eval")
+                .wrap_try(),
+            }
+        }
+        TypedExpr::ElabCast(_, cast, input) => {
+            let input = synthesize(input);
+            let coerce = |t: GenType| IntType::try_from(t);
+            let sig = cast
+                .sig
+                .clone()
+                .try_map_type(&coerce)
+                .expect("failed to coerce cast signature");
+            let is_arith = cast.op.cast_semantics.is_arithmetic();
+            if is_arith {
+                match classify_unary(None, sig) {
+                    // NOTE - we avoid function stubbing for no-op casts (i.e. T -> T)
+                    UnaryOpClass::Pure(_) => input,
+                    class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => {
+                        RustExpr::Invoke(
+                            FnEntity::Specific {
+                                fname: RustEntity::Local(induce_cast_fname(class)),
+                            },
+                            vec![input],
+                        )
+                        .call_method("eval")
+                        .wrap_try()
+                    }
+                }
+            } else {
+                RustExpr::Operation(crate::codegen::rust_ast::RustOp::AsCast(
+                    Box::new(input),
+                    RustType::from(sig.1),
+                ))
+            }
+        }
+    }
+}

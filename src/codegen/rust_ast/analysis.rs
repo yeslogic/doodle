@@ -1,21 +1,30 @@
 use std::{cell::RefCell, collections::HashMap};
 
 pub(crate) mod heap_optimize;
+use crate::codegen::model::{READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
+
 use super::*;
 use heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
 
 /// Helper trait for any AST model-type that represents a type-construct in Rust that may rely on non-local
 /// context to properly analyze certain static properties of.
 pub trait ASTContext {
+    /// The minimal amount of information required to make static inferences about the type-items encapsulated by `Self.
     type Context<'a>: Sized + 'a;
 }
 
+/// Computes the expected number of niches in a product-type, given a list of the niche-counts of each of its components.
 fn niche_product(iter: impl Iterator<Item = usize>) -> usize {
     iter.map(|x| x.saturating_add(1))
         .fold(1usize, usize::saturating_mul)
         - 1
 }
 
+/// Computes the expected number of niches in a sum-type, given a ist of the niche-counts of each of its variants
+///
+/// Assumes that the discriminants occupy a fixed number of bytes and are not optimized away.
+///
+/// Does not account for how many niches are filled by the unoccupied values in the discriminant memory-slot.
 fn niche_sum(iter: impl Iterator<Item = usize>) -> usize {
     iter.fold(0usize, usize::saturating_add)
 }
@@ -30,30 +39,45 @@ pub trait CanOptimize: ASTContext {
     }
 }
 
+/// Helper trait for performing recursive, memoized static analysis of an AST type-item
+/// to determine high-confidence estimatees of its size and alignment when emitted as
+/// a native Rust type in generated code.
 pub trait MemSize: CanOptimize {
+    /// High-confidence estimation of what `std::mem::size_of` will return for the type being modelled.
     fn size_hint(&self, context: Self::Context<'_>) -> usize;
 
+    /// High-confidence estimation of what `std::mem::align_of` will return for the type being modelled.
     fn align_hint(&self, context: Self::Context<'_>) -> usize;
 }
 
+/// Helper trait for determining whether an AST type-item is `Copy`-eligible
 pub trait CopyEligible: ASTContext {
+    /// High-confidence estimation of whether the type being modelled is `Copy`-eligible
     fn copy_hint(&self, context: Self::Context<'_>) -> bool;
 }
 
+/// Internal cache of static analysis results to memoize previous inferences of type-properties.
 #[derive(Default)]
 struct CacheEntry {
+    /// Whether the type can derive `Copy`
     copy: Option<bool>,
+    /// Number of niches in the memory representation of a type-value
     niches: Option<usize>,
+    /// Number of machine-bytes a type-value takes up, or best approximation
     size: Option<usize>,
+    /// Alignment (in bytes) that the Rust compiler will determine this type should have
     align: Option<usize>,
+    /// Determination of how the type itself or its sub-members should be heap-optimized according to the strategy passed in on first invocation
     heap: Option<HeapOutcome>,
 }
 
+/// Context for memoized static analysis of compiled FormatModule
 pub(crate) struct SourceContext<'a> {
-    def_map: &'a [RustTypeDef],
+    def_map: &'a [RustTypeDecl],
     cache: Rc<RefCell<HashMap<usize, CacheEntry>>>,
 }
 
+/// Helper macro for automating the lookup, computation, and memoization of static analysis results
 macro_rules! cache_get {
     ( $this:expr, $field:ident, $ix:ident, $method:ident $( , $pre_arg:expr )? ) => {{
         let cache = $this.cache.borrow();
@@ -83,37 +107,57 @@ macro_rules! cache_get {
 }
 
 impl SourceContext<'_> {
-    pub fn get_def(&self, ix: usize) -> &RustTypeDef {
+    /// Returns the RustAST declaration for the type at `ix`.
+    pub fn get_def(&self, ix: usize) -> &RustTypeDecl {
         &self.def_map[ix]
     }
 
+    /// Polls the cache for the computed niche-count for the type at `ix`.
+    ///
+    /// See [`CanOptimize::niches`] for details.
     pub fn get_niches(&self, ix: usize) -> usize {
         cache_get!(self, niches, ix, niches)
     }
 
+    /// Polls the cache for the computed raw memory footprint (in bytes) for the type at `ix`.
+    ///
+    /// See [`MemSize::size_hint`] for details.
     pub fn get_size(&self, ix: usize) -> usize {
         cache_get!(self, size, ix, size_hint)
     }
+
+    /// Polls the cache for the computed raw alignment (in bytes) for the type at `ix`.
+    ///
+    /// See [`MemSize::align_hint`] for details.
 
     pub fn get_align(&self, ix: usize) -> usize {
         cache_get!(self, align, ix, align_hint)
     }
 
+    /// Polls the cache for the determination of whether the type is `Copy`-eligible.
+    ///
+    /// See [`CopyEligible::copy_hint`] for details
     pub fn get_copy(&self, ix: usize) -> bool {
         cache_get!(self, copy, ix, copy_hint)
     }
 
-    /// NOTE: Due to memoization, only one strategy will be computed for a given type-definition,
-    /// meaning that if you then request a different strategy with the same Context object, the old
-    /// result will be served up regardless of the actual strategy being passed in the second time
-    /// around.
+    /// Polls the cache for a heap-optimization result for the type at `ix` under the given `strategy`.
+    ///
+    /// If no entry is found, it will be computed and cached for future requests.
+    ///
+    /// # Notes
+    ///
+    /// Due to memoization, the strategy passed in the first time will determine the cached result,
+    /// and subsequent calls will serve up that same cached result even if a different strategy is
+    /// passed in. This is generally fine, because a single generation-run will almost always
+    /// commit to a single strategy.
     pub fn get_heap(&self, strategy: HeapStrategy, ix: usize) -> HeapOutcome {
         cache_get!(self, heap, ix, heap_hint, strategy)
     }
 }
 
-impl<'a> From<&'a [RustTypeDef]> for SourceContext<'a> {
-    fn from(def_map: &'a [RustTypeDef]) -> Self {
+impl<'a> From<&'a [RustTypeDecl]> for SourceContext<'a> {
+    fn from(def_map: &'a [RustTypeDecl]) -> Self {
         SourceContext {
             def_map,
             cache: Rc::new(RefCell::new(HashMap::new())),
@@ -132,6 +176,10 @@ impl CanOptimize for RustType {
             RustType::AnonTuple(ts) => niche_product(ts.iter().map(|t| t.niches(context))),
             // conservative estimate based on our assumption we won't see any Verbatim types in gencode structs
             RustType::Verbatim(..) => 0,
+            // in actuality, ReadArray has many more niches, but we cannot calculate it reliably because it is an external definition
+            RustType::ReadArray(..) => 1,
+            // in actuality, ViewObject has many more niches, but we can't predictably calculate them without locking in the backing-type implementation
+            RustType::ViewObject(..) => 1,
         }
     }
 }
@@ -152,6 +200,22 @@ impl MemSize for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
+            RustType::ReadArray(..) => {
+                // FIXME - this is subject to external implementation details
+                let sz_scope = {
+                    let sz_slice = std::mem::size_of::<&[u8]>();
+                    let sz_base = std::mem::size_of::<usize>();
+                    sz_slice + sz_base
+                };
+                let sz_length = std::mem::size_of::<usize>();
+                let sz_stride = std::mem::size_of::<usize>();
+                sz_scope + sz_length + sz_stride
+            }
+            RustType::ViewObject(..) => {
+                let sz_buffer = std::mem::size_of::<&[u8]>();
+                let sz_start_offs = std::mem::size_of::<usize>();
+                sz_buffer + sz_start_offs
+            }
         }
     }
 
@@ -169,6 +233,10 @@ impl MemSize for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
+            RustType::ReadArray(..) | RustType::ViewObject(..) => {
+                // FIXME - this is subject to external implementation details
+                std::mem::align_of::<usize>()
+            }
         }
     }
 }
@@ -181,6 +249,8 @@ impl CopyEligible for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
+            RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
+            RustType::ViewObject(..) => VIEW_OBJECT_IS_COPY,
         }
     }
 }
@@ -193,6 +263,7 @@ impl CanOptimize for AtomType {
     fn niches(&self, context: &SourceContext<'_>) -> usize {
         match self {
             AtomType::Prim(pt) => pt.niches(()),
+            AtomType::Signed(pxt) => pxt.niches(()),
             AtomType::Comp(ct) => ct.niches(context),
             AtomType::TypeRef(lt) => lt.niches(context),
         }
@@ -203,6 +274,7 @@ impl MemSize for AtomType {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             AtomType::Prim(pt) => pt.size_hint(()),
+            AtomType::Signed(pxt) => pxt.size_hint(()),
             AtomType::Comp(ct) => ct.size_hint(context),
             AtomType::TypeRef(lt) => lt.size_hint(context),
         }
@@ -211,6 +283,7 @@ impl MemSize for AtomType {
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             AtomType::Prim(pt) => pt.align_hint(()),
+            AtomType::Signed(pxt) => pxt.align_hint(()),
             AtomType::Comp(ct) => ct.align_hint(context),
             AtomType::TypeRef(lt) => lt.align_hint(context),
         }
@@ -221,6 +294,7 @@ impl CopyEligible for AtomType {
     fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
         match self {
             AtomType::Prim(pt) => pt.copy_hint(()),
+            AtomType::Signed(pxt) => pxt.copy_hint(()),
             AtomType::Comp(ct) => ct.copy_hint(context),
             AtomType::TypeRef(lt) => lt.copy_hint(context),
         }
@@ -249,22 +323,20 @@ const UTF16_SCALAR_MAX: usize = 0x10FFF;
 
 impl CanOptimize for PrimType {
     fn niches(&self, _: ()) -> usize {
-        match self {
+        match *self {
             PrimType::Unit => 0,
             PrimType::Bool => const { (u8::MAX as usize + 1) - 2 },
             // Because Char is Unicode, there are invalid ranges that form niches
-            PrimType::Char => match char::UNICODE_VERSION {
-                (16, 0, 0) => const { u32::MAX as usize - UTF16_SCALAR_MAX },
-                _ => unimplemented!("unsupported Unicode version"),
-            },
-            PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize => 0,
+            PrimType::Char => const { u32::MAX as usize - UTF16_SCALAR_MAX },
+            PrimType::Usize => 0,
+            PrimType::Unsigned(ut) => ut.niches(()),
         }
     }
 }
 
 impl MemSize for PrimType {
     fn size_hint(&self, _: ()) -> usize {
-        one_to_one! { size self,
+        one_to_one! { size *self,
             Unit => (),
             U8 => u8,
             U16 => u16,
@@ -277,7 +349,7 @@ impl MemSize for PrimType {
     }
 
     fn align_hint(&self, _: ()) -> usize {
-        one_to_one! { align self,
+        one_to_one! { align *self,
             Unit => (),
             U8 => u8,
             U16 => u16,
@@ -293,23 +365,98 @@ impl MemSize for PrimType {
 impl CopyEligible for PrimType {
     fn copy_hint(&self, _: ()) -> bool {
         // NOTE - as implemented, all PrimTypes are copy, but we don't want to hardcode this and forget if we add non-Copy primtypes later on
+        match self {
+            PrimType::Unsigned(ut) => ut.copy_hint(()),
+            PrimType::Usize | PrimType::Unit | PrimType::Bool | PrimType::Char => true,
+        }
+    }
+}
+
+impl ASTContext for MachineUint {
+    type Context<'a> = ();
+}
+
+impl CanOptimize for MachineUint {
+    fn niches(&self, _: ()) -> usize {
+        match self {
+            MachineUint::U8 | MachineUint::U16 | MachineUint::U32 | MachineUint::U64 => 0,
+        }
+    }
+}
+
+impl MemSize for MachineUint {
+    fn size_hint(&self, _: ()) -> usize {
+        one_to_one! { size self,
+            U8 => u8,
+            U16 => u16,
+            U32 => u32,
+            U64 => u64
+        }
+    }
+
+    fn align_hint(&self, _: ()) -> usize {
+        one_to_one! { align self,
+            U8 => u8,
+            U16 => u16,
+            U32 => u32,
+            U64 => u64
+        }
+    }
+}
+
+impl CopyEligible for MachineUint {
+    fn copy_hint(&self, _: ()) -> bool {
         matches!(
             self,
-            PrimType::U8
-                | PrimType::U16
-                | PrimType::U32
-                | PrimType::U64
-                | PrimType::Usize
-                | PrimType::Unit
-                | PrimType::Bool
-                | PrimType::Char
+            MachineUint::U8 | MachineUint::U16 | MachineUint::U32 | MachineUint::U64
         )
     }
 }
 
-/// Local choice of what type to embed as the parameter to make `Vec` a concrete type-instance we can pass into
+impl ASTContext for MachineSint {
+    type Context<'a> = ();
+}
+
+impl CanOptimize for MachineSint {
+    fn niches(&self, _: ()) -> usize {
+        match self {
+            MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64 => 0,
+        }
+    }
+}
+
+impl MemSize for MachineSint {
+    fn size_hint(&self, _: ()) -> usize {
+        one_to_one! { size self,
+            I8 => i8,
+            I16 => i16,
+            I32 => i32,
+            I64 => i64
+        }
+    }
+
+    fn align_hint(&self, _: ()) -> usize {
+        one_to_one! { align self,
+            I8 => i8,
+            I16 => i16,
+            I32 => i32,
+            I64 => i64
+        }
+    }
+}
+
+impl CopyEligible for MachineSint {
+    fn copy_hint(&self, _: ()) -> bool {
+        matches!(
+            self,
+            MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64
+        )
+    }
+}
+
+/// Local choice of what type to embed as the parameter to make concrete type-instances we can pass into
 /// `size_of` and `align_of` methods.
-type VecFiller = u8;
+type Cement = u32;
 
 impl<T> ASTContext for CompType<Box<T>>
 where
@@ -325,7 +472,7 @@ where
 {
     fn size_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
-            CompType::Vec(..) => size_of::<Vec<VecFiller>>(),
+            CompType::Vec(..) => size_of::<Vec<Cement>>(),
             CompType::Option(inner) => {
                 if inner.is_optimized(context) {
                     inner.size_hint(context)
@@ -333,18 +480,20 @@ where
                     inner.size_hint(context) + inner.align_hint(context)
                 }
             }
+            CompType::PhantomData(..) => size_of::<std::marker::PhantomData<Cement>>(),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
-            CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
+            CompType::Borrow(..) => size_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
 
     fn align_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
-            CompType::Vec(..) => align_of::<Vec<VecFiller>>(),
+            CompType::PhantomData(..) => align_of::<std::marker::PhantomData<Cement>>(),
+            CompType::Vec(..) => align_of::<Vec<Cement>>(),
             CompType::Option(inner) => inner.align_hint(context),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
-            CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
+            CompType::Borrow(..) => align_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
@@ -359,6 +508,7 @@ where
         match self {
             // Vec<T> has enough niches that all values of `n: u8` are optimizable
             CompType::Vec(..) => usize::MAX,
+            // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
             CompType::Option(inner) => match inner.niches(context) {
                 0 => match inner.align_hint(context) {
                     n @ 1..=7 => (1 << (8 * n)) - 1,
@@ -367,8 +517,8 @@ where
                 },
                 n => n - 1,
             },
-            // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
-            CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
+            CompType::PhantomData(..) => 0,
+            CompType::Borrow(..) => 1,
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
@@ -386,6 +536,7 @@ where
             CompType::Borrow(_lt, Mut::Mutable, _) => {
                 unreachable!("unexpected mutable borrow in generative type: {self:?}")
             }
+            CompType::PhantomData(..) => true,
             CompType::Vec(..) => false,
             CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
             CompType::Option(inner) => inner.copy_hint(context),
@@ -402,7 +553,7 @@ impl CanOptimize for LocalType {
     fn niches(&self, context: &SourceContext<'_>) -> usize {
         match self {
             // Note - this can be circular if we are not careful, but we don't expect circularity in practice
-            LocalType::LocalDef(ix, _) => context.get_niches(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_niches(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
             }
@@ -413,7 +564,7 @@ impl CanOptimize for LocalType {
 impl MemSize for LocalType {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
-            LocalType::LocalDef(ix, _) => context.get_size(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_size(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
             }
@@ -422,7 +573,7 @@ impl MemSize for LocalType {
 
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
-            LocalType::LocalDef(ix, _) => context.get_align(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_align(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
             }
@@ -433,11 +584,39 @@ impl MemSize for LocalType {
 impl CopyEligible for LocalType {
     fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
         match self {
-            LocalType::LocalDef(ix, _) => context.get_copy(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_copy(*ix),
             LocalType::External(ext_type) => {
-                unreachable!("unexpected external type-reference encountered during copy-analysis: {ext_type}")
+                unreachable!(
+                    "unexpected external type-reference encountered during copy-analysis: {ext_type}"
+                )
             }
         }
+    }
+}
+
+impl ASTContext for RustTypeDecl {
+    type Context<'a> = &'a SourceContext<'a>;
+}
+
+impl CanOptimize for RustTypeDecl {
+    fn niches(&self, context: &SourceContext<'_>) -> usize {
+        self.def.niches(context)
+    }
+}
+
+impl MemSize for RustTypeDecl {
+    fn size_hint(&self, context: &SourceContext<'_>) -> usize {
+        self.def.size_hint(context)
+    }
+
+    fn align_hint(&self, context: &SourceContext<'_>) -> usize {
+        self.def.align_hint(context)
+    }
+}
+
+impl CopyEligible for RustTypeDecl {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        self.def.copy_hint(context)
     }
 }
 

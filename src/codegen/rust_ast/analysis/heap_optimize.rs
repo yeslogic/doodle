@@ -1,6 +1,7 @@
-use super::{aligned_size, MemSize};
+use super::{MemSize, aligned_size};
 use crate::codegen::rust_ast::{
-    AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDef, RustVariant,
+    AtomType, CompType, LocalType, MachineSint, PrimType, RustStruct, RustType, RustTypeDecl,
+    RustTypeDef, RustVariant,
 };
 use core::alloc::Layout;
 use std::num::NonZeroUsize;
@@ -128,9 +129,7 @@ impl HeapOptimize for RustStruct {
             (HeapAction::Noop, mk_layout(self, context))
         } else {
             // NOTE - a rust struct, as a standalone object, cannot be wrapped in a heap allocation; only its fields can be individually heap-allocated
-            let fields = match &self {
-                RustStruct::Record(fields) => fields,
-            };
+            let RustStruct::Record(fields) = &self;
             let mut raw_size = 0;
             let mut max_align = 1;
             let mut field_actions = Vec::with_capacity(fields.len());
@@ -158,6 +157,8 @@ impl HeapOptimize for RustStruct {
 impl HeapOptimize for RustType {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
+            RustType::ReadArray(..) => (HeapAction::Noop, mk_layout(self, context)),
+            RustType::ViewObject(..) => (HeapAction::Noop, mk_layout(self, context)),
             RustType::Atom(at) => at.heap_hint(strategy, context),
             RustType::AnonTuple(ts) => {
                 if strategy.is_never() {
@@ -203,6 +204,7 @@ impl HeapOptimize for AtomType {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
             AtomType::Prim(pt) => pt.heap_hint(strategy, ()),
+            AtomType::Signed(pxt) => pxt.heap_hint(strategy, ()),
             AtomType::Comp(ct) => ct.heap_hint(strategy, context),
             AtomType::TypeRef(lt) => lt.heap_hint(strategy, context),
         }
@@ -210,6 +212,12 @@ impl HeapOptimize for AtomType {
 }
 
 impl HeapOptimize for PrimType {
+    fn heap_hint(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+        (HeapAction::Noop, mk_layout(self, context))
+    }
+}
+
+impl HeapOptimize for MachineSint {
     fn heap_hint(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         (HeapAction::Noop, mk_layout(self, context))
     }
@@ -238,8 +246,10 @@ impl HeapOptimize for CompType<Box<RustType>> {
                 }
             }
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
-            CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
+            // REVIEW - is this an accurate claim, or do we need a bespoke variant for this case?
+            CompType::Borrow(..) => (HeapAction::Noop, mk_layout(self, context)),
             CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
+            CompType::PhantomData(..) => (HeapAction::Noop, mk_layout(self, context)),
         }
     }
 }
@@ -247,7 +257,7 @@ impl HeapOptimize for CompType<Box<RustType>> {
 impl HeapOptimize for LocalType {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            LocalType::LocalDef(ix, _) => {
+            LocalType::LocalDef(ix, ..) => {
                 let (action, layout) = context.get_heap(strategy, *ix);
                 let size = layout.size();
                 if strategy.min_heap_size().is_some_and(|sz| size >= sz) {
@@ -279,6 +289,12 @@ impl HeapOptimize for LocalType {
                 unreachable!("unexpected external type-reference in structural type")
             }
         }
+    }
+}
+
+impl HeapOptimize for RustTypeDecl {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+        self.def.heap_hint(strategy, context)
     }
 }
 
@@ -324,19 +340,17 @@ impl HeapOptimize for RustTypeDef {
                             },
                             Layout::from_size_align(max_var_size, HEAP_ALIGN).unwrap(),
                         )
-                    } else {
-                        if is_productive {
-                            (
-                                HeapAction::NonLocal,
-                                Layout::from_size_align(
-                                    aligned_size(max_var_size + 1, max_align),
-                                    max_align,
-                                )
-                                .unwrap(),
+                    } else if is_productive {
+                        (
+                            HeapAction::NonLocal,
+                            Layout::from_size_align(
+                                aligned_size(max_var_size + 1, max_align),
+                                max_align,
                             )
-                        } else {
-                            (HeapAction::Noop, mk_layout(self, context))
-                        }
+                            .unwrap(),
+                        )
+                    } else {
+                        (HeapAction::Noop, mk_layout(self, context))
                     }
                 } else if let Some(_abs_cutoff) = strategy.min_heap_size() {
                     let mut var_actions = Vec::with_capacity(vars.len());

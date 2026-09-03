@@ -55,11 +55,11 @@ impl fmt::Debug for Fragment {
             Self::String(s) => f.debug_tuple("String").field(s).finish(),
             Self::DebugAtom(at) => f
                 .debug_tuple("DebugAtom")
-                .field(&format!("{:?}", at))
+                .field(&format!("{at:?}"))
                 .finish(),
             Self::DisplayAtom(at) => f
                 .debug_tuple("DisplayAtom")
-                .field(&format!("{}", at))
+                .field(&format!("{at}"))
                 .finish(),
             Self::Group(grp) => f.debug_tuple("Group").field(grp).finish(),
             Self::Cat(x, y) => f.debug_tuple("Cat").field(x).field(y).finish(),
@@ -108,7 +108,7 @@ impl Fragment {
                     0 => true,
                     1 => items[0].is_vacuous(), // sep can be non-vacuous if there is only one item
                     _ => {
-                        sep.as_ref().map_or(true, |frag| frag.is_vacuous())
+                        sep.as_deref().is_none_or(Fragment::is_vacuous)
                             && items.iter().all(Fragment::is_vacuous)
                     }
                 }
@@ -230,12 +230,12 @@ impl Fragment {
     /// There are currently no display rules that differentiate [`Fragment::Group`](x) from `x` itself, but
     /// it is defined anyway and supported with this helper to allow for cleaner adoption of a more nuanced
     /// model in which logically-grouped fragments have their own display rules.
-    pub fn group(self) -> Self {
+    pub(crate) fn group(self) -> Self {
         Self::Group(Box::new(self))
     }
 
     /// Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
-    pub fn enclose(&mut self) -> &mut Self {
+    pub(crate) fn enclose(&mut self) -> &mut Self {
         let this = Box::new(std::mem::take(self));
         *self = Self::Group(this);
         self
@@ -251,22 +251,24 @@ impl Fragment {
     ///
     /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
     #[inline]
-    pub fn append_break(&mut self) -> &mut Self {
+    fn append_break(&mut self) -> &mut Self {
         self.append(Fragment::Char('\n'))
     }
 
     /// Returns an empty fragment
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self::Empty
     }
 
     /// Returns `true` if the printable representation of `self` fits on a single line.
     ///
+    /// Takes a boolean `is_final` parameter that is to be set to `true` if and only if `self` is the last fragment of a larger expression
+    ///
     /// Similar to [`Fragment::fits_inline`], but determines whether more than one line is displayed
     /// rather than whether inline concatenations are possible.
     ///
-    /// Importantly, a single trailing newline character is permitted, and `Symbols` care allowed to appear anywhere
-    pub fn is_single_line(&self, is_final: bool) -> bool {
+    /// Importantly, a single trailing newline character is permitted, and `Symbols` are allowed to appear anywhere
+    pub(crate) fn is_single_line(&self, is_final: bool) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Char('\n') => is_final,
@@ -307,7 +309,7 @@ impl Fragment {
     /// Returns `false` if any of the following are true:
     ///   - The Display form of `self` contains any newline characters
     ///   - `self` contains any `Symbol` sub-fragments
-    pub fn fits_inline(&self) -> bool {
+    pub(crate) fn fits_inline(&self) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Char(c) => *c != '\n',
@@ -333,7 +335,7 @@ impl Fragment {
     /// Joins two fragments with appropriate whitespace:
     ///   - If `other` fits on a single line with no trailing newline, joins with `' '`, with a newline at the very end
     ///   - Otherwise, joins with `'\n'`
-    pub fn join_with_wsp(self, other: Self) -> Self {
+    pub(crate) fn join_with_wsp(self, other: Self) -> Self {
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {
@@ -344,22 +346,24 @@ impl Fragment {
     /// Joins two fragments with the appropriate whitespace and a conditional line-ending `trailer`:
     ///    - If `other` does not require more than one line to print, joins with `' '`, with a newline at the very end (and without `trailer`).
     ///    - Otherwise, joins `self` and `trailer` with no separation, followed by `other` on the following line
-    pub fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
+    pub(crate) fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {
+            // FIXME - this doesn't work properly if `self` ends in a newline
             self.cat(trailer).cat_break().cat(other)
         }
     }
 }
 
 /// Builder pattern helper-struct for accumulating up longer sequences of [Fragment]s.
-pub struct FragmentBuilder {
+pub(crate) struct FragmentBuilder {
     frozen: Vec<Fragment>,
     active: Fragment,
 }
 
 impl FragmentBuilder {
+    /// Constructs a new, empty [`FragmentBuilder`]
     pub fn new() -> Self {
         Self {
             frozen: Vec::new(),
@@ -367,6 +371,7 @@ impl FragmentBuilder {
         }
     }
 
+    /// Obtains a mutable reference to the currently-active Fragment if further mutation is desired before it is finalized.
     pub fn active_mut(&mut self) -> &mut Fragment {
         &mut self.active
     }
@@ -397,11 +402,13 @@ impl FragmentBuilder {
         }
     }
 
+    /// Freezes the active fragment (if any), before sequencing all frozen fragments into a [`Fragment::Sequence`].
     pub fn finalize(mut self) -> Fragment {
         let _ = self.renew();
         Fragment::seq(self.frozen, None)
     }
 
+    /// Similar to [`Self::finalize`], but adds a separator between each frozen fragment.
     pub fn finalize_with_sep(mut self, sep: Fragment) -> Fragment {
         let _ = self.renew();
         Fragment::seq(self.frozen, Some(sep))

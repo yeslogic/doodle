@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use doodle::{codegen::generate_code, FormatModule};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use doodle::{FormatModule, codegen::generate_code};
 
 pub fn codegen_run_benchmark(c: &mut Criterion) {
     let mut module = FormatModule::new();

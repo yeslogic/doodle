@@ -1,17 +1,57 @@
-use num_traits::{one, One};
+use num_traits::{One, one};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 pub use crate::byte_set::ByteSet;
+pub use crate::numeric::eval::*;
 pub use crate::parser::{
-    error::{PResult, ParseError},
-    Parser,
+    Parser, View,
+    error::{PResult, ParseError, Permissible},
 };
+pub use smallsorts::{
+    self as allsorts,
+    binary::{
+        U8, U16Be, U32Be, U64Be,
+        read::{ReadArray, ReadCtxt, ReadUnchecked},
+    },
+};
+
+/// Trait implemented over marker-type proxies that implement the most natural parse for their
+pub trait CommonObject {
+    type Args<'a>: Sized;
+    type Output<'a>: Sized;
+
+    fn parse<'input>(
+        p: &mut Parser<'input>,
+        args: Self::Args<'input>,
+    ) -> PResult<Self::Output<'input>>;
+
+    fn parse_offset<'input>(
+        view: View<'input>,
+        offset: usize,
+        args: Self::Args<'input>,
+    ) -> PResult<Self::Output<'input>> {
+        let mut p = Parser::from(view.offset(offset)?);
+        Self::parse(&mut p, args)
+    }
+
+    fn parse_nullable_offset<'input>(
+        view: View<'input>,
+        offset: usize,
+        args: Self::Args<'input>,
+    ) -> PResult<Option<Self::Output<'input>>> {
+        if offset == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(Self::parse_offset(view, offset, args)?))
+        }
+    }
+}
 
 /// Performs a checked_sub operation, returning an error if the result would be negative
 #[macro_export]
 macro_rules! try_sub {
-    ( $x:expr, $y:expr, $trace:expr ) => {
+    ( $x:expr_2021, $y:expr_2021, $trace:expr_2021 ) => {
         match $x.checked_sub($y) {
             Some(z) => z,
             None => {
@@ -24,12 +64,36 @@ macro_rules! try_sub {
     };
 }
 
-/// Computes the predecessor `x - 1`.
-///
-/// When called on `x := 0`, will behave identically to `x - 1`.
+/// `Numeric` trait to support the code-generation pipeline for the `IntSucc` and `IntPred` unary operations defined in the `numeric` engine.
+pub trait Numeric {
+    /// Computes the predecessor `x - 1`.
+    ///
+    /// This should produce the same result and behavior as `x - 1`, including for edge-cases.
+    fn pred(self) -> Self;
+
+    /// Computes the successor `x + 1`.
+    ///
+    /// This should produce the same result and behavior as `x + 1`, including for edge-cases.
+    fn succ(self) -> Self;
+}
+
+impl<T> Numeric for T
+where
+    T: One + std::ops::Sub<Output = T> + std::ops::Add<Output = T>,
+{
+    #[inline]
+    fn pred(self) -> Self {
+        self - one()
+    }
+
+    #[inline]
+    fn succ(self) -> Self {
+        self + one()
+    }
+}
+
+// REVIEW - after introducing the Numeric trait, the standalone `succ` and `pred` functions can be phased out once all references to them have been migrated
 #[inline]
-// REVIEW - should we handle 0 explicitly/differently?
-// NOTE - this impl (and that of `succ`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
 pub fn pred<T>(x: T) -> T
 where
     T: One + std::ops::Sub<Output = T>,
@@ -37,17 +101,28 @@ where
     x - one()
 }
 
-/// Computes the successor `x + 1`.
-///
-/// When called on `x := T::MAX`, will behave identically to `x + 1`.
 #[inline]
-// REVIEW - should we handle T::MAX explicitly/differently?
-// NOTE - this impl (and that of `pred`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
 pub fn succ<T>(x: T) -> T
 where
     T: One + std::ops::Add<Output = T>,
 {
     x + one()
+}
+
+/// Helper for normalizing both `&Vec<T>` and `&[T]` to `&[T]`.
+///
+/// # Examples
+///
+/// ```
+/// # use doodle::prelude::slice_all;
+/// let v = vec![true, false];
+/// assert_eq!(slice_all(&v), slice_all(&v[..]));
+/// ```
+pub fn slice_all<'a, T, Arr>(buf: &'a Arr) -> &'a [T]
+where
+    Arr: ?Sized + AsRef<[T]>,
+{
+    buf.as_ref()
 }
 
 /// Performs a flat-map operation taking an iterator over `T` and returning a vector over `U`.
@@ -193,7 +268,7 @@ pub fn u64be(input: (u8, u8, u8, u8, u8, u8, u8, u8)) -> u64 {
 /// For compatibility reasons with the code-generator layer, `count` is a `u32`
 /// to avoid having to cast it to `usize` in advance.
 pub fn dup32<T: Clone>(count: u32, value: T) -> Vec<T> {
-    Vec::from_iter(std::iter::repeat(value).take(count as usize))
+    Vec::from_iter(std::iter::repeat_n(value, count as usize))
 }
 
 /// Parses a DEFLATE-style huffman code-length table, with optional code-value table to reconsider the lengths
@@ -239,7 +314,7 @@ where
 {
     match rf {
         Ok(f) => Box::new(f),
-        Err(e) => Box::new(move |_| Err(e)),
+        Err(e) => Box::new(move |_| Err(e.clone())),
     }
 }
 
@@ -247,7 +322,7 @@ where
 /// to the canonical prefix-code reconstruction algorithm used in DEFLATE.
 pub fn make_huffman_decoder(
     lengths: &[usize],
-) -> PResult<impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16>> {
+) -> PResult<impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> + use<>> {
     let max_length = *lengths.iter().max().unwrap();
     let mut bl_count = [0].repeat(max_length + 1);
 
@@ -277,7 +352,7 @@ pub fn make_huffman_decoder(
 }
 
 pub(crate) mod huffman {
-    use crate::parser::error::StateError;
+    use crate::parser::error::{DataStateError, StateError};
 
     use super::{PResult, ParseError, Parser};
 
@@ -326,7 +401,7 @@ pub(crate) mod huffman {
                     match children[b as usize].insert(&suffix[1..], value) {
                         Ok(()) => {}
                         Err(_e) => {
-                            eprintln!("{:?}", this);
+                            eprintln!("{this:?}");
                             return Err(_e);
                         }
                     }
@@ -386,9 +461,9 @@ pub(crate) mod huffman {
                 node = match node.follow(b) {
                     Ok(node) => node,
                     Err(e) => {
-                        return Err(ParseError::InternalError(StateError::HuffmanDescentError(
-                            e,
-                        )))
+                        return Err(ParseError::InternalError(StateError::Data(
+                            DataStateError::HuffmanDescentError(e),
+                        )));
                     }
                 }
             }
@@ -408,11 +483,7 @@ fn bit_range(nbits: usize, value: usize) -> Vec<u8> {
 }
 
 fn bit_as_u8(b: bool) -> u8 {
-    if b {
-        1
-    } else {
-        0
-    }
+    if b { 1 } else { 0 }
 }
 
 pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {
@@ -450,13 +521,27 @@ pub fn slice_ext<T: Copy>(vs: &[T], range: std::ops::Range<usize>) -> Cow<'_, [T
 
 #[inline]
 /// Returns a boolean indicating whether we are finished processing a bounded repetition ([`Format::RepeatBetween`])
-/// given whether the following element matches (`next_match`), whether we have repeated at least the minimum required
-/// number of times (`ge_min`), and whether we have repeated exactly the maximum required number of times (`eq_max`).
+/// given whether we are out of available repeats (`out_of_reps`), and based on whether the current length (repetition count)
+/// is in the half-open range `[min, max)`, or otherwise under `min` or exactly at `max`.
 ///
-/// Will return an error if we have run out of elements but the minimum repetition requirement is not met.
-pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> PResult<bool> {
-    if next_match && !ge_min {
+/// Will return an error if `out_of_reps` is true and `len < min`.
+pub fn repeat_between_finished(
+    out_of_reps: bool,
+    len: usize,
+    min: usize,
+    max: usize,
+) -> PResult<bool> {
+    assert!(
+        min <= max,
+        "bad repeat-count instance: min is greater than max: ({min} > {max})"
+    );
+    assert!(
+        len <= max,
+        "bad repeat-count state: len has exceeded max ({len} > {max})"
+    );
+
+    if out_of_reps && len < min {
         return Err(ParseError::InsufficientRepeats);
     };
-    Ok(next_match || eq_max)
+    Ok(out_of_reps || len == max)
 }

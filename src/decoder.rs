@@ -1,25 +1,57 @@
-use crate::byte_set::ByteSet;
-use crate::error::{DecodeError, DecodeResult};
-use crate::read::ReadCtxt;
-use crate::{
-    pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
-    TypeScope, ValueType,
-};
-use crate::{IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp};
-use anyhow::{anyhow, Result as AResult};
-use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+use anyhow::{Result as AResult, anyhow};
+
+use crate::byte_set::ByteSet;
+use crate::error::{DecodeError, DecodeErrorKind, UnknownVarError};
+use crate::fixed::{SpineElem, analyze_fixed_shape};
+use crate::read::{BufferKind, ReadCtxt};
+use crate::util::{EResult, WithErr};
+use crate::util::{ErrTrace as _, downgrade_error_with};
+use crate::validation::Condition;
+use crate::{
+    BaseKind, DynFormat, Endian, Expr, Format, FormatModule, Label, MatchTree, MaybeTyped, Next,
+    Pattern, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
+};
+use crate::{FixedReadKind, try_with};
 
 pub mod seq_kind;
 use seq_kind::sub_range;
 pub use seq_kind::{SeqKind, ValueSeq};
 
+/// Helper macro for discarding identifiers but keeping their repetition-group
+macro_rules! wildcard {
+    ( $x:ident ) => {
+        _
+    };
+}
+pub(crate) use wildcard;
+
+/// Helper macro for breaking out of a loop if a "done" flag is set in a `WithErr` value.
+///
+/// Syntax:
+///
+/// Takes the `WithErr` value as the first argument,
+/// with a comma-separated and parenthesized list of identifiers (up to but **excluding** the "done" flag),
+/// separated by `=>`.
+///
+/// ```ignore
+/// break_if_done!(expr => (ident1, ident2, ..., identN))
+/// ```
+macro_rules! break_if_done {
+    ( $expr:expr => ( $($x:ident),+ ) ) => {
+        let ($($crate::decoder::wildcard!($x)),* , done) = $expr.as_ref();
+        if *done {
+            break;
+        }
+    };
+}
+pub(crate) use break_if_done;
+
 pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
-    if vec.len() != 2 {
-        panic!("expected pair");
-    }
+    assert_eq!(vec.len(), 2, "expected pair");
     unsafe {
         // Safe because we checked the length above
         let second = vec.pop().unwrap_unchecked();
@@ -28,281 +60,32 @@ pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-#[serde(tag = "tag", content = "data")]
-pub enum Value {
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    Char(char),
-    Usize(usize),
-    EnumFromTo(std::ops::Range<usize>),
-    Option(Option<Box<Value>>),
-    Tuple(Vec<Value>),
-    Record(Vec<(Label, Value)>),
-    Variant(Label, Box<Value>),
-    Seq(SeqKind<Value>),
-    Mapped(Box<Value>, Box<Value>),
-    Branch(usize, Box<Value>),
-}
+pub mod value;
+pub use value::Value;
 
-impl From<usize> for Value {
-    fn from(value: usize) -> Value {
-        Value::Usize(value)
-    }
-}
-
-const MAX_SEQ_LEN: usize = 64;
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Bool(b) => write!(f, "{}", b),
-            Value::U8(i) => write!(f, "{}", i),
-            Value::U16(i) => write!(f, "{}", i),
-            Value::U32(i) => write!(f, "{}", i),
-            Value::U64(i) => write!(f, "{}", i),
-            Value::Char(c) => write!(f, "{:?}", c),
-            Value::Usize(i) => write!(f, "{}", i),
-            Value::EnumFromTo(r) => write!(f, "{:?}", r),
-            Value::Option(v) => match v {
-                None => write!(f, "None"),
-                Some(v) => write!(f, "Some({})", v),
-            },
-            Value::Tuple(vs) => {
-                write!(
-                    f,
-                    "({})",
-                    vs.iter()
-                        .map(|v| v.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Value::Record(fields) => {
-                write!(
-                    f,
-                    "{{ {} }}",
-                    fields
-                        .iter()
-                        .map(|(f, v)| format!("{}: {}", f, v))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Value::Variant(label, value) => {
-                write!(f, "`{}({})", label, value)
-            }
-            Value::Seq(s_kind) => match s_kind {
-                SeqKind::Dup(n, v) => write!(f, "[{v}; {n}]"),
-                SeqKind::Strict(vs) => {
-                    if vs.len() > MAX_SEQ_LEN {
-                        write!(f, "[...; {}]", vs.len())
-                    } else {
-                        write!(
-                            f,
-                            "[{}]",
-                            vs.iter()
-                                .map(|v| v.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )
-                    }
-                }
-            },
-            Value::Mapped(orig, image) => {
-                write!(f, "({} => {})", orig, image)
-            }
-            Value::Branch(n, value) => write!(f, "({n} :~ {})", value),
-        }
-    }
-}
-
-impl Value {
-    fn tuple_proj(&self, index: usize) -> &Self {
-        match self.coerce_mapped_value() {
-            Value::Tuple(vs) => &vs[index],
-            _ => panic!("expected tuple"),
-        }
-    }
-
-    fn matches_inner<'a>(&'a self, scope: &mut MultiScope<'a>, pattern: &Pattern) -> bool {
-        match (pattern, self) {
-            (Pattern::Binding(name), head) => {
-                scope.push(name.clone(), head);
-                true
-            }
-            (Pattern::Wildcard, _) => true,
-            (Pattern::Bool(b0), Value::Bool(b1)) => b0 == b1,
-            (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
-            (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
-            (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
-            (Pattern::U64(i0), Value::U64(i1)) => i0 == i1,
-            (Pattern::Int(bounds), Value::U8(n)) => bounds.contains(usize::from(*n)),
-            (Pattern::Int(bounds), Value::U16(n)) => bounds.contains(usize::from(*n)),
-            (Pattern::Int(bounds), Value::U32(n)) => bounds.contains(usize::try_from(*n).unwrap()),
-            (Pattern::Int(bounds), Value::U64(n)) => bounds.contains(usize::try_from(*n).unwrap()),
-            (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
-            (Pattern::Tuple(ps), Value::Tuple(vs)) if ps.len() == vs.len() => {
-                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
-                    }
-                }
-                true
-            }
-            (Pattern::Seq(ps), Value::Seq(vs)) if ps.len() == vs.len() => {
-                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
-                    }
-                }
-                true
-            }
-
-            (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
-                v.matches_inner(scope, p)
-            }
-            (Pattern::Option(None), Value::Option(None)) => true,
-            (Pattern::Option(Some(p)), Value::Option(Some(v))) => v.matches_inner(scope, p),
-            _ => false,
-        }
-    }
-
-    pub(crate) fn matches<'a>(
-        &'a self,
-        scope: &'a Scope<'a>,
-        pattern: &Pattern,
-    ) -> Option<MultiScope<'a>> {
-        let mut pattern_scope = MultiScope::new(scope);
-        self.coerce_mapped_value()
-            .matches_inner(&mut pattern_scope, pattern)
-            .then_some(pattern_scope)
-    }
-
-    pub fn coerce_mapped_value(&self) -> &Self {
-        match self {
-            Value::Mapped(_orig, v) => v.coerce_mapped_value(),
-            Value::Branch(_n, v) => v.coerce_mapped_value(),
-            v => v,
-        }
-    }
-
-    pub fn extract_mapped_value(self) -> Self {
-        match self {
-            Value::Mapped(_orig, v) => v.extract_mapped_value(),
-            Value::Branch(_n, v) => v.extract_mapped_value(),
-            v => v,
-        }
-    }
-
-    fn record_proj(&self, label: &str) -> &Self {
-        match self {
-            Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
-                Some((_, v)) => v,
-                None => panic!("{label} not found in record"),
-            },
-            _ => panic!("expected record, found {self:?}"),
-        }
-    }
-
-    pub(crate) fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
-        match self {
-            Value::Seq(elts) => Some(ValueSeq::ValueSeq(elts)),
-            Value::EnumFromTo(range) => Some(ValueSeq::IntRange(range.clone())),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn is_boolean(&self) -> bool {
-        match self.coerce_mapped_value() {
-            Value::Bool(_) => true,
-            _ => false,
-        }
-    }
-}
-
-impl Value {
-    pub const UNIT: Value = Value::Tuple(Vec::new());
-
-    pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Value)>) -> Value {
-        Value::Record(
-            fields
-                .into_iter()
-                .map(|(label, value)| (label.into(), value))
-                .collect(),
-        )
-    }
-
-    pub fn variant(label: impl IntoLabel, value: impl Into<Box<Value>>) -> Value {
-        Value::Variant(label.into(), value.into())
-    }
-
-    /// Unwraps any compatible numeric-typed `Value` and returns the contained number as a `usize`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the value is not numeric.
-    pub(crate) fn unwrap_usize(self) -> usize {
-        match self {
-            Value::U8(n) => usize::from(n),
-            Value::U16(n) => usize::from(n),
-            Value::U32(n) => usize::try_from(n).unwrap(),
-            Value::U64(n) => usize::try_from(n).unwrap(),
-            Value::Usize(n) => n,
-            _ => panic!("value is not a number"),
-        }
-    }
-
-    /// Unwraps `Value::U8` and returns the contained value, or panics if the value is not `Value::U8`.
-    pub(crate) fn get_as_u8(&self) -> u8 {
-        match self {
-            Value::U8(n) => *n,
-            Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!("value is numeric but not u8 (this may be a soft error, or even success, in future)"),
-            _ => panic!("value is not a number"),
-        }
-    }
-
-    pub(crate) fn unwrap_tuple(self) -> Vec<Value> {
-        match self {
-            Value::Tuple(values) => values,
-            _ => panic!("value is not a tuple"),
-        }
-    }
-
-    pub(crate) fn unwrap_bool(&self) -> bool {
-        match self {
-            Value::Bool(b) => *b,
-            _ => panic!("value is not a bool"),
-        }
-    }
-
-    /// FIXME - do we really need this?
-    #[allow(dead_code)]
-    fn unwrap_char(self) -> char {
-        match self {
-            Value::Char(c) => c,
-            _ => panic!("value is not a char"),
-        }
-    }
-}
+pub type DecodeResult<T> = Result<T, DecodeError>;
+pub type EDecodeResult<T> = EResult<T, DecodeError>;
 
 impl Expr {
     pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
-            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
+            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name).unwrap()),
             Expr::Bool(b) => Cow::Owned(Value::Bool(*b)),
             Expr::U8(i) => Cow::Owned(Value::U8(*i)),
             Expr::U16(i) => Cow::Owned(Value::U16(*i)),
             Expr::U32(i) => Cow::Owned(Value::U32(*i)),
             Expr::U64(i) => Cow::Owned(Value::U64(*i)),
+            Expr::Numeric(n) => match n.eval(scope) {
+                Ok(v) => Cow::Owned(v.into()),
+                Err(e) => {
+                    panic!("Expr::eval(Numeric({n:?})) failed during NumExpr evaluation: {e}")
+                }
+            },
             Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
             Expr::TupleProj(head, index) => cow_map(head.eval(scope), |v| {
-                v.coerce_mapped_value().tuple_proj(*index)
+                v.coerce_mapped_value().tuple_proj(*index).into_inner()
             }),
             Expr::Record(fields) => {
                 Cow::Owned(Value::record(fields.iter().map(|(label, expr)| {
@@ -310,7 +93,9 @@ impl Expr {
                 })))
             }
             Expr::RecordProj(head, label) => cow_map(head.eval(scope), |v| {
-                v.coerce_mapped_value().record_proj(label.as_ref())
+                v.coerce_mapped_value()
+                    .record_proj(label.as_ref())
+                    .into_inner()
             }),
             Expr::Variant(label, expr) => {
                 Cow::Owned(Value::variant(label.clone(), expr.eval_value(scope)))
@@ -332,217 +117,29 @@ impl Expr {
                 let head = head.eval(scope);
                 if let Some(pattern_scope) = head.matches(scope, pat) {
                     let value = expr.eval_value(&Scope::Multi(&pattern_scope));
-                    return Cow::Owned(value);
+                    Cow::Owned(value)
                 } else {
                     panic!("refutable pattern failed to match: {pat:?} :~ {head:?}");
                 }
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::IntRel(IntRel::Eq, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Ne, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Lt, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Gt, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Lte, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Gte, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Add, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Sub, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Mul, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Div, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Rem, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BitAnd, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BitOr, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BoolAnd, x, y) => {
-                // REVIEW - do we want left-biased short-circuiting?
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BoolOr, x, y) => {
-                // REVIEW - do we want left-biased short-circuiting?
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Shl, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Shr, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::Bool(x) => Value::Bool(!x),
-                x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
+            Expr::IntRel(rel, x, y) => Cow::Owned({
+                let left = x.eval_value(scope);
+                let right = y.eval_value(scope);
+                Value::int_rel(*rel, left, right)
             }),
-            Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed")),
-                ),
-                Value::U16(x) => Value::U16(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed")),
-                ),
-                Value::U32(x) => Value::U32(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed")),
-                ),
-                Value::U64(x) => Value::U64(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed")),
-                ),
-                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            Expr::Arith(op, x, y) => Cow::Owned({
+                let left = x.eval_value(scope);
+                let right = y.eval_value(scope);
+                Value::arith(*op, left, right)
             }),
-            Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
-                ),
-                Value::U16(x) => Value::U16(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
-                ),
-                Value::U32(x) => Value::U32(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
-                ),
-                Value::U64(x) => Value::U64(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                ),
-                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            Expr::Unary(op, x) => Cow::Owned({
+                let value = x.eval_value(scope);
+                Value::unary(*op, value)
             }),
 
+            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
             Expr::AsU8(x) => {
                 Cow::Owned(match x.eval_value(scope) {
                     Value::U8(x) => Value::U8(x),
@@ -555,6 +152,9 @@ impl Expr {
                     Value::U64(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
                         panic!("cannot perform AsU8 cast on u64 {x}: {err}")
                     })),
+                    Value::Usize(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on usize {x}: {err}")
+                    })),
                     x => panic!("cannot convert {x:?} to U8"),
                 })
             }
@@ -563,6 +163,7 @@ impl Expr {
                 Value::U16(x) => Value::U16(x),
                 Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
                 Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
+                Value::Usize(x) => Value::U16(u16::try_from(x).unwrap()),
                 x => panic!("cannot convert {x:?} to U16"),
             }),
             Expr::AsU32(x) => Cow::Owned(match x.eval_value(scope) {
@@ -570,6 +171,7 @@ impl Expr {
                 Value::U16(x) => Value::U32(u32::from(x)),
                 Value::U32(x) => Value::U32(x),
                 Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
+                Value::Usize(x) => Value::U32(u32::try_from(x).unwrap()),
                 x => panic!("cannot convert {x:?} to U32"),
             }),
             Expr::AsU64(x) => Cow::Owned(match x.eval_value(scope) {
@@ -577,6 +179,7 @@ impl Expr {
                 Value::U16(x) => Value::U64(u64::from(x)),
                 Value::U32(x) => Value::U64(u64::from(x)),
                 Value::U64(x) => Value::U64(x),
+                Value::Usize(x) => Value::U64(u64::try_from(x).unwrap()),
                 x => panic!("cannot convert {x:?} to U64"),
             }),
 
@@ -605,19 +208,33 @@ impl Expr {
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
             Expr::U64Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                    Cow::Owned(Value::U64(u64::from_be_bytes([
-                        *a, *b, *c, *d, *e, *f, *g, *h,
-                    ])))
-                }
+                [
+                    Value::U8(a),
+                    Value::U8(b),
+                    Value::U8(c),
+                    Value::U8(d),
+                    Value::U8(e),
+                    Value::U8(f),
+                    Value::U8(g),
+                    Value::U8(h),
+                ] => Cow::Owned(Value::U64(u64::from_be_bytes([
+                    *a, *b, *c, *d, *e, *f, *g, *h,
+                ]))),
                 _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
             },
             Expr::U64Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                    Cow::Owned(Value::U64(u64::from_le_bytes([
-                        *a, *b, *c, *d, *e, *f, *g, *h,
-                    ])))
-                }
+                [
+                    Value::U8(a),
+                    Value::U8(b),
+                    Value::U8(c),
+                    Value::U8(d),
+                    Value::U8(e),
+                    Value::U8(f),
+                    Value::U8(g),
+                    Value::U8(h),
+                ] => Cow::Owned(Value::U64(u64::from_le_bytes([
+                    *a, *b, *c, *d, *e, *f, *g, *h,
+                ]))),
                 _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
             },
             Expr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
@@ -629,6 +246,10 @@ impl Expr {
                     Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
                 }
                 Value::U64(x) => Value::Char(
+                    char::from_u32(u32::try_from(x).unwrap())
+                        .unwrap_or(char::REPLACEMENT_CHARACTER),
+                ),
+                Value::Usize(x) => Value::Char(
                     char::from_u32(u32::try_from(x).unwrap())
                         .unwrap_or(char::REPLACEMENT_CHARACTER),
                 ),
@@ -712,9 +333,9 @@ impl Expr {
                     Some(val_seq0) => match seq1.eval(scope).coerce_mapped_value().get_sequence() {
                         Some(val_seq1) => {
                             if val_seq0.is_empty() {
-                                return Cow::Owned(seq1.eval(scope).coerce_mapped_value().clone());
+                                return Cow::Owned(seq1.eval(scope).coerce_mapped_value().cloned());
                             } else if val_seq1.is_empty() {
-                                return Cow::Owned(seq0.eval(scope).coerce_mapped_value().clone());
+                                return Cow::Owned(seq0.eval(scope).coerce_mapped_value().cloned());
                             }
                             Cow::Owned(Value::Seq(val_seq0.append(val_seq1)))
                         }
@@ -837,8 +458,8 @@ impl Expr {
 
     fn eval_value_ref<'a, 'b: 'a>(&'b self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self.eval(scope) {
-            Cow::Borrowed(value) => Cow::Borrowed(value.coerce_mapped_value()),
-            Cow::Owned(v) => Cow::Owned(v.extract_mapped_value()),
+            Cow::Borrowed(value) => Cow::Borrowed(value.coerce_mapped_value().into_inner()),
+            Cow::Owned(v) => Cow::Owned(v.extract_mapped_value().into_inner()),
         }
     }
 
@@ -859,10 +480,59 @@ impl Expr {
 
 pub(crate) mod search;
 
+/// Compiled (interpreter-ready) form of [`FixedReadKind`], used by [`Decoder::ReadArray`].
+///
+/// Unlike `FixedReadKind::FixedFormat`, which only carries a `FormatRef`, this carries the
+/// flattened field-layout precomputed from it (see `record_fmt::analyze_fixed_shape`) -- a
+/// compiled `Decoder` tree is fully self-contained and is never given `&FormatModule` access
+/// again once built, so the layout has to be resolved once, at compile-time
+/// (`Compiler::compile_format`), rather than looked up per-parse.
+#[derive(Clone, Debug)]
+pub enum ReadArrayKind {
+    Base(BaseKind<Endian>),
+    /// A single `SpineElem` (see [`crate::fixed::FixedShape::Single`]), read directly as the
+    /// element value with no record-wrapping.
+    Single {
+        elem: SpineDecoder,
+        stride: usize,
+    },
+    /// A struct-shaped element made up purely of primitive fields. Persisted (named) fields
+    /// become entries of the resulting `Value::Record`; anonymous/ephemeral fields (`None`)
+    /// are still read -- and so still contribute to `stride` -- but are not persisted.
+    ///
+    /// NOTE - switching struct `ReadUnchecked`/codegen derivation from on-demand to blanket
+    /// (see codegen) requires no change here: this variant already carries the complete field
+    /// layout regardless of which structs end up with a generated Rust-side impl.
+    FixedFormat {
+        fields: Vec<(Option<Label>, SpineDecoder)>,
+        stride: usize,
+    },
+}
+
+/// Compiled (interpreter-ready) form of [`crate::fixed::SpineElem`]: either a direct base-kind
+/// read, or a self-contained sub-`Decoder` compiled from the target of a `SpineElem::Indirect`'s
+/// `FormatRef` (which is restricted to a single `CommonOp` read, possibly `Variant`-wrapped, so
+/// the compiled `Decoder` never contains a `Decoder::Call` of its own and can be parsed standalone).
+#[derive(Debug, Clone)]
+pub enum SpineDecoder {
+    Raw(BaseKind<Endian>),
+    Indirect { dec: Rc<Decoder> },
+}
+
+impl ReadArrayKind {
+    pub(crate) fn stride(&self) -> usize {
+        match self {
+            ReadArrayKind::Base(kind) => kind.size(),
+            ReadArrayKind::Single { stride, .. } => *stride,
+            ReadArrayKind::FixedFormat { stride, .. } => *stride,
+        }
+    }
+}
+
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub enum Decoder {
-    Call(usize, Vec<(Label, Expr)>),
+    Call(usize, Vec<(Label, Expr)>, Vec<(Label, ViewExpr)>),
     Pos,
     Fail,
     EndOfInput,
@@ -885,20 +555,30 @@ pub enum Decoder {
     Bits(Box<Decoder>),
     WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Decoder>),
     Map(Box<Decoder>, Box<Expr>),
-    Where(Box<Decoder>, Box<Expr>),
+    Where(Box<Decoder>, Condition),
     Compute(Box<Expr>),
     Let(Label, Box<Expr>, Box<Decoder>),
     Match(Box<Expr>, Vec<(Pattern, Decoder)>),
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
+    /// RepeatBetween: the MatchTree is an N-ary decision-tree where the matching index corresponds to the number of unparsed repetitions left in the limited LL(k) window.
     RepeatBetween(MatchTree, Box<Expr>, Box<Expr>, Box<Decoder>),
     ForEach(Box<Expr>, Label, Box<Decoder>),
     SkipRemainder,
     DecodeBytes(Box<Expr>, Box<Decoder>),
+    ParseFromView(ViewExpr, Box<Decoder>),
     LetFormat(Box<Decoder>, Label, Box<Decoder>),
     MonadSeq(Box<Decoder>, Box<Decoder>),
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
     LiftedOption(Option<Box<Decoder>>),
+    LetView(Label, Box<Decoder>),
+    CaptureBytes(ViewExpr, Box<Expr>),
+    ReadArray(ViewExpr, Box<Expr>, ReadArrayKind),
+    ReifyView(ViewExpr),
+    Phantom,
+    #[cfg(feature = "format_enforce")]
+    Enforce(Box<Decoder>),
+    Permit(Box<Decoder>, Box<Expr>),
 }
 
 #[derive(Clone, Debug)]
@@ -907,13 +587,16 @@ pub struct Program {
 }
 
 impl Program {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let decoders = Vec::new();
         Program { decoders }
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> DecodeResult<(Value, ReadCtxt<'input>)> {
-        self.decoders[0].0.parse(self, &Scope::Empty, input)
+        Ok(self.decoders[0]
+            .0
+            .parse(self, &Scope::Empty, input)?
+            .extract_warn())
     }
 }
 
@@ -964,9 +647,33 @@ impl<'a> Compiler<'a> {
         compiler.compile_format(format, Rc::new(Next::Empty))
     }
 
+    /// Compiles a [`crate::fixed::SpineElem`] into its interpreter-ready [`SpineDecoder`]
+    /// counterpart. `Raw` needs no compilation; `Indirect` compiles the (validated, single-hop)
+    /// target of the `FormatRef` into a self-contained `Decoder`, which never emits its own
+    /// `Decoder::Call` since `SpineElem::Indirect` only ever refers to a target that performs
+    /// exactly one `CommonOp` read (optionally `Variant`-wrapped) with no further indirection.
+    fn compile_spine_elem(&mut self, elem: &SpineElem) -> AResult<SpineDecoder> {
+        match elem {
+            SpineElem::Raw(kind) => Ok(SpineDecoder::Raw(*kind)),
+            SpineElem::Indirect(format_ref, _kind) => {
+                let target = self.module.get_format(format_ref.get_level());
+                let dec = self.compile_format(target, Rc::new(Next::Empty))?;
+                Ok(SpineDecoder::Indirect { dec: Rc::new(dec) })
+            }
+        }
+    }
+
+    /// Extracted helper to construct the inner `next` value to be used for
+    /// compiling the inner format of `RepeatCount` and similar repeat-style
+    /// formats that terminate on a non-MatchTree condition.
+    fn __repeat_next(format: &'a Format, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        // NOTE - stop condition is determined by value at runtime, but structurally the matchtree looks identical to a standard Repeat
+        Rc::new(Next::Repeat(MaybeTyped::Untyped(format), next))
+    }
+
     fn compile_format(&mut self, format: &'a Format, next: Rc<Next<'a>>) -> AResult<Decoder> {
         match format {
-            Format::ItemVar(level, arg_exprs) => {
+            Format::ItemVar(level, arg_exprs, arg_views) => {
                 let f = self.module.get_format(*level);
                 let next = if f.depends_on_next(self.module) {
                     next
@@ -982,18 +689,32 @@ impl<'a> Compiler<'a> {
                     n
                 };
                 let arg_names = self.module.get_args(*level);
-                let mut args = Vec::new();
+                let mut args = Vec::with_capacity(arg_names.len());
                 for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
-                Ok(Decoder::Call(n, args))
+                let view_names = self.module.get_view_args(*level);
+                let mut views = Vec::with_capacity(view_names.len());
+                for (name, view) in Iterator::zip(view_names.iter(), arg_views.iter()) {
+                    views.push((name.clone(), view.clone()));
+                }
+                Ok(Decoder::Call(n, args, views))
             }
+            Format::Phantom(_inner) => Ok(Decoder::Phantom),
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
-                let d = self.compile_format(inner, next.clone())?;
+                let d = self.compile_format(inner, Rc::new(Next::Empty))?;
                 Ok(Decoder::DecodeBytes(expr.clone(), Box::new(d)))
             }
+            Format::ParseFromView(v_expr, inner) => {
+                let d = self.compile_format(inner, Rc::new(Next::Empty))?;
+                Ok(Decoder::ParseFromView(v_expr.clone(), Box::new(d)))
+            }
             Format::Pos => Ok(Decoder::Pos),
+            Format::LetView(ident, a) => {
+                let d = self.compile_format(a, next.clone())?;
+                Ok(Decoder::LetView(ident.clone(), Box::new(d)))
+            }
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Align(n) => Ok(Decoder::Align(*n)),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
@@ -1082,16 +803,16 @@ impl<'a> Compiler<'a> {
                 }
             }
             Format::RepeatCount(expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::RepeatBetween(xmin, xmax, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = xmin.bounds().is_exact() else {
+                let Some(min) = xmin.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
-                let Some(max) = xmax.bounds().is_exact() else {
+                let Some(max) = xmax.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
 
@@ -1114,7 +835,7 @@ impl<'a> Compiler<'a> {
                         branches.push(f_count);
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        panic!("cannot build match tree for {:?}", format)
+                        panic!("cannot build match tree for {format:?}")
                     };
                     tree
                 };
@@ -1126,22 +847,22 @@ impl<'a> Compiler<'a> {
                 ))
             }
             Format::RepeatUntilLast(expr, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilLast(expr.clone(), da))
             }
             Format::ForEach(expr, lbl, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::ForEach(expr.clone(), lbl.clone(), da))
             }
             Format::RepeatUntilSeq(expr, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
             }
             Format::AccumUntil(f_done, f_update, init, vt, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::AccumUntil(
                     f_done.clone(),
@@ -1166,7 +887,7 @@ impl<'a> Compiler<'a> {
                     Some(n) if n > MAX_LOOKAHEAD => {
                         return Err(anyhow!(
                             "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
-                        ))
+                        ));
                     }
                     _ => {}
                 }
@@ -1192,6 +913,15 @@ impl<'a> Compiler<'a> {
             Format::Where(a, expr) => {
                 let da = Box::new(self.compile_format(a, next.clone())?);
                 Ok(Decoder::Where(da, expr.clone()))
+            }
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(a) => {
+                let da = Box::new(self.compile_format(a, next.clone())?);
+                Ok(Decoder::Enforce(da))
+            }
+            Format::Permit(a, expr) => {
+                let da = Box::new(self.compile_format(a, next.clone())?);
+                Ok(Decoder::Permit(da, expr.clone()))
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Let(name, expr, a) => {
@@ -1232,6 +962,53 @@ impl<'a> Compiler<'a> {
             Format::LiftedOption(Some(a)) => Ok(Decoder::LiftedOption(Some(Box::new(
                 self.compile_format(a, next)?,
             )))),
+            Format::WithView(v_expr, vf) => match vf {
+                ViewFormat::CaptureBytes(len) => {
+                    // REVIEW - do we want to fuse WithView and ViewFormat, or keep them separate?
+                    Ok(Decoder::CaptureBytes(v_expr.clone(), len.clone()))
+                }
+                ViewFormat::ReadArray(len, FixedReadKind::Base(k)) => Ok(Decoder::ReadArray(
+                    v_expr.clone(),
+                    len.clone(),
+                    ReadArrayKind::Base(*k),
+                )),
+                ViewFormat::ReadArray(len, FixedReadKind::FixedFormat(format_ref)) => {
+                    let level = format_ref.get_level();
+                    // Re-derives the same `FixedShape` already validated by
+                    // `typecheck::infer_var_view_format` -- cheap and pure over `&Format`, so
+                    // recomputing here (rather than threading it through the AST) keeps this
+                    // as the single source of truth for the field layout.
+                    let shape = analyze_fixed_shape(self.module, *format_ref).unwrap_or_else(|e| {
+                        panic!(
+                            "format `{}` is not eligible for FixedFormat ReadArray: {e}",
+                            self.module.get_name(level),
+                        )
+                    });
+                    let read_array_kind = match shape {
+                        crate::fixed::FixedShape::Single { format, stride } => {
+                            let elem = self.compile_spine_elem(&format)?;
+                            ReadArrayKind::Single { elem, stride }
+                        }
+                        crate::fixed::FixedShape::Record { fields, stride } => {
+                            let mut accum = Vec::with_capacity(fields.len());
+                            for (name, field) in fields.iter() {
+                                let dec = self.compile_spine_elem(field)?;
+                                accum.push((name.clone(), dec));
+                            }
+                            ReadArrayKind::FixedFormat {
+                                fields: accum,
+                                stride,
+                            }
+                        }
+                    };
+                    Ok(Decoder::ReadArray(
+                        v_expr.clone(),
+                        len.clone(),
+                        read_array_kind,
+                    ))
+                }
+                ViewFormat::ReifyView => Ok(Decoder::ReifyView(v_expr.clone())),
+            },
         }
     }
 }
@@ -1240,6 +1017,7 @@ impl<'a> Compiler<'a> {
 pub enum ScopeEntry<Value: Clone> {
     Value(Value),
     Decoder(Decoder),
+    View(usize),
 }
 
 pub enum Scope<'a> {
@@ -1247,11 +1025,18 @@ pub enum Scope<'a> {
     Multi(&'a MultiScope<'a>),
     Single(SingleScope<'a>),
     Decoder(DecoderScope<'a>),
+    View(ViewScope<'a>),
+}
+
+#[derive(Clone)]
+enum ViewOrValue<'a> {
+    View(View<'a>),
+    Value(Cow<'a, Value>),
 }
 
 pub struct MultiScope<'a> {
     parent: &'a Scope<'a>,
-    entries: Vec<(Label, Cow<'a, Value>)>,
+    entries: Vec<(Label, ViewOrValue<'a>)>,
 }
 
 pub struct SingleScope<'a> {
@@ -1266,13 +1051,23 @@ pub struct DecoderScope<'a> {
     decoder: Decoder,
 }
 
+pub struct ViewScope<'a> {
+    parent: &'a Scope<'a>,
+    name: &'a str,
+    view: View<'a>,
+}
+
+// REVIEW - do we want a specialized type for holding views?
+pub type View<'a> = ReadCtxt<'a>;
+
 impl<'a> Scope<'a> {
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    pub(crate) fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
         match self {
-            Scope::Empty => panic!("value not found: {name}"),
+            Scope::Empty => Err(UnknownVarError(Label::Owned(name.to_string()))),
             Scope::Multi(multi) => multi.get_value_by_name(name),
             Scope::Single(single) => single.get_value_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
+            Scope::View(view) => view.parent.get_value_by_name(name),
         }
     }
 
@@ -1282,6 +1077,17 @@ impl<'a> Scope<'a> {
             Scope::Multi(multi) => multi.parent.get_decoder_by_name(name),
             Scope::Single(single) => single.parent.get_decoder_by_name(name),
             Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
+            Scope::View(view) => view.parent.get_decoder_by_name(name),
+        }
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        match self {
+            Scope::Empty => panic!("view not found: {name}"),
+            Scope::Multi(multi) => multi.get_view_by_name(name),
+            Scope::Single(single) => single.parent.get_view_by_name(name),
+            Scope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
+            Scope::View(view) => view.get_view_by_name(name),
         }
     }
 
@@ -1291,6 +1097,7 @@ impl<'a> Scope<'a> {
             Scope::Multi(multi) => multi.get_bindings(bindings),
             Scope::Single(single) => single.get_bindings(bindings),
             Scope::Decoder(decoder) => decoder.get_bindings(bindings),
+            Scope::View(view) => view.get_bindings(bindings),
         }
     }
 }
@@ -1308,26 +1115,62 @@ impl<'a> MultiScope<'a> {
 
     /// Pushes a new binding to the scope using a borrow that lives at least as long as the scope itself
     pub fn push(&mut self, name: impl Into<Label>, v: &'a Value) {
-        self.entries.push((name.into(), Cow::Borrowed(v)));
+        self.entries
+            .push((name.into(), ViewOrValue::Value(Cow::Borrowed(v))))
     }
 
     /// Pushes a new binding to the scope using an owned [Value]
     pub fn push_owned(&mut self, name: impl Into<Label>, v: Value) {
-        self.entries.push((name.into(), Cow::Owned(v)));
+        self.entries
+            .push((name.into(), ViewOrValue::Value(Cow::Owned(v))))
     }
 
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
+        self.entries.push((name.into(), ViewOrValue::View(view)));
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
         for (n, v) in self.entries.iter().rev() {
             if n == name {
-                return v;
+                if let ViewOrValue::View(v) = v {
+                    return *v;
+                } else {
+                    log::warn!(
+                        "MultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
+                    );
+                    continue;
+                }
+            }
+        }
+        self.parent.get_view_by_name(name)
+    }
+
+    fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
+        for (n, v) in self.entries.iter().rev() {
+            if n == name {
+                if let ViewOrValue::Value(v) = v {
+                    return Ok(v);
+                } else {
+                    log::warn!(
+                        "MultiScope::get_value_by_name: query for `{name}` encountered a view-binding before any value-bindings, skipping..."
+                    );
+                    continue;
+                }
             }
         }
         self.parent.get_value_by_name(name)
     }
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
-        for (name, value) in self.entries.iter().rev() {
-            bindings.push((name.clone(), ScopeEntry::Value(value.clone().into_owned())));
+        for (name, vv) in self.entries.iter().rev() {
+            match vv {
+                ViewOrValue::View(view) => {
+                    bindings.push((name.clone(), ScopeEntry::View(view.offset)))
+                }
+                ViewOrValue::Value(value) => {
+                    bindings.push((name.clone(), ScopeEntry::Value(value.clone().into_owned())));
+                }
+            }
         }
         self.parent.get_bindings(bindings);
     }
@@ -1342,9 +1185,9 @@ impl<'a> SingleScope<'a> {
         }
     }
 
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
         if self.name == name {
-            self.value
+            Ok(self.value)
         } else {
             self.parent.get_value_by_name(name)
         }
@@ -1352,7 +1195,7 @@ impl<'a> SingleScope<'a> {
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
         bindings.push((
-            self.name.to_string().into(),
+            Label::Owned(self.name.to_string()),
             ScopeEntry::Value(self.value.clone()),
         ));
         self.parent.get_bindings(bindings);
@@ -1385,123 +1228,175 @@ impl<'a> DecoderScope<'a> {
     }
 }
 
+impl<'a> ViewScope<'a> {
+    fn new(parent: &'a Scope<'a>, name: &'a str, view: View<'a>) -> ViewScope<'a> {
+        ViewScope { parent, name, view }
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        if self.name == name {
+            self.view
+        } else {
+            self.parent.get_view_by_name(name)
+        }
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
+        bindings.push((
+            self.name.to_string().into(),
+            ScopeEntry::View(self.view.offset),
+        ));
+        self.parent.get_bindings(bindings);
+    }
+}
+
 impl Decoder {
     pub fn parse<'input>(
         &self,
         program: &Program,
         scope: &Scope<'_>,
         input: ReadCtxt<'input>,
-    ) -> DecodeResult<(Value, ReadCtxt<'input>)> {
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
         match self {
-            Decoder::Call(n, es) => {
+            Decoder::Call(n, es, vs) => {
                 let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_value(scope);
                     new_scope.push_owned(name.clone(), v);
                 }
+                for (name, v) in vs {
+                    let vv = Self::eval_view_expr(scope, v)?;
+                    new_scope.push_view(name.clone(), vv);
+                }
+                Ok(try_with! (
                 program.decoders[*n]
                     .0
                     .parse(program, &Scope::Multi(&new_scope), input)
+                => ("parse@Call", *n)
+                ))
             }
-            Decoder::Fail => Err(DecodeError::<Value>::fail(scope, input)),
+            Decoder::Phantom => Ok(WithErr::new((Value::PhantomData, input))),
+            Decoder::Fail => Err(DecodeErrorKind::<Value>::fail(scope, input).into()),
             Decoder::Pos => {
                 let pos = input.offset as u64;
-                Ok((Value::U64(pos), input))
+                Ok(WithErr::new((Value::U64(pos), input)))
             }
             Decoder::SkipRemainder => {
                 let input = input.skip_remainder();
-                Ok((Value::UNIT, input))
+                Ok(WithErr::new((Value::UNIT, input)))
             }
             Decoder::EndOfInput => match input.read_byte() {
-                None => Ok((Value::UNIT, input)),
-                Some((b, _)) => Err(DecodeError::trailing(b, input.offset)),
+                None => Ok(WithErr::new((Value::UNIT, input))),
+                Some((b, _)) => Err(input.kind.trailing(b, input.offset).into()),
             },
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
-                    .ok_or(DecodeError::overrun(skip, input.offset))?;
-                Ok((Value::UNIT, input))
+                    .ok_or(input.kind.overrun(skip, input.offset))?;
+                Ok(WithErr::new((Value::UNIT, input)))
             }
             Decoder::Byte(bs) => {
-                let (b, input) = input
-                    .read_byte()
-                    .ok_or(DecodeError::overbyte(input.offset))?;
+                let (b, input) = input.read_byte().ok_or(input.kind.overbyte(input.offset))?;
                 if bs.contains(b) {
-                    Ok((Value::U8(b), input))
+                    Ok(WithErr::new((Value::U8(b), input)))
                 } else {
-                    Err(DecodeError::unexpected(b, *bs, input.offset))
+                    Err(DecodeErrorKind::unexpected(b, *bs, input.offset).into())
                 }
             }
-            Decoder::Variant(label, d) => {
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Variant(label.clone(), Box::new(v)), input))
-            }
+            Decoder::Variant(label, d) => Ok(d
+                .parse(program, scope, input)?
+                .map(move |(v, input)| (Value::Variant(label.clone(), Box::new(v)), input))),
             Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                let index = tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Branch(index, Box::new(v)), input))
+                Ok(d.parse(program, scope, input)?
+                    .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)))
             }
             Decoder::Parallel(branches) => {
                 for (index, d) in branches.iter().enumerate() {
                     let res = d.parse(program, scope, input);
-                    if let Ok((v, input)) = res {
-                        return Ok((Value::Branch(index, Box::new(v)), input));
+                    if let Ok(p) = res {
+                        return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
-                Err(DecodeError::<Value>::fail(scope, input))
+                Err(DecodeErrorKind::<Value>::fail(scope, input).with_trace("no valid branch"))
             }
-            Decoder::Tuple(fields) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(fields.len());
-                for f in fields {
-                    let (vf, next_input) = f.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf);
-                }
-                Ok((Value::Tuple(v), input))
-            }
-            Decoder::Sequence(decs) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(decs.len());
-                for d in decs {
-                    let (vf, next_input) = d.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf);
-                }
-                Ok((Value::Seq(SeqKind::Strict(v)), input))
-            }
+            Decoder::Tuple(fields) => Ok(WithErr::fold(
+                (Vec::with_capacity(fields.len()), input),
+                fields.iter().enumerate(),
+                |(mut v, input), (ix, f)| {
+                    Ok(
+                        try_with!(f.parse(program, scope, input) => ("Tuple", ix)).map(
+                            move |(vf, new_input)| {
+                                v.push(vf);
+                                (v, new_input)
+                            },
+                        ),
+                    )
+                },
+            )?
+            .map(|(v, input)| (Value::Tuple(v), input))),
+            Decoder::Sequence(decs) => Ok(WithErr::fold(
+                (Vec::with_capacity(decs.len()), input),
+                decs.iter(),
+                |(mut v, input), f| {
+                    Ok(
+                        try_with!(f.parse(program, scope, input) => ("Sequence", v.len())).map(
+                            move |(vf, new_input)| {
+                                v.push(vf);
+                                (v, new_input)
+                            },
+                        ),
+                    )
+                },
+            )?
+            .map(|(v, input)| (Value::Seq(SeqKind::Strict(v)), input))),
             Decoder::While(tree, a) => {
                 let mut input = input;
-                let mut v = Vec::new();
-                while tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                let mut res = WithErr::new((Vec::new(), input));
+                while try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                     offset: input.offset,
-                })? == 0
+                }) => ("While(matchtree)", res.as_ref().0.len()))
+                    == 0
                 {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                    res = res.join(|(mut v, input)| {
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("While(parse)", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
+                    })?;
+                    input = res.as_ref().1;
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::Until(tree, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
+                let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                    res = res.join(|(mut v, input)| {
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("Until(parse)", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
+                    })?;
+                    let input = res.as_ref().1;
+                    if try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                         offset: input.offset,
-                    })? == 0
+                    }) => ("Until(matchtree)", res.as_ref().0.len()))
+                        == 0
                     {
                         break;
                     }
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::DecodeBytes(bytes, a) => {
                 let bytes = {
@@ -1512,62 +1407,84 @@ impl Decoder {
                         .map(|v| v.get_as_u8())
                         .collect::<Vec<u8>>()
                 };
-                let new_input = ReadCtxt::new(&bytes);
-                let (va, rem_input) = a.parse(program, scope, new_input)?;
-                // REVIEW - do we *actually* want to enforce full-consumption of the sub-buffer (i.e. no strictly partial reads)
-                match rem_input.read_byte() {
-                    Some((b, _)) => {
-                        // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        Err(DecodeError::Trailing {
-                            byte: b,
-                            offset: rem_input.offset,
+                let new_input = ReadCtxt::from_value(&bytes);
+                try_with!(a.parse(program, scope, new_input) => ("DecodeBytes", bytes.len())).join(
+                    |(va, rem_input)| {
+                        Ok(match rem_input.read_byte() {
+                            Some((b, _)) => {
+                                let err = rem_input.kind.trailing(b, rem_input.offset).into();
+                                WithErr::with_err((va, input), err)
+                            }
+                            None => WithErr::new((va, input)),
                         })
-                    }
-                    None => Ok((va, input)),
-                }
+                    },
+                )
+            }
+            Decoder::ParseFromView(v_expr, a) => {
+                let view_window = Self::eval_view_expr(scope, v_expr)?;
+                Ok(try_with!(a.parse(program, scope, view_window) => ("ParseFromView", format!("{:?}", v_expr)))
+                    .map(|(va, _)| (va, input)))
             }
             Decoder::LetFormat(da, name, db) => {
-                let (va, input) = da.parse(program, scope, input)?;
-                let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
-                db.parse(program, &new_scope, input)
+                try_with!(da.parse(program, scope, input) => ("LetFormat(lhs)", name.to_string()))
+                    .join(|(va, input)| {
+                        let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
+                        db.parse(program, &new_scope, input)
+                    })
             }
             Decoder::MonadSeq(da, db) => {
-                let (_, input) = da.parse(program, scope, input)?;
-                db.parse(program, scope, input)
+                try_with!(da.parse(program, scope, input) => "MonadSeq(lhs)").join(|(_, input)| {
+                    Ok(try_with!(db.parse(program, scope, input) => "MonadSeq(rhs)"))
+                })
             }
             Decoder::ForEach(expr, lbl, a) => {
-                let mut input = input;
+                // we need val because it would otherwise be a dropped temporary binding
                 let val = expr.eval_value(scope);
                 let seq = val.get_sequence().expect("bad type for ForEach input");
-                let mut v = Vec::with_capacity(seq.len());
-                for e in seq {
-                    let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
-                    let (va, next_input) = a.parse(program, &new_scope, input)?;
-                    v.push(va);
-                    input = next_input;
-                }
-                Ok((Value::Seq(v.into()), input))
+                Ok(WithErr::fold(
+                    (Vec::with_capacity(seq.len()), input),
+                    seq,
+                    |(mut v, input), e| {
+                        let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
+                        Ok(try_with!(a.parse(program, &new_scope, input) => ("ForEach", v.len(), format!("{e:?}")))
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    },
+                )?
+                .map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::RepeatCount(expr, a) => {
-                let mut input = input;
                 let count = expr.eval_value(scope).unwrap_usize();
-                let mut v = Vec::with_capacity(count);
-                for _ in 0..count {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                }
-                Ok((Value::Seq(v.into()), input))
+                Ok(WithErr::fold(
+                    (Vec::with_capacity(count), input),
+                    0..count,
+                    |(mut v, input), _| {
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("RepeatCount", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
+                    },
+                )?
+                .map(|(v, input)| (Value::Seq(v.into()), input)))
             }
-            Decoder::RepeatBetween(tree, min, max, a) => {
-                let mut input = input;
+            Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
                 let min = min.eval_value(scope).unwrap_usize();
                 let max = max.eval_value(scope).unwrap_usize();
-                let mut v = Vec::new();
+                let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
-                        offset: input.offset,
-                    })? == 0
+                    let v = &res.as_ref().0;
+                    // REVIEW - does the order of the conditions in the OR matter?
+                    if reps_left_tree.matches(input).ok_or(
+                        DecodeErrorKind::NoValidBranch {
+                            offset: input.offset,
+                        }
+                        .with_trace(v.len()),
+                    )? == 0
                         || v.len() == max
                     {
                         if v.len() < min {
@@ -1575,151 +1492,206 @@ impl Decoder {
                         }
                         break;
                     }
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                    res = res.join(|(mut v, input)| {
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("RepeatBetween", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
+                    })?;
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value(scope).unwrap_bool();
                 if is_present {
-                    let (raw, next_input) = a.parse(program, scope, input)?;
-                    Ok((Value::Option(Some(Box::new(raw))), next_input))
+                    Ok(try_with!(a.parse(program, scope, input) => "Maybe")
+                        .map(|(val, input)| (Value::Option(Some(Box::new(val))), input)))
                 } else {
-                    Ok((Value::Option(None), input))
+                    Ok(WithErr::new((Value::Option(None), input)))
                 }
             }
             Decoder::RepeatUntilLast(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
+                // third value is "done" flag
+                let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    let done = expr.eval_lambda(scope, &va).unwrap_bool();
-                    v.push(va);
-                    if done {
-                        break;
-                    }
+                    res = res.join(|(mut v, input, _done)| {
+                        Ok(try_with!(a.parse(program, scope, input) => ("RepeatUntilLast", v.len())).map(|(va, next_input)| {
+                            let done = expr.eval_lambda(scope, &va).unwrap_bool();
+                            v.push(va);
+                            (v, next_input, done)
+                        }))
+                    })?;
+                    break_if_done!(res => (v, input));
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
             }
             Decoder::RepeatUntilSeq(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
+                // third value is "done" flag
+                let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    let vs = Value::Seq(v.into());
-                    let done = expr.eval_lambda(scope, &vs).unwrap_bool();
-                    v = match vs {
-                        Value::Seq(v) => v.into_vec(),
-                        _ => unreachable!(),
-                    };
-                    if done {
-                        break;
-                    }
+                    res = res.join(|(mut v, input, _done)| {
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    let vs = Value::Seq(v.into());
+                                    let done = expr.eval_lambda(scope, &vs).unwrap_bool();
+                                    let v = match vs {
+                                        Value::Seq(v) => v.into_vec(),
+                                        _ => unreachable!(),
+                                    };
+                                    (v, next_input, done)
+                                }),
+                        )
+                    })?;
+                    break_if_done!(res => (v, input));
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
             }
             Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                let mut accum = init.eval_value(scope);
+                let accum = init.eval_value(scope);
+                let mut res = WithErr::new((Vec::new(), accum, input, false));
                 loop {
-                    let done_arg = Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
-                    let is_done = f_done.eval_lambda(&scope, &done_arg).unwrap_bool();
-                    if is_done {
-                        break;
-                    }
-                    let (next_elem, next_input) = a.parse(program, scope, input)?;
-                    v.push(next_elem.clone());
-                    let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
-                    let next_accum = f_update.eval_lambda(scope, &update_arg);
-                    accum = next_accum;
-                    input = next_input;
+                    res = res.join(|(mut v, accum, input, _done)| {
+                        let done_arg =
+                            Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
+                        let is_done = f_done.eval_lambda(scope, &done_arg).unwrap_bool();
+                        if is_done {
+                            return Ok(WithErr::new((v, accum, input, true)));
+                        }
+                        Ok(try_with!(a.parse(program, scope, input) => ("AccumUntil", format!("len={}", v.len()), format!("accum={:?}", accum)))
+                            .map(|(next_elem, next_input)| {
+                                v.push(next_elem.clone());
+                                let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
+                                let next_accum = f_update.eval_lambda(scope, &update_arg);
+                                (v, next_accum, next_input, false)
+                            }))
+                    })?;
+                    break_if_done!(res => (v, accum, input));
                 }
-                Ok((Value::Tuple(vec![accum, Value::Seq(v.into())]), input))
+                Ok(res.map(|(v, accum, input, _)| {
+                    (Value::Tuple(vec![accum, Value::Seq(v.into())]), input)
+                }))
             }
-            Decoder::Peek(a) => {
-                let (v, _next_input) = a.parse(program, scope, input)?;
-                Ok((v, input))
-            }
+            Decoder::Peek(a) => Ok(a.parse(program, scope, input)?.map(|(v, _)| (v, input))),
             Decoder::PeekNot(a) => {
                 if a.parse(program, scope, input).is_ok() {
-                    Err(DecodeError::<Value>::fail(scope, input))
+                    Err(DecodeErrorKind::<Value>::fail(scope, input)
+                        .with_trace(("PeekNot", format!("{:?}", a))))
                 } else {
-                    Ok((Value::Tuple(vec![]), input))
+                    Ok(WithErr::new((Value::Tuple(vec![]), input)))
                 }
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
-                let (slice, input) = input
-                    .split_at(size)
-                    .ok_or(DecodeError::overrun(size, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
-                Ok((v, input))
+                let (mut slice, input) = input.split_at(size).ok_or(
+                    input
+                        .kind
+                        .overrun(size, input.offset)
+                        .with_trace(("Slice(create)", format!("{:?}->{size}", expr))),
+                )?;
+                slice.kind &= BufferKind::Slice;
+                Ok(try_with!(a.parse(program, scope, slice) => ("Slice(parse)", format!("{:?}", a))).map(|(v, _)| (v, input)))
             }
             Decoder::Bits(a) => {
+                // FIXME - copying the entire buffer as bits feels inefficient, we should measure performance and see if there is a better alternative
                 let mut bits = Vec::with_capacity(input.remaining().len() * 8);
                 for b in input.remaining() {
                     for i in 0..8 {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
-                let bytes_remain = bits.remaining().len() >> 3;
-                let bytes_read = input.remaining().len() - bytes_remain;
-                let (_, input) = input
-                    .split_at(bytes_read)
-                    .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
-                Ok((v, input))
+                try_with!(a.parse(program, scope, ReadCtxt::new(&bits)) => ("Bits(parse)", format!("{a:?}")))
+                    .join(|(v, bits)| {
+                        let bytes_remain = bits.remaining().len() >> 3;
+                        let bytes_read = input.remaining().len() - bytes_remain;
+                        let (_, input) = input
+                            .split_at(bytes_read)
+                            .ok_or(input.kind.overrun(bytes_read, input.offset))?;
+                        Ok(WithErr::new((v, input)))
+                    })
             }
             Decoder::WithRelativeOffset(base_addr, expr, a) => {
                 let base = base_addr.eval_value(scope).unwrap_usize();
                 let offset = expr.eval_value(scope).unwrap_usize();
                 let abs_offset = base + offset;
-                let seek_input = input
-                    .seek_to(abs_offset)
-                    .ok_or(DecodeError::bad_seek(abs_offset, input.input.len()))?;
-                let (v, _) = a.parse(program, scope, seek_input)?;
-                Ok((v, input))
+                let seek_input = input.seek_to(abs_offset).ok_or(
+                    input
+                        .kind
+                        .bad_seek(abs_offset, input.input.len())
+                        .with_trace("WithRelativeOffset(seek)"),
+                )?;
+                Ok(try_with!(a.parse(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
+                    .map(|(v, _)| (v, input)))
             }
-            Decoder::Map(d, expr) => {
-                let (orig, input) = d.parse(program, scope, input)?;
-                let v = expr.eval_lambda(scope, &orig);
-                Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
-            }
-            Decoder::Where(d, expr) => {
-                let (v, input) = d.parse(program, scope, input)?;
-                match expr.eval_lambda(scope, &v).unwrap_bool() {
-                    true => Ok((v, input)),
-                    false => Err(DecodeError::bad_where(scope, *expr.clone(), v)),
-                }
+            Decoder::Map(d, expr) => Ok(
+                try_with!(d.parse(program, scope, input) => ("Map(parse)", format!("{d:?}"))).map(
+                    |(orig, input)| {
+                        let v = expr.eval_lambda(scope, &orig);
+                        (Value::Mapped(Box::new(orig), Box::new(v)), input)
+                    },
+                ),
+            ),
+            Decoder::Where(d, cond) => {
+                try_with!(d.parse(program, scope, input) => ("Where(parse)", format!("{d:?}")))
+                    .join(|(v, input)| {
+                        let Condition { expr, severity } = cond;
+                        match expr.eval_lambda(scope, &v).unwrap_bool() {
+                            true => Ok(WithErr::new((v, input))),
+                            false => {
+                                let err = DecodeErrorKind::bad_where(
+                                    scope,
+                                    expr.clone(),
+                                    Box::new(v.clone()),
+                                )
+                                .into();
+                                if severity.is_strict() {
+                                    Err(err)
+                                } else {
+                                    Ok(WithErr::with_err((v, input), err))
+                                }
+                            }
+                        }
+                    })
             }
             Decoder::Compute(expr) => {
                 let v = expr.eval_value(scope);
-                Ok((v, input))
+                Ok(WithErr::new((v, input)))
             }
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
                 let let_scope = SingleScope::new(scope, name, &v);
-                d.parse(program, &Scope::Single(let_scope), input)
+                Ok(
+                    try_with!(d.parse(program, &Scope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),
+                )
+            }
+            Decoder::LetView(name, d) => {
+                let mut view = input;
+                view.kind &= BufferKind::View;
+                let let_scope = ViewScope::new(scope, name, view);
+                Ok(
+                    try_with!(d.parse(program, &Scope::View(let_scope), input) => ("LetView(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) =
-                            decoder.parse(program, &Scope::Multi(&pattern_scope), input)?;
-                        return Ok((Value::Branch(index, Box::new(v)), input));
+                        return Ok(try_with!(decoder.parse(program, &Scope::Multi(&pattern_scope), input)
+                        => ("Match(parse)", format!("[{}]: {:?} => {:?}", index, pattern, decoder))
+                        )
+                            .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
-                panic!(
-                    "non-exhaustive patterns: {head:?} not in {:#?}",
-                    branches.iter().map(|(p, _)| p).collect::<Vec<_>>()
-                );
+                // NOTE - if we reach this point, it means that none of the patterns matched the head value, and we therefore have to return an error
+                let cases = branches.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>();
+                Err(DecodeError::from(DecodeErrorKind::RefutedPatternMatch {
+                    cases,
+                    value: Box::new(head.into_owned()),
+                }))
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval(scope);
@@ -1738,19 +1710,173 @@ impl Decoder {
                 let f = make_huffman_codes(&lengths);
                 let dyn_d = Compiler::compile_one(&f).unwrap();
                 let child_scope = DecoderScope::new(scope, name, dyn_d);
-                d.parse(program, &Scope::Decoder(child_scope), input)
+                Ok(
+                    try_with!(d.parse(program, &Scope::Decoder(child_scope), input) => ("Dynamic(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
-                d.parse(program, scope, input)
+                Ok(
+                    try_with!(d.parse(program, scope, input) => ("Apply(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
-            Decoder::LiftedOption(None) => Ok((Value::Option(None), input)),
-            Decoder::LiftedOption(Some(dec)) => {
-                let (v, input) = dec.parse(program, scope, input)?;
-                Ok((Value::Option(Some(Box::new(v))), input))
+            Decoder::LiftedOption(None) => Ok(WithErr::new((Value::Option(None), input))),
+            Decoder::LiftedOption(Some(dec)) => Ok(try_with!(dec
+                .parse(program, scope, input) => ("LiftedOption(parse)", format!("{dec:?}")))
+            .map(|(v, input)| (Value::Option(Some(Box::new(v))), input))),
+            Decoder::CaptureBytes(v_expr, len) => {
+                let len = len.eval_value(scope).unwrap_usize();
+
+                let view_window = Self::eval_view_expr(scope, v_expr)?;
+
+                // accumulate `len` bytes into a Vec<Value>
+                let mut accum = Vec::with_capacity(len);
+                let mut buf = view_window;
+                for _ in 0..len {
+                    let Some((byte, new_buf)) = buf.read_byte() else {
+                        return Err(input.kind.overbyte(buf.offset).with_trace((
+                            "CaptureBytes",
+                            format!("len: {len}"),
+                            format!("view: {v_expr:?}"),
+                        )));
+                    };
+                    accum.push(Value::U8(byte));
+                    buf = new_buf;
+                }
+
+                // return the accumulated bytes, along with the original input
+                Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
+            }
+            Decoder::ReadArray(v_expr, len, kind) => {
+                let len = len.eval_value(scope).unwrap_usize();
+                let view_window = Self::eval_view_expr(scope, v_expr)?;
+
+                let folded = WithErr::fold(
+                    (Vec::with_capacity(len), view_window),
+                    0..len,
+                    |(mut accum, buf), ix| {
+                        Ok(try_with!(read_array_elem(program, buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}"))).map(|(val, new_buf)| {
+                            accum.push(val);
+                            (accum, new_buf)
+                        }))
+                    },
+                )?;
+                Ok(folded.map(|(accum, _buf)| (Value::Seq(SeqKind::Strict(accum)), input)))
+            }
+            Decoder::ReifyView(v_expr) => {
+                let view = try_with!(Self::eval_view_expr(scope, v_expr) => ("ReifyView", format!("view: {v_expr:?}")));
+                Ok(WithErr::new((
+                    Value::View {
+                        offset: view.offset,
+                    },
+                    input,
+                )))
+            }
+            #[cfg(feature = "format_enforce")]
+            Decoder::Enforce(a) => {
+                let res = a.parse(program, scope, input)?;
+                match res.into_strict() {
+                    Ok((v, input)) => Ok(WithErr::new((v, input))),
+                    Err(mut errs) => {
+                        let e = errs.swap_remove(0);
+                        return Err(e);
+                    }
+                }
+            }
+            Decoder::Permit(a, expr) => Ok(downgrade_error_with(
+                a.parse(program, scope, input)
+                    .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
+                || {
+                    (
+                        Value::Permit(Err(Some(Box::new(expr.eval_value(scope))))),
+                        input,
+                    )
+                },
+            )),
+        }
+    }
+    /// Given a `ViewExpr` and a `Scope` to evaluate named views under, returns the appropriate `View`
+    /// (`:= ReadCtxt`).
+    ///
+    /// Returns an error if the `ViewExpr` is defined via an offset that overruns the base view.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the `ViewExpr` depends on a view-variable that is not in `scope`.
+    fn eval_view_expr<'a>(
+        scope: &Scope<'a>,
+        v_expr: &ViewExpr,
+    ) -> Result<View<'a>, DecodeErrorKind> {
+        match v_expr {
+            ViewExpr::Var(ident) => {
+                let view = scope.get_view_by_name(ident);
+                Ok(view)
+            }
+            ViewExpr::Offset(base, offset) => {
+                let offset = offset.eval_value(scope).unwrap_usize();
+                let base_view = Self::eval_view_expr(scope, base)?;
+                let Some((_, mut view_window)) = base_view.split_at(offset) else {
+                    return Err(base_view.kind.overrun(offset, base_view.offset).into());
+                };
+                view_window.kind &= BufferKind::View;
+                Ok(view_window)
             }
         }
     }
+}
+
+fn read_array_elem<'a>(
+    program: &'a Program,
+    buf: ReadCtxt<'a>,
+    kind: &ReadArrayKind,
+) -> EDecodeResult<(Value, ReadCtxt<'a>)> {
+    match kind {
+        ReadArrayKind::Base(kind) => Ok(WithErr::new(read_base(buf, *kind)?)),
+        ReadArrayKind::Single { elem, .. } => read_spine_elem(program, buf, elem),
+        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(program, buf, fields),
+    }
+}
+
+/// Reads a single `SpineDecoder`-kinded parse-directive: either a direct base-kind read, or a
+/// recursive invocation of the compiled sub-`Decoder` for a `SpineElem::Indirect`'s `FormatRef`.
+fn read_spine_elem<'a>(
+    program: &'a Program,
+    buf: ReadCtxt<'a>,
+    elem: &SpineDecoder,
+) -> EDecodeResult<(Value, ReadCtxt<'a>)> {
+    match elem {
+        SpineDecoder::Raw(kind) => Ok(WithErr::new(read_base(buf, *kind)?)),
+        SpineDecoder::Indirect { dec } => dec.parse(program, &Scope::Empty, buf),
+    }
+}
+
+/// Reads one element of a `FixedFormat`-kinded `ReadArray`: sequentially reads each field of
+/// `fields` (in order), and constructs a `Value::Record` out of the persisted (named) ones.
+/// Anonymous/ephemeral fields (`None`) are read -- consuming their share of bytes -- but
+/// discarded rather than included in the resulting record, matching `record_fmt::analyze_fixed_shape`.
+fn read_fixed_record<'a>(
+    program: &'a Program,
+    buf: ReadCtxt<'a>,
+    fields: &[(Option<Label>, SpineDecoder)],
+) -> EDecodeResult<(Value, ReadCtxt<'a>)> {
+    let folded = WithErr::fold(
+        (Vec::with_capacity(fields.len()), buf),
+        fields,
+        |(mut captured, input), (name, elem)| {
+            Ok(try_with!(read_spine_elem(program, input, elem) => ("FixedFormat field", format!("name: {name:?}"))).map(|(v, new_buf)| {
+                if let Some(name) = name {
+                    captured.push((name.clone(), v));
+                }
+                (captured, new_buf)
+            }))
+        },
+    )?;
+    Ok(folded.map(|(captured, buf)| (Value::Record(captured), buf)))
+}
+
+fn read_base(buf: ReadCtxt<'_>, kind: BaseKind<Endian>) -> DecodeResult<(Value, ReadCtxt<'_>)> {
+    buf.read_base(kind)
+        .map_err(|e| DecodeErrorKind::from(e).into())
 }
 
 fn value_to_vec_usize(v: &Value) -> Vec<usize> {
@@ -1759,7 +1885,7 @@ fn value_to_vec_usize(v: &Value) -> Vec<usize> {
         _ => panic!("expected Seq"),
     };
     vs.iter()
-        .map(|v| match v.coerce_mapped_value() {
+        .map(|v| match v.coerce_mapped_value().into_inner() {
             Value::U8(n) => *n as usize,
             _ => panic!("expected U8"),
         })
@@ -1852,20 +1978,26 @@ mod tests {
     use super::*;
     use crate::helper::*;
 
+    /// Test-helper function for decoder tests.
+    ///
+    /// Given a decoder `d` and input `input`, checks that `d.parse(input)` returns the value `expect`,
+    /// and that the remaining input after parsing matches `tail`.
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
         let (val, remain) = d
             .parse(&program, &Scope::Empty, ReadCtxt::new(input))
-            .unwrap();
+            .unwrap()
+            .into_inner();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
-        assert!(d
-            .parse(&program, &Scope::Empty, ReadCtxt::new(input))
-            .is_err());
+        assert!(
+            d.parse(&program, &Scope::Empty, ReadCtxt::new(input))
+                .is_err()
+        );
     }
 
     fn value_some(x: Value) -> Value {
@@ -2597,21 +2729,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO can we distinguish a Union based on disjoint Where clauses?
+    #[ignore = "matchtree cannot unify based on disjoint where clauses, only byte-patterns"]
     fn compile_where_u16be_eq() {
-        let u8 = Format::Byte(ByteSet::full());
-        let u16be = map(
-            tuple([u8.clone(), u8]),
-            lambda("x", Expr::U16Be(Box::new(var("x")))),
-        );
-        let a = Format::Where(
-            Box::new(u16be.clone()),
-            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0x00FF)))),
-        );
-        let b = Format::Where(
-            Box::new(u16be),
-            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0xFF00)))),
-        );
+        let a = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0x00FF)));
+        let b = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0xFF00)));
         let f = Format::Union(vec![a, b]);
         let d = Compiler::compile_one(&f).unwrap();
         accepts(
@@ -2647,5 +2768,222 @@ mod tests {
                 Value::Branch(0, Box::new(Value::U8(0))),
             )]),
         );
+    }
+
+    #[test]
+    fn permit_valid_parse_expected_value() {
+        let f = fmt_some(Format::record([(
+            "foo",
+            mk_ascii_string(byte_seq(b"hello world")),
+        )]));
+        let g = permit(f, expr_none());
+        let d = Compiler::compile_one(&g).unwrap();
+
+        const DATA: &[u8] = b"hello world";
+
+        let expect = Value::Permit(Ok(Box::new(Value::Option(Some(Box::new(Value::Record(
+            vec![(
+                Label::Borrowed("foo"),
+                Value::Seq(SeqKind::Strict(
+                    (b"hello world")
+                        .into_iter()
+                        .map(|b| Value::U8(*b))
+                        .collect::<Vec<_>>(),
+                )),
+            )],
+        )))))));
+        assert!(!expect.is_fallback());
+        accepts(&d, DATA, &[], expect)
+    }
+
+    #[test]
+    fn permit_invalid_parse_expected_value() {
+        let f = fmt_some(Format::record([(
+            "foo",
+            mk_ascii_string(byte_seq(b"hello world")),
+        )]));
+        let df = Compiler::compile_one(&f).unwrap();
+        let g = permit(f, expr_none());
+        let dg = Compiler::compile_one(&g).unwrap();
+
+        let expect = Value::Permit(Err(Some(Box::new(Value::Option(None)))));
+
+        const DATA: &[u8] = b"hello";
+
+        assert!(expect.is_fallback());
+        rejects(&df, DATA);
+        accepts(&dg, DATA, DATA, expect)
+    }
+
+    #[test]
+    fn matches_inner_on_permit_err() {
+        let f = permit(
+            fmt_some(Format::record([("foo", Format::ANY_BYTE)])),
+            expr_none(),
+        );
+        let g = record([
+            ("x", f),
+            (
+                "is_good",
+                fmt_match(
+                    var("x"),
+                    [
+                        (pat_some(bind("y")), compute(Expr::Bool(true))),
+                        (pat_none(), compute(Expr::Bool(false))),
+                    ],
+                ),
+            ),
+        ]);
+        let d = Compiler::compile_one(&g).unwrap();
+
+        const DATA: &[u8] = &[];
+
+        accepts(
+            &d,
+            DATA,
+            DATA,
+            Value::Record(vec![
+                (
+                    Label::Borrowed("x"),
+                    Value::Permit(Err(Some(Box::new(Value::Option(None))))),
+                ),
+                (
+                    Label::Borrowed("is_good"),
+                    Value::Branch(1, Box::new(Value::Bool(false))),
+                ),
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_negative_number_match() {
+        let f = i8();
+        let g = chain(
+            f,
+            "x",
+            fmt_match(
+                var("x"),
+                [
+                    (
+                        Pattern::ZConst(num_bigint::BigInt::from(-1)),
+                        compute(Expr::Bool(true)),
+                    ),
+                    (Pattern::Wildcard, compute(Expr::Bool(false))),
+                ],
+            ),
+        );
+        let d = Compiler::compile_one(&g).unwrap();
+
+        const DATA: &[u8] = &[0xFF];
+
+        accepts(&d, DATA, &[], Value::Branch(0, Box::new(Value::Bool(true))));
+    }
+
+    #[test]
+    fn test_bits() {
+        let byte = 0b1101_0110;
+        // pattern is the sequence of bits of `byte`, read from lsb to msb
+        let pattern = [0, 1, 1, 0, 1, 0, 1, 1];
+
+        let f = Format::Bits(Box::new(byte_seq(&pattern)));
+        let d = Compiler::compile_one(&f).unwrap();
+        let input = &[byte];
+
+        accepts(
+            &d,
+            input,
+            &[],
+            Value::Seq(SeqKind::Strict(
+                pattern.into_iter().map(Value::U8).collect(),
+            )),
+        );
+    }
+
+    /// Regression test for the `Next`-context bug in `compile_format` for `RepeatCount`
+    /// (and analogous repeat-like formats).
+    ///
+    /// The format `(0xAA (0xBB)*)×2  0xCC` is a well-defined, unambiguous language:
+    /// two "runs" of zero-or-more 0xBB bytes each preceded by 0xAA, then a 0xCC sentinel.
+    ///
+    /// The inner `Repeat(Byte(0xBB))` must stop when it sees 0xAA (the start of the next
+    /// outer iteration) as well as when it sees 0xCC (the outer sentinel).  The fix
+    /// passes `Next::Repeat(a, outer_next)` as the inner `next`, so its MatchTree gains a
+    /// stop-edge for 0xAA in addition to 0xCC.
+    #[test]
+    fn repeat_count_next_context_correct_behaviour() {
+        let inner = record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]);
+        let outer = record([
+            ("pairs", repeat_count(Expr::U32(2), inner)),
+            ("end", is_byte(0xCC)),
+        ]);
+        let d = Compiler::compile_one(&outer).unwrap();
+
+        let data: &[u8] = &[0xAA, 0xBB, 0xBB, 0xAA, 0xBB, 0xCC];
+
+        let mk_inner = |bs: Vec<Value>| {
+            Value::Record(vec![
+                (Label::Borrowed("a"), Value::U8(0xAA)),
+                (Label::Borrowed("bs"), Value::Seq(SeqKind::Strict(bs))),
+            ])
+        };
+        let expected = Value::Record(vec![
+            (
+                Label::Borrowed("pairs"),
+                Value::Seq(SeqKind::Strict(vec![
+                    mk_inner(vec![Value::U8(0xBB), Value::U8(0xBB)]),
+                    mk_inner(vec![Value::U8(0xBB)]),
+                ])),
+            ),
+            (Label::Borrowed("end"), Value::U8(0xCC)),
+        ]);
+
+        accepts(&d, data, &[], expected);
+    }
+
+    /// Exercises `FixedReadKind::FixedFormat`: a `ReadArray` whose element-type is a
+    /// defined format (`point`, a record of two `u16be` fields) rather than a bare `BaseKind`.
+    /// Covers eligibility validation (`record_fmt::analyze_fixed_shape`, run both by
+    /// `FormatModule::infer_format_type` and by `Compiler::compile_format`) and the interpreter's
+    /// inline flattened decode (`decoder::read_fixed_record`).
+    #[test]
+    fn read_array_fixed_format() {
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+        let outer = from_here(read_array(Expr::U8(2), point));
+        let d = Compiler::new(&module)
+            .compile_format(&outer, Rc::new(Next::Empty))
+            .unwrap();
+
+        let mk_point = |x: u16, y: u16| {
+            Value::Record(vec![
+                (Label::Borrowed("x"), Value::U16(x)),
+                (Label::Borrowed("y"), Value::U16(y)),
+            ])
+        };
+        let expected = Value::Seq(SeqKind::Strict(vec![mk_point(1, 2), mk_point(3, 4)]));
+
+        // View-based reads (like `CaptureBytes`) read from a separate `View` established by
+        // `from_here`/`LetView`, and never advance the main `input` cursor -- so `tail` is the
+        // full, unconsumed original input, not the post-read remainder of the view.
+        let data: &[u8] = &[0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04];
+        accepts(&d, data, data, expected);
+        // only 3 bytes available for the second point's 4-byte record -> should fail
+        rejects(&d, &[0x00, 0x01, 0x00, 0x02, 0x00, 0x03]);
+    }
+
+    /// An ineligible `FixedFormat` reference (a field with a data-dependent length) must be
+    /// rejected by `record_fmt::analyze_fixed_shape`, surfacing as a panic at compile-time
+    /// (mirroring the existing `Format::to_record_format`/`infer_format_type` panic-on-invariant-
+    /// violation convention) rather than silently producing an incorrect stride.
+    #[test]
+    #[should_panic(expected = "is not eligible for FixedFormat ReadArray")]
+    fn read_array_fixed_format_rejects_dependent_length() {
+        let mut module = FormatModule::new();
+        let variable = module.define_format(
+            "variable",
+            record([("len", u8()), ("data", repeat_count(var("len"), u8()))]),
+        );
+        let outer = from_here(read_array(Expr::U8(1), variable));
+        let _ = Compiler::new(&module).compile_format(&outer, Rc::new(Next::Empty));
     }
 }

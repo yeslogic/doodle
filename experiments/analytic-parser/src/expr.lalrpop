@@ -1,0 +1,78 @@
+use std::str::FromStr;
+use num_bigint::BigInt;
+use analytic_engine::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, Expr, NumRep, MachineRep};
+
+grammar;
+
+pub Tree: Expr = {
+    #[precedence(level="0")]
+    Term,
+    #[precedence(level="1")]
+    <op:Op0> <t:Tree> => Expr::UnaryOp(op, Box::new(t)),
+    #[precedence(level="2")]
+    <t:Tree> "as" <mr:MRep> => Expr::Cast(mr, Box::new(t)),
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:Tree> <op:Op1> <r:Tree> => Expr::BinOp(op, Box::new(l), Box::new(r)),
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:Tree> <op:Op2> <r:Tree> => Expr::BinOp(op, Box::new(l), Box::new(r)),
+}
+
+Term: Expr = {
+    Const => Expr::Const(<>),
+    "(" <Tree> ")",
+}
+
+OpCode0: BasicUnaryOp = {
+    "~" => BasicUnaryOp::Negate,
+    "abs" => BasicUnaryOp::AbsVal,
+}
+
+OpCode1: BasicBinOp = {
+    "*" => BasicBinOp::Mul,
+    "/" => BasicBinOp::Div,
+    "%" => BasicBinOp::Rem,
+}
+
+OpCode2: BasicBinOp = {
+    "+" => BasicBinOp::Add,
+    "-" => BasicBinOp::Sub,
+}
+
+Op0: UnaryOp = {
+    <op:OpCode0> <r:MRep> => UnaryOp::new(op, Some(r)),
+    <op:OpCode0> => UnaryOp::new(op, None),
+}
+
+Op1: BinOp = {
+    <op:OpCode1> <r:MRep> => BinOp::new(op, Some(r)),
+    <op:OpCode1> => BinOp::new(op, None),
+}
+
+Op2: BinOp = {
+    <op:OpCode2> <r:MRep> => BinOp::new(op, Some(r)),
+    OpCode2 => BinOp::new(<>, None),
+}
+
+Const: TypedConst = {
+    <n:Num> => TypedConst(n, NumRep::AUTO),
+    <n:Num><r:Rep> => TypedConst(n, r),
+}
+
+Rep: NumRep = {
+    "?" => NumRep::AUTO,
+    MRep => NumRep::Concrete(<>),
+}
+
+
+MRep: MachineRep = {
+    "u8" => MachineRep::U8,
+    "u16" => MachineRep::U16,
+    "u32" => MachineRep::U32,
+    "u64" => MachineRep::U64,
+    "i8" => MachineRep::I8,
+    "i16" => MachineRep::I16,
+    "i32" => MachineRep::I32,
+    "i64" => MachineRep::I64,
+}
+
+Num: BigInt = <s:r"-?[0-9]+"> => BigInt::from_str(s).unwrap();

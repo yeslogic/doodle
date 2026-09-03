@@ -1,8 +1,11 @@
-use crate::codegen::util::MapLike;
 use crate::Label;
+use crate::codegen::util::MapLike;
 
 use super::*;
 
+/// Trait for globally substituting the final names of ad-hoc types
+/// in a Rust program, both at the type-definition level, in parameters and enum scope-expressions,
+/// and as fragments of decoder names.
 pub trait Rebindable {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>);
 }
@@ -49,7 +52,37 @@ impl Rebindable for RustDecl {
                 tdef.rebind(table)
             }
             RustDecl::Function(fn_def) => fn_def.rebind(table),
+            RustDecl::TraitImpl(trait_impl) => trait_impl.rebind(table),
         }
+    }
+}
+
+impl Rebindable for RustTraitImpl {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        // REVIEW - do we need to rebind unbound trait-parameters?
+        // self.trait_params.rebind(table);
+        self.on_type.rebind(table);
+        self.body.rebind(table);
+    }
+}
+
+impl Rebindable for TraitItem {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            // REVIEW - though unlikely, we may need to guard against certain rebindings here
+            TraitItem::Method(fn_def) => fn_def.rebind(table),
+            TraitItem::AssocType(.., rhs) => rhs.rebind(table),
+            TraitItem::Const(.., ty, expr) => {
+                ty.rebind(table);
+                expr.rebind(table);
+            }
+        }
+    }
+}
+
+impl Rebindable for RustTypeDecl {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        self.def.rebind(table);
     }
 }
 
@@ -76,7 +109,6 @@ impl Rebindable for RustStmt {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustStmt::Expr(expr) => expr.rebind(table),
-            RustStmt::Control(ctrl) => ctrl.rebind(table),
             RustStmt::LetPattern(pat, rhs) => {
                 pat.rebind(table);
                 rhs.rebind(table)
@@ -87,6 +119,7 @@ impl Rebindable for RustStmt {
             }
             RustStmt::Reassign(_, rhs) => rhs.rebind(table),
             RustStmt::Return(_, rhs) => rhs.rebind(table),
+            // RustStmt::Control(ctrl) => ctrl.rebind(table),
         }
     }
 }
@@ -110,20 +143,37 @@ impl Rebindable for RustEntity {
     }
 }
 
+impl Rebindable for FnEntity {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            FnEntity::Specific { fname } | FnEntity::Synthetic { fname, .. } => {
+                fname.rebind(table);
+            }
+        }
+    }
+}
+
 impl Rebindable for RustExpr {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
+            RustExpr::Void => (),
+            RustExpr::ConstNum(..) => (),
             RustExpr::Entity(ent) => ent.rebind(table),
             RustExpr::ResultOk(.., inner) | RustExpr::ResultErr(inner) => {
                 inner.rebind(table);
             }
             RustExpr::PrimitiveLit(..) => (),
             RustExpr::ArrayLit(arr) => arr.rebind(table),
-            RustExpr::MethodCall(head, _, args) => {
+            RustExpr::MethodCall(head, _, params, args) => {
                 head.rebind(table);
+                params.rebind(table);
                 args.rebind(table);
             }
             RustExpr::FieldAccess(head, _) => head.rebind(table),
+            RustExpr::Invoke(f, args) => {
+                f.rebind(table);
+                args.rebind(table);
+            }
             RustExpr::FunctionCall(f, args) => {
                 f.rebind(table);
                 args.rebind(table);
@@ -144,17 +194,27 @@ impl Rebindable for RustExpr {
                     rust_exprs.rebind(table);
                 }
             },
+            RustExpr::Macro(RustMacro::Log(_log_fn, log_msg)) => {
+                log_msg.args.rebind(table);
+            }
             RustExpr::Struct(con, expr) => {
                 con.rebind(table);
                 match expr {
-                    StructExpr::EmptyExpr => (),
-                    StructExpr::TupleExpr(vals) => vals.rebind(table),
-                    StructExpr::RecordExpr(flds) => {
+                    StructExpr::Empty => (),
+                    StructExpr::Tuple(vals) => vals.rebind(table),
+                    StructExpr::Record(flds) => {
                         flds.iter_mut().for_each(|(_, fld)| fld.rebind(table))
                     }
                 }
             }
             RustExpr::Owned(owned) => owned.rebind(table),
+            RustExpr::OwnedOption(expr, kind) => match kind {
+                OwnedKind::Unresolved(lens) => {
+                    expr.rebind(table);
+                    lens.rebind(table);
+                }
+                _ => expr.rebind(table),
+            },
 
             RustExpr::Borrow(inner) | RustExpr::BorrowMut(inner) | RustExpr::Try(inner) => {
                 inner.rebind(table)
@@ -183,6 +243,14 @@ impl Rebindable for RustExpr {
     }
 }
 
+impl Rebindable for UseParams {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        for tp in self.ty_params.iter_mut() {
+            tp.rebind(table);
+        }
+    }
+}
+
 impl Rebindable for RustClosure {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.0.rebind(table);
@@ -195,6 +263,12 @@ impl Rebindable for RustClosureHead {
         match self {
             RustClosureHead::Thunk => (),
             RustClosureHead::SimpleVar(_, otyp) => otyp.rebind(table),
+            RustClosureHead::VarList(vars) => {
+                for (_, otyp) in vars.iter_mut() {
+                    // NOTE - in practice nothing will be rebound because the params are all prim-int types
+                    otyp.rebind(table)
+                }
+            }
         }
     }
 }
@@ -336,9 +410,8 @@ impl Rebindable for RustStruct {
 impl Rebindable for FnSig {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.args.iter_mut().for_each(|(_, arg)| arg.rebind(table));
-        match self.ret.as_mut() {
-            Some(ret) => ret.rebind(table),
-            None => (),
+        if let Some(ret) = self.ret.as_mut() {
+            ret.rebind(table)
         }
     }
 }
@@ -348,7 +421,18 @@ impl Rebindable for RustType {
         match self {
             RustType::Atom(at) => at.rebind(table),
             RustType::AnonTuple(args) => args.iter_mut().for_each(|arg| arg.rebind(table)),
-            RustType::Verbatim(..) => (),
+            RustType::ReadArray(.., fst) => fst.rebind(table),
+            RustType::Verbatim(.., Some(params)) => params.rebind(table),
+            RustType::Verbatim(.., None) | RustType::ViewObject(..) => (),
+        }
+    }
+}
+
+impl Rebindable for FixedSizeType {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            FixedSizeType::Marker(..) => (),
+            FixedSizeType::Adhoc(lt) => lt.rebind(table),
         }
     }
 }
@@ -357,7 +441,7 @@ impl Rebindable for AtomType {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             AtomType::TypeRef(tref) => tref.rebind(table),
-            AtomType::Prim(_) => (),
+            AtomType::Prim(_) | AtomType::Signed(_) => (),
             AtomType::Comp(comp_type) => comp_type.rebind(table),
         }
     }
@@ -366,7 +450,7 @@ impl Rebindable for AtomType {
 impl Rebindable for LocalType {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
-            LocalType::LocalDef(_ix, lab) => {
+            LocalType::LocalDef(_ix, lab, _) => {
                 if table.contains_key(lab) {
                     *lab = table.index(lab).clone();
                 }
@@ -383,6 +467,7 @@ impl Rebindable for CompType {
             | CompType::RawSlice(t)
             | CompType::Option(t)
             | CompType::Result(t, ..)
+            | CompType::PhantomData(t)
             | CompType::Borrow(.., t) => t.rebind(table),
         }
     }
@@ -412,6 +497,7 @@ where
             Lens::Ground(typ) => typ.rebind(table),
             Lens::ElemOf(this) => this.rebind(table),
             Lens::FieldAccess(.., this) => this.rebind(table),
+            Lens::ParamOf(this) => this.rebind(table),
         }
     }
 }

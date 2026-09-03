@@ -114,7 +114,7 @@ fn check_covered(
     format: &Format,
 ) -> Result<(), String> {
     match format {
-        Format::ItemVar(level, _args) => {
+        Format::ItemVar(level, _args, _views) => {
             let name = module.get_name(*level).to_string();
             if is_show_format(&name).is_none() {
                 path.push(name.into());
@@ -122,15 +122,18 @@ fn check_covered(
                 path.pop();
             }
         }
+        Format::Phantom(inner) => {
+            check_covered(module, path, inner)?;
+        }
         Format::Fail => {}
         Format::EndOfInput => {}
         Format::SkipRemainder => {}
         Format::Pos => {}
         Format::Align(_) => {}
         Format::Byte(_) => {
-            return Err(format!("uncovered byte: {:?}", path));
+            return Err(format!("uncovered byte: {path:?}"));
         }
-        Format::DecodeBytes(_, format) => {
+        Format::ParseFromView(_, format) | Format::DecodeBytes(_, format) => {
             check_covered(module, path, format)?;
         }
         Format::Variant(label, format) => {
@@ -173,8 +176,11 @@ fn check_covered(
         Format::LiftedOption(Some(format)) => {
             check_covered(module, path, format)?;
         }
-        Format::Peek(_) => {}    // FIXME
-        Format::PeekNot(_) => {} // FIXME
+        Format::Peek(format) => {
+            check_covered(module, path, format)?;
+        }
+        // NOTE - because PeekNot is expressly negated, its contents will never represent the actual structure of a parsed value
+        Format::PeekNot(_) => (),
         Format::Slice(_, format) => {
             check_covered(module, path, format)?;
         }
@@ -182,11 +188,14 @@ fn check_covered(
         Format::Bits(format) => {
             check_covered(module, path, format)?;
         }
-        Format::WithRelativeOffset(_, _, _) => {} // FIXME
+        Format::WithRelativeOffset(_, _, format) => {
+            check_covered(module, path, format)?;
+        }
         Format::Map(format, _expr) => check_covered(module, path, format)?,
         Format::Where(format, _expr) => check_covered(module, path, format)?,
         Format::Compute(_expr) => {}
         Format::Let(_name, _expr, format) => check_covered(module, path, format)?,
+        Format::LetView(_name, format) => check_covered(module, path, format)?,
         Format::Match(_head, branches) => {
             for (_pattern, format) in branches {
                 check_covered(module, path, format)?;
@@ -199,6 +208,10 @@ fn check_covered(
             check_covered(module, path, f)?;
         }
         Format::Hint(_hint, format) => check_covered(module, path, format)?,
+        #[cfg(feature = "format_enforce")]
+        Format::Enforce(format) => check_covered(module, path, format)?,
+        Format::Permit(format, _expr) => check_covered(module, path, format)?,
+        Format::WithView(_ident, _vf) => {} // FIXME
     }
     Ok(())
 }
@@ -210,7 +223,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     pub fn write_flat(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 let label = self.module.get_name(*level);
                 if let Some(title) = is_show_format(label) {
                     writeln!(&mut self.writer, "{label} - {title}")
@@ -218,6 +231,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     self.write_flat(value, self.module.get_format(*level))
                 }
             }
+            Format::Phantom(..) => Ok(()),
             Format::Fail => Ok(()),
             Format::EndOfInput => Ok(()),
             Format::SkipRemainder => Ok(()),
@@ -308,6 +322,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 other => unreachable!("expected Option, found {other:?}"),
             },
             Format::DecodeBytes(_bytes, format) => self.write_flat(value, format),
+            Format::ParseFromView(_view, format) => self.write_flat(value, format),
             Format::Peek(format) => self.write_flat(value, format),
             Format::PeekNot(format) => self.write_flat(value, format),
             Format::Slice(_, format) => self.write_flat(value, format),
@@ -317,6 +332,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Where(_format, _expr) => Ok(()),
             Format::Compute(_expr) => Ok(()),
             Format::Let(_name, _expr, format) => self.write_flat(value, format),
+            Format::LetView(_name, format) => self.write_flat(value, format),
             Format::Match(_head, branches) => match value {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
@@ -332,7 +348,14 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Hint(StyleHint::Record { .. }, record_format) => {
                 self.write_record(value, record_format)
             }
+            Format::Permit(format, _) => self.write_flat(value, format),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(format) => self.write_flat(value, format),
             Format::Hint(StyleHint::AsciiStr, str_format) => self.write_flat(value, str_format),
+            Format::Hint(StyleHint::AsciiChar, char_format) => self.write_flat(value, char_format),
+            Format::Hint(StyleHint::Common(..), inner) => self.write_flat(value, inner),
+            // REVIEW - is this the most sensible implementation?
+            Format::WithView(_ident, _vf) => Ok(()),
         }
     }
 

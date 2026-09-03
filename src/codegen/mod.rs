@@ -1,23 +1,3 @@
-mod name;
-mod rust_ast;
-mod trace;
-mod typed_decoder;
-pub(crate) mod typed_format;
-mod util;
-
-use rebind::Rebindable;
-use resolve::Resolvable;
-pub use rust_ast::ToFragment;
-
-use crate::{
-    byte_set::ByteSet,
-    decoder::extract_pair,
-    parser::error::TraceHash,
-    typecheck::{TypeChecker, UScope, UVar},
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
-    Pattern, StyleHint, UnaryOp, ValueType,
-};
-
 use std::{
     borrow::Cow,
     cell::OnceCell,
@@ -25,22 +5,66 @@ use std::{
     hash::{Hash, Hasher},
     rc::Rc,
 };
-mod ixlabel;
-mod path_names;
-
-use ixlabel::IxLabel;
-use name::{Derivation, NameAtom};
-use path_names::NameGen;
-use rust_ast::analysis::{
-    heap_optimize::{HeapOptimize, HeapStrategy},
-    CopyEligible,
-};
-use rust_ast::*;
-use util::{BTree, MapLike, StableMap};
 
 use trace::get_and_increment_seed;
+
+use crate::{
+    Arith, BaseType, CommonOp, DynFormat, Expr, FixedReadKind, Format, FormatModule, FormatRef,
+    IntRel, IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
+    byte_set::ByteSet,
+    codegen::typed_format::TypedFixedReadKind,
+    decoder::extract_pair,
+    numeric::elaborator::{TypedBinOp, TypedCast, TypedUnaryOp},
+    parser::error::TraceHash,
+    typecheck::{TypeChecker, UType, UVar, WHNFSolution},
+    validation::{Severity, TypedCondition},
+    valuetype::{SeqBorrowHint, ValueType},
+};
+use intmap::IntMap;
+
+use crate::numeric::{
+    core::Expr as NumExpr,
+    elaborator::{IntType as NumIntType, TypedExpr as TypedNumExpr},
+};
+
+pub(crate) mod catalog;
+
+mod ixlabel;
+use ixlabel::IxLabel;
+
+pub(crate) mod model;
+use model::traits::TraitObject;
+mod name;
+use name::{Derivation, NameAtom, PathLabel};
+mod path_names;
+use path_names::NameGen;
+
+pub(crate) mod rust_ast;
+pub use rust_ast::ToFragment;
+use rust_ast::{
+    analysis::{
+        CopyEligible,
+        heap_optimize::{HeapOptimize, HeapStrategy},
+    },
+    rebind::Rebindable,
+    resolve::Resolvable,
+    *,
+};
+
+mod trace;
+
+mod typed_decoder;
 use typed_decoder::{GTCompiler, GTDecoder, TypedDecoder};
-use typed_format::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern};
+
+pub(crate) mod typed_format;
+use typed_format::{
+    GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewExpr, TypedViewFormat,
+};
+
+mod util;
+use util::{BTree, MapLike, StableMap};
+
+pub(crate) type Typed<T> = (T, GenType);
 
 /// Produces a probabilistically unique TraceHash based on the value of a thread-local counter-state
 /// (and post-increments the counter).
@@ -63,130 +87,456 @@ fn get_trace(_salt: &impl std::hash::Hash) -> TraceHash {
 
 pub struct CodeGen {
     name_gen: NameGen,
-    defined_types: Vec<RustTypeDef>,
+    defined_types: Vec<RustTypeDecl>,
+    metavariables: StableMap<UVar, RustTypeDecl, util::BTree>,
+    /// Vars whose `RustTypeDecl` is currently being constructed (`Expansion::Record`/`Union`
+    /// handling in `lift_uvar`), so a self-reference reached during that construction (which can
+    /// only ever arise from a `Format::Phantom` - the one context in which `Format::ItemVar` may
+    /// validly name a level whose own elaboration is still in progress) resolves here instead of
+    /// recursing into `lift_uvar` for the same var without bound.
+    ///
+    /// The reservation itself is populated lazily, on the *first* self-reference actually
+    /// encountered (`None` until then) rather than eagerly for every var: `NameGen::get_name`'s
+    /// ordinary, decl-content-keyed path deduplicates any two *non*-recursive vars that happen to
+    /// produce structurally identical decls into a single Rust type, and eagerly reserving a
+    /// fresh index for every var (most of which are never self-referenced) would bypass that
+    /// dedup and allocate a same-shaped type twice. A genuinely self-referential decl can never
+    /// collide with anything else this way, since its own content embeds its own reserved index -
+    /// so it's safe to skip dedup specifically (and only) for the vars that escalate here.
+    in_progress: StableMap<UVar, Option<(Label, usize, PathLabel)>, util::FxHash>,
+    /// Vars for which an entry in `in_progress` was actually read by a self-reference while their
+    /// decl was under construction, mapped to whether that var needs a lifetime parameter at all
+    /// (per [`Self::var_needs_lifetime`], computed once on first self-reference and reused for any
+    /// further ones). Tracked so the finished decl can be forced to carry the same lifetime
+    /// verdict its self-referencing placeholder already promised to callers, rather than trusting
+    /// a field/variant-only computation that cannot see that promise. A bare cycle through
+    /// `Format::Phantom` never independently justifies a lifetime - forcing `Some` unconditionally
+    /// produces a struct whose lifetime parameter is otherwise unused (rustc E0392) whenever
+    /// nothing else in the type borrows anything - hence the need to predict this correctly rather
+    /// than guess.
+    recursion_lt_needed: StableMap<UVar, bool, util::FxHash>,
+    /// Maps the `defined_types` index of a generated struct to the `FormatRef` it was elaborated
+    /// from, for the subset of generated structs that were reached via a
+    /// `FixedReadKind::FixedFormat`-kinded `ReadArray`. Populated in `Elaborator::elaborate_kind`.
+    /// Consulted by `generate_code` to decide which types need a `ReadUnchecked` impl generated,
+    /// and to recover (via `record_fmt::analyze_fixed_shape`) the per-field primitive-read
+    /// sequence that `RustType`/`SourceContext` cannot reconstruct on their own (in particular,
+    /// per-field endianness).
+    fixed_format_defs: IntMap<usize, FormatRef>,
 }
 
 impl CodeGen {
     pub fn new() -> Self {
         let name_gen = NameGen::new();
         let defined_types = Vec::new();
+        let metavariables = StableMap::<_, _, util::BTree>::new();
+        let fixed_format_defs = IntMap::new();
         CodeGen {
             name_gen,
             defined_types,
+            metavariables,
+            in_progress: StableMap::<_, _, util::FxHash>::default(),
+            recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
+            fixed_format_defs,
         }
     }
 
-    /// Converts a `ValueType` to a `GenType`, potentially creating new ad-hoc names
+    /// Read-only, side-effect-free walk of `tc`'s solved type-graph to determine whether
+    /// resolving `var` would require a lifetime parameter, without performing any of the
+    /// (mutating) codegen work `lift_uvar` would do for the same purpose.
+    ///
+    /// A var reached while already being visited (a self- or mutually-recursive reference, the
+    /// only way such a cycle can arise given `Format::Phantom`'s role as the sole gateway for
+    /// self-reference) contributes nothing on its own - only genuinely borrowed leaf data
+    /// (`ReadArray`, a borrowed buffer slice, `ViewObj`) or a transitive dependency on one does.
+    fn var_needs_lifetime(
+        tc: &TypeChecker,
+        var: UVar,
+        visiting: &mut std::collections::HashSet<UVar>,
+    ) -> bool {
+        use super::typecheck::Expansion;
+        let var = tc.get_canonical_uvar(var);
+        if !visiting.insert(var) {
+            return false;
+        }
+        let ret = match tc.expand_var(var) {
+            Expansion::Empty | Expansion::Base(_) | Expansion::Int(_) => false,
+            Expansion::Record(fields) => fields
+                .iter()
+                .any(|(_, sol)| Self::solution_needs_lifetime(tc, *sol, visiting)),
+            Expansion::Union(vars) => vars
+                .iter()
+                .any(|(_, sol)| Self::solution_needs_lifetime(tc, *sol, visiting)),
+            Expansion::Seq(sol, hint) => {
+                matches!(hint, SeqBorrowHint::ReadArray | SeqBorrowHint::BufferView)
+                    || Self::solution_needs_lifetime(tc, sol, visiting)
+            }
+            Expansion::Option(sol) | Expansion::PhantomData(sol) => {
+                Self::solution_needs_lifetime(tc, sol, visiting)
+            }
+            Expansion::Tuple(vs) => vs
+                .iter()
+                .any(|sol| Self::solution_needs_lifetime(tc, *sol, visiting)),
+            Expansion::ViewObj => true,
+        };
+        visiting.remove(&var);
+        ret
+    }
+
+    fn solution_needs_lifetime(
+        tc: &TypeChecker,
+        sol: WHNFSolution,
+        visiting: &mut std::collections::HashSet<UVar>,
+    ) -> bool {
+        match sol {
+            WHNFSolution::Base(_) | WHNFSolution::Int(_) => false,
+            WHNFSolution::Var(v) => Self::var_needs_lifetime(tc, v, visiting),
+        }
+    }
+
+    /// Updates `fixed_format_defs` to record that the generated struct at index `ix` (in `defined_types`)
+    /// originated from the format referenced by `format_ref`, for later lookup when generating a `ReadUnchecked` impl.
+    ///
+    /// May be called more than once for the same `(ix, format_ref)` pair (elaboration of a given
+    /// `FixedReadKind::FixedFormat` is memoized by level, but a level may be referenced from more
+    /// than one `ReadArray` site) -- such repeated calls are idempotent.
+    fn register_fixed_format_target(&mut self, ix: usize, format_ref: FormatRef) {
+        self.fixed_format_defs.insert(ix, format_ref);
+    }
+
+    fn lift_base<T>(bt: BaseType) -> T
+    where
+        T: From<PrimType>,
+    {
+        match bt {
+            BaseType::Bool => PrimType::Bool.into(),
+            BaseType::U8 => PrimType::U8.into(),
+            BaseType::U16 => PrimType::U16.into(),
+            BaseType::U32 => PrimType::U32.into(),
+            BaseType::U64 => PrimType::U64.into(),
+            BaseType::Char => PrimType::Char.into(),
+        }
+    }
+
+    fn lift_int<T>(int_t: NumIntType) -> T
+    where
+        T: From<AtomType>,
+    {
+        AtomType::from(int_t).into()
+    }
+
+    /// Takes a [`WHNFSolution`] from a solved TypeChecker and lifts it to the corresponding `RustType`.
+    fn lift_whnf_solution(&mut self, tc: &TypeChecker, sol: WHNFSolution, lt: &RustLt) -> RustType {
+        match sol {
+            WHNFSolution::Base(bt) => Self::lift_base(bt),
+            WHNFSolution::Int(it) => Self::lift_int(it),
+            WHNFSolution::Var(var) => self.lift_uvar(tc, var, lt).to_rust_type(),
+        }
+    }
+
+    /// Resolves a metavariable type in a solved TypeChecker into a `GenType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
-    fn lift_type(&mut self, vt: &ValueType) -> GenType {
-        match vt {
-            ValueType::Empty => RustType::UNIT.into(),
-            ValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
-            ValueType::Base(BaseType::U8) => PrimType::U8.into(),
-            ValueType::Base(BaseType::U16) => PrimType::U16.into(),
-            ValueType::Base(BaseType::U32) => PrimType::U32.into(),
-            ValueType::Base(BaseType::U64) => PrimType::U64.into(),
-            ValueType::Base(BaseType::Char) => PrimType::Char.into(),
-            ValueType::Option(param_t) => GenType::Inline(
-                CompType::Option(Box::new(self.lift_type(param_t).to_rust_type())).into(),
+    fn lift_uvar(&mut self, tc: &TypeChecker, var: UVar, lt: &RustLt) -> GenType {
+        use super::typecheck::Expansion;
+        let var = tc.get_canonical_uvar(var);
+        match tc.expand_var(var) {
+            Expansion::Empty => RustType::UNIT.into(),
+            Expansion::Base(bt) => Self::lift_base(bt),
+            Expansion::Int(it) => Self::lift_int(it.into()),
+            Expansion::Record(fields) => {
+                if let Some(decl) = self.metavariables.get(&var) {
+                    let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
+                    if cfg!(debug_assertions) && is_new {
+                        log::error!(
+                            "expansion of {var} -> Record(..) found previously-stored type-declaration, but name-generation generated a new name for it:\nfields: {fields:#?}\ndecl: {decl:?}\nType({ix}), is_new=true: {type_name:?}"
+                        );
+                    }
+                    return GenType::Def((ix, type_name), decl.clone());
+                }
+                // A self-reference reached while resolving `var`'s own fields below (always via
+                // a `Format::Phantom`, the only place this can validly occur) resolves here
+                // instead of recursing back into this branch. Its decl content is never actually
+                // read - `to_rust_type()` (the only consumer reachable through `PhantomData`'s
+                // handling) only needs `(ix, name, lt)` - but its `lt` must match whatever this
+                // call ends up settling on, which is why that's forced below whenever this fires.
+                if let Some(reservation) = self.in_progress.get(&var) {
+                    let (name, ix, _) = match reservation {
+                        Some(r) => r.clone(),
+                        None => {
+                            let r = self.name_gen.reserve_name();
+                            self.in_progress.insert(var, Some(r.clone()));
+                            r
+                        }
+                    };
+                    let needs_lt = *self.recursion_lt_needed.entry(var).or_insert_with(|| {
+                        Self::var_needs_lifetime(tc, var, &mut Default::default())
+                    });
+                    let placeholder = RustTypeDecl {
+                        def: RustTypeDef::Struct(RustStruct::Record(Vec::new())),
+                        lt: needs_lt.then(|| lt.clone()),
+                    };
+                    // Only push on the first reservation: at that point `ix == len`.
+                    // Subsequent self-refs (Same(r) path) must not push again.
+                    if self.defined_types.len() == ix {
+                        self.defined_types.push(placeholder.clone());
+                    }
+                    return GenType::Def((ix, name), placeholder);
+                }
+                // Mark `var` in-progress (with no reservation yet - see the field's doc comment
+                // for why this is deferred rather than eager) before recursing into fields.
+                self.in_progress.insert(var, None);
+
+                let mut lt_bound = None;
+                let mut rt_fields = Vec::new();
+                for (lab, f_sol) in fields.iter() {
+                    self.name_gen
+                        .ctxt
+                        .push_atom(NameAtom::RecordField(lab.clone()));
+                    let rt_field = self.lift_whnf_solution(tc, *f_sol, lt);
+                    if let Some(lt) = rt_field.lt_param() {
+                        // REVIEW - is it likely to have clashing lifetimes?
+                        let _ = lt_bound.get_or_insert(lt.clone());
+                    }
+                    rt_fields.push((lab.clone(), rt_field));
+                    self.name_gen.ctxt.escape();
+                }
+                let reservation = self.in_progress.remove(&var).unwrap();
+                // If a self-reference consulted `recursion_lt_needed` above, honor the same
+                // verdict here, so the placeholder's promised `lt` (already baked into whatever
+                // field embedded it) matches what this decl actually ends up declaring.
+                if let Some(true) = self.recursion_lt_needed.remove(&var) {
+                    lt_bound = Some(lt.clone());
+                }
+                let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
+                let rt_decl = RustTypeDecl {
+                    def: rt_def,
+                    lt: lt_bound,
+                };
+                let (type_name, ix) = match reservation {
+                    // A self-reference occurred: its placeholder already committed to this
+                    // (ix, name), and dedup against other decls is moot (see field doc comment).
+                    Some((name, ix, path)) => {
+                        self.name_gen
+                            .commit_reservation(ix, name.clone(), path, rt_decl.clone());
+                        self.defined_types[ix] = rt_decl.clone();
+                        (name, ix)
+                    }
+                    // Ordinary, non-recursive case: preserve the original content-based dedup.
+                    None => {
+                        let (name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
+                        if is_new {
+                            self.defined_types.push(rt_decl.clone());
+                        }
+                        (name, ix)
+                    }
+                };
+                self.metavariables.insert(var, rt_decl.clone());
+                GenType::Def((ix, type_name), rt_decl)
+            }
+            Expansion::Union(vars) => {
+                if let Some(decl) = self.metavariables.get(&var) {
+                    let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
+                    assert!(!is_new);
+                    return GenType::Def((ix, type_name), decl.clone());
+                }
+                // See the symmetric comment in the `Expansion::Record` branch above: a
+                // self-reference reached while resolving `var`'s own variants below resolves
+                // here instead of recursing back into this branch.
+                if let Some(reservation) = self.in_progress.get(&var) {
+                    let (name, ix, _) = match reservation {
+                        Some(r) => r.clone(),
+                        None => {
+                            let r = self.name_gen.reserve_name();
+                            self.in_progress.insert(var, Some(r.clone()));
+                            r
+                        }
+                    };
+                    let needs_lt = *self.recursion_lt_needed.entry(var).or_insert_with(|| {
+                        Self::var_needs_lifetime(tc, var, &mut Default::default())
+                    });
+                    let placeholder = RustTypeDecl {
+                        def: RustTypeDef::Enum(Vec::new()),
+                        lt: needs_lt.then(|| lt.clone()),
+                    };
+                    // Only push on the first reservation: at that point `ix == len`.
+                    // Subsequent self-refs (Same(r) path) must not push again.
+                    if self.defined_types.len() == ix {
+                        self.defined_types.push(placeholder.clone());
+                    }
+                    return GenType::Def((ix, name), placeholder);
+                }
+
+                // Mark `var` in-progress (no reservation yet) before recursing into variants -
+                // see the symmetric comment in the `Expansion::Record` branch above.
+                self.in_progress.insert(var, None);
+
+                let mut rt_vars = Vec::new();
+                let mut lt_bound = None;
+                for (name, branch_sol) in vars.iter() {
+                    self.name_gen
+                        .ctxt
+                        .push_atom(NameAtom::Variant(name.clone()));
+                    let name = name.clone();
+                    let variant = match branch_sol {
+                        WHNFSolution::Base(bt) => {
+                            RustVariant::Tuple(name, vec![Self::lift_base(*bt)])
+                        }
+                        WHNFSolution::Int(it) => {
+                            RustVariant::Tuple(name, vec![Self::lift_int(*it)])
+                        }
+                        WHNFSolution::Var(branch_v) => {
+                            let def = tc.expand_var(*branch_v);
+                            match def {
+                                Expansion::Empty => RustVariant::Unit(name),
+                                Expansion::Tuple(args) => match &args[..] {
+                                    [] => RustVariant::Unit(name),
+                                    [sol_arg] => RustVariant::Tuple(
+                                        name,
+                                        vec![self.lift_whnf_solution(tc, *sol_arg, lt)],
+                                    ),
+                                    _ => {
+                                        let mut v_args = Vec::new();
+                                        self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                                        for sol_arg in args {
+                                            v_args.push(self.lift_whnf_solution(tc, sol_arg, lt));
+                                            self.name_gen.ctxt.increment_index();
+                                        }
+                                        self.name_gen.ctxt.escape();
+                                        RustVariant::Tuple(name, v_args)
+                                    }
+                                },
+                                _ => {
+                                    let inner = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
+                                    RustVariant::Tuple(name, vec![inner])
+                                }
+                            }
+                        }
+                    };
+                    if let Some(lt) = variant.lt_param() {
+                        let _ = lt_bound.get_or_insert(lt.clone());
+                    }
+                    rt_vars.push(variant);
+                    self.name_gen.ctxt.escape();
+                }
+                let reservation = self.in_progress.remove(&var).unwrap();
+                if let Some(true) = self.recursion_lt_needed.remove(&var) {
+                    lt_bound = Some(lt.clone());
+                }
+                let rt_def = RustTypeDef::Enum(rt_vars);
+                let rt_decl = RustTypeDecl {
+                    def: rt_def,
+                    lt: lt_bound,
+                };
+                let (tname, ix) = match reservation {
+                    // A self-reference occurred: its placeholder already committed to this
+                    // (ix, name), and dedup against other decls is moot (see field doc comment
+                    // on `in_progress`, above the `Expansion::Record` branch's identical logic).
+                    Some((name, ix, path)) => {
+                        self.name_gen
+                            .commit_reservation(ix, name.clone(), path, rt_decl.clone());
+                        self.defined_types[ix] = rt_decl.clone();
+                        (name, ix)
+                    }
+                    // Ordinary, non-recursive case: preserve the original content-based dedup.
+                    None => {
+                        let (name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
+                        if is_new {
+                            self.defined_types.push(rt_decl.clone());
+                        }
+                        (name, ix)
+                    }
+                };
+                self.metavariables.insert(var, rt_decl.clone());
+                GenType::Def((ix, tname), rt_decl)
+            }
+            Expansion::Seq(sol, hint) => {
+                let inner = self.lift_whnf_solution(tc, sol, lt);
+                match hint {
+                    SeqBorrowHint::ReadArray => {
+                        if let Some(p) = inner.try_as_prim()
+                            && let Ok(mt) = MarkerType::try_from(p)
+                        {
+                            RustType::ReadArray(lt.clone(), FixedSizeType::Marker(mt)).into()
+                        } else if let RustType::Atom(AtomType::TypeRef(
+                            local_type @ LocalType::LocalDef(..),
+                        )) = &inner
+                        {
+                            RustType::ReadArray(
+                                lt.clone(),
+                                FixedSizeType::Adhoc(local_type.clone()),
+                            )
+                            .into()
+                        } else {
+                            unreachable!(
+                                "unsound ReadArray over non-prim, non-adhoc type {inner:?}"
+                            )
+                        }
+                    }
+                    SeqBorrowHint::Constructed => CompType::Vec(Box::new(inner)).into(),
+                    SeqBorrowHint::Empty => {
+                        log::warn!("found empty-sequence hint during code-generation");
+                        CompType::Borrow(
+                            Some(RustLt::Parametric("'static".into())),
+                            Mut::Immutable,
+                            Box::new(CompType::RawSlice(Box::new(inner)).into()),
+                        )
+                        .into()
+                    }
+                    SeqBorrowHint::BufferView => CompType::Borrow(
+                        Some(lt.clone()),
+                        Mut::Immutable,
+                        Box::new(CompType::RawSlice(Box::new(inner)).into()),
+                    )
+                    .into(),
+                }
+            }
+            Expansion::Option(sol) => GenType::Inline(
+                CompType::Option(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
             ),
-            ValueType::Tuple(vs) => match &vs[..] {
+            Expansion::PhantomData(sol) => GenType::Inline(
+                CompType::PhantomData(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
+            ),
+            Expansion::Tuple(vs) => match &vs[..] {
                 [] => RustType::AnonTuple(Vec::new()).into(),
-                [v] => RustType::AnonTuple(vec![self.lift_type(v).to_rust_type()]).into(),
+                // REVIEW - should one-tuples be preserved?
+                [v] => RustType::AnonTuple(vec![self.lift_whnf_solution(tc, *v, lt)]).into(),
                 _ => {
                     let mut buf = Vec::with_capacity(vs.len());
                     self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                     for v in vs.iter() {
-                        buf.push(self.lift_type(v).to_rust_type());
+                        buf.push(self.lift_whnf_solution(tc, *v, lt));
                         self.name_gen.ctxt.increment_index();
                     }
                     self.name_gen.ctxt.escape();
                     RustType::AnonTuple(buf).into()
                 }
             },
-            ValueType::Seq(t) => {
-                let inner = self.lift_type(t.as_ref()).to_rust_type();
-                CompType::Vec(Box::new(inner)).into()
-            }
-            ValueType::Any => panic!("ValueType::Any"),
-            ValueType::Record(fields) => {
-                let mut rt_fields = Vec::new();
-                for (lab, ty) in fields.iter() {
-                    self.name_gen
-                        .ctxt
-                        .push_atom(NameAtom::RecordField(lab.clone()));
-                    let rt_field = self.lift_type(ty);
-                    rt_fields.push((lab.clone(), rt_field.to_rust_type()));
-                    self.name_gen.ctxt.escape();
-                }
-                let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
-                let (type_name, (ix, is_new)) = self.name_gen.get_name(&rt_def);
-                if is_new {
-                    self.defined_types.push(rt_def.clone());
-                }
-                GenType::Def((ix, type_name), rt_def)
-            }
-            ValueType::Union(vars) => {
-                let mut rt_vars = Vec::new();
-                for (name, def) in vars.iter() {
-                    self.name_gen
-                        .ctxt
-                        .push_atom(NameAtom::Variant(name.clone()));
-                    let name = name.clone();
-                    let var = match def {
-                        ValueType::Empty => RustVariant::Unit(name),
-                        ValueType::Tuple(args) => match &args[..] {
-                            [] => RustVariant::Unit(name),
-                            [arg] => {
-                                RustVariant::Tuple(name, vec![self.lift_type(arg).to_rust_type()])
-                            }
-                            _ => {
-                                let mut v_args = Vec::new();
-                                self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                                for arg in args {
-                                    v_args.push(self.lift_type(arg).to_rust_type());
-                                    self.name_gen.ctxt.increment_index();
-                                }
-                                self.name_gen.ctxt.escape();
-                                RustVariant::Tuple(name, v_args)
-                            }
-                        },
-                        other => {
-                            let inner = self.lift_type(other).to_rust_type();
-                            RustVariant::Tuple(name, vec![inner])
-                        }
-                    };
-                    rt_vars.push(var);
-                    self.name_gen.ctxt.escape();
-                }
-                let rt_def = RustTypeDef::Enum(rt_vars);
-                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_def);
-                if is_new {
-                    self.defined_types.push(rt_def.clone());
-                }
-                GenType::Def((ix, tname), rt_def)
-            }
+            Expansion::ViewObj => GenType::Inline(model::view_obj_type(lt.clone())),
         }
     }
 
     fn translate(&self, decoder: &GTDecoder) -> CaseLogic<GTExpr> {
         match decoder {
-            TypedDecoder::Call(_gt, ix, args) =>
-                CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
+            TypedDecoder::Call(_gt, ix, (args, views)) => {
+                CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone(), views.clone()))
+            }
             TypedDecoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
-            TypedDecoder::Pos => CaseLogic::Simple(SimpleLogic::YieldCurrentOffset),
+            TypedDecoder::Pos(nt) => CaseLogic::Simple(SimpleLogic::YieldCurrentOffsetAs(*nt)),
             TypedDecoder::SkipRemainder => CaseLogic::Simple(SimpleLogic::SkipRemainder),
+            TypedDecoder::Phantom => CaseLogic::Simple(SimpleLogic::PhantomData),
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
-                    let Some((ix, lab)) = gt.try_as_adhoc() else { panic!("unexpected type_hint for Decoder::Variant: {:?}", gt) };
+                    let Some((ix, lab, _)) = gt.try_as_adhoc() else {
+                        panic!("unexpected type_hint for Decoder::Variant: {gt:?}")
+                    };
                     (lab.clone(), &self.defined_types[ix])
                 };
                 let constr = Constructor::Compound(type_name.clone(), name.clone());
-                match def {
+                match &def.def {
                     RustTypeDef::Enum(vars) => {
                         let matching = vars
                             .iter()
@@ -194,12 +544,10 @@ impl CodeGen {
                         // REVIEW - should we enforce exact matches (i.e. `inner` must conform to the exact specification of the defined type)?
                         match matching {
                             Some(RustVariant::Unit(_)) => {
-                                CaseLogic::Derived(
-                                    DerivedLogic::UnitVariantOf(
-                                        constr,
-                                        Box::new(self.translate(inner.get_dec()))
-                                    )
-                                )
+                                CaseLogic::Derived(DerivedLogic::UnitVariantOf(
+                                    constr,
+                                    Box::new(self.translate(inner.get_dec())),
+                                ))
                             }
                             Some(RustVariant::Tuple(_, types)) => {
                                 if types.is_empty() {
@@ -214,20 +562,16 @@ impl CodeGen {
                                                 // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
                                                 match &types[0] {
                                                     RustType::AnonTuple(..) => {
-                                                        let cl_mono_tuple = self.translate(
-                                                            inner.get_dec()
-                                                        );
-                                                        CaseLogic::Derived(
-                                                            DerivedLogic::VariantOf(
-                                                                constr,
-                                                                Box::new(cl_mono_tuple)
-                                                            )
-                                                        )
+                                                        let cl_mono_tuple =
+                                                            self.translate(inner.get_dec());
+                                                        CaseLogic::Derived(DerivedLogic::VariantOf(
+                                                            constr,
+                                                            Box::new(cl_mono_tuple),
+                                                        ))
                                                     }
-                                                    other =>
-                                                        panic!(
-                                                            "unable to translate Decoder::Tuple with hint ({other:?}) implied by {type_name}::{name}"
-                                                        ),
+                                                    other => panic!(
+                                                        "unable to translate Decoder::Tuple with hint ({other:?}) implied by {type_name}::{name}"
+                                                    ),
                                                 }
                                             } else {
                                                 unreachable!(
@@ -251,9 +595,10 @@ impl CodeGen {
                                     _ => {
                                         if types.len() == 1 {
                                             let cl_mono = self.translate(inner.get_dec());
-                                            CaseLogic::Derived(
-                                                DerivedLogic::VariantOf(constr, Box::new(cl_mono))
-                                            )
+                                            CaseLogic::Derived(DerivedLogic::VariantOf(
+                                                constr,
+                                                Box::new(cl_mono),
+                                            ))
                                         } else {
                                             panic!(
                                                 "Variant {type_name}::{name}({types:#?}) mismatches non-tuple Decoder {inner:?}"
@@ -262,10 +607,9 @@ impl CodeGen {
                                     }
                                 }
                             }
-                            None =>
-                                unreachable!(
-                                    "VariantOf called for nonexistent variant `{name}` of enum-type `{type_name}`"
-                                ),
+                            None => unreachable!(
+                                "VariantOf called for nonexistent variant `{name}` of enum-type `{type_name}`"
+                            ),
                         }
                     }
                     RustTypeDef::Struct(_) => {
@@ -273,190 +617,197 @@ impl CodeGen {
                     }
                 }
             }
-            TypedDecoder::Parallel(_, alts) =>
-                CaseLogic::Parallel(
-                    ParallelLogic::Alts(
-                        alts
+            TypedDecoder::Parallel(_, alts) => CaseLogic::Parallel(ParallelLogic::Alts(
+                alts.iter()
+                    .map(|alt| self.translate(alt.get_dec()))
+                    .collect(),
+            )),
+            TypedDecoder::Branch(_, tree, flat) => CaseLogic::Other(OtherLogic::Descend(
+                tree.clone(),
+                flat.iter()
+                    .map(|alt| self.translate(alt.get_dec()))
+                    .collect(),
+            )),
+            TypedDecoder::Tuple(gt, elts) => match gt {
+                GenType::Inline(RustType::AnonTuple(_tys)) => {
+                    CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                        constructor: None,
+                        elements: elts
                             .iter()
-                            .map(|alt| self.translate(alt.get_dec()))
-                            .collect()
-                    )
-                ),
-            TypedDecoder::Branch(_, tree, flat) =>
-                CaseLogic::Other(
-                    OtherLogic::Descend(
-                        tree.clone(),
-                        flat
-                            .iter()
-                            .map(|alt| self.translate(alt.get_dec()))
-                            .collect()
-                    )
-                ),
-            TypedDecoder::Tuple(gt, elts) =>
-                match gt {
-                    GenType::Inline(RustType::AnonTuple(_tys)) => {
-                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                            constructor: None,
-                            elements: elts
-                                .iter()
-                                .map(|elt| self.translate(elt.get_dec()))
-                                .collect(),
-                        })
-                    }
-                    GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit))) if
-                        elts.is_empty()
-                    => {
-                        CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
-                    }
-                    other =>
-                        unreachable!(
-                            "TypedDecoder::Tuple expected to have type RustType::AnonTuple(..) (or UNIT if empty), found {other:?}"
-                        ),
+                            .map(|elt| self.translate(elt.get_dec()))
+                            .collect(),
+                    })
                 }
+                GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit)))
+                    if elts.is_empty() =>
+                {
+                    CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
+                }
+                other => unreachable!(
+                    "TypedDecoder::Tuple expected to have type RustType::AnonTuple(..) (or UNIT if empty), found {other:?}"
+                ),
+            },
             TypedDecoder::Sequence(gt, elts) => match gt {
                 GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(_t)))) => {
                     let as_array = _t.prefer_array(elts.len());
-                    let elements = elts.iter().map(|elt| self.translate(elt.get_dec())).collect();
+                    let elements = elts
+                        .iter()
+                        .map(|elt| self.translate(elt.get_dec()))
+                        .collect();
                     CaseLogic::Sequential(SequentialLogic::AccumSeq { as_array, elements })
-                },
-                other => unreachable!("TypedDecoder::Sequence expected to have type CompType::Vec(..), found {other:?}"),
+                }
+                other => unreachable!(
+                    "TypedDecoder::Sequence expected to have type CompType::Vec(..), found {other:?}"
+                ),
             },
-            TypedDecoder::Repeat0While(_gt, tree_continue, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::Repeat0ContinueOnMatch(
-                        tree_continue.clone(),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::Repeat0While(_gt, tree_continue, single) => {
+                CaseLogic::Repeat(RepeatLogic::Repeat0ContinueOnMatch(
+                    tree_continue.clone(),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
 
-            TypedDecoder::Repeat1Until(_gt, tree_break, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::Repeat1BreakOnMatch(
-                        tree_break.clone(),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::Repeat1Until(_gt, tree_break, single) => {
+                CaseLogic::Repeat(RepeatLogic::Repeat1BreakOnMatch(
+                    tree_break.clone(),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
             TypedDecoder::ForEach(_gt, expr, lbl, single) => {
                 // REVIEW[epic=zealous-clone] - do we need to ensure this is cloned?
-                let cl_expr = embed_expr(expr, ExprInfo::EmbedOwned);
-                CaseLogic::Repeat(RepeatLogic::ForEach(cl_expr, lbl.clone(), Box::new(self.translate(single.get_dec()))))
+                let cl_expr = embed_expr_owned(expr);
+                CaseLogic::Repeat(RepeatLogic::ForEach(
+                    Box::new(cl_expr),
+                    lbl.clone(),
+                    Box::new(self.translate(single.get_dec())),
+                ))
             }
             TypedDecoder::DecodeBytes(_gt, expr, inner) => {
-                let cl_expr = embed_expr_dft(expr);
-                CaseLogic::Derived(DerivedLogic::DecodeBytes(cl_expr, Box::new(self.translate(inner.get_dec()))))
+                let cl_expr = embed_expr_nat(expr);
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::DecodeBytes(
+                    Box::new(cl_expr),
+                    Box::new(cl_inner),
+                ))
             }
-            TypedDecoder::RepeatCount(_gt, expr_count, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::ExactCount(
-                        embed_expr_dft(expr_count),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::ParseFromView(_t, view, inner) => {
+                let cl_view = embed_view_expr(view);
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::ParseView(
+                    Box::new(cl_view),
+                    Box::new(cl_inner),
+                ))
+            }
+            TypedDecoder::RepeatCount(_gt, expr_count, single) => {
+                CaseLogic::Repeat(RepeatLogic::ExactCount(
+                    Box::new(embed_expr_nat(expr_count)),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
             TypedDecoder::RepeatBetween(_gt, tree, expr_min, expr_max, single) => {
-                CaseLogic::Repeat(
-                    RepeatLogic::BetweenCounts(
-                        tree.clone(),
-                        embed_expr_dft(expr_min),
-                        embed_expr_dft(expr_max),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                )
+                CaseLogic::Repeat(RepeatLogic::BetweenCounts(
+                    tree.clone(),
+                    Box::new(embed_expr_nat(expr_min)),
+                    Box::new(embed_expr_nat(expr_max)),
+                    Box::new(self.translate(single.get_dec())),
+                ))
             }
-            TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::ConditionTerminal(
-                        GenLambda::from_expr(*pred_terminal.clone(), ClosureKind::Predicate),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) => {
+                CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
+                    Box::new(GenLambda::from_expr(
+                        *pred_terminal.clone(),
+                        ClosureKind::Predicate,
+                    )),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
             TypedDecoder::RepeatUntilSeq(_gt, pred_complete, single) => {
-                CaseLogic::Repeat(
-                    RepeatLogic::ConditionComplete(
-                        GenLambda::from_expr(*pred_complete.clone(), ClosureKind::Predicate),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                )
+                CaseLogic::Repeat(RepeatLogic::ConditionComplete(
+                    Box::new(GenLambda::from_expr(
+                        *pred_complete.clone(),
+                        ClosureKind::Predicate,
+                    )),
+                    Box::new(self.translate(single.get_dec())),
+                ))
             }
             TypedDecoder::AccumUntil(_gt, f, g, init, single) => {
-                CaseLogic::Repeat(
-                    RepeatLogic::AccumUntil(
-                        GenLambda::from_expr(*f.clone(), ClosureKind::PairOwnedBorrow),
-                        GenLambda::from_expr(*g.clone(), ClosureKind::Transform),
-                        (embed_expr_dft(init), init.get_type().unwrap().into_owned()),
-                        (Box::new(self.translate(single.get_dec())), single.get_dec().get_type().unwrap().into_owned()),
-                    )
-                )
+                CaseLogic::Repeat(RepeatLogic::AccumUntil(
+                    Box::new(GenLambda::from_expr(
+                        *f.clone(),
+                        ClosureKind::PairOwnedBorrow,
+                    )),
+                    Box::new(GenLambda::from_expr(*g.clone(), ClosureKind::Transform)),
+                    (
+                        Box::new(embed_expr_nat(init)),
+                        init.get_type().unwrap().into_owned(),
+                    ),
+                    (
+                        Box::new(self.translate(single.get_dec())),
+                        single.get_dec().get_type().unwrap().into_owned(),
+                    ),
+                ))
             }
-            TypedDecoder::Maybe(_gt, cond, inner) => {
-                CaseLogic::Derived(
-                    DerivedLogic::Maybe(
-                        embed_expr_dft(cond),
-                        Box::new(self.translate(inner.get_dec()))
-                    )
-                )
-            }
+            TypedDecoder::Maybe(_gt, cond, inner) => CaseLogic::Derived(DerivedLogic::Maybe(
+                Box::new(embed_expr_nat(cond)),
+                Box::new(self.translate(inner.get_dec())),
+            )),
             TypedDecoder::Map(_gt, inner, f) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::MapOf(
-                        GenLambda::from_expr(*f.clone(), ClosureKind::Transform),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::MapOf(
+                    Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::Transform)),
+                    Box::new(cl_inner),
+                ))
             }
-            TypedDecoder::Where(_gt, inner, f) => {
+            TypedDecoder::Where(_gt, inner, cond) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::Where(
-                        GenLambda::from_expr(*f.clone(), ClosureKind::Transform),
-                        Box::new(cl_inner)
-                    )
-                )
+                let f = *cond.expr.clone();
+                CaseLogic::Derived(DerivedLogic::Where(
+                    Box::new(GenLambda::from_expr(f, ClosureKind::Transform)),
+                    cond.severity,
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::Compute(_t, expr) =>
-                // REVIEW[epic=zealous-clone] - try to gate Clone when Move, Copy or reference is possible
-                CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr, ExprInfo::EmbedOwned))),
+            // REVIEW[epic=zealous-clone] - try to gate Clone when Move, Copy or reference is possible
+            {
+                CaseLogic::Simple(SimpleLogic::Eval(embed_expr_owned(expr)))
+            }
             TypedDecoder::Let(_t, name, expr, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::Let(
-                        name.clone(),
-                        // REVIEW[epic=zealous-clone] - gate cloning when reference or Copy is possible
-                        embed_expr(expr, ExprInfo::EmbedOwned),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::Let(
+                    name.clone(),
+                    Box::new(embed_expr_owned(expr)),
+                    Box::new(cl_inner),
+                ))
+            }
+            TypedDecoder::LetView(_t, name, inner) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::View(ViewLogic::LetView(name.clone(), Box::new(cl_inner)))
             }
             TypedDecoder::LetFormat(_t, f0, name, f) => {
                 let cl_f0 = self.translate(f0.get_dec());
                 let cl_f = self.translate(f.get_dec());
-                CaseLogic::Other(
-                    OtherLogic::LetFormat(
-                        Box::new(cl_f0),
-                        name.clone(),
-                        Box::new(cl_f),
-                    )
-                )
+                CaseLogic::Other(OtherLogic::LetFormat(
+                    Box::new(cl_f0),
+                    name.clone(),
+                    Box::new(cl_f),
+                ))
             }
             TypedDecoder::MonadSeq(_t, f0, f) => {
                 let cl_f0 = self.translate(f0.get_dec());
                 let cl_f = self.translate(f.get_dec());
-                CaseLogic::Other(
-                    OtherLogic::MonadSeq(
-                        Box::new(cl_f0),
-                        Box::new(cl_f),
-                    )
-                )
+                CaseLogic::Other(OtherLogic::MonadSeq(Box::new(cl_f0), Box::new(cl_f)))
             }
             TypedDecoder::Hint(_t, hint, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Other(OtherLogic::Hint(hint.clone(), Box::new(cl_inner)))
             }
             TypedDecoder::Match(_t, scrutinee, cases) => {
-                let scrutinized = embed_expr_dft(scrutinee);
+                let scrutinized = embed_expr_nat(scrutinee);
                 let head = match scrutinee.get_type().unwrap().as_ref() {
-                    GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) =>
-                        scrutinized.vec_as_slice(),
+                    GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => {
+                        scrutinized.vec_as_slice()
+                    }
                     _ => scrutinized,
                 };
                 let mut cl_cases = Vec::new();
@@ -467,8 +818,11 @@ impl CodeGen {
                     ));
                 }
                 let ck = refutability_check(
-                    scrutinee.get_type().expect("bad lambda in scrutinee position").as_ref(),
-                    cases
+                    scrutinee
+                        .get_type()
+                        .expect("bad lambda in scrutinee position")
+                        .as_ref(),
+                    cases,
                 );
                 CaseLogic::Other(OtherLogic::ExprMatch(head, cl_cases, ck))
             }
@@ -479,12 +833,14 @@ impl CodeGen {
                 inner,
             ) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::Dynamic(
-                        DynamicLogic::Huffman(name.clone(), lengths.as_ref().clone(), opt_values.as_deref().cloned()),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::Dynamic(
+                    DynamicLogic::Huffman(
+                        name.clone(),
+                        lengths.as_ref().clone(),
+                        opt_values.as_deref().cloned(),
+                    ),
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::Apply(_t, lab) => {
                 CaseLogic::Simple(SimpleLogic::CallDynamic(lab.clone()))
@@ -498,7 +854,7 @@ impl CodeGen {
                 CaseLogic::Engine(EngineLogic::PeekNot(Box::new(cl_inner)))
             }
             TypedDecoder::Slice(_t, width, inner) => {
-                let re_width = embed_expr_dft(width);
+                let re_width = embed_expr_nat(width);
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Slice(re_width, Box::new(cl_inner)))
             }
@@ -507,10 +863,14 @@ impl CodeGen {
                 CaseLogic::Engine(EngineLogic::Bits(Box::new(cl_inner)))
             }
             TypedDecoder::WithRelativeOffset(_t, base_addr, offset, inner) => {
-                let re_base_addr = embed_expr_dft(base_addr);
-                let re_offset = embed_expr_dft(offset);
+                let re_base_addr = embed_expr_nat(base_addr);
+                let re_offset = embed_expr_nat(offset);
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Engine(EngineLogic::OffsetPeek(re_base_addr, re_offset, Box::new(cl_inner)))
+                CaseLogic::Engine(EngineLogic::OffsetPeek(
+                    re_base_addr,
+                    re_offset,
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::LiftedOption(_, None) => {
                 // REVIEW - do we ever need to preserve the type of the None value?
@@ -520,6 +880,228 @@ impl CodeGen {
                 let cl_inner = self.translate(da.get_dec());
                 CaseLogic::Derived(DerivedLogic::WrapSome(Box::new(cl_inner)))
             }
+            TypedDecoder::CaptureBytes(_, view, len) => CaseLogic::View(ViewLogic::CaptureBytes(
+                embed_view_expr(view),
+                embed_expr_nat(len),
+            )),
+            TypedDecoder::ReadArray(_, view, len, kind) => CaseLogic::View(ViewLogic::ReadArray(
+                embed_view_expr(view),
+                embed_expr_nat(len),
+                kind.clone(),
+            )),
+            TypedDecoder::ReifyView(_, view) => {
+                CaseLogic::View(ViewLogic::ReifyView(embed_view_expr(view)))
+            }
+            TypedDecoder::Permit(_, inner, dft) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::Permit(
+                    Box::new(cl_inner),
+                    Box::new(embed_expr_nat(dft)),
+                ))
+            }
+            #[cfg(feature = "format_enforce")]
+            TypedDecoder::Enforce(_, inner) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::Enforce(Box::new(cl_inner)))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+enum ByteCriterion {
+    Any,
+    MustBe(u8),         // singleton
+    OtherThan(u8),      // negated singleton
+    WithinSet(ByteSet), // use embed_byteset to bridge to RustExpr
+}
+
+impl ByteCriterion {
+    /// Returns `true` if the ByteCriterion is satisfied by every possible byte from 0 to 255.
+    pub fn is_always_true(&self) -> bool {
+        matches!(self, ByteCriterion::Any)
+    }
+
+    /// Returns a RustExpr that evaluates to `true` if the argument (`arg`) satisfies the criterion
+    /// represented by `self`.
+    fn as_predicate(&self, arg: RustExpr) -> RustExpr {
+        match self {
+            ByteCriterion::Any => RustExpr::TRUE,
+            ByteCriterion::MustBe(byte) => {
+                RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte)))
+            }
+            ByteCriterion::OtherThan(byte) => {
+                RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte)))
+            }
+            ByteCriterion::WithinSet(bs) => embed_byteset(bs).call_method_with("contains", [arg]),
+        }
+    }
+}
+
+fn embed_byteset(bs: &ByteSet) -> RustExpr {
+    if bs.is_full() {
+        RustExpr::scoped(["ByteSet"], "full").call()
+    } else if bs.len() == 1 {
+        let Some(elt) = bs.min_elem() else {
+            unreachable!("len == 1 but no min_elem")
+        };
+        RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::num_lit(elt)])
+    } else {
+        let [q0, q1, q2, q3] = bs.to_bits();
+        RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
+            RustExpr::u64lit(q0),
+            RustExpr::u64lit(q1),
+            RustExpr::u64lit(q2),
+            RustExpr::u64lit(q3),
+        ])])
+    }
+}
+
+/// this production should be a RustExpr whose compiled type is usize, and whose
+/// runtime value is the index of the successful match relative to the input
+fn invoke_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustExpr {
+    embed_matchtree(tree, ctxt).into()
+}
+
+// follows the same rules as CaseLogic::to_ast as far as the expression type of the generated code
+fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> GenBlock {
+    fn expand_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> GenBlock {
+        match &tree.branches[..] {
+            [] => {
+                if let Some(ix) = tree.accept {
+                    GenBlock::simple_expr(RustExpr::num_lit(ix))
+                } else {
+                    let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                        .call_with([RustExpr::u64lit(get_trace(&(tree, "empty-non-accepting")))]);
+                    GenBlock::explicit_return(RustExpr::err(err_val))
+                }
+            }
+            [(bs, branch)] => {
+                let bc = ByteCriterion::from(bs);
+
+                let call = ctxt.parser().call_method("read_byte").wrap_try();
+
+                if bc.is_always_true() {
+                    // this always accepts, but needs to read a byte
+                    let ignore_byte = GenStmt::Embed(RustStmt::Expr(call));
+                    let branch_block = expand_matchtree(branch, ctxt);
+                    // REVIEW - need append-stable indexing, or dedicated method for prepend/append
+                    let all_stmts =
+                        Iterator::chain(std::iter::once(ignore_byte), branch_block.stmts).collect();
+                    GenBlock {
+                        stmts: all_stmts,
+                        ..branch_block
+                    }
+                } else {
+                    let bind = RustStmt::assign("b", call);
+                    let guard = Box::new(bc.as_predicate(RustExpr::local("b")));
+                    let b_true: Vec<RustStmt> = expand_matchtree(branch, ctxt).flatten();
+                    let b_false = {
+                        if let Some(ix) = tree.accept {
+                            vec![RustStmt::Return(
+                                ReturnKind::Implicit,
+                                RustExpr::num_lit(ix),
+                            )]
+                        } else {
+                            let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                                .call_with([RustExpr::u64lit(get_trace(&(
+                                    tree,
+                                    "failed-descent-condition",
+                                )))]);
+                            vec![RustStmt::Return(
+                                ReturnKind::Keyword,
+                                RustExpr::err(err_val),
+                            )]
+                        }
+                    };
+                    GenBlock::lift_block(
+                        [bind],
+                        RustExpr::Control(Box::new(RustControl::If(guard, b_true, Some(b_false)))),
+                    )
+                }
+            }
+            _ => {
+                let call = Box::new(ctxt.parser().call_method("read_byte").wrap_try());
+                let mut cases = Vec::new();
+
+                for (bs, branch) in tree.branches.iter() {
+                    let crit = ByteCriterion::from(bs);
+                    match crit {
+                        ByteCriterion::Any => {
+                            unreachable!("unconditional descent with more than one branch");
+                        }
+                        ByteCriterion::MustBe(b) => {
+                            let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
+                                RustPrimLit::Numeric(RustNumLit::U8(b)),
+                            ));
+                            let rhs = expand_matchtree(branch, ctxt).flatten();
+                            cases.push((lhs, rhs));
+                        }
+                        ByteCriterion::OtherThan(_) | ByteCriterion::WithinSet(_) => {
+                            let guard = crit.as_predicate(RustExpr::local("byte"));
+                            let lhs = MatchCaseLHS::WithGuard(
+                                RustPattern::CatchAll(Some(Label::from("byte"))),
+                                guard,
+                            );
+                            let rhs = expand_matchtree(branch, ctxt).flatten();
+                            cases.push((lhs, rhs));
+                        }
+                    }
+                }
+
+                let value = Box::new(RustExpr::err(
+                    RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                        .call_with([RustExpr::u64lit(get_trace(&(tree, "catchall-nomatch")))]),
+                ));
+                let match_block = RustControl::Match(
+                    call,
+                    RustMatchBody::Refutable(cases, RustCatchAll::ReturnErrorValue { value }),
+                );
+                GenBlock::simple_expr(RustExpr::Control(Box::new(match_block)))
+            }
+        }
+    }
+
+    let open_peek = GenStmt::Embed(RustStmt::Expr(
+        ctxt.parser().call_method("open_peek_context"),
+    ));
+
+    // this is a stub for alternate parsing models to replace the `Parser` argument in the context of the expansion
+    let ll_context = ProdCtxt { ..ctxt };
+
+    let mut tree_block = expand_matchtree(tree, ll_context);
+    let close_peek = GenStmt::Embed(RustStmt::Expr(
+        ctxt.parser().call_method("close_peek_context").wrap_try(),
+    ));
+
+    // REVIEW - we could definitely clean up the structural grouping of the pieces below
+    let mut stmts =
+        Vec::with_capacity(tree_block.stmts.len() + if tree_block.ret.is_some() { 1 } else { 2 });
+
+    stmts.push(open_peek);
+    stmts.append(&mut tree_block.stmts);
+    let ret = match tree_block.ret {
+        None => {
+            stmts.push(close_peek);
+            None
+        }
+        Some(expr) => Some(GenExpr::BlockScope(Box::new(GenBlock {
+            stmts: vec![
+                GenStmt::assign("ret", GenBlock::single_expr(expr)),
+                close_peek,
+            ],
+            ret: Some(GenExpr::Embed(RustExpr::local("ret"))),
+        }))),
+    };
+    GenBlock { stmts, ret }
+}
+
+fn embed_view_expr(view: &TypedViewExpr<GenType>) -> RustExpr {
+    match view {
+        TypedViewExpr::Var(name) => RustExpr::local(name.clone()),
+        TypedViewExpr::Offset(base, offset) => {
+            let offset = embed_expr_nat(offset);
+            model::view_offset(embed_view_expr(base), offset.cast_as_usize())
         }
     }
 }
@@ -582,13 +1164,22 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
         TypedPattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U16(*n))),
         TypedPattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U32(*n))),
         TypedPattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U64(*n))),
-        TypedPattern::Int(gt, bounds) => match bounds.is_exact() {
+        TypedPattern::ZConst(_, z) => {
+            RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::SomeInt(z.clone())))
+        }
+        TypedPattern::ZRange(_, range) => RustPattern::PrimRange(
+            RustPrimLit::Numeric(RustNumLit::SomeInt(range.min.clone())),
+            Some(RustPrimLit::Numeric(RustNumLit::SomeInt(range.max.clone()))),
+        ),
+        TypedPattern::Int(gt, bounds) => match bounds.as_exact() {
             Some(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(n))),
             None => match gt {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8))) => {
                     let Ok((min, opt_max)): Result<(u8, Option<u8>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U8 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U8 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U8(min)),
@@ -598,7 +1189,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U16))) => {
                     let Ok((min, opt_max)): Result<(u16, Option<u16>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U16 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U16 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U16(min)),
@@ -608,7 +1201,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U32))) => {
                     let Ok((min, opt_max)): Result<(u32, Option<u32>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U32 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U32 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U32(min)),
@@ -618,7 +1213,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U64))) => {
                     let Ok((min, opt_max)): Result<(u64, Option<u64>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U64 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U64 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U64(min)),
@@ -636,60 +1233,70 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum ExprInfo {
     #[default]
-    /// Uses implicit copy-or-move semantics on referenced local variables (i.e. as opposed to cloning)
+    /// Uses implicit copy-or-move semantics on referenced local variables
     Natural,
-    /// Applies a `clone` operation to any referenced local variables
+    /// Applies type-aware owned-value coercion to referenced local variables
     EmbedOwned,
 }
 
 fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
+        TypedExpr::Numeric(_gt, num) => embed_numeric_expr(num),
         TypedExpr::Record(gt, fields) => {
             let tname = match gt {
                 GenType::Def((_, tname), _) => tname,
-                GenType::Inline(
-                    RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_ix, tname))),
-                ) => tname,
-                other =>
-                    unreachable!(
-                        "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
-                    ),
+                GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                    _ix,
+                    tname,
+                    _,
+                )))) => tname,
+                other => unreachable!(
+                    "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
+                ),
             };
             RustExpr::Struct(
                 Constructor::Simple(tname.clone()),
-                StructExpr::RecordExpr(fields
-                    .iter()
-                    .map(|(name, val)| {
-                        let value = match embed_expr_dft(val) {
-                            RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
-                            other => Some(other),
-                        };
-                        (name.clone(), value)
-                    }).collect()
-                )
+                StructExpr::Record(
+                    fields
+                        .iter()
+                        .map(|(name, val)| {
+                            let value = match embed_expr_nat(val) {
+                                RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
+                                other => Some(other),
+                            };
+                            (name.clone(), value)
+                        })
+                        .collect(),
+                ),
             )
         }
         TypedExpr::Variant(gt, vname, inner) => {
             match gt {
                 GenType::Def((_ix, tname), def) => {
-                    match def {
+                    match &def.def {
                         RustTypeDef::Enum(vars) => {
-                            let Some(this) = vars.iter().find(|var| var.get_label() == vname) else {
+                            // NOTE - `this` is the definition-level layout of the variant whose name matches `vname` in the enum-declaration found in `gt`
+                            let Some(this) = vars.iter().find(|var| var.get_label() == vname)
+                            else {
                                 unreachable!("Variant not found: {:?}::{:?}", tname, vname)
                             };
                             let constr = Constructor::Compound(tname.clone(), vname.clone());
                             match this {
                                 RustVariant::Unit(_vname) => {
-                                    // FIXME - this leads to some '();' statements we might want to elide
+                                    // NOTE - the variant we are ultimately constructing (`this`) is found to be a Unit variant, so `inner` does not produce a final value (or implicitly produces `()`).
+                                    // REVIEW - determine whether there are any cases where `();` statements end up persisting in the output
                                     RustExpr::BlockScope(
-                                        // REVIEW - we only need EmbedCloned if there are any potential reuse-after-move patterns within the `_ : ()` preamble...
-                                        vec![RustStmt::Expr(embed_expr_dft(inner))],
-                                        Box::new(RustExpr::Struct(constr, StructExpr::EmptyExpr))
+                                        // REVIEW - EmbedCloned would be necessary in the rare case that the block `{ .. } : ()` contains variable references that might be subject to use-after-move issues
+                                        vec![RustStmt::Expr(embed_expr_nat(inner))],
+                                        Box::new(RustExpr::Struct(constr, StructExpr::Empty)),
                                     )
                                 }
                                 RustVariant::Tuple(_vname, _elts) => {
-                                    // FIXME - not sure how to avoid 1 x N (unary-over-tuple) if inner becomes RustExpr::Tuple...
-                                    RustExpr::Struct(constr, StructExpr::TupleExpr(vec![embed_expr_dft(inner)]))
+                                    // REVIEW - we have no strategy to avoid embedding a value of an N-tuple type as the member of a 1-tuple variant, but this is mostly a cosmetic concern and not a critical flaw
+                                    RustExpr::Struct(
+                                        constr,
+                                        StructExpr::Tuple(vec![embed_expr_nat(inner)]),
+                                    )
                                 }
                             }
                         }
@@ -698,10 +1305,9 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                         }
                     }
                 }
-                other =>
-                    unreachable!(
-                        "Cannot embed variant expression with inlined (abstract) GenType: {other:?}"
-                    ),
+                other => unreachable!(
+                    "Cannot embed variant expression with inlined (abstract) GenType: {other:?}"
+                ),
             }
         }
         TypedExpr::Destructure(_t, bound_value, pattern, inner) => {
@@ -719,38 +1325,28 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::Match(t, scrutinee, cases) => {
             embed_match_expr(expr, t, scrutinee.as_ref(), cases, info)
         }
-        TypedExpr::Tuple(_t, tup) =>
-            RustExpr::Tuple(
-                tup
-                    .iter()
-                    .map(|x| embed_expr(x, info))
-                    .collect()
-            ),
-        TypedExpr::TupleProj(_, expr_tup, ix) => {
-            embed_expr(expr_tup, info /* ExprInfo::EmbedCloned */).at_pos(*ix)
+        TypedExpr::Tuple(_t, tup) => {
+            RustExpr::Tuple(tup.iter().map(|x| embed_expr(x, info)).collect())
         }
+        TypedExpr::TupleProj(_, expr_tup, ix) => embed_expr(expr_tup, info).at_pos(*ix),
         TypedExpr::SeqIx(_, expr_seq, ix) => {
-            let ix_expr = RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(ix)), PrimType::Usize.into()));
-            // REVIEW[epic=zealous-clone] - figure out under what circumstances we can avoid introducing cloning here
-            embed_expr(expr_seq, ExprInfo::EmbedOwned).index(ix_expr)
+            // REVIEW - there is needless cruft generated in the case of `Expr::SeqIx(Expr::EnumFromTo(..))`, but there is a low likelihood of this construction ending up in any practical format
+            let ix_expr = RustExpr::Operation(RustOp::AsCast(
+                Box::new(embed_expr_nat(ix)),
+                PrimType::Usize.into(),
+            ));
+            embed_expr(expr_seq, info).index(ix_expr)
         }
-        TypedExpr::RecordProj(_, expr_rec, fld) => {
-            // REVIEW[epic=zealous-clone] - figure out under what circumstances we can avoid introducing cloning here
-            embed_expr(expr_rec, ExprInfo::EmbedOwned).field(fld.clone())
-        }
+        TypedExpr::RecordProj(_, expr_rec, fld) => embed_expr(expr_rec, info).field(fld.clone()),
         TypedExpr::Seq(_, elts) => {
-            RustExpr::ArrayLit(
-                elts
-                    .iter()
-                    .map(|x| embed_expr(x, info))
-                    .collect()
-            ).call_method("to_vec")
+            RustExpr::ArrayLit(elts.iter().map(|x| embed_expr(x, info)).collect())
+                .call_method("to_vec")
         }
         TypedExpr::Arith(_gt, arith, lhs, rhs) => {
             // NOTE - because arith only deals with Copy types, we oughtn't need any embedded clones
             let mut alt = None;
-            let x = embed_expr_dft(lhs);
-            let y = embed_expr_dft(rhs);
+            let x = embed_expr_nat(lhs);
+            let y = embed_expr_nat(rhs);
             let op = match arith {
                 Arith::BitAnd => InfixOperator::BitAnd,
                 Arith::BitOr => InfixOperator::BitOr,
@@ -758,7 +1354,11 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 Arith::BoolOr => InfixOperator::BoolOr,
                 Arith::Add => InfixOperator::Add,
                 Arith::Sub => {
-                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone(), RustExpr::u64lit(get_trace(&()))]));
+                    alt.replace(RustExpr::local("try_sub!").call_with([
+                        x.clone(),
+                        y.clone(),
+                        RustExpr::u64lit(get_trace(&())),
+                    ]));
                     InfixOperator::Sub
                 }
                 Arith::Mul => InfixOperator::Mul,
@@ -779,15 +1379,14 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             }
         }
         TypedExpr::EnumFromTo(_, from, to) => {
-            let start = embed_expr_dft(from);
-            let stop = embed_expr_dft(to);
-            // FIXME - currently, we have no optimization to pre-optimize SeqIx(EnumFromTo)...
+            let start = embed_expr_nat(from);
+            let stop = embed_expr_nat(to);
             RustExpr::RangeExclusive(Box::new(start), Box::new(stop))
         }
         TypedExpr::IntRel(_, rel, lhs, rhs) => {
             // NOTE - because IntRel only deals with Copy types, we oughtn't need any embedded clones
-            let x = embed_expr_dft(lhs);
-            let y = embed_expr_dft(rhs);
+            let x = embed_expr_nat(lhs);
+            let y = embed_expr_nat(rhs);
             let op = match rel {
                 IntRel::Eq => InfixOperator::Eq,
                 IntRel::Ne => InfixOperator::Neq,
@@ -800,7 +1399,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         }
         TypedExpr::Unary(_, op, inner) => {
             // NOTE - because Unary only deals with Copy types, we oughtn't need any embedded clones
-            let x = embed_expr_dft(inner);
+            let x = embed_expr_nat(inner);
             match op {
                 UnaryOp::BoolNot => {
                     let op = PrefixOperator::BoolNot;
@@ -814,38 +1413,49 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 }
             }
         }
-        TypedExpr::AsU8(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(x)), PrimType::U8.into())),
-        TypedExpr::AsU16(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(x)), PrimType::U16.into())),
-        TypedExpr::AsU32(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(x)), PrimType::U32.into())),
-        TypedExpr::AsU64(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(x)), PrimType::U64.into())),
-        TypedExpr::U16Be(be_bytes) =>
-            RustExpr::local("u16be").call_with([embed_expr_dft(be_bytes)]),
-        TypedExpr::U16Le(le_bytes) =>
-            RustExpr::local("u16le").call_with([embed_expr_dft(le_bytes)]),
-        TypedExpr::U32Be(be_bytes) =>
-            RustExpr::local("u32be").call_with([embed_expr_dft(be_bytes)]),
-        TypedExpr::U32Le(le_bytes) =>
-            RustExpr::local("u32le").call_with([embed_expr_dft(le_bytes)]),
-        TypedExpr::U64Be(be_bytes) =>
-            RustExpr::local("u64be").call_with([embed_expr_dft(be_bytes)]),
-        TypedExpr::U64Le(le_bytes) =>
-            RustExpr::local("u64le").call_with([embed_expr_dft(le_bytes)]),
-        TypedExpr::AsChar(codepoint) =>
-            RustExpr::scoped(["char"], "from_u32")
-                .call_with([embed_expr_dft(codepoint)])
-                .call_method("unwrap"),
+        TypedExpr::AsU8(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U8.into(),
+        )),
+        TypedExpr::AsU16(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U16.into(),
+        )),
+        TypedExpr::AsU32(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U32.into(),
+        )),
+        TypedExpr::AsU64(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U64.into(),
+        )),
+        TypedExpr::U16Be(be_bytes) => {
+            RustExpr::local("u16be").call_with([embed_expr_nat(be_bytes)])
+        }
+        TypedExpr::U16Le(le_bytes) => {
+            RustExpr::local("u16le").call_with([embed_expr_nat(le_bytes)])
+        }
+        TypedExpr::U32Be(be_bytes) => {
+            RustExpr::local("u32be").call_with([embed_expr_nat(be_bytes)])
+        }
+        TypedExpr::U32Le(le_bytes) => {
+            RustExpr::local("u32le").call_with([embed_expr_nat(le_bytes)])
+        }
+        TypedExpr::U64Be(be_bytes) => {
+            RustExpr::local("u64be").call_with([embed_expr_nat(be_bytes)])
+        }
+        TypedExpr::U64Le(le_bytes) => {
+            RustExpr::local("u64le").call_with([embed_expr_nat(le_bytes)])
+        }
+        TypedExpr::AsChar(codepoint) => RustExpr::scoped(["char"], "from_u32")
+            .call_with([embed_expr_nat(codepoint)])
+            .call_method("unwrap"),
         TypedExpr::SeqLength(seq) => {
             // NOTE - SeqLength is treated as U32 in Format context, so any operations on it have to be done on a U32 value rather than the natural `.len(): _ -> usize` return-value
-            RustExpr::Operation(
-                RustOp::AsCast(
-                    Box::new(embed_expr_dft(seq).vec_len()),
-                    RustType::Atom(AtomType::Prim(PrimType::U32))
-                )
-            )
+            RustExpr::Operation(RustOp::AsCast(
+                Box::new(embed_expr_nat(seq).vec_len()),
+                RustType::Atom(AtomType::Prim(PrimType::U32)),
+            ))
         }
         TypedExpr::Append(_, seq0, seq1) => {
             let lhs = embed_expr(seq0, info);
@@ -853,109 +1463,127 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             RustExpr::FunctionCall(Box::new(RustExpr::local("seq_append")), vec![lhs, rhs])
         }
         TypedExpr::SubSeq(_, seq, ix, len) => {
-            let start_expr = embed_expr_dft(ix);
+            let start_expr = embed_expr_nat(ix);
             let bind_ix = RustStmt::assign(
                 "ix",
-                RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into()))
+                RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())),
             );
             let end_expr = RustExpr::infix(
                 RustExpr::local("ix"),
                 InfixOperator::Add,
-                RustExpr::Operation(
-                    RustOp::AsCast(Box::new(embed_expr_dft(len)), PrimType::Usize.into())
-                )
+                RustExpr::Operation(RustOp::AsCast(
+                    Box::new(embed_expr_nat(len)),
+                    PrimType::Usize.into(),
+                )),
             );
             RustExpr::BlockScope(
                 vec![bind_ix],
                 Box::new(
                     // REVIEW - in some cases, we might be able to get away with slice-typed expressions, but in practice it is easier to vec everything for now and worry about performance later
-                    RustExpr::scoped(["Vec"], "from").call_with([
-                        RustExpr::Borrow(
-                            Box::new(
-                                RustExpr::Slice(
-                                    Box::new(embed_expr_dft(seq)),
-                                    Box::new(RustExpr::local("ix")),
-                                    Box::new(end_expr)
-                                )
-                            )
+                    RustExpr::scoped(["Vec"], "from").call_with([RustExpr::Borrow(Box::new(
+                        RustExpr::Slice(
+                            Box::new(embed_expr_nat(seq)),
+                            Box::new(RustExpr::local("ix")),
+                            Box::new(end_expr),
                         ),
-                    ])
-                )
+                    ))]),
+                ),
             )
         }
         TypedExpr::SubSeqInflate(_, seq, ix, len) => {
-            let start_expr = embed_expr_dft(ix);
+            let start_expr = embed_expr_nat(ix);
 
-            let bind_ix = RustStmt::assign("ix", RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())));
+            let bind_ix = RustStmt::assign(
+                "ix",
+                RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())),
+            );
             let end_expr = RustExpr::infix(
                 RustExpr::local("ix"),
                 InfixOperator::Add,
-                RustExpr::Operation(
-                    RustOp::AsCast(Box::new(embed_expr_dft(len)), PrimType::Usize.into())
-                )
+                RustExpr::Operation(RustOp::AsCast(
+                    Box::new(embed_expr_nat(len)),
+                    PrimType::Usize.into(),
+                )),
             );
 
-            let range = RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
+            let range =
+                RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
 
-            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![embed_expr_dft(seq), range]).call_method("to_vec")))
+            RustExpr::BlockScope(
+                vec![bind_ix],
+                Box::new(
+                    RustExpr::local("slice_ext")
+                        .call_with(vec![embed_expr_nat(seq), range])
+                        .call_method("to_vec"),
+                ),
+            )
         }
-        TypedExpr::FlatMap(_, f, seq) =>
-            RustExpr::local("try_flat_map_vec")
-                .call_with([
-                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
-                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
-                ])
-                .wrap_try(),
-        TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) =>
+        TypedExpr::FlatMap(_, f, seq) => RustExpr::local("try_flat_map_vec")
+            .call_with([
+                embed_expr_nat(seq)
+                    .call_method("iter")
+                    .call_method("cloned"),
+                embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
+            ])
+            .wrap_try(),
+        TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) => {
             RustExpr::local("try_fold_map_curried")
                 .call_with([
-                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
+                    embed_expr_nat(seq)
+                        .call_method("iter")
+                        .call_method("cloned"),
                     embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
-                .wrap_try(),
-        TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) =>
+                .wrap_try()
+        }
+        TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) => {
             RustExpr::local("try_fold_left_curried")
                 .call_with([
-                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
+                    embed_expr_nat(seq)
+                        .call_method("iter")
+                        .call_method("cloned"),
                     embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
-                .wrap_try(),
-        TypedExpr::FlatMapList(_, f, _ret_type, seq) =>
-            RustExpr::local("try_flat_map_append_vec")
-                .call_with([
-                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
-                    embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
-                ])
-                .wrap_try(),
-        TypedExpr::FindByKey(_, is_sorted, f, query, seq) => {
+                .wrap_try()
+        }
+        TypedExpr::FlatMapList(_, f, _ret_type, seq) => RustExpr::local("try_flat_map_append_vec")
+            .call_with([
+                embed_expr_nat(seq)
+                    .call_method("iter")
+                    .call_method("cloned"),
+                embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
+            ])
+            .wrap_try(),
+        TypedExpr::FindByKey(ty, is_sorted, f, query, seq) => {
             let method = if *is_sorted {
                 "find_by_key_sorted"
             } else {
                 "find_by_key_unsorted"
             };
-            let seq = embed_expr_dft(seq).make_persistent().into_owned();
-            RustExpr::local(method)
-                .call_with([
-                    embed_lambda_dft(f, ClosureKind::ExtractKey, false),
-                    embed_expr(query, ExprInfo::Natural),
-                    seq,
-                ])
-                // REVIEW[epic=zealous-clone] - do we need this? (we probably do)
-                // TODO: gate 'copied' by whether the GenType is Copy/Clone; we may want to infer whether an owned value is needed at all, but that is harder to answer locally
-                .call_method("cloned")
+            fn mk_name() -> &'static str {
+                "tmp"
+            }
+            embed_expr_nat(seq).use_as_persistent(
+                |seq| {
+                    RustExpr::local(method)
+                        .call_with([
+                            embed_lambda_dft(f, ClosureKind::ExtractKey, false),
+                            embed_expr(query, ExprInfo::Natural),
+                            seq,
+                        ])
+                        .owned_opt_ref(ty.to_rust_type())
+                },
+                mk_name,
+            )
         }
         TypedExpr::Dup(_, n, expr) => {
             // NOTE - the dup count should be simple, but the duplicated expression must be move-safe
-            RustExpr::local("dup32").call_with([
-                embed_expr_dft(n),
-                // REVIEW[epc=zealous-clone] - consider under what circumstances the clone can be eliminated
-                embed_expr(expr, ExprInfo::EmbedOwned),
-            ])
+            RustExpr::local("dup32").call_with([embed_expr_nat(n), embed_expr_owned(expr)])
         }
         TypedExpr::Var(t, vname) => {
-            // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
+            // TODO[epic=soundness] - implement proper checks for proper scoping and variable-name sanitization; review the set of identifiers that are generated by codegen itself, and ensure that they do not shadow format-level variables
             let loc = RustExpr::local(vname.clone());
             let expr_type = t.to_rust_type();
             match info {
@@ -968,14 +1596,19 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::U16(n) => RustExpr::u16lit(*n),
         TypedExpr::U32(n) => RustExpr::u32lit(*n),
         TypedExpr::U64(n) => RustExpr::u64lit(*n),
-        TypedExpr::Lambda(_, _, _) =>
-            unreachable!(
-                "TypedExpr::Lambda unsupported as first-class embed (requires embed_lambda with proper ClosureKind argument)"
-            ),
+        TypedExpr::Lambda(_, _, _) => unreachable!(
+            "TypedExpr::Lambda unsupported as first-class embed (requires embed_lambda with proper ClosureKind argument)"
+        ),
         // TODO - determine if we need to type-annotate the Some call based on the gt we are currently ignoring
         TypedExpr::LiftOption(_, Some(x)) => embed_expr(x, info).wrap_some(),
         TypedExpr::LiftOption(_, None) => RustExpr::option_none(),
     }
+}
+
+/// Constructs the appropriate `RustExpr` for an embedded (typed) numeric-subtree expression.
+fn embed_numeric_expr(num: &TypedNumExpr<GenType>) -> RustExpr {
+    use crate::numeric::codegen::synthesize;
+    synthesize(num)
 }
 
 fn embed_match_expr(
@@ -985,11 +1618,15 @@ fn embed_match_expr(
     cases: &Vec<(GTPattern, GTExpr)>,
     info: ExprInfo,
 ) -> RustExpr {
-    let scrutinized = embed_expr_dft(scrutinee);
+    fn mk_name() -> &'static str {
+        "tmp"
+    }
+    let scrutinized = embed_expr_nat(scrutinee);
     let head = match scrutinee.get_type().unwrap().as_ref() {
-        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => {
-            scrutinized.make_persistent().into_owned().vec_as_slice()
-        }
+        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => scrutinized
+            .make_persistent(mk_name)
+            .into_owned()
+            .vec_as_slice(),
         _ => scrutinized,
     };
 
@@ -1028,15 +1665,15 @@ fn embed_match_expr(
         Refutability::Refutable | Refutability::Indeterminate => RustMatchBody::Refutable(
             rust_cases,
             RustCatchAll::ReturnErrorValue {
-                value: RustExpr::err(
+                value: Box::new(RustExpr::err(
                     RustExpr::scoped(["ParseError"], "ExcludedBranch")
                         .call_with([RustExpr::u64lit(get_trace(&expr))]),
-                ),
+                )),
             },
         ),
         Refutability::Irrefutable => RustMatchBody::Irrefutable(rust_cases),
     };
-    RustExpr::Control(Box::new(RustControl::Match(head, rust_body)))
+    RustExpr::Control(Box::new(RustControl::Match(Box::new(head), rust_body)))
 }
 
 /// Speculatively collects the RustPatterns corresponding to the match-set of a `matches!`-like `match` expression,
@@ -1057,10 +1694,8 @@ fn try_as_matches_macro_cases(
                         return None;
                     }
                     accum.push(embed_pattern(pat));
-                } else {
-                    if !matches!(pat, TypedPattern::Wildcard(..)) {
-                        return None;
-                    }
+                } else if !matches!(pat, TypedPattern::Wildcard(..)) {
+                    return None;
                 }
             }
             _other => return None,
@@ -1069,9 +1704,14 @@ fn try_as_matches_macro_cases(
     Some(accum)
 }
 
-/// Uses the default value of `ExprInfo` for [`embed_expr`]
-fn embed_expr_dft(expr: &TypedExpr<GenType>) -> RustExpr {
-    embed_expr(expr, ExprInfo::default())
+/// Shorthand for embedding an expression with `ExprInfo::Natural`
+fn embed_expr_nat(expr: &TypedExpr<GenType>) -> RustExpr {
+    embed_expr(expr, ExprInfo::Natural)
+}
+
+/// Shorthand for embedding an expression with `ExprInfo::EmbedOwned`
+fn embed_expr_owned(x: &TypedExpr<GenType>) -> RustExpr {
+    embed_expr(x, ExprInfo::EmbedOwned)
 }
 
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Default)]
@@ -1100,101 +1740,117 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
         return Refutability::Irrefutable;
     }
     match head_type {
-        GenType::Inline(rt) =>
-            match rt {
-                RustType::Atom(at) =>
-                    match at {
-                        AtomType::TypeRef(lt) =>
-                            match lt {
-                                LocalType::LocalDef(ix, lbl) =>
-                                    unreachable!(
-                                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
-                                    ),
-                                LocalType::External(t) =>
-                                    unreachable!(
-                                        "external type '{t}' cannot be resolved without further information"
-                                    ),
-                            }
-                        AtomType::Prim(pt) =>
-                            match pt {
-                                PrimType::Unit => {
-                                    if cases.is_empty() {
-                                        Refutability::Refutable
-                                    } else {
-                                        Refutability::Irrefutable
-                                    }
+        GenType::Inline(rt) => match rt {
+            RustType::Atom(at) => match at {
+                AtomType::TypeRef(lt) => match lt {
+                    LocalType::LocalDef(ix, lbl, _) => unreachable!(
+                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
+                    ),
+                    LocalType::External(t) => unreachable!(
+                        "external type '{t}' cannot be resolved without further information"
+                    ),
+                },
+                AtomType::Signed(pxt) => match pxt {
+                    // NOTE[epic=embedded-num] - Int can't cover negative values yet, so these are all refutable
+                    MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64 => {
+                        Refutability::Refutable
+                    }
+                },
+                AtomType::Prim(pt) => match pt {
+                    PrimType::Unit => {
+                        if cases.is_empty() {
+                            Refutability::Refutable
+                        } else {
+                            Refutability::Irrefutable
+                        }
+                    }
+                    // FIXME - handle Pattern::Int properly
+                    // these cases have too many values to practically cover...
+                    PrimType::Unsigned(_) | PrimType::Char => Refutability::Indeterminate,
+                    PrimType::Bool => {
+                        // mask for inclusion with indices 0: false, 1: true
+                        let mut cover_mask = [false, false];
+                        for (pat, _) in cases {
+                            match pat {
+                                TypedPattern::Bool(b) => {
+                                    let ix = if *b { 1 } else { 0 };
+                                    cover_mask[ix] = true;
                                 }
-                                // these cases have too many values to practically cover...
-                                | PrimType::U8
-                                | PrimType::U16
-                                | PrimType::U32
-                                | PrimType::U64
-                                | PrimType::Char => Refutability::Indeterminate,
-                                //
-                                PrimType::Bool => {
-                                    // mask for inclusion with indices 0: false, 1: true
-                                    let mut cover_mask = [false, false];
-                                    for (pat, _) in cases {
-                                        match pat {
-                                            TypedPattern::Bool(b) => {
-                                                let ix = if *b { 1 } else { 0 };
-                                                cover_mask[ix] = true;
-                                            }
-                                            _ => {
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                    if cover_mask[0] && cover_mask[1] {
-                                        Refutability::Irrefutable
-                                    } else {
-                                        Refutability::Refutable
-                                    }
+                                _ => {
+                                    continue;
                                 }
-                                // any match on usize is only exhaustive with a catch-all, which we have precluded above
-                                PrimType::Usize => Refutability::Refutable,
                             }
-                        AtomType::Comp(ct) =>
-                            match ct {
-                                CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
-                                CompType::Option(t) => {
-                                    let none_covered = cases.iter().any(|(pat, _)| matches!(pat, TypedPattern::Option(_, None)));
-                                    if !none_covered {
-                                        return Refutability::Refutable;
-                                    }
+                        }
+                        if cover_mask[0] && cover_mask[1] {
+                            Refutability::Irrefutable
+                        } else {
+                            Refutability::Refutable
+                        }
+                    }
+                    // any match on usize is only exhaustive with a catch-all, which we have precluded above
+                    PrimType::Usize => Refutability::Refutable,
+                },
+                AtomType::Comp(ct) => match ct {
+                    CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                    CompType::PhantomData(..) => {
+                        unreachable!("PhantomData is not a sensible scrutinee");
+                        // Refutability::Irrefutable
+                    }
+                    CompType::Option(t) => {
+                        let none_covered = cases
+                            .iter()
+                            .any(|(pat, _)| matches!(pat, TypedPattern::Option(_, None)));
+                        if !none_covered {
+                            return Refutability::Refutable;
+                        }
 
-                                    let some_cases: Vec<(TypedPattern<GenType>, A)> = cases.iter().filter_map(|(pat, rhs)| match pat { TypedPattern::Option(_, Some(x)) => Some(((**x).clone(), rhs.clone())), _ => None}).collect();
-                                    let rust_type = (**t).clone();
-                                    refutability_check(&GenType::Inline(rust_type), &some_cases)
+                        let some_cases: Vec<(TypedPattern<GenType>, A)> = cases
+                            .iter()
+                            .filter_map(|(pat, rhs)| match pat {
+                                TypedPattern::Option(_, Some(x)) => {
+                                    Some(((**x).clone(), rhs.clone()))
                                 }
-                                CompType::Result(_, _) =>
-                                    unreachable!("unexpected result in pattern head-type"),
-                                CompType::Borrow(_, _, t) => {
-                                    refutability_check(&GenType::Inline((**t).clone()), cases)
-                                }
-                            }
+                                _ => None,
+                            })
+                            .collect();
+                        let rust_type = (**t).clone();
+                        refutability_check(&GenType::Inline(rust_type), &some_cases)
                     }
-                RustType::AnonTuple(ts) => {
-                    // we have already checked in contains_irrefutable_pattern that there is no (_x0, ..., _xN) pattern
-                    if ts.is_empty() && !cases.is_empty() {
-                        Refutability::Irrefutable
-                    } else {
-                        Refutability::Indeterminate
+                    CompType::Result(_, _) => {
+                        unreachable!("unexpected result in pattern head-type")
                     }
+                    CompType::Borrow(_, _, t) => {
+                        refutability_check(&GenType::Inline((**t).clone()), cases)
+                    }
+                },
+            },
+            RustType::AnonTuple(ts) => {
+                // we have already checked in contains_irrefutable_pattern that there is no (_x0, ..., _xN) pattern
+                if ts.is_empty() && !cases.is_empty() {
+                    Refutability::Irrefutable
+                } else {
+                    Refutability::Indeterminate
                 }
-                RustType::Verbatim(_, _) =>
-                    unreachable!("verbatim types not expected in generated match-expressions"),
             }
+            RustType::Verbatim(_, _) => {
+                unreachable!("verbatim types not expected in generated match-expressions")
+            }
+            RustType::ReadArray(..) => {
+                unreachable!("ReadArray not expected in generated match-expressions")
+            }
+            RustType::ViewObject(..) => {
+                unreachable!("ViewObject not expected in generated match-expressions")
+            }
+        },
         GenType::Def(_, def) => {
-            match def {
+            match &def.def {
                 RustTypeDef::Enum(vars) => {
                     // NOTE - we encounter badness when attempting to check full-variant coverage using subtyped partial unions
                     // NOTE - we can only check for every possible value being covered for every possible variant
-                    let mut variant_coverage: StableMap<Label, Refutability, BTree> =
-                        vars
-                            .iter()
-                            .map(|x| (x.get_label().clone(), Refutability::Refutable))
-                            .collect();
+                    let mut variant_coverage: StableMap<Label, Refutability, BTree> = vars
+                        .iter()
+                        .map(|x| (x.get_label().clone(), Refutability::Refutable))
+                        .collect();
                     for (pat, _) in cases {
                         match pat {
                             TypedPattern::Variant(_, vname, inner_pat) => {
@@ -1215,7 +1871,11 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                             }
                         }
                     }
-                    variant_coverage.values().cloned().reduce(Refutability::and).unwrap()
+                    variant_coverage
+                        .values()
+                        .cloned()
+                        .reduce(Refutability::and)
+                        .unwrap()
                 }
                 RustTypeDef::Struct(st) => {
                     unreachable!(
@@ -1236,7 +1896,7 @@ fn is_pattern_irrefutable(pat: &TypedPattern<GenType>) -> bool {
             // a variant pattern is irrefutable if there are no other variants and the inner expression is also irrefutable
             is_pattern_irrefutable(inner)
                 && (match gt {
-                    GenType::Def(_, def) => match def {
+                    GenType::Def(_, def) => match &def.def {
                         RustTypeDef::Enum(vars) => vars.len() == 1 && vars[0].get_label() == lab,
                         _ => unreachable!("variant pattern will never match struct-typed value"),
                     },
@@ -1382,7 +2042,7 @@ struct TypedLambda<TypeRep> {
     __needs_ok: OnceCell<bool>,
 }
 
-/// REVIEW - consider how GenLambda nad GenBlock interoperate (or, possibly, fail to)
+/// REVIEW - consider how GenLambda and GenBlock interoperate (or, possibly, fail to)
 type GenLambda = TypedLambda<GenType>;
 
 impl GenLambda {
@@ -1423,7 +2083,7 @@ impl GenLambda {
     fn beta_reduce(&self, param: RustExpr, body_info: ExprInfo) -> RustExpr {
         match param.as_local() {
             Some(outer) => {
-                if &**outer == &*self.head {
+                if **outer == *self.head {
                     embed_expr(&self.body, body_info)
                 } else if let Some(rebound) = self.try_alpha_convert(outer) {
                     embed_expr(&rebound.body, body_info)
@@ -1481,12 +2141,18 @@ impl GenLambda {
         }
     }
 
-    // FIXME - the logic here may be broken
+    /// Internal driver for [`Self::apply_pair`] after the beta-reduction criterion has been settled,
+    /// which takes the final form of `param0` and `param1` without any further modifications.
+    ///
+    /// Specifically, this method expands the body of `self` and performs a deep traversal that
+    /// appropriately substitutes the parameter-pair wherever the head variable is referenced.
     fn __apply_pair(&self, param0: RustExpr, param1: RustExpr, body_info: ExprInfo) -> RustExpr {
         let raw_expansion = embed_expr(&self.body, body_info);
         match raw_expansion {
             RustExpr::BlockScope(stmts, tail) => match stmts.as_slice() {
+                // NOTE - if we are producing a RustExpr::BlockScope with an empty block, the code-generation engine is broken somehow and so we are willing to panic
                 [] => unreachable!("empty RustStmt-array in RustExpr::BlockScope"),
+                // NOTE - based on the `crate::helper::lambda_tuple` helper, we assume and specialize for pair-lambdas that immediately de-structure the pair (as the first statement)
                 [first, rest @ ..] => match first {
                     RustStmt::LetPattern(pat, rhs) if rhs.as_local() == Some(&self.head) => {
                         match pat {
@@ -1514,70 +2180,113 @@ impl GenLambda {
                                     out_stmts.extend_from_slice(rest.as_ref());
                                     RustExpr::BlockScope(out_stmts, tail)
                                 }
+                                // NOTE - the only case of LetPattern we ever expect to see at the start of a pair-lambda body is `let (<ident0>, <ident1>) = <head-var>`. We don't mind panicking for the time being to reduce the amount of edge-case support we would otherwise have to write.
                                 other => unreachable!(
                                     "expected pair-var capture pattern in lhs, found {other:?}"
                                 ),
                             },
+                            // NOTE - because we are presumptively a Pair-lambda, anything besides a tuple in a LetPattern statement is a sign we are calling this in the wrong place, or else earlier code-generation steps are broken
                             other => unreachable!(
                                 "expected pair-var capture pattern in lhs, found {other:?}"
                             ),
                         }
                     }
                     _ => {
+                        // NOTE - if we do not immediately capture the pair using a destructuring pattern, we have no reason to beta-reduce it and so we fall-back to calling our lambda with a pair argument without any specialization.
                         let arg = RustExpr::Tuple(vec![param0, param1]);
-                        return self.apply(arg, body_info);
+                        self.apply(arg, body_info)
                     }
                 },
             },
             RustExpr::Control(ctrl) => match ctrl.as_ref() {
+                // NOTE - Match is the only case where destructuring can
                 RustControl::Match(scrutinee, match_body) => {
+                    // NOTE - the panic within this block are mostly watermarks for exotic cases we haven't had to encounter yet, and we will drop any panic if it turns out there is a legitimate case where said branch should be handled gracefully
                     if scrutinee.as_local() != Some(&self.head) {
-                        unreachable!("unexpected outer scrutinee in expansion of pair-lambda (head: {}): {scrutinee:?}", &self.head);
+                        unreachable!(
+                            "unexpected outer scrutinee in expansion of pair-lambda (head: {head}): {scrutinee:?}",
+                            head = &self.head
+                        );
                     }
                     match match_body {
                         RustMatchBody::Irrefutable(cases) => match &cases[..] {
                             [(lhs, rhs)] => match lhs {
-                                MatchCaseLHS::Pattern(RustPattern::TupleLiteral(pair)) => match &pair[..] {
-                                    [fst, snd] => match (fst, snd) {
-                                        (RustPattern::CatchAll(Some(fst_lbl)), RustPattern::CatchAll(Some(snd_lbl))) => {
-                                            let fst_bind = RustStmt::assign(fst_lbl.clone(), param0);
-                                            let snd_bind = RustStmt::assign(snd_lbl.clone(), param1);
-                                            match stmts_to_block(Cow::Borrowed(rhs)) {
-                                                Some((block, ret)) => {
-                                                    let all_stmts = [fst_bind, snd_bind].into_iter().chain(block.iter().cloned()).collect();
-                                                    RustExpr::BlockScope(
-                                                        all_stmts,
-                                                        Box::new(ret.into_owned())
-                                                    )
+                                MatchCaseLHS::Pattern(RustPattern::TupleLiteral(pair)) => {
+                                    match &pair[..] {
+                                        [fst, snd] => match (fst, snd) {
+                                            (
+                                                RustPattern::CatchAll(Some(fst_lbl)),
+                                                RustPattern::CatchAll(Some(snd_lbl)),
+                                            ) => {
+                                                let fst_bind =
+                                                    RustStmt::assign(fst_lbl.clone(), param0);
+                                                let snd_bind =
+                                                    RustStmt::assign(snd_lbl.clone(), param1);
+                                                match stmts_to_block(Cow::Borrowed(rhs)) {
+                                                    Some((block, ret)) => {
+                                                        let all_stmts = [fst_bind, snd_bind]
+                                                            .into_iter()
+                                                            .chain(block.iter().cloned())
+                                                            .collect();
+                                                        RustExpr::BlockScope(
+                                                            all_stmts,
+                                                            Box::new(ret.into_owned()),
+                                                        )
+                                                    }
+                                                    None => unreachable!(
+                                                        "unexpected short-circuit: {rhs:?}"
+                                                    ),
                                                 }
-                                                None => unreachable!("unexpected short-circuit: {rhs:?}"),
                                             }
-                                        }
-                                        other => unreachable!("expected pair-var capture pattern in lhs, found {other:?}"),
+                                            other => unreachable!(
+                                                "expected pair-var capture pattern in lhs, found {other:?}"
+                                            ),
+                                        },
+                                        other => unreachable!("expected 2-tuple, found {other:?}"),
                                     }
-                                    other => unreachable!("expected 2-tuple, found {other:?}"),
                                 }
-                                other => unreachable!("unexpected if-guarded or non-tuple MatchCaseLHS {other:?}"),
-                            }
+                                other => unreachable!(
+                                    "unexpected if-guarded or non-tuple MatchCaseLHS {other:?}"
+                                ),
+                            },
                             [] => unreachable!("unexpected empty match-block"),
-                            other => unreachable!("unexpected multi-branch RustMatchBody in pair-lambda expansion: {other:?}"),
-                        }
-                        other => unreachable!("unexpected non-irrefutable RustMatchBody in pair-lambda expansion: {other:?}"),
+                            other => unreachable!(
+                                "unexpected multi-branch RustMatchBody in pair-lambda expansion: {other:?}"
+                            ),
+                        },
+                        other => unreachable!(
+                            "unexpected non-irrefutable RustMatchBody in pair-lambda expansion: {other:?}"
+                        ),
                     }
                 }
                 _ => {
+                    // NOTE - because this function is intended to specialize pair-lambdas that pair-destructure their head-variable, we fall-bcak to standard `apply` if this expectation is not fulfilled
                     let arg = RustExpr::Tuple(vec![param0, param1]);
-                    return self.apply(arg, body_info);
+                    self.apply(arg, body_info)
                 }
             },
             _ => {
+                // NOTE - because this function is intended to specialize pair-lambdas that pair-destructure their head-variable, we fall-bcak to standard `apply` if this expectation is not fulfilled
                 let arg = RustExpr::Tuple(vec![param0, param1]);
-                return self.apply(arg, body_info);
+                self.apply(arg, body_info)
             }
         }
     }
 
-    // FIXME - the logic here may be broken
+    /// Produces a new expression equivalent to the application of a pair-lambda to `(param0, param1)`, using
+    /// the specified `body_info` to determine how locally-referenced variables in the lambda body are embedded.
+    ///
+    /// Produces the expected call `(|..| ..)((param0, param1))` if `self` is determined to be ineligible
+    /// for beta-reduction.
+    ///
+    /// Otherwise, performs beta-reduction to return the raw body of `self` with `(param0, param1)` substituted
+    /// in for the (single) head-variable, with specialization for destructuring expressions in the body.
+    ///
+    /// Infers the correct borrow-or-move strategy for each parameter based on the stored `ClosureKind`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if called on a [`GenLambda`] that is not a pair-lambda.
     pub fn apply_pair(&self, param0: RustExpr, param1: RustExpr, body_info: ExprInfo) -> RustExpr {
         let beta_reducible = self.is_beta_reducible();
         match (self.kind, beta_reducible) {
@@ -1611,11 +2320,7 @@ impl GenLambda {
         } else {
             let raw = self.embed(body_info).call_with([param]);
             // REVIEW - double-check this is the right predicate to apply
-            if self.needs_ok() {
-                raw.wrap_try()
-            } else {
-                raw
-            }
+            if self.needs_ok() { raw.wrap_try() } else { raw }
         }
     }
 
@@ -1630,7 +2335,7 @@ impl GenLambda {
         let __body = self.body.clone();
         *self
             .__beta_reducible
-            .get_or_init(move || !embed_expr_dft(__body.as_ref()).has_short_circuit(true))
+            .get_or_init(move || !embed_expr_nat(__body.as_ref()).has_short_circuit(true))
     }
 
     /// Indicates whether the body, if it is found to have short-circuiting, needs to be wrapped in `Ok(..)`.
@@ -1641,7 +2346,7 @@ impl GenLambda {
         let __body = self.body.clone();
         *self
             .__needs_ok
-            .get_or_init(move || embed_expr_dft(__body.as_ref()).needs_ok())
+            .get_or_init(move || embed_expr_nat(__body.as_ref()).needs_ok())
     }
 
     fn embed(&self, info: ExprInfo) -> RustExpr {
@@ -1799,18 +2504,33 @@ impl GenExpr {
         }
     }
 
+    /// Transforms a `GenExpr` that produces a value of type `T` into a `GenExpr` that returns `Option<T>` by enclosing the expression in `Some`.
+    ///
+    /// For the case of a block-scope expression, this function is applied only to the final value-producing expression, rather than wrapping
+    /// the entire block in `Some`.
+    ///
+    /// Due to the limitations of local analysis, this function is not responsible for ensuring that the return-value in a function/closure body
+    /// is always `Option<T>`, as in the case of a block-scope expression containing early-return statements.
     fn wrap_some(mut self) -> GenExpr {
         match self {
             Self::ResultOk(t, inner) => Self::ResultOk(t, Box::new(inner.wrap_some())),
             Self::BlockScope(ref mut block) => {
-                // REVIEW - this may not be enough if non-`ret` (statements) can return values
+                // NOTE - we cannot determine whether early-return branches should or should not be `Some`-wrapped, so we do not do anything but wrap the final value.
                 block.wrap_some_final_value();
                 self
             }
+            // TODO - consider whether to distribute `Some` over the branches of a `GenExpr::Control(..)`, for the cases of `RustControl::IfThenElse` and `RustControl::Match`
             this => Self::WrapSome(Box::new(this)),
         }
     }
 
+    /// Applies the most natural form of `Try` construction to self.
+    ///
+    /// If self happens to `ResultOk(.., inner)`, returns `inner`.
+    ///
+    /// If self is a block-scope expression, this method is recursively applied to the final expression.
+    ///
+    /// Otherwise, self is directly wrapped in a `Try` expression.
     fn wrap_try(self) -> GenExpr {
         match self {
             Self::ResultOk(_, inner) => *inner,
@@ -1831,7 +2551,7 @@ impl GenExpr {
     fn embed_match(expr: RustExpr, body: RustMatchBody<GenBlock>) -> Self {
         match body {
             RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
-                // unwwrap is safe because we checked cases above
+                // unwrap is safe because we checked cases above
                 let Some((MatchCaseLHS::Pattern(pat), mut block)) = cases.pop() else {
                     panic!("bad guard")
                 };
@@ -1840,54 +2560,92 @@ impl GenExpr {
                 GenExpr::BlockScope(Box::new(block))
             }
             _ => {
-                let match_item = RustControl::Match(expr, body);
+                let match_item = RustControl::Match(Box::new(expr), body);
                 GenExpr::Control(Box::new(match_item))
             }
         }
     }
-}
 
-impl From<RustExpr> for GenExpr {
-    fn from(value: RustExpr) -> Self {
-        GenExpr::Embed(value)
-    }
-}
-
-impl From<GenExpr> for RustExpr {
-    fn from(value: GenExpr) -> Self {
-        match value {
-            GenExpr::BlockScope(block) => RustExpr::from(*block),
-            GenExpr::Embed(expr) | GenExpr::TyValCon(.., expr) => expr,
-            GenExpr::Control(ctrl) => RustExpr::Control(Box::new(RustControl::translate(*ctrl))),
-            GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
-            GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
-            GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
-            GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
-            GenExpr::CallThunk(thunk) => {
-                let closure = if thunk.thunk_body.ret.is_none() {
-                    RustClosure::thunk_body(thunk.thunk_body.flatten())
-                } else {
-                    RustClosure::thunk_expr(RustExpr::from(thunk.thunk_body))
-                };
-                RustExpr::Closure(closure).call()
-            }
-        }
-    }
-}
-
-impl ShortCircuit for GenExpr {
-    fn is_short_circuiting(&self) -> bool {
+    /// Returns `true` if `self` is sufficiently simple to be directly used within the predicate of a control-flow expression like `if <expr> { .. }`.
+    ///
+    /// Returns `false` if `self` is sufficiently complex that it should be extracted into a local variable assingment instead.
+    pub fn is_simple(&self) -> bool {
         match self {
-            GenExpr::Embed(expr) => expr.is_short_circuiting(),
-            GenExpr::TyValCon(expr) => expr.is_short_circuiting(),
-            GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
-            GenExpr::ResultOk(.., expr) | GenExpr::ResultErr(expr) | GenExpr::WrapSome(expr) => {
-                expr.is_short_circuiting()
-            }
-            GenExpr::BlockScope(block) => block.is_short_circuiting(),
-            GenExpr::Try(..) => true,
-            GenExpr::CallThunk(..) => false,
+            GenExpr::Embed(r_expr) | GenExpr::TyValCon(r_expr) => !r_expr.is_complex(),
+
+            GenExpr::BlockScope(block) => block.is_simple(),
+
+            GenExpr::WrapSome(g_expr)
+            | GenExpr::Try(g_expr)
+            | GenExpr::ResultOk(_, g_expr)
+            | GenExpr::ResultErr(g_expr) => g_expr.is_simple(),
+
+            GenExpr::Control(_) => false,
+            GenExpr::CallThunk(_) => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod genexpr_tests {
+    use super::rust_ast::ToFragmentExt;
+    use super::*;
+    use crate::{output::Fragment, precedence::Precedence};
+
+    fn expr_to_fragment(expr: GenExpr) -> Fragment {
+        let block = GenBlock::single_expr(expr);
+        let (stmts, ret) = block.synthesize();
+        assert!(stmts.is_empty());
+        let Some(ret) = ret else { unreachable!() };
+        ret.to_fragment_precedence(Precedence::TOP)
+    }
+
+    #[test]
+    /// Behavior regression for [`GenExpr::wrap_some`] that documents the current behavior, specifically the fact that `GenExpr::Control` are non-distrubively wrapped
+    /// (i.e. `Some(if <expr> { .. } else { .. })` rather than `(if <expr> { Some(..) } else { Some(..) })`).
+    // REVEIW - consider how often this case occurs in practice, and if it is preferable to adjust the logic to make Some-wrapping distributive over certain control-flow expressions
+    fn regression_wrap_some_non_distributive_over_control() {
+        let if_ctrl: RustControl<GenBlock> = {
+            let scrutinee = Box::new(RustExpr::local("x"));
+            let then_branch = GenBlock::simple_expr(RustExpr::local("y"));
+            let else_branch = GenBlock::simple_expr(RustExpr::local("z"));
+            RustControl::If(scrutinee, then_branch, Some(else_branch))
+        };
+
+        let match_ctrl: RustControl<GenBlock> = {
+            let scrutinee = Box::new(RustExpr::local("x"));
+            let true_case = {
+                let lhs =
+                    MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Boolean(true)));
+                let rhs = GenBlock::simple_expr(RustExpr::local("y"));
+                (lhs, rhs)
+            };
+            let false_case = {
+                let lhs =
+                    MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Boolean(false)));
+                let rhs = GenBlock::simple_expr(RustExpr::local("z"));
+                (lhs, rhs)
+            };
+            RustControl::Match(
+                scrutinee,
+                RustMatchBody::Irrefutable(vec![true_case, false_case]),
+            )
+        };
+        let if_expr = GenExpr::Control(Box::new(if_ctrl));
+        let match_expr = GenExpr::Control(Box::new(match_ctrl));
+
+        let wrapped_if = GenExpr::wrap_some(if_expr.clone());
+        let wrapped_match = GenExpr::wrap_some(match_expr.clone());
+
+        let if_oput_manual_wrap = format!("Some({})", expr_to_fragment(if_expr));
+        let wrapped_if_oput = format!("{}", expr_to_fragment(wrapped_if));
+
+        assert_eq!(wrapped_if_oput, if_oput_manual_wrap);
+
+        let match_oput_manual_wrap = format!("Some({})", expr_to_fragment(match_expr));
+        let wrapped_match_oput = format!("{}", expr_to_fragment(wrapped_match));
+
+        assert_eq!(wrapped_match_oput, match_oput_manual_wrap);
     }
 }
 
@@ -1908,79 +2666,6 @@ enum GenStmt {
     BindOnce(Label, GenBlock),
 }
 
-impl GenBlock {
-    /// Inserts the single statement `before` at the start of the statements contained in `self`.
-    fn prepend_stmt(&mut self, before: GenStmt) {
-        let mut stmts = Vec::with_capacity(self.stmts.len() + 1);
-        stmts.push(before);
-        stmts.append(&mut self.stmts);
-        self.stmts = stmts;
-    }
-
-    /// Inserts the statements contained in the iterable `preamble`, in order, directly before
-    /// the statements contained in `self`.
-    fn prepend_stmts(&mut self, preamble: impl IntoIterator<Item = GenStmt>) {
-        let stmts =
-            Iterator::chain(preamble.into_iter(), self.stmts.drain(..)).collect::<Vec<GenStmt>>();
-        self.stmts = stmts;
-    }
-
-    pub fn wrap_some_final_value(&mut self) {
-        let fallback = || {
-            Result::<_, std::convert::Infallible>::Ok(Some(GenExpr::from(
-                RustExpr::UNIT.wrap_some(),
-            )))
-        };
-        self.transform_return_value(GenExpr::wrap_some, fallback)
-            .unwrap()
-    }
-
-    fn transform_return_value<E, F, G>(&mut self, f: F, fallback: G) -> Result<(), E>
-    where
-        F: Fn(GenExpr) -> GenExpr,
-        G: FnOnce() -> Result<Option<GenExpr>, E>,
-    {
-        if let Some(val) = self.ret.take() {
-            self.ret.replace(f(val));
-        } else {
-            self.ret = fallback()?;
-        }
-        Ok(())
-    }
-}
-
-impl From<GenStmt> for RustStmt {
-    fn from(value: GenStmt) -> Self {
-        match value {
-            GenStmt::Expr(gen_expr) => RustStmt::Expr(RustExpr::from(gen_expr)),
-            GenStmt::Embed(stmt) => stmt,
-            GenStmt::BindOnce(bind_name, block) => RustStmt::assign(bind_name, block.into()),
-        }
-    }
-}
-
-impl From<GenBlock> for Vec<RustStmt> {
-    fn from(value: GenBlock) -> Vec<RustStmt> {
-        value.flatten()
-    }
-}
-
-impl From<RustStmt> for GenStmt {
-    fn from(value: RustStmt) -> Self {
-        GenStmt::Embed(value)
-    }
-}
-
-impl ShortCircuit for GenStmt {
-    fn is_short_circuiting(&self) -> bool {
-        match self {
-            GenStmt::Expr(gen_expr) => gen_expr.is_short_circuiting(),
-            GenStmt::Embed(stmt) => stmt.is_short_circuiting(),
-            GenStmt::BindOnce(_, block) => block.is_short_circuiting(),
-        }
-    }
-}
-
 impl GenStmt {
     /// Returns a mutable reference to the `GenBlock` assigned to a sigbind if the name of the binding matches `query`.
     ///
@@ -1991,10 +2676,6 @@ impl GenStmt {
             GenStmt::BindOnce(lab, rhs) if lab.as_ref() == query.as_ref() => Some(rhs),
             GenStmt::BindOnce(..) | GenStmt::Embed(..) | GenStmt::Expr(..) => None,
         }
-    }
-
-    pub const fn is_bind(&self) -> bool {
-        matches!(self, GenStmt::BindOnce(..))
     }
 
     /// Returns the name for a distinguished binding (e.g. [`GenStmt::BindOnce`]), if there is one,
@@ -2008,7 +2689,7 @@ impl GenStmt {
         }
     }
 
-    fn assign<Name: IntoLabel>(binding: Name, rhs: GenBlock) -> Self {
+    pub fn assign<Name: IntoLabel>(binding: Name, rhs: GenBlock) -> Self {
         GenStmt::BindOnce(binding.into(), rhs)
     }
 }
@@ -2029,22 +2710,17 @@ impl GenThunk {
     }
 }
 
+type GenControl = RustControl<GenBlock>;
+
 #[derive(Debug, Clone, Default)]
 struct GenBlock {
     stmts: Vec<GenStmt>,
     ret: Option<GenExpr>,
 }
 
-impl ShortCircuit for GenBlock {
-    fn is_short_circuiting(&self) -> bool {
-        self.stmts.is_short_circuiting()
-            || self.ret.as_ref().is_some_and(GenExpr::is_short_circuiting)
-    }
-}
-
 impl GenBlock {
-    /// Constructs a new, empty `GenBlock``.
-    #[expect(unused)]
+    /// Constructs a new, empty `GenBlock`.
+    #[expect(dead_code)]
     pub const fn new() -> Self {
         GenBlock {
             stmts: Vec::new(),
@@ -2052,20 +2728,67 @@ impl GenBlock {
         }
     }
 
+    /// Returns true if the `GenBlock` is empty - i.e. contains no statements and no return value.
+    pub const fn is_empty(&self) -> bool {
+        self.stmts.is_empty() && self.ret.is_none()
+    }
+
+    /// Constructs a `GenBlock` from a possibly-empty list of statements `Vec<GenStmt>` and a possibly-none (implicit) return value `Option<GenExpr>`.
+    pub const fn from_parts(stmts: Vec<GenStmt>, ret: Option<GenExpr>) -> Self {
+        GenBlock { stmts, ret }
+    }
+
+    /// Inserts the single statement `before` at the start of the statements contained in `self`.
+    fn prepend_stmt(&mut self, before: GenStmt) {
+        // REVIEW - indexing scheme must be resilient to prepend and append...
+        let mut stmts = Vec::with_capacity(self.stmts.len() + 1);
+        stmts.push(before);
+        stmts.append(&mut self.stmts);
+        self.stmts = stmts;
+    }
+
+    /// Inserts the statements contained in the iterable `preamble`, in order, directly before
+    /// the statements contained in `self`.
+    fn prepend_stmts(&mut self, preamble: impl IntoIterator<Item = GenStmt>) {
+        let stmts =
+            Iterator::chain(preamble.into_iter(), self.stmts.drain(..)).collect::<Vec<GenStmt>>();
+        self.stmts = stmts;
+    }
+
+    /// Performs an in-place transformation of the return value of `self`, wrapping it in `Some`. If there is no explicit return-value,
+    /// wraps the implicit return-value of `()` in `Some`.
+    pub fn wrap_some_final_value(&mut self) {
+        let fallback = || -> Result<_, std::convert::Infallible> {
+            Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_some())))
+        };
+        self.transform_return_value(GenExpr::wrap_some, fallback)
+            .unwrap()
+    }
+
+    /// Performs an in-place transformation of the return value of `self` using the given function `f`.
+    ///
+    /// If `self.ret` is `Some(val)`, changes it to `Some(f(val))`.
+    ///
+    /// If `self.ret` is `None`, calls `fallback`, either storing the `Ok` result in `self.ret` or returning the `Err` it produces.
+    fn transform_return_value<E, F, G>(&mut self, f: F, fallback: G) -> Result<(), E>
+    where
+        F: Fn(GenExpr) -> GenExpr,
+        G: FnOnce() -> Result<Option<GenExpr>, E>,
+    {
+        if let Some(val) = self.ret.take() {
+            self.ret.replace(f(val));
+        } else {
+            self.ret = fallback()?;
+        }
+        Ok(())
+    }
+
+    /// Given a bare `RustStmt`, constructs a `GenBlock` containing that single statement and nothing else.
     pub fn mono_statement(stmt: RustStmt) -> Self {
         GenBlock {
             stmts: vec![GenStmt::Embed(stmt)],
             ret: None,
         }
-    }
-
-    pub const fn from_parts(stmts: Vec<GenStmt>, ret: Option<GenExpr>) -> Self {
-        GenBlock { stmts, ret }
-    }
-
-    #[expect(unused)]
-    pub fn has_binds(&self) -> bool {
-        self.stmts.iter().any(GenStmt::is_bind)
     }
 
     /// Constructs a traditional `RustBlock` value from a `GenBlock`, consuming the original in the process.
@@ -2138,6 +2861,14 @@ impl GenBlock {
             stmts
         }
     }
+
+    pub fn is_simple(&self) -> bool {
+        self.stmts.is_empty()
+            && match &self.ret {
+                None => true,
+                Some(g_expr) => g_expr.is_simple(),
+            }
+    }
 }
 
 impl GenBlock {
@@ -2189,7 +2920,7 @@ impl GenBlock {
     /// Applies a lambda-abstraction to a `GenBlock` so that engine logic isn't affected
     /// by short-circuiting behavior of `?` and `return Err(...)` within the block in question
     ///
-    /// Used when the value of `Err` must be inspected (as in `PeekNot`` or `Alts`),
+    /// Used when the value of `Err` must be inspected (as in `PeekNot` or `Alts`),
     /// rather than externally short-circuited on via `?` (in which case, [`local_try`] should be used).
     fn abstracted_try(self) -> GenBlock {
         if self.stmts.iter().any(GenStmt::is_short_circuiting) {
@@ -2228,42 +2959,42 @@ impl GenBlock {
     }
 }
 
-impl From<GenBlock> for RustExpr {
-    fn from(value: GenBlock) -> Self {
-        let (stmts, ret) = value.synthesize();
-        if stmts.is_empty() {
-            // REVIEW - do we always want an explicit Unit here?
-            ret.unwrap_or(RustExpr::UNIT)
-        } else {
-            // REVIEW - do we always want an explicit Unit here?
-            RustExpr::BlockScope(stmts, Box::new(ret.unwrap_or(RustExpr::UNIT)))
-        }
-    }
-}
-
-impl From<RustExpr> for GenBlock {
-    fn from(value: RustExpr) -> Self {
-        GenBlock::simple_expr(value)
-    }
-}
-
-impl From<GenExpr> for GenBlock {
-    fn from(value: GenExpr) -> Self {
-        GenBlock::single_expr(value)
-    }
-}
-
 #[derive(Clone, Copy)]
 pub(crate) struct ProdCtxt<'a> {
     input_varname: &'a Label,
 }
 
-impl<'a> Default for ProdCtxt<'a> {
-    fn default() -> Self {
-        Self {
-            input_varname: &Cow::Borrowed(""),
-        }
+impl<'a> ProdCtxt<'a> {
+    pub fn parser(self) -> RustExpr {
+        RustExpr::local(self.input_varname.clone())
     }
+}
+
+/// Trait for converting internally-modelled abstract decoder-logic into the gen-code AST.
+pub(crate) trait ToAst {
+    /// Correpsonding item in the RustAST grammar model that an item of type `Self` most naturally compiles to.
+    type AstElem;
+
+    /// Compiles a decoder-logic directive into raw code-blocks.
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> Self::AstElem;
+
+    /// Helper heuristic for determining variance/invariance with respect to the input parameter passed in through `ProdCtxt`.
+    fn depends_on_input(&self) -> bool;
+}
+
+/// Abstraction type use to sub-categorize different Decoders and ensure that the codegen layer
+/// is more resilient to changes both upstream (in the Decoder model)
+/// and downstream (in the API made available for generated code to use)
+#[derive(Clone, Debug)]
+enum CaseLogic<ExprT = Expr> {
+    Derived(DerivedLogic<ExprT>),
+    Engine(EngineLogic<ExprT>),
+    Other(OtherLogic<ExprT>),
+    Parallel(ParallelLogic<ExprT>),
+    Repeat(RepeatLogic<ExprT>),
+    Sequential(SequentialLogic<ExprT>),
+    Simple(SimpleLogic<ExprT>),
+    View(ViewLogic<ExprT>),
 }
 
 macro_rules! impl_toast_caselogic {
@@ -2290,6 +3021,20 @@ macro_rules! impl_toast_caselogic {
                     CaseLogic::Repeat(r) => r.to_ast(ctxt),
                     CaseLogic::Sequential(sq) => sq.to_ast(ctxt),
                     CaseLogic::Simple(s) => s.to_ast(ctxt),
+                    CaseLogic::View(v) => v.to_ast(ctxt),
+                }
+            }
+
+            fn depends_on_input(&self) -> bool {
+                match self {
+                    CaseLogic::Derived(d) => d.depends_on_input(),
+                    CaseLogic::Engine(e) => e.depends_on_input(),
+                    CaseLogic::Other(o) => o.depends_on_input(),
+                    CaseLogic::Parallel(p) => p.depends_on_input(),
+                    CaseLogic::Repeat(r) => r.depends_on_input(),
+                    CaseLogic::Sequential(sq) => sq.depends_on_input(),
+                    CaseLogic::Simple(s) => s.depends_on_input(),
+                    CaseLogic::View(v) => v.depends_on_input(),
                 }
             }
         }
@@ -2299,67 +3044,82 @@ macro_rules! impl_toast_caselogic {
 
 impl_toast_caselogic!(GTExpr);
 
+/// Cases that require no recursion into other case-logic
+#[derive(Clone, Debug)]
+enum SimpleLogic<ExprT, ViewExprT = TypedViewExpr<GenType>> {
+    Fail,
+    ExpectEnd,
+    Invoke(usize, Vec<(Label, ExprT)>, Vec<(Label, ViewExprT)>),
+    SkipToNextMultiple(usize),
+    ByteIn(ByteSet),
+    Eval(RustExpr),
+    CallDynamic(Label),
+    YieldCurrentOffsetAs(NumType),
+    SkipRemainder,
+    ConstNone,
+    PhantomData,
+}
+
 impl ToAst for SimpleLogic<GTExpr> {
     type AstElem = GenBlock;
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
-            SimpleLogic::Fail => GenBlock::explicit_return(RustExpr::err(
-                RustExpr::scoped(["ParseError"], "FailToken")
-                    .call_with([RustExpr::u64lit(get_trace(&()))]),
-            )),
-            SimpleLogic::ExpectEnd => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone())
-                    .call_method("finish")
-                    .wrap_try(),
-            ),
-            SimpleLogic::SkipRemainder => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone()).call_method("skip_remainder"),
-            ),
-            SimpleLogic::Invoke(ix_dec, args) => {
+            SimpleLogic::Fail => GenBlock::explicit_return(model::err_fail(get_trace(&()))),
+            SimpleLogic::ExpectEnd => GenBlock::simple_expr(model::try_enforce_eos(ctxt.parser())),
+            SimpleLogic::PhantomData => GenBlock::simple_expr(model::phantom_data()),
+            SimpleLogic::SkipRemainder => {
+                GenBlock::simple_expr(model::skip_remainder(ctxt.parser()))
+            }
+            SimpleLogic::Invoke(ix_dec, args, views) => {
                 let fname = format!("Decoder{ix_dec}");
                 let call_args = {
-                    let base_args = [RustExpr::local(ctxt.input_varname.clone())];
-                    if args.is_empty() {
+                    let base_args = [ctxt.parser()];
+                    let dep_args = args
+                        .iter()
+                        .map(|(_lab, x)| {
+                            let Some(t) = x.get_type() else {
+                                panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
+                            };
+                            if t.to_rust_type().should_borrow_for_arg() {
+                                RustExpr::borrow_of(embed_expr_nat(x))
+                            } else {
+                                embed_expr_owned(x)
+                            }
+                        })
+                        .chain(views.iter().map(|(_lab, x)| embed_view_expr(x)));
+                    if args.is_empty() && views.is_empty() {
                         base_args.to_vec()
                     } else {
-                        base_args
-                            .into_iter()
-                            .chain(args.iter().map(|(_lab, x)| {
-                                let Some(t) = x.get_type() else {
-                                    panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
-                                };
-                                if t.to_rust_type().should_borrow_for_arg() {
-                                    RustExpr::borrow_of(embed_expr(x, ExprInfo::Natural))
-                                } else {
-                                    embed_expr(x, ExprInfo::EmbedOwned)
-                                }
-                            }))
-                            .collect()
+                        base_args.into_iter().chain(dep_args).collect()
                     }
                 };
                 let call = RustExpr::local(fname).call_with(call_args);
                 GenBlock::simple_expr(call.wrap_try())
             }
             SimpleLogic::CallDynamic(dynf_name) => {
-                let call = RustExpr::local(dynf_name.clone())
-                    .call_with([RustExpr::local(ctxt.input_varname.clone())]);
+                let call = RustExpr::local(dynf_name.clone()).call_with([ctxt.parser()]);
                 GenBlock::simple_expr(call.wrap_try())
             }
-            SimpleLogic::SkipToNextMultiple(n) => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone())
-                    .call_method_with("skip_align", [RustExpr::num_lit(*n)])
-                    .wrap_try(),
-            ),
-            SimpleLogic::YieldCurrentOffset => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone()).call_method("get_offset_u64"),
-            ),
+            SimpleLogic::SkipToNextMultiple(n) => {
+                GenBlock::simple_expr(model::try_skip_align(ctxt.parser(), *n))
+            }
+            SimpleLogic::YieldCurrentOffsetAs(nt) => match nt {
+                NumType::U(MachineUint::U64) => {
+                    GenBlock::simple_expr(model::yield_offset_as_u64(ctxt.parser()))
+                }
+                other => {
+                    let call = model::yield_offset_as_u64(ctxt.parser());
+                    GenBlock::simple_expr(RustExpr::Operation(RustOp::AsCast(
+                        Box::new(call),
+                        RustType::from(*other),
+                    )))
+                }
+            },
             SimpleLogic::ByteIn(bs) => {
-                let call = RustExpr::local(ctxt.input_varname.clone())
-                    .call_method("read_byte")
-                    .wrap_try();
+                let call = ctxt.parser().call_method("read_byte").wrap_try();
                 let bc = ByteCriterion::from(bs);
-                if bc.always_true() {
+                if bc.is_always_true() {
                     GenBlock::simple_expr(call)
                 } else {
                     let b_let = RustStmt::assign("b", call);
@@ -2372,8 +3132,11 @@ impl ToAst for SimpleLogic<GTExpr> {
                                 .call_with([RustExpr::u64lit(get_trace(bs))]),
                         ),
                     )];
-                    let logic =
-                        RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))));
+                    let logic = RustExpr::Control(Box::new(RustControl::If(
+                        Box::new(cond),
+                        b_true,
+                        Some(b_false),
+                    )));
                     GenBlock::lift_block([b_let], logic)
                 }
             }
@@ -2381,238 +3144,88 @@ impl ToAst for SimpleLogic<GTExpr> {
             SimpleLogic::ConstNone => GenBlock::simple_expr(RustExpr::NONE),
         }
     }
-}
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
-enum ByteCriterion {
-    Any,
-    MustBe(u8),         // singleton
-    OtherThan(u8),      // negated singleton
-    WithinSet(ByteSet), // use embed_byteset to bridge to RustExpr
-}
-
-impl From<&ByteSet> for ByteCriterion {
-    fn from(value: &ByteSet) -> Self {
-        if value.is_full() {
-            ByteCriterion::Any
-        } else {
-            match value.len() {
-                1 => {
-                    let elt = value.min_elem().expect("len == 1 but no min_elem");
-                    ByteCriterion::MustBe(elt)
-                }
-                255 => {
-                    let elt = (!value)
-                        .min_elem()
-                        .expect("len == 255 but no min_elem (on negation)");
-                    ByteCriterion::OtherThan(elt)
-                }
-                2..=254 => ByteCriterion::WithinSet(*value),
-                other => unreachable!("unexpected byteset len in catch-all: {other}"),
-            }
-        }
-    }
-}
-
-impl ByteCriterion {
-    /// Returns `true` if the ByteCriterion is satisfied by every possible byte from 0 to 255.
-    pub fn always_true(&self) -> bool {
-        matches!(self, ByteCriterion::Any)
-    }
-
-    /// Returns a tuple a RustExpr that evaluates to `true` if the argument satisfies the criterion
-    /// that `self` represents.
-    fn as_predicate(&self, arg: RustExpr) -> RustExpr {
+    fn depends_on_input(&self) -> bool {
         match self {
-            ByteCriterion::Any => RustExpr::TRUE,
-            ByteCriterion::MustBe(byte) => {
-                RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte)))
-            }
-            ByteCriterion::OtherThan(byte) => {
-                RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte)))
-            }
-            ByteCriterion::WithinSet(bs) => embed_byteset(bs).call_method_with("contains", [arg]),
+            // true (leaf-nodes)
+            SimpleLogic::ExpectEnd => true,
+            SimpleLogic::SkipToNextMultiple(..) => true,
+            SimpleLogic::ByteIn(..) => true,
+            SimpleLogic::YieldCurrentOffsetAs(..) => true,
+            SimpleLogic::SkipRemainder => true,
+            // true (required for recursive dispatch)
+            SimpleLogic::Invoke(..) => true,
+            SimpleLogic::CallDynamic(..) => true,
+            // false cases
+            // NOTE - these cases can be double-checked via the [`ToAst::to_ast`] impl for [`SimpleLogic`]
+            SimpleLogic::Fail => false,
+            SimpleLogic::Eval(..) => false,
+            SimpleLogic::ConstNone => false,
+            SimpleLogic::PhantomData => false,
         }
     }
 }
 
-fn embed_byteset(bs: &ByteSet) -> RustExpr {
-    if bs.is_full() {
-        RustExpr::scoped(["ByteSet"], "full").call()
-    } else if bs.len() == 1 {
-        let Some(elt) = bs.min_elem() else {
-            unreachable!("len == 1 but no min_elem")
-        };
-        RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::num_lit(elt)])
-    } else {
-        let [q0, q1, q2, q3] = bs.to_bits();
-        RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
-            RustExpr::num_lit(q0 as usize),
-            RustExpr::num_lit(q1 as usize),
-            RustExpr::num_lit(q2 as usize),
-            RustExpr::num_lit(q3 as usize),
-        ])])
-    }
-}
-
-// follows the same rules as CaseLogic::to_ast as far as the expression type of the generated code
-fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> GenBlock {
-    fn expand_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> GenBlock {
-        match &tree.branches[..] {
-            [] => {
-                if let Some(ix) = tree.accept {
-                    return GenBlock::simple_expr(RustExpr::num_lit(ix));
-                } else {
-                    let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch")
-                        .call_with([RustExpr::u64lit(get_trace(&(tree, "empty-non-accepting")))]);
-                    return GenBlock::explicit_return(RustExpr::err(err_val));
-                }
-            }
-            [(bs, branch)] => {
-                let bc = ByteCriterion::from(bs);
-
-                let call = RustExpr::local(ctxt.input_varname.clone())
-                    .call_method("read_byte")
-                    .wrap_try();
-
-                if bc.always_true() {
-                    // this always accepts, but needs to read a byte
-                    let ignore_byte = GenStmt::Embed(RustStmt::Expr(call));
-                    let branch_block = expand_matchtree(branch, ctxt);
-                    // REVIEW - need append-stable indexing, or dedicated method for prepend/append
-                    let all_stmts = Iterator::chain(
-                        std::iter::once(ignore_byte),
-                        branch_block.stmts.into_iter(),
-                    )
-                    .collect();
-                    GenBlock {
-                        stmts: all_stmts,
-                        ..branch_block
-                    }
-                } else {
-                    let bind = RustStmt::assign("b", call);
-                    let guard = bc.as_predicate(RustExpr::local("b"));
-                    let b_true: Vec<RustStmt> = expand_matchtree(branch, ctxt).flatten();
-                    let b_false = {
-                        if let Some(ix) = tree.accept {
-                            vec![RustStmt::Return(
-                                ReturnKind::Implicit,
-                                RustExpr::num_lit(ix),
-                            )]
-                        } else {
-                            let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch")
-                                .call_with([RustExpr::u64lit(get_trace(&(
-                                    tree,
-                                    "failed-descent-condition",
-                                )))]);
-                            vec![RustStmt::Return(
-                                ReturnKind::Keyword,
-                                RustExpr::err(err_val),
-                            )]
-                        }
-                    };
-                    GenBlock::lift_block(
-                        [bind],
-                        RustExpr::Control(Box::new(RustControl::If(guard, b_true, Some(b_false)))),
-                    )
-                }
-            }
-            _ => {
-                let call = RustExpr::local(ctxt.input_varname.clone())
-                    .call_method("read_byte")
-                    .wrap_try();
-                let mut cases = Vec::new();
-
-                for (bs, branch) in tree.branches.iter() {
-                    let crit = ByteCriterion::from(bs);
-                    match crit {
-                        ByteCriterion::Any => {
-                            unreachable!("unconditional descent with more than one branch");
-                        }
-                        ByteCriterion::MustBe(b) => {
-                            let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
-                                RustPrimLit::Numeric(RustNumLit::U8(b)),
-                            ));
-                            let rhs = expand_matchtree(branch, ctxt).flatten();
-                            cases.push((lhs, rhs));
-                        }
-                        ByteCriterion::OtherThan(_) | ByteCriterion::WithinSet(_) => {
-                            let guard = crit.as_predicate(RustExpr::local("byte"));
-                            let lhs = MatchCaseLHS::WithGuard(
-                                RustPattern::CatchAll(Some(Label::from("byte"))),
-                                guard,
-                            );
-                            let rhs = expand_matchtree(branch, ctxt).flatten();
-                            cases.push((lhs, rhs));
-                        }
-                    }
-                }
-
-                let value = RustExpr::err(
-                    RustExpr::scoped(["ParseError"], "ExcludedBranch")
-                        .call_with([RustExpr::u64lit(get_trace(&(tree, "catchall-nomatch")))]),
-                );
-                let match_block = RustControl::Match(
-                    call,
-                    RustMatchBody::Refutable(cases, RustCatchAll::ReturnErrorValue { value }),
-                );
-                GenBlock::simple_expr(RustExpr::Control(Box::new(match_block)))
-            }
-        }
-    }
-
-    let open_peek = GenStmt::Embed(RustStmt::Expr(
-        RustExpr::local(ctxt.input_varname.clone()).call_method("open_peek_context"),
-    ));
-
-    // this is a stub for alternate parsing models to replace the `Parser` argument in the context of the expansion
-    let ll_context = ProdCtxt { ..ctxt };
-
-    let mut tree_block = expand_matchtree(tree, ll_context);
-    let close_peek = GenStmt::Embed(RustStmt::Expr(
-        RustExpr::local(ctxt.input_varname.clone())
-            .call_method("close_peek_context")
-            .wrap_try(),
-    ));
-
-    // REVIEW - we could definitely clean up the structural grouping of the pieces below
-    let mut stmts =
-        Vec::with_capacity(tree_block.stmts.len() + if tree_block.ret.is_some() { 1 } else { 2 });
-
-    stmts.push(open_peek);
-    stmts.append(&mut tree_block.stmts);
-    let ret = match tree_block.ret {
-        None => {
-            stmts.push(close_peek);
-            None
-        }
-        Some(expr) => Some(GenExpr::BlockScope(Box::new(GenBlock {
-            stmts: vec![
-                GenStmt::assign("ret", GenBlock::single_expr(expr)),
-                close_peek,
-            ],
-            ret: Some(GenExpr::Embed(RustExpr::local("ret"))),
-        }))),
-    };
-    GenBlock {
-        stmts,
-        ret,
-        ..tree_block
-    }
-}
-
-/// Abstraction type use to sub-categorize different Decoders and ensure that the codegen layer
-/// is more resilient to changes both upstream (in the Decoder model)
-/// and downstream (in the API made available for generated code to use)
 #[derive(Clone, Debug)]
-enum CaseLogic<ExprT = Expr> {
-    Simple(SimpleLogic<ExprT>),
-    Derived(DerivedLogic<ExprT>),
-    Sequential(SequentialLogic<ExprT>),
-    Parallel(ParallelLogic<ExprT>),
-    Repeat(RepeatLogic<ExprT>),
-    Engine(EngineLogic<ExprT>),
-    Other(OtherLogic<ExprT>),
+enum ViewLogic<ExprT> {
+    LetView(Label, Box<CaseLogic<ExprT>>),
+    CaptureBytes(RustExpr, RustExpr),
+    ReadArray(RustExpr, RustExpr, GTFixedReadKind),
+    ReifyView(RustExpr),
+}
+
+impl ToAst for ViewLogic<GTExpr> {
+    type AstElem = GenBlock;
+
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
+        match self {
+            ViewLogic::LetView(name, inner_cl) => {
+                let bind_view = GenStmt::Embed(RustStmt::assign(
+                    name.clone(),
+                    model::get_view(ctxt.parser()),
+                ));
+                let mut inner = inner_cl.to_ast(ctxt);
+                inner.prepend_stmt(bind_view);
+                inner
+            }
+            ViewLogic::CaptureBytes(view, len) => GenBlock::simple_expr(model::read_from_view(
+                view.clone(),
+                len.clone().cast_as_usize(),
+            )),
+            ViewLogic::ReadArray(view, len, kind) => match kind {
+                TypedFixedReadKind::Base(base_kind) => {
+                    GenBlock::simple_expr(model::read_array_from_view(
+                        view.clone(),
+                        len.clone().cast_as_usize(),
+                        *base_kind,
+                    ))
+                }
+                // NOTE - the emitted `view.as_read_array::<T>(len)` call (see
+                // `model::read_fixed_array_from_view`) only type-checks once `gt`'s RustType
+                // actually implements `ReadUnchecked`; that trait-impl is emitted separately
+                // (see `codegen/model/traits.rs`).
+                TypedFixedReadKind::FixedFormat(gt, _format_ref) => {
+                    GenBlock::simple_expr(model::read_fixed_array_from_view(
+                        view.clone(),
+                        len.clone().cast_as_usize(),
+                        gt.to_rust_type(),
+                    ))
+                }
+            },
+            ViewLogic::ReifyView(view) => GenBlock::simple_expr(model::reify_view(view.clone())),
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // true - construct view from parser
+            ViewLogic::LetView(..) => true,
+            // false - only operate on view, not on parser directly
+            ViewLogic::CaptureBytes(..) | ViewLogic::ReadArray(..) | ViewLogic::ReifyView(..) => {
+                false
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -2635,110 +3248,87 @@ where
         match self {
             EngineLogic::Slice(sz, cl_inner) => {
                 let bind_sz_var = RustStmt::assign(
-                    Label::from("sz"),
-                    RustExpr::Operation(RustOp::AsCast(
-                        Box::new(sz.clone()),
-                        RustType::from(PrimType::Usize),
-                    )),
+                    Label::Borrowed(model::SLICE_LEN),
+                    sz.clone().cast_as_usize(),
                 )
                 .into();
-                let try_open_peek = GenStmt::Embed(RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method_with("start_slice", [RustExpr::local("sz")])
-                        .wrap_try(),
-                ));
-                let bind_ret = GenStmt::assign("ret", cl_inner.to_ast(ctxt).local_try());
-                let try_close_peek = GenStmt::Embed(RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method("end_slice")
-                        .wrap_try(),
-                ));
-                let stmts = vec![bind_sz_var, try_open_peek, bind_ret, try_close_peek];
-                let ret = Some(GenExpr::Embed(RustExpr::local("ret")));
+                let try_open_slice = RustStmt::Expr(model::try_open_slice(
+                    ctxt.parser(),
+                    RustExpr::local(model::SLICE_LEN),
+                ))
+                .into();
+                let bind_ret = GenStmt::assign(model::SLICE_RET, cl_inner.to_ast(ctxt).local_try());
+                let try_close_slice = RustStmt::Expr(model::try_close_slice(ctxt.parser())).into();
+                let stmts = vec![bind_sz_var, try_open_slice, bind_ret, try_close_slice];
+                let ret = Some(RustExpr::local(model::SLICE_RET).into());
                 GenBlock::from_parts(stmts, ret)
             }
             EngineLogic::Peek(cl_inner) => {
-                let start_peek = RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone()).call_method("open_peek_context"),
-                )
-                .into();
-                let bind_ret = GenStmt::assign("ret", cl_inner.to_ast(ctxt).local_try());
-                let try_close_peek = GenStmt::Embed(RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method("close_peek_context")
-                        .wrap_try(),
-                ));
+                let start_peek = RustStmt::Expr(model::open_peek(ctxt.parser())).into();
+                let bind_ret = GenStmt::assign(model::PEEK_RET, cl_inner.to_ast(ctxt).local_try());
+                let try_close_peek = RustStmt::Expr(model::try_close_peek(ctxt.parser())).into();
                 let stmts = vec![start_peek, bind_ret, try_close_peek];
-                let ret = Some(GenExpr::Embed(RustExpr::local("ret")));
+                let ret = Some(RustExpr::local(model::PEEK_RET).into());
                 GenBlock::from_parts(stmts, ret)
             }
             EngineLogic::OffsetPeek(base_addr, offs, cl_inner) => {
-                let bind_tgt_offset_var = GenStmt::Embed(RustStmt::assign(
-                    "tgt_offset",
+                let bind_tgt_offset_var = RustStmt::assign(
+                    model::OFFS_PEEK_TARGET,
                     RustExpr::add(base_addr.clone(), offs.clone()),
-                ));
-                let advance_or_seek = GenStmt::Embed(RustStmt::assign(
-                    "_is_advance",
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method_with("advance_or_seek", [RustExpr::local("tgt_offset")])
-                        .wrap_try(),
-                ));
-                let bind_ret = GenStmt::assign("ret", cl_inner.to_ast(ctxt).local_try());
-                let try_close_peek = GenStmt::Embed(RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method("close_peek_context")
-                        .wrap_try(),
-                ));
+                )
+                .into();
+                let advance_or_seek = RustStmt::assign(
+                    model::OFFS_PEEK_DBG_ADV,
+                    model::try_seek_to_target(
+                        ctxt.parser(),
+                        RustExpr::local(model::OFFS_PEEK_TARGET),
+                    ),
+                )
+                .into();
+                let bind_ret =
+                    GenStmt::assign(model::OFFS_PEEK_RET, cl_inner.to_ast(ctxt).local_try());
+                let try_close_peek = RustStmt::Expr(model::try_close_peek(ctxt.parser())).into();
                 let stmts = vec![
                     bind_tgt_offset_var,
                     advance_or_seek,
                     bind_ret,
                     try_close_peek,
                 ];
-                let ret = Some(GenExpr::Embed(RustExpr::local("ret")));
+                let ret = Some(RustExpr::local(model::OFFS_PEEK_RET).into());
                 GenBlock::from_parts(stmts, ret)
             }
             EngineLogic::PeekNot(cl_inner) => {
-                let open_peek_not = RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method("open_peek_not_context"),
-                )
-                .into();
-                let bind_res = GenStmt::assign("res", cl_inner.to_ast(ctxt).abstracted_try());
+                let open_peek_not = RustStmt::Expr(model::open_peek_not(ctxt.parser())).into();
+                let bind_res =
+                    GenStmt::assign(model::PEEK_NOT_RES, cl_inner.to_ast(ctxt).abstracted_try());
                 let close_or_fail = GenExpr::Control(Box::new(RustControl::If(
-                    RustExpr::local("res").call_method("is_err"),
-                    GenBlock::simple_expr(
-                        RustExpr::local(ctxt.input_varname.clone())
-                            .call_method("close_peek_not_context")
-                            .wrap_try(),
-                    ),
-                    Some(GenBlock::explicit_return(RustExpr::err(RustExpr::scoped(
-                        ["ParseError"],
-                        "NegatedSuccess",
-                    )))),
+                    Box::new(RustExpr::local(model::PEEK_NOT_RES).call_method("is_err")),
+                    GenBlock::simple_expr(model::try_close_peek_not(ctxt.parser())),
+                    Some(GenBlock::explicit_return(model::err_bad_peek_not())),
                 )));
                 let stmts = vec![open_peek_not, bind_res];
                 GenBlock::from_parts(stmts, Some(close_or_fail))
             }
             EngineLogic::Bits(cl_inner) => {
-                let enter_bits = RustStmt::Expr(
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method("enter_bits_mode")
-                        .wrap_try(),
-                )
-                .into();
-                let bind_ret = GenStmt::assign("ret", cl_inner.to_ast(ctxt).local_try());
-                let escape_bits = GenStmt::Embed(RustStmt::assign(
-                    // FIXME: promote to non-hardcoded identifier
-                    "_bits_read",
-                    RustExpr::local(ctxt.input_varname.clone())
-                        .call_method("escape_bits_mode")
-                        .wrap_try(),
-                ));
+                let enter_bits = RustStmt::Expr(model::ent_bits(ctxt.parser())).into();
+                let bind_ret = GenStmt::assign(model::BITS_RET, cl_inner.to_ast(ctxt).local_try());
+                let escape_bits =
+                    RustStmt::assign(model::BITS_NREAD, model::esc_bits(ctxt.parser())).into();
                 let stmts = vec![enter_bits, bind_ret, escape_bits];
-                let ret = Some(GenExpr::Embed(RustExpr::local("ret")));
+                let ret = Some(RustExpr::local(model::BITS_RET).into());
                 GenBlock::from_parts(stmts, ret)
             }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        // NOTE - 'Engine' logic inherently itneracts with the parse-engine, so all cases return true, but we don't want silent drift so we match on the current variants explicitly
+        match self {
+            EngineLogic::Slice(..)
+            | EngineLogic::Peek(..)
+            | EngineLogic::Bits(..)
+            | EngineLogic::PeekNot(..)
+            | EngineLogic::OffsetPeek(..) => true,
         }
     }
 }
@@ -2751,32 +3341,27 @@ enum RepeatLogic<ExprT> {
     /// evaluates a matchtree and breaks if it is matched
     Repeat1BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>),
     /// repeats a specific number of times
-    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),
+    ExactCount(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     /// Repeats between N and M times
-    BetweenCounts(MatchTree, RustExpr, RustExpr, Box<CaseLogic<ExprT>>),
+    BetweenCounts(
+        MatchTree, // MatchTree, constructed so that the matching index is how many unprocessed repetitions are still available in the current LL(k) window
+        Box<RustExpr>, // Min (N)
+        Box<RustExpr>, // Max (M)
+        Box<CaseLogic<ExprT>>,
+    ),
     /// Repetition stops after a predicate for 'terminal element' is satisfied
-    ConditionTerminal(GenLambda, Box<CaseLogic<ExprT>>),
+    ConditionTerminal(Box<GenLambda>, Box<CaseLogic<ExprT>>),
     /// Repetition stops after a predicate for 'complete sequence' is satisfied (post-append)
-    ConditionComplete(GenLambda, Box<CaseLogic<ExprT>>),
+    ConditionComplete(Box<GenLambda>, Box<CaseLogic<ExprT>>),
     /// Lifts an Expr to a sequence of parameters to apply to a format, once per element
-    ForEach(RustExpr, Label, Box<CaseLogic<ExprT>>),
+    ForEach(Box<RustExpr>, Label, Box<CaseLogic<ExprT>>),
     /// Fused logic for a left-fold that is updated on each repeat, and contributes to the condition for termination
-    ///
-    /// Lambda order: termination-predicate, then update-function
     AccumUntil(
-        GenLambda,
-        GenLambda,
-        Typed<RustExpr>,
+        Box<GenLambda>, // termination predicate ((Acc, [T]) -> Bool)
+        Box<GenLambda>, // update function ((Acc, T) -> Acc)
+        Typed<Box<RustExpr>>,
         Typed<Box<CaseLogic<ExprT>>>,
     ),
-}
-
-pub(crate) type Typed<T> = (T, GenType);
-
-pub(crate) trait ToAst {
-    type AstElem;
-
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> Self::AstElem;
 }
 
 impl<ExprT> ToAst for RepeatLogic<ExprT>
@@ -2789,387 +3374,265 @@ where
         match self {
             RepeatLogic::Repeat0ContinueOnMatch(continue_tree, elt) => {
                 let mut stmts = Vec::new();
+                stmts.push(model::let_mut_vec_new(model::R0COM_ACCUM).into());
 
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
-
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call(),
-                    )
-                    .into(),
-                );
                 let ctrl = {
-                    let tree_index_expr: RustExpr = invoke_matchtree(continue_tree, ctxt);
-                    let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
-                    let cond = RustExpr::infix(
-                        RustExpr::local("matching_ix"),
-                        InfixOperator::Eq,
-                        RustExpr::num_lit(0usize),
-                    );
-                    let b_continue = [
-                        // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                        RustStmt::assign("next_elem", elt_expr),
-                        RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
-                        ),
-                    ]
-                    .to_vec();
-                    let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
-                    let escape_clause = RustControl::If(cond, b_continue, Some(b_stop));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::infix(
-                            RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
-                            InfixOperator::Gt,
-                            RustExpr::num_lit(0usize),
-                        ),
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    let tree_index_expr = invoke_matchtree(continue_tree, ctxt);
+                    let bind_ix = RustStmt::assign(model::MATCH_BRANCH_IX, tree_index_expr).into();
+                    let cond = model::eq0(RustExpr::local(model::MATCH_BRANCH_IX));
+                    let b_continue = {
+                        let bind_elem = GenStmt::assign(model::R0COM_ELEM, elt.to_ast(ctxt));
+                        let push_elem = model::vec_push(
+                            RustExpr::local(model::R0COM_ACCUM),
+                            RustExpr::local(model::R0COM_ELEM),
+                        );
+                        GenBlock::from_parts(vec![bind_elem], Some(push_elem.into()))
+                    };
+                    let escape_clause =
+                        GenControl::If(Box::new(cond), b_continue, Some(GenControl::Break.into()));
+                    GenControl::While(
+                        Box::new(model::gt0(model::rem_bytes(ctxt.parser()))),
+                        GenBlock::from_parts(vec![bind_ix], Some(escape_clause.into())),
+                    )
                 };
                 stmts.push(ctrl.into());
-                // FIXME - internal is misleading here but currently accurate due to the lack of interoperability between RustControl and GenContext
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::R0COM_ACCUM).into()))
             }
             RepeatLogic::Repeat1BreakOnMatch(break_tree, elt) => {
                 let mut stmts = Vec::new();
 
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
-
-                stmts.push(
-                    RustStmt::assign_mut("accum", RustExpr::scoped(["Vec"], "new").call()).into(),
-                );
+                stmts.push(model::let_mut_vec_new(model::R1BOM_ACCUM).into());
                 let ctrl = {
-                    let tree_index_expr: RustExpr = invoke_matchtree(break_tree, ctxt);
-                    let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
-                    let cond = RustExpr::infix(
-                        RustExpr::local("matching_ix"),
-                        InfixOperator::Eq,
-                        RustExpr::num_lit(0usize),
-                    );
-                    let b_continue = [
-                        // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                        RustStmt::assign("next_elem", elt_expr),
-                        RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
-                        ),
-                    ]
-                    .to_vec();
-                    let b_stop = vec![RustStmt::Control(RustControl::If(
-                        RustExpr::local("accum").call_method("is_empty"),
-                        vec![RustStmt::Return(
-                            ReturnKind::Keyword,
-                            RustExpr::err(RustExpr::scoped(["ParseError"], "InsufficientRepeats")),
-                        )],
-                        Some(vec![RustStmt::Control(RustControl::Break)]),
-                    ))];
-                    let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::infix(
-                            RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
-                            InfixOperator::Gt,
-                            RustExpr::num_lit(0usize),
-                        ),
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    let tree_index_expr = invoke_matchtree(break_tree, ctxt);
+                    let bind_ix = RustStmt::assign(model::MATCH_BRANCH_IX, tree_index_expr).into();
+                    let cond = model::eq0(RustExpr::local(model::MATCH_BRANCH_IX));
+                    let b_continue = {
+                        let bind_elem = GenStmt::assign(model::R1BOM_ELEM, elt.to_ast(ctxt));
+                        let push_elem = model::vec_push(
+                            RustExpr::local(model::R1BOM_ACCUM),
+                            RustExpr::local(model::R1BOM_ELEM),
+                        );
+                        GenBlock::from_parts(vec![bind_elem], Some(push_elem.into()))
+                    };
+                    let b_stop = GenControl::If(
+                        Box::new(RustExpr::local(model::R1BOM_ACCUM).vec_is_empty()),
+                        GenBlock::explicit_return(model::err_too_few()),
+                        Some(GenControl::Break.into()),
+                    )
+                    .into();
+                    let escape_clause = GenControl::If(Box::new(cond), b_stop, Some(b_continue));
+                    GenControl::While(
+                        Box::new(model::gt0(model::rem_bytes(ctxt.parser()))),
+                        GenBlock::from_parts(vec![bind_ix], Some(escape_clause.into())),
+                    )
                 };
                 stmts.push(ctrl.into());
-                // FIXME - internal is misleading here but currently accurate due to the lack of interoperability between RustControl and GenContext
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::R1BOM_ACCUM).into()))
             }
-            RepeatLogic::BetweenCounts(btree, expr_min, expr_max, elt) => {
+            RepeatLogic::BetweenCounts(reps_left_tree, expr_min, expr_max, elt) => {
                 let mut stmts = Vec::new();
 
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
-                stmts.push(
-                    RustStmt::assign_mut("accum", RustExpr::scoped(["Vec"], "new").call()).into(),
-                );
+                stmts.push(model::let_mut_vec_new(model::BETWEEN_ACCUM).into());
                 let ctrl = {
-                    let tree_index_expr: RustExpr = invoke_matchtree(btree, ctxt);
-                    let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
-                    let cond = {
-                        let tree_cond = RustExpr::infix(
-                            RustExpr::local("matching_ix"),
-                            InfixOperator::Eq,
-                            RustExpr::num_lit(0usize),
-                        );
-                        let min_cond = RustExpr::infix(
-                            RustExpr::local("accum").vec_len(),
-                            InfixOperator::Gte,
-                            RustExpr::Operation(RustOp::AsCast(
-                                Box::new(expr_min.clone()),
-                                RustType::from(PrimType::Usize),
-                            )),
-                        );
-                        let max_cond = RustExpr::infix(
-                            RustExpr::local("accum").vec_len(),
-                            InfixOperator::Eq,
-                            RustExpr::Operation(RustOp::AsCast(
-                                Box::new(expr_max.clone()),
-                                RustType::from(PrimType::Usize),
-                            )),
-                        );
-                        // Workaround for lack of boolean operations in RustOp
-                        RustExpr::local("repeat_between_finished")
-                            .call_with([tree_cond, min_cond, max_cond])
-                            .wrap_try()
+                    let bind_reps_left = {
+                        let reps_left = invoke_matchtree(reps_left_tree, ctxt);
+                        RustStmt::assign(model::BETWEEN_REPS_LEFT, reps_left).into()
                     };
-                    let b_continue = [
-                        // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                        RustStmt::assign("next_elem", elt_expr),
-                        RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
-                        ),
-                    ]
-                    .to_vec();
-                    let b_stop = vec![RustStmt::Control(RustControl::Break)];
-                    let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::infix(
-                            RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
-                            InfixOperator::Gt,
-                            RustExpr::num_lit(0usize),
-                        ),
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    let cond = {
+                        let out_of_reps = model::eq0(RustExpr::local(model::BETWEEN_REPS_LEFT));
+                        let len_expr = RustExpr::local(model::BETWEEN_ACCUM).vec_len();
+                        let min_expr = expr_min.clone().cast_as_usize();
+                        let max_expr = expr_max.clone().cast_as_usize();
+                        model::repeat_between_finished(out_of_reps, len_expr, min_expr, max_expr)
+                    };
+                    let b_continue = {
+                        let bind_elem = GenStmt::assign(model::BETWEEN_ELEM, elt.to_ast(ctxt));
+                        let push_elem = model::vec_push(
+                            RustExpr::local(model::BETWEEN_ACCUM),
+                            RustExpr::local(model::BETWEEN_ELEM),
+                        );
+                        GenBlock::from_parts(vec![bind_elem], Some(push_elem.into()))
+                    };
+                    let b_stop = GenControl::Break.into();
+                    let escape_clause = GenControl::If(Box::new(cond), b_stop, Some(b_continue));
+                    GenControl::While(
+                        Box::new(model::gt0(model::rem_bytes(ctxt.parser()))),
+                        GenBlock::from_parts(vec![bind_reps_left], Some(escape_clause.into())),
+                    )
                 };
                 stmts.push(ctrl.into());
-                // FIXME - internal is misleading here but currently accurate due to the lack of interoperability between RustControl and GenContext
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::BETWEEN_ACCUM).into()))
             }
             RepeatLogic::ForEach(seq, lbl, inner) => {
                 let mut stmts = Vec::new();
 
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let inner_expr = inner.to_ast(ctxt).into();
+                stmts.push(model::let_mut_vec_new(model::FOREACH_ACCUM).into());
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                let ctrl = {
+                    let body = GenBlock::from_parts(
+                        vec![GenStmt::assign(model::FOREACH_ELEM, inner.to_ast(ctxt))],
+                        Some(
+                            model::vec_push(
+                                RustExpr::local(model::FOREACH_ACCUM),
+                                RustExpr::local(model::FOREACH_ELEM),
+                            )
+                            .into(),
+                        ),
+                    );
+                    GenControl::ForIter(lbl.clone(), seq.clone(), body)
+                };
+                stmts.push(ctrl.into());
 
-                let body = vec![RustStmt::Expr(
-                    // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible - and we don't even capture it, currently
-                    RustExpr::local("accum").call_method_with("push", [inner_expr]),
-                )];
-                stmts.push(RustStmt::Control(RustControl::ForIter(
-                    lbl.clone(),
-                    seq.clone(),
-                    body,
-                )));
-
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::FOREACH_ACCUM).into()))
             }
             RepeatLogic::ExactCount(expr_n, elt) => {
                 let mut stmts = Vec::new();
 
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
+                stmts.push(model::let_mut_vec_new(model::EXACT_ACCUM).into());
 
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call(),
-                    )
-                    .into(),
-                );
-                // N non-loop blocks rather than 1 block representing an N-iteration loop
-                let body = vec![RustStmt::Expr(
-                    // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible - and we don't even capture it, currently
-                    RustExpr::local("accum").call_method_with("push", [elt_expr]),
-                )];
-                stmts.push(
-                    RustStmt::Control(RustControl::ForRange0(
-                        Label::from("_"),
-                        expr_n.clone(),
-                        body,
-                    ))
-                    .into(),
-                );
-                // FIXME - internal is misleading here but currently accurate due to the lack of interoperability between RustControl and GenContext
-
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
+                let ctrl = {
+                    let body = GenBlock::from_parts(
+                        vec![GenStmt::assign(model::EXACT_ELEM, elt.to_ast(ctxt))],
+                        Some(
+                            model::vec_push(
+                                RustExpr::local(model::EXACT_ACCUM),
+                                RustExpr::local(model::EXACT_ELEM),
+                            )
+                            .into(),
+                        ),
+                    );
+                    GenControl::ForRange0(Label::from("_"), expr_n.clone(), body)
+                };
+                stmts.push(ctrl.into());
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::EXACT_ACCUM).into()))
             }
             RepeatLogic::ConditionTerminal(pred_last, elt) => {
                 let mut stmts = Vec::new();
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
-
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call(),
-                    )
-                    .into(),
-                );
+                stmts.push(model::let_mut_vec_new(model::UNTIL_LAST_ACCUM).into());
                 let ctrl = {
-                    let mut loop_body = Vec::new();
-
-                    // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                    let elt_bind = RustStmt::assign("elem", elt_expr);
-
-                    loop_body.push(elt_bind);
-
-                    let cond = pred_last.beta_reduce(
-                        RustExpr::Borrow(Box::new(RustExpr::local("elem"))),
-                        ExprInfo::default(),
-                    );
-                    let b_terminal = [
-                        RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("elem")]),
-                        ),
-                        RustStmt::Control(RustControl::Break),
-                    ]
-                    .to_vec();
-                    let b_else = [RustStmt::Expr(
-                        RustExpr::local("accum")
-                            .call_method_with("push", [RustExpr::local("elem")]),
-                    )]
-                    .to_vec();
-                    if cond.is_complex() {
-                        // REVIEW - we might need a strategy to avoid shadowing
-                        let tmp_var_name = "tmp_cond";
-                        loop_body.push(RustStmt::assign(tmp_var_name, cond));
-                        loop_body.push(RustStmt::Control(RustControl::If(
-                            RustExpr::local(tmp_var_name),
-                            b_terminal,
-                            Some(b_else),
-                        )));
-                    } else {
-                        loop_body.push(RustStmt::Control(RustControl::If(
-                            cond,
-                            b_terminal,
-                            Some(b_else),
-                        )));
+                    let elt_bind = GenStmt::assign(model::UNTIL_LAST_ELEM, elt.to_ast(ctxt));
+                    let stop_if_done = {
+                        let done_cond = pred_last.beta_reduce(
+                            RustExpr::borrow_of(RustExpr::local(model::UNTIL_LAST_ELEM)),
+                            ExprInfo::default(),
+                        );
+                        let b_terminal = GenBlock::from_parts(
+                            vec![
+                                model::vec_push(
+                                    RustExpr::local(model::UNTIL_LAST_ACCUM),
+                                    RustExpr::local(model::UNTIL_LAST_ELEM),
+                                )
+                                .into(),
+                            ],
+                            Some(GenControl::Break.into()),
+                        );
+                        let b_else = GenBlock::simple_expr(model::vec_push(
+                            RustExpr::local(model::UNTIL_LAST_ACCUM),
+                            RustExpr::local(model::UNTIL_LAST_ELEM),
+                        ));
+                        model::simplifying_if(done_cond, b_terminal, Some(b_else))
                     };
-                    RustStmt::Control(RustControl::Loop(loop_body))
+
+                    GenControl::Loop(GenBlock::from_parts(vec![elt_bind], Some(stop_if_done)))
                 };
                 stmts.push(ctrl.into());
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::UNTIL_LAST_ACCUM).into()))
             }
             RepeatLogic::ConditionComplete(pred_full, elt) => {
                 let mut stmts = Vec::new();
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
-
-                stmts.push(
-                    RustStmt::assign_mut("accum", RustExpr::scoped(["Vec"], "new").call()).into(),
-                );
+                stmts.push(model::let_mut_vec_new(model::UNTIL_SEQ_ACCUM).into());
                 let ctrl = {
-                    let mut loop_body = Vec::new();
-
-                    // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                    loop_body.push(RustStmt::assign("elem", elt_expr));
-                    loop_body.push(RustStmt::Expr(
-                        RustExpr::local("accum")
-                            .call_method_with("push", [RustExpr::local("elem")]),
-                    ));
-
-                    let cond = pred_full.apply(
-                        RustExpr::borrow_of(RustExpr::local("accum")),
-                        ExprInfo::default(),
-                    );
-                    if cond.is_complex() {
-                        // REVIEW - we might need a strategy to avoid shadowing
-                        let tmp_var_name = "tmp_cond";
-                        loop_body.push(RustStmt::assign(tmp_var_name, cond));
-                        loop_body.push(RustStmt::Control(RustControl::If(
-                            RustExpr::local(tmp_var_name),
-                            vec![RustStmt::BREAK],
-                            None,
-                        )));
-                    } else {
-                        loop_body.push(RustStmt::Control(RustControl::If(
-                            cond,
-                            vec![RustStmt::BREAK],
-                            None,
-                        )));
-                    };
-                    RustStmt::Control(RustControl::Loop(loop_body))
-                };
-                stmts.push(ctrl.into());
-                GenBlock::lift_block(stmts, RustExpr::local("accum"))
-            }
-            RepeatLogic::AccumUntil(cond, update, (init, acc_type), (elt, elt_type)) => {
-                let mut stmts = Vec::new();
-                // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                let elt_expr = elt.to_ast(ctxt).into();
-                let seq_type = match cond.head_type.to_rust_type() {
-                    RustType::AnonTuple(ts) => ts[1].clone(),
-                    other => unreachable!("bad type {other:?}"),
-                };
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::Borrowed("seq"),
-                        Some(seq_type),
-                        RustExpr::scoped(["Vec"], "new").call(),
+                    let elt_bind = GenStmt::assign(model::UNTIL_SEQ_ELEM, elt.to_ast(ctxt));
+                    let elt_push = model::vec_push(
+                        RustExpr::local(model::UNTIL_SEQ_ACCUM),
+                        RustExpr::local(model::UNTIL_SEQ_ELEM),
                     )
-                    .into(),
-                );
-                stmts.push(RustStmt::assign_mut("acc", init.clone()));
-                let ctrl = {
-                    let mut loop_body = Vec::new();
-
-                    let done_call = cond.apply_pair(
-                        // REVIEW[epic=clone-of-copy] - figure out if we can avoid cloning copy-types here
-                        RustExpr::owned(RustExpr::local("acc"), acc_type.to_rust_type()),
-                        RustExpr::local("seq"),
-                        ExprInfo::default(),
-                    );
-                    if done_call.is_complex() {
-                        let tmp_var_done = "tmp_is_done";
-                        loop_body.push(RustStmt::assign(tmp_var_done, done_call));
-                        loop_body.push(RustStmt::Control(RustControl::If(
-                            RustExpr::local(tmp_var_done),
-                            vec![RustStmt::Control(RustControl::Break)],
-                            None,
-                        )));
-                    } else {
-                        loop_body.push(RustStmt::Control(RustControl::If(
-                            done_call,
-                            vec![RustStmt::Control(RustControl::Break)],
-                            None,
-                        )));
-                    }
-
-                    // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                    loop_body.push(RustStmt::assign("elem", elt_expr));
-                    loop_body.push(RustStmt::Expr(RustExpr::local("seq").call_method_with(
-                        "push",
-                        [RustExpr::owned(
-                            RustExpr::local("elem"),
-                            elt_type.to_rust_type(),
-                        )],
-                    )));
-                    let new_acc = update.apply_pair(
-                        RustExpr::local("acc"),
-                        RustExpr::local("elem"),
-                        ExprInfo::default(),
-                    );
-                    loop_body.push(RustStmt::Reassign(Label::Borrowed("acc"), new_acc));
-                    RustStmt::Control(RustControl::Loop(loop_body))
+                    .into();
+                    let stop_if_done = {
+                        let predicate = pred_full.apply(
+                            RustExpr::borrow_of(RustExpr::local(model::UNTIL_SEQ_ACCUM)),
+                            ExprInfo::default(),
+                        );
+                        model::simplifying_if(predicate, GenControl::Break.into(), None)
+                    };
+                    GenControl::Loop(GenBlock::from_parts(
+                        vec![elt_bind, elt_push],
+                        Some(stop_if_done),
+                    ))
                 };
                 stmts.push(ctrl.into());
-                GenBlock::lift_block(
+                GenBlock::from_parts(stmts, Some(RustExpr::local(model::UNTIL_SEQ_ACCUM).into()))
+            }
+            RepeatLogic::AccumUntil(f_stop, f_update, (init, acc_type), (elt, elt_type)) => {
+                let mut stmts = Vec::new();
+
+                let seq_type = match f_stop.head_type.to_rust_type() {
+                    RustType::AnonTuple(ts) => ts[1].clone(),
+                    other => unreachable!(
+                        "bad type for AccumUntil termination-predicate head-var: {other:?}"
+                    ),
+                };
+                stmts.push(model::let_mut_sig_vec_new(model::UNFOLD_SEQ, seq_type).into());
+                // REVIEW - is there ever a case where we need to add a signature with acc_type?
+                stmts.push(RustStmt::assign_mut(model::UNFOLD_ACC, (**init).clone()).into());
+
+                let ctrl = {
+                    let break_if_done = {
+                        let predicate_done = f_stop.apply_pair(
+                            RustExpr::owned(
+                                RustExpr::local(model::UNFOLD_ACC),
+                                acc_type.to_rust_type(),
+                            ),
+                            RustExpr::local(model::UNFOLD_SEQ),
+                            ExprInfo::default(),
+                        );
+                        model::simplifying_if(predicate_done, GenControl::Break.into(), None).into()
+                    };
+                    let bind_elt = GenStmt::assign(model::UNFOLD_ELEM, elt.to_ast(ctxt));
+
+                    let update_acc = {
+                        let new_acc = f_update.apply_pair(
+                            RustExpr::local(model::UNFOLD_ACC),
+                            RustExpr::local(model::UNFOLD_ELEM).owned(elt_type.to_rust_type()),
+                            ExprInfo::default(),
+                        );
+                        RustStmt::Reassign(Label::Borrowed(model::UNFOLD_ACC), new_acc).into()
+                    };
+                    let push_elt = model::vec_push(
+                        RustExpr::local(model::UNFOLD_SEQ),
+                        RustExpr::local(model::UNFOLD_ELEM),
+                    );
+                    GenControl::Loop(GenBlock::from_parts(
+                        vec![break_if_done, bind_elt, update_acc],
+                        Some(push_elt.into()),
+                    ))
+                };
+                stmts.push(ctrl.into());
+                GenBlock::from_parts(
                     stmts,
-                    RustExpr::Tuple(vec![RustExpr::local("acc"), RustExpr::local("seq")]),
+                    Some(
+                        RustExpr::Tuple(vec![
+                            RustExpr::local(model::UNFOLD_ACC),
+                            RustExpr::local(model::UNFOLD_SEQ),
+                        ])
+                        .into(),
+                    ),
                 )
             }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // tree-based repeats can only terminate based on input-conditions, so they are always dependent on input
+            RepeatLogic::Repeat0ContinueOnMatch(..) | RepeatLogic::Repeat1BreakOnMatch(..) => true,
+            RepeatLogic::BetweenCounts(..) => true,
+            // speculatively true but actually depend on the inner argument
+            RepeatLogic::ExactCount(.., inner)
+            | RepeatLogic::ForEach(.., inner)
+            | RepeatLogic::ConditionTerminal(.., inner)
+            | RepeatLogic::ConditionComplete(.., inner)
+            | RepeatLogic::AccumUntil(.., (inner, _)) => inner.depends_on_input(),
         }
     }
 }
@@ -3182,6 +3645,7 @@ enum SequentialLogic<ExprT> {
         elements: Vec<CaseLogic<ExprT>>,
     },
     AccumSeq {
+        /// When `true`, use a fixed-sized array-literal instead of a `Vec`
         as_array: bool,
         elements: Vec<CaseLogic<ExprT>>,
     },
@@ -3195,25 +3659,29 @@ where
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
-            // REVIEW - in certain cases, we may be able to use fixed-sized arrays instead of vec, but that might complicate matters...
             SequentialLogic::AccumSeq { as_array, elements } => {
                 if elements.is_empty() {
-                    return GenBlock::simple_expr(RustExpr::VEC_NIL);
+                    return if *as_array {
+                        GenBlock::simple_expr(RustExpr::ARR_NIL)
+                    } else {
+                        GenBlock::simple_expr(RustExpr::VEC_NIL)
+                    };
                 }
-                let mut stmts = Vec::new();
-                let mut terms = Vec::new();
 
-                for (ix, cl) in elements.iter().enumerate() {
-                    const LAB_PREFIX: &str = "_seq";
-                    let lab = Label::Owned(format!("{LAB_PREFIX}{ix}"));
-                    stmts.push(GenStmt::BindOnce(lab.clone(), cl.to_ast(ctxt)));
-                    terms.push(RustExpr::local(lab));
-                }
+                let mk_name = {
+                    use model::ACCUM_SEQ_PREFIX;
+                    move |ix| Label::Owned(format!("{ACCUM_SEQ_PREFIX}{ix}"))
+                };
+                // REVIEW - consider whether there might be cases in which we would have to to add `.local_try()` to `cl.to_ast(ctxt)`
+                let blocks = elements.iter().map(|cl| cl.to_ast(ctxt)).collect();
+                let (stmts, terms) = model::accum_seq_terms(blocks, mk_name);
+
                 let ret = Some(GenExpr::Embed(if *as_array {
                     RustExpr::ArrayLit(terms)
                 } else {
                     RustExpr::Macro(RustMacro::Vec(VecExpr::List(terms)))
                 }));
+
                 GenBlock { stmts, ret }
             }
             SequentialLogic::AccumTuple {
@@ -3221,36 +3689,47 @@ where
                 elements,
             } => {
                 if elements.is_empty() {
-                    return GenBlock::simple_expr(RustExpr::UNIT);
+                    return if let Some(con) = constructor {
+                        GenExpr::TyValCon(RustExpr::Struct(
+                            con.clone(),
+                            StructExpr::Tuple(Vec::new()),
+                        ))
+                        .into()
+                    } else {
+                        GenBlock::simple_expr(RustExpr::UNIT)
+                    };
                 }
 
-                let mut names: Vec<Label> = Vec::new();
-                let mut body = Vec::new();
+                let mk_name = {
+                    use model::ACCUM_TUP_PREFIX;
+                    move |ix| Label::Owned(format!("{ACCUM_TUP_PREFIX}{ix}"))
+                };
 
-                for (ix, elt_cl) in elements.iter().enumerate() {
-                    let varname = format!("field{}", ix);
-                    names.push(varname.clone().into());
-                    body.push(GenStmt::assign(varname, elt_cl.to_ast(ctxt).local_try()));
-                }
+                // REVIEW - do we need `.local_try()` here?
+                let blocks = elements.iter().map(|elt_cl| elt_cl.to_ast(ctxt)).collect();
+                let (stmts, terms) = model::accum_seq_terms(blocks, mk_name);
 
                 if let Some(con) = constructor {
                     // FIXME - In addition to local rule-interpretation for each tuple positional, we also want to selectively box the elements, either at site-of-binding or in the struct expr
                     GenBlock::from_parts(
-                        body,
+                        stmts,
                         Some(GenExpr::TyValCon(RustExpr::Struct(
                             con.clone(),
-                            StructExpr::TupleExpr(names.into_iter().map(RustExpr::local).collect()),
+                            StructExpr::Tuple(terms),
                         ))),
                     )
                 } else {
                     // FIXME - In addition to local rule-interpretation for each tuple positional, we also want to selectively box the elements, either at site-of-binding or in the struct expr
-                    GenBlock::from_parts(
-                        body,
-                        Some(GenExpr::TyValCon(RustExpr::Tuple(
-                            names.into_iter().map(RustExpr::local).collect(),
-                        ))),
-                    )
+                    GenBlock::from_parts(stmts, Some(GenExpr::TyValCon(RustExpr::Tuple(terms))))
                 }
+            }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            Self::AccumTuple { elements, .. } | Self::AccumSeq { elements, .. } => {
+                elements.iter().any(ToAst::depends_on_input)
             }
         }
     }
@@ -3279,40 +3758,36 @@ where
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
             OtherLogic::Descend(tree, cases) => {
-                let mut branches = Vec::new();
-                for (ix, case) in cases.iter().enumerate() {
-                    let case_block = case.to_ast(ctxt);
-
-                    branches.push((
-                        MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Numeric(
-                            RustNumLit::Usize(ix),
-                        ))),
-                        case_block,
-                    ));
-                }
-                let bind =
-                    GenStmt::Embed(RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt)));
+                let branches = cases
+                    .iter()
+                    .enumerate()
+                    .map(|(ix, case)| (model::match_case_usize(ix), case.to_ast(ctxt)))
+                    .collect();
+                let bind = GenStmt::Embed(RustStmt::assign(
+                    model::DESCEND_IX,
+                    invoke_matchtree(tree, ctxt),
+                ));
                 let ctrl = {
-                    let fallthrough = RustExpr::err(
-                        RustExpr::scoped(["ParseError"], "ExcludedBranch")
-                            .call_with([RustExpr::u64lit(get_trace(&(tree, "fallthrough")))]),
-                    );
-                    RustControl::Match(
-                        RustExpr::local("tree_index"),
+                    GenControl::Match(
+                        Box::new(RustExpr::local(model::DESCEND_IX)),
                         RustMatchBody::Refutable(
                             branches,
-                            RustCatchAll::ReturnErrorValue { value: fallthrough },
+                            RustCatchAll::ReturnErrorValue {
+                                value: Box::new(model::err_fallthrough(get_trace(&(
+                                    tree,
+                                    "fallthrough",
+                                )))),
+                            },
                         ),
                     )
                 };
                 GenBlock::from_parts(vec![bind], Some(GenExpr::Control(Box::new(ctrl))))
             }
             OtherLogic::ExprMatch(expr, cases, ck) => {
-                let mut branches = Vec::new();
-                for (lhs, logic) in cases.iter() {
-                    let case_block = logic.to_ast(ctxt);
-                    branches.push((lhs.clone(), case_block));
-                }
+                let branches = cases
+                    .iter()
+                    .map(|(lhs, logic)| (lhs.clone(), logic.to_ast(ctxt)))
+                    .collect();
 
                 let match_body = match ck {
                     Refutability::Refutable | Refutability::Indeterminate => {
@@ -3330,37 +3805,52 @@ where
             }
             OtherLogic::LetFormat(prior, name, inner) => {
                 let prior_block = prior.to_ast(ctxt);
+                if prior_block.is_empty() {
+                    unreachable!(
+                        "let binding `{name}` has empty rhs; there may be an exposed phantom in definition"
+                    );
+                }
                 let mut inner_block = inner.to_ast(ctxt);
-                // REVIEW - indexing scheme must be resilient to prepend and append...
-                inner_block
-                    .stmts
-                    .insert(0, GenStmt::assign(name.clone(), prior_block));
+                inner_block.prepend_stmt(GenStmt::assign(name.clone(), prior_block));
                 inner_block
             }
             OtherLogic::MonadSeq(prior, inner) => {
                 let prior_block = prior.to_ast(ctxt);
                 let mut inner_block = inner.to_ast(ctxt);
 
-                // REVIEW - is there a better construction we can use instead of this?
-                let prior_stmt = GenStmt::Expr(GenExpr::BlockScope(Box::new(prior_block)));
-
-                inner_block.prepend_stmt(prior_stmt);
+                // REVIEW - handle empty-blocks from SimpleLogic::PhantomData (phantom)
+                if !prior_block.is_empty() {
+                    // REVIEW - is there a better construction we can use instead of this?
+                    let prior_stmt = GenStmt::Expr(GenExpr::BlockScope(Box::new(prior_block)));
+                    inner_block.prepend_stmt(prior_stmt);
+                }
                 inner_block
             }
             OtherLogic::Hint(_hint, inner) => {
                 let inner_block = inner.to_ast(ctxt);
-
-                // REVIEW - do we want to perform any local modifications?
-                inner_block
+                match _hint {
+                    // REVIEW - do we want to perform any local modifications?
+                    StyleHint::Record { .. } => inner_block,
+                    StyleHint::AsciiStr | StyleHint::AsciiChar => inner_block,
+                    StyleHint::Common(CommonOp::EndianParse(_kind_endian)) => {
+                        // REVIEW - do we want to swap-in particular endian parses instead?
+                        inner_block
+                    }
+                }
             }
         }
     }
-}
 
-/// this production should be a RustExpr whose compiled type is usize, and whose
-/// runtime value is the index of the successful match relative to the input
-fn invoke_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustExpr {
-    embed_matchtree(tree, ctxt).into()
+    fn depends_on_input(&self) -> bool {
+        match self {
+            OtherLogic::Descend(..) => true,
+            OtherLogic::ExprMatch(_, items, _) => items.iter().any(|(_, cl)| cl.depends_on_input()),
+            OtherLogic::LetFormat(lhs, _, rhs) | OtherLogic::MonadSeq(lhs, rhs) => {
+                lhs.depends_on_input() || rhs.depends_on_input()
+            }
+            OtherLogic::Hint(.., inner) => inner.depends_on_input(),
+        }
+    }
 }
 
 /// Cases that require processing of multiple cases in parallel (on the same input-state)
@@ -3380,8 +3870,7 @@ where
             ParallelLogic::Alts(alts) => {
                 let l = alts.len();
                 assert_ne!(
-                    alts.len(),
-                    0,
+                    l, 0,
                     "ParallelLogic::Alts found with empty list of parse-alternations"
                 );
 
@@ -3389,54 +3878,39 @@ where
                 let mut last_ctrl = None;
 
                 {
-                    let start_alternation = GenStmt::Embed(RustStmt::Expr(
-                        RustExpr::local(ctxt.input_varname.clone()).call_method("start_alt"),
-                    ));
-
+                    let start_alternation = model::start_alt(ctxt.parser()).into();
                     stmts.push(start_alternation);
                 }
 
                 for (ix, branch_cl) in alts.iter().enumerate() {
-                    let on_match = |ret_expr: RustExpr| match l - ix {
-                        0 => unreachable!("index matches overall length"),
-                        1 => GenBlock::implicit_return(ret_expr),
-                        2.. => GenBlock::explicit_return(ret_expr),
+                    let n_left = (l - 1) - ix;
+                    let on_match = |ret_expr: RustExpr| match n_left {
+                        0 => GenBlock::implicit_return(ret_expr),
+                        1.. => GenBlock::explicit_return(ret_expr),
                     };
-                    let on_err = match l - ix {
-                        0 => unreachable!("index matches overall length"),
-                        1 => GenBlock::implicit_return(RustExpr::ResultErr(Box::new(
-                            RustExpr::local("_e"),
+                    let on_err = match n_left {
+                        0 => GenBlock::implicit_return(RustExpr::ResultErr(Box::new(
+                            RustExpr::local(model::ALT_ERR_BIND),
                         ))),
-                        2 => GenBlock::mono_statement(RustStmt::Expr(
-                            RustExpr::local(ctxt.input_varname.clone())
-                                .call_method_with("next_alt", [RustExpr::TRUE])
-                                .wrap_try(),
-                        )),
-                        3.. => GenBlock::mono_statement(RustStmt::Expr(
-                            RustExpr::local(ctxt.input_varname.clone())
-                                .call_method_with("next_alt", [RustExpr::FALSE])
-                                .wrap_try(),
-                        )),
+                        1 => GenBlock::mono_statement(RustStmt::Expr(model::try_next_alt(
+                            ctxt.parser(),
+                            true,
+                        ))),
+                        2.. => GenBlock::mono_statement(RustStmt::Expr(model::try_next_alt(
+                            ctxt.parser(),
+                            false,
+                        ))),
                     };
                     let branch_result = branch_cl.to_ast(ctxt).abstracted_try();
-                    let bind_res = GenStmt::assign("res", branch_result);
+                    let bind_res = GenStmt::assign(model::ALT_RES, branch_result);
                     let ctrl = RustControl::Match(
-                        RustExpr::local("res"),
+                        Box::new(RustExpr::local(model::ALT_RES)),
                         RustMatchBody::Irrefutable(vec![
                             (
-                                MatchCaseLHS::Pattern(RustPattern::Variant(
-                                    Constructor::Simple(Label::from("Ok")),
-                                    Box::new(RustPattern::CatchAll(Some(Label::from("inner")))),
-                                )),
+                                model::match_case_ok_bind(model::ALT_OK_BIND),
                                 on_match(RustExpr::local("inner").wrap_ok(Some("PResult"))),
                             ),
-                            (
-                                MatchCaseLHS::Pattern(RustPattern::Variant(
-                                    Constructor::Simple(Label::from("Err")),
-                                    Box::new(RustPattern::CatchAll(Some(Label::from("_e")))),
-                                )),
-                                on_err,
-                            ),
+                            (model::match_case_err_bind(model::ALT_ERR_BIND), on_err),
                         ]),
                     );
                     if let Some(expr) = last_ctrl.replace(GenExpr::Control(Box::new(ctrl))) {
@@ -3448,21 +3922,11 @@ where
             }
         }
     }
-}
 
-/// Cases that require no recursion into other case-logic
-#[derive(Clone, Debug)]
-enum SimpleLogic<ExprT> {
-    Fail,
-    ExpectEnd,
-    Invoke(usize, Vec<(Label, ExprT)>),
-    SkipToNextMultiple(usize),
-    ByteIn(ByteSet),
-    Eval(RustExpr),
-    CallDynamic(Label),
-    YieldCurrentOffset,
-    SkipRemainder,
-    ConstNone,
+    fn depends_on_input(&self) -> bool {
+        // NOTE - vacuously true but we don't want to unwittingly break things by hard-coding in `true` verbatim
+        matches!(self, ParallelLogic::Alts(..))
+    }
 }
 
 /// Cases that recurse into other case-logic only once
@@ -3471,12 +3935,233 @@ enum DerivedLogic<ExprT> {
     WrapSome(Box<CaseLogic<ExprT>>),
     VariantOf(Constructor, Box<CaseLogic<ExprT>>),
     UnitVariantOf(Constructor, Box<CaseLogic<ExprT>>),
-    MapOf(GenLambda, Box<CaseLogic<ExprT>>),
-    Let(Label, RustExpr, Box<CaseLogic<ExprT>>),
+    MapOf(Box<GenLambda>, Box<CaseLogic<ExprT>>),
+    Let(Label, Box<RustExpr>, Box<CaseLogic<ExprT>>),
     Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<ExprT>>),
-    Where(GenLambda, Box<CaseLogic<ExprT>>),
-    Maybe(RustExpr, Box<CaseLogic<ExprT>>),
-    DecodeBytes(RustExpr, Box<CaseLogic<ExprT>>),
+    // FIXME[epic=with-err] - handle severity appropriately
+    Where(Box<GenLambda>, Severity, Box<CaseLogic<ExprT>>),
+    Maybe(Box<RustExpr>, Box<CaseLogic<ExprT>>),
+    DecodeBytes(Box<RustExpr>, Box<CaseLogic<ExprT>>),
+    ParseView(Box<RustExpr>, Box<CaseLogic<ExprT>>),
+    Permit(Box<CaseLogic<ExprT>>, Box<RustExpr>),
+    #[cfg(feature = "format_enforce")]
+    Enforce(Box<CaseLogic<ExprT>>),
+}
+
+impl ToAst for DerivedLogic<GTExpr> {
+    type AstElem = GenBlock;
+
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
+        match self {
+            DerivedLogic::Dynamic(dyn_logic, inner_cl) => {
+                let mut block = inner_cl.to_ast(ctxt);
+                block.prepend_stmt(GenStmt::Embed(dyn_logic.to_ast(ctxt)));
+                block
+            }
+            DerivedLogic::DecodeBytes(bytes_expr, inner_cl) => {
+                // boilerplate for creating a parser from the value-level buffer
+                let bind_parser_obj = GenStmt::Embed(model::let_mut_parser_new(
+                    model::DECODE_BUF_PARSER_OBJ,
+                    bytes_expr.clone().vec_as_slice(),
+                ));
+                let bind_ref_mut_parser = GenStmt::Embed(RustStmt::assign(
+                    model::DECODE_BUF_PARSER_REF,
+                    RustExpr::BorrowMut(Box::new(RustExpr::local(model::DECODE_BUF_PARSER_OBJ))),
+                ));
+
+                /*
+                 * Instantiate the appropriately modified ProdCtxt for parsing from the value-level buffer,
+                 * and perform the actual parsing within that context
+                 */
+                let bytes_ctxt = ProdCtxt {
+                    input_varname: &Cow::Borrowed(model::DECODE_BUF_PARSER_REF),
+                };
+
+                let mut inner_block = inner_cl.to_ast(bytes_ctxt);
+                inner_block.prepend_stmts([bind_parser_obj, bind_ref_mut_parser]);
+                inner_block
+            }
+            DerivedLogic::ParseView(view, inner_cl) => {
+                // boilerplate for creating a parser from the view
+                let bind_parser_obj = GenStmt::Embed(model::let_mut_parser_from(
+                    model::PARSE_VIEW_PARSER_OBJ,
+                    (**view).clone(),
+                ));
+                let bind_ref_mut_parser = GenStmt::Embed(RustStmt::assign(
+                    model::PARSE_VIEW_PARSER_REF,
+                    RustExpr::BorrowMut(Box::new(RustExpr::local(model::PARSE_VIEW_PARSER_OBJ))),
+                ));
+
+                /*
+                 * Instantiate the appropriately modified ProdCtxt for parsing from the View,
+                 * and perform the actual parsing within that context
+                 */
+                let bytes_ctxt = ProdCtxt {
+                    input_varname: &Cow::Borrowed(model::PARSE_VIEW_PARSER_REF),
+                };
+                let mut inner_block = inner_cl.to_ast(bytes_ctxt);
+
+                inner_block.prepend_stmts([bind_parser_obj, bind_ref_mut_parser]);
+                inner_block
+            }
+            DerivedLogic::Maybe(is_present, inner_cl) => {
+                let mut if_true = inner_cl.to_ast(ctxt);
+                match if_true.ret {
+                    None => unreachable!(
+                        "UNEXPECTED: inner logic of Format::Maybe context does not have return-value"
+                    ),
+                    Some(expr) => if_true.ret = Some(expr.wrap_some()),
+                }
+                let if_false = GenBlock::simple_expr(RustExpr::local("None"));
+                let ctrl = model::simplifying_if((**is_present).clone(), if_true, Some(if_false));
+                GenBlock::single_expr(ctrl)
+            }
+            DerivedLogic::Permit(inner, expr) => {
+                let rhs = inner.to_ast(ctxt).abstracted_try();
+                let bind_res = GenStmt::assign(model::PERMIT_BIND, rhs);
+                let if_ok = GenBlock::simple_expr(RustExpr::local(model::PERMIT_BIND));
+                let if_err = {
+                    let handle_err = model::permit_err_fallback_value(
+                        (&**expr).clone(),
+                        RustExpr::local(model::PERMIT_ERR),
+                    );
+                    GenBlock::simple_expr(handle_err)
+                };
+                let ctrl = GenExpr::Control(Box::new(RustControl::Match(
+                    Box::new(RustExpr::local(model::PERMIT_BIND)),
+                    RustMatchBody::Irrefutable(
+                        [
+                            (model::match_case_ok_bind(model::PERMIT_BIND), if_ok),
+                            (model::match_case_err_bind(model::PERMIT_ERR), if_err),
+                        ]
+                        .to_vec(),
+                    ),
+                )));
+                let block = GenBlock::from_parts(vec![bind_res], Some(ctrl));
+                block
+            }
+            #[cfg(feature = "format_enforce")]
+            DerivedLogic::Enforce(inner) => {
+                // FIXME[epic=permit-enforce] - because soft-errors are logged transiently without any value-level record that they were encountered, we do not yet have any way of handling Enforce in generated code
+                let ret = inner.to_ast(ctxt);
+                ret
+            }
+            DerivedLogic::VariantOf(constr, inner) => {
+                let bind_inner = GenStmt::assign(model::VARIANT_INNER, inner.to_ast(ctxt));
+                let ret = GenExpr::TyValCon(RustExpr::Struct(
+                    constr.clone(),
+                    StructExpr::Tuple(vec![RustExpr::local(model::VARIANT_INNER)]),
+                ));
+                GenBlock::from_parts(vec![bind_inner], Some(ret))
+            }
+            DerivedLogic::WrapSome(inner) => {
+                let mut inner_block = inner.to_ast(ctxt);
+                if let Some(ret) = inner_block.ret.take() {
+                    inner_block.ret.replace(ret.wrap_some());
+                } else {
+                    unreachable!(
+                        "WrapSome called on non-value-producing GenBlock: {inner_block:?}"
+                    );
+                };
+                inner_block
+            }
+            DerivedLogic::UnitVariantOf(constr, inner) => {
+                let inner_block = inner.to_ast(ctxt);
+                if inner_block.stmts.last().is_some_and(|s| {
+                    matches!(s, GenStmt::Embed(RustStmt::Return(ReturnKind::Keyword, _)))
+                }) {
+                    debug_assert!(
+                        inner_block.ret.is_none(),
+                        "explicit return precedes implicitly returned value in block-scope expression"
+                    );
+                    // NOTE - if the last statement is an explicit return, pass-through as-is because there is no variant to construct
+                    // REVIEW - are all such cases (if any exist) properly considered here?
+                    inner_block
+                } else {
+                    match RustStmt::assign_and_forget(RustExpr::from(inner_block)) {
+                        Some(inner) => GenBlock::lift_block(
+                            [inner],
+                            RustExpr::Struct(constr.clone(), StructExpr::Empty),
+                        ),
+                        None => GenBlock::simple_expr(RustExpr::Struct(
+                            constr.clone(),
+                            StructExpr::Empty,
+                        )),
+                    }
+                }
+            }
+            DerivedLogic::MapOf(f, inner) => {
+                // REVIEW - consider whether there are any issues with shadowing that could occur here
+                let varname = f.get_head_var();
+                let assign_inner = GenStmt::assign(varname.clone(), inner.to_ast(ctxt));
+                // REVIEW - consider repackaging this GenBlock as GenExpr::BlockScope and returning that as a single-expression block
+                GenBlock::from_parts(
+                    vec![assign_inner],
+                    Some(GenExpr::Embed(f.apply(
+                        RustExpr::local(varname.clone()),
+                        ExprInfo::default(),
+                    ))),
+                )
+            }
+            DerivedLogic::Where(f, severity, inner) => {
+                let assign_inner = GenStmt::assign(model::WHERE_INNER, inner.to_ast(ctxt));
+                let is_valid = f.apply(RustExpr::local(model::WHERE_INNER), ExprInfo::default());
+                let bind_cond = GenStmt::Embed(RustStmt::assign(model::WHERE_CHECK, is_valid));
+                let ctrl = {
+                    let b_valid = GenBlock::simple_expr(RustExpr::local(model::WHERE_INNER));
+                    let trace = get_trace(&());
+                    let b_invalid = match severity {
+                        Severity::Require => {
+                            GenBlock::explicit_return(model::err_where_unsatisfied(trace))
+                        }
+                        Severity::Expect => {
+                            let handle_err = model::permit_err_fallback_value(
+                                RustExpr::local(model::WHERE_INNER),
+                                model::err_where_unsatisfied(trace),
+                            );
+                            GenBlock::simple_expr(handle_err)
+                        }
+                    };
+                    GenControl::If(
+                        Box::new(RustExpr::local(model::WHERE_CHECK)),
+                        b_valid,
+                        Some(b_invalid),
+                    )
+                };
+                let stmts = vec![assign_inner, bind_cond];
+                GenBlock::from_parts(stmts, Some(GenExpr::Control(Box::new(ctrl))))
+            }
+            DerivedLogic::Let(name, expr, inner) => {
+                let mut inner_block = inner.to_ast(ctxt);
+                inner_block.prepend_stmt(GenStmt::Embed(RustStmt::assign(
+                    name.clone(),
+                    (**expr).clone(),
+                )));
+                inner_block
+            }
+        }
+    }
+
+    fn depends_on_input(&self) -> bool {
+        match self {
+            // false cases - ignore ctxt and read from value-level data-stream
+            DerivedLogic::DecodeBytes(..) | DerivedLogic::ParseView(..) => false,
+            // inductive cases
+            DerivedLogic::Maybe(_, inner)
+            | DerivedLogic::Where(.., inner)
+            | DerivedLogic::Let(.., inner)
+            | DerivedLogic::MapOf(_, inner)
+            | DerivedLogic::WrapSome(inner)
+            | DerivedLogic::VariantOf(_, inner)
+            | DerivedLogic::UnitVariantOf(_, inner) => inner.depends_on_input(),
+            DerivedLogic::Dynamic(dynamic, inner) => {
+                dynamic.depends_on_input() || inner.depends_on_input()
+            }
+            #[cfg(feature = "format_enforce")]
+            DerivedLogic::Enforce(inner) => inner.depends_on_input(),
+            DerivedLogic::Permit(inner, _) => inner.depends_on_input(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3487,177 +4172,30 @@ enum DynamicLogic<ExprT> {
 impl ToAst for DynamicLogic<GTExpr> {
     type AstElem = RustStmt;
 
-    fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> Self::AstElem {
+    fn to_ast(&self, _: ProdCtxt<'_>) -> Self::AstElem {
         match self {
             DynamicLogic::Huffman(lbl, code_lengths, opt_values_expr) => {
-                let info = ExprInfo::EmbedOwned;
                 let rhs = {
-                    let opt_values_lifted = match opt_values_expr {
-                        None => RustExpr::NONE,
-                        Some(x) => RustExpr::some(embed_expr(x, info)),
-                    };
-                    RustExpr::local("parse_huffman")
-                        .call_with([embed_expr(code_lengths, info), opt_values_lifted])
+                    let lengths = embed_expr_owned(code_lengths);
+                    let opt_values = opt_values_expr.as_ref().map(embed_expr_owned);
+                    model::parse_huffman(lengths, opt_values)
                 };
                 RustStmt::Let(Mut::Immutable, lbl.clone(), None, rhs)
             }
         }
     }
-}
 
-impl ToAst for DerivedLogic<GTExpr> {
-    type AstElem = GenBlock;
-
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
-        match self {
-            DerivedLogic::Dynamic(dyn_logic, inner_cl) => {
-                let GenBlock { mut stmts, ret } = inner_cl.to_ast(ctxt);
-                let _stmts = &mut stmts;
-                let mut stmts = Vec::with_capacity(_stmts.len() + 1);
-                // REVIEW - we need an indexing model that is prepend/append-stable, or an internal method to add GenStmts before/after
-                stmts.push(GenStmt::Embed(dyn_logic.to_ast(ctxt)));
-                stmts.append(_stmts);
-                GenBlock { stmts, ret }
-            }
-            DerivedLogic::DecodeBytes(bytes_expr, inner_cl) => {
-                const INNER_NAME: &str = "reparser";
-
-                // pre-generate local byte-context to parse, and logic to parse inner_cl within it
-                let bytes_ctxt = ProdCtxt {
-                    input_varname: &Cow::Borrowed(INNER_NAME),
-                };
-                let mut inner_block = inner_cl.to_ast(bytes_ctxt);
-
-                // prepend boilerplate for second-phase byte-parsing
-                let persist_parser = GenStmt::Embed(RustStmt::assign_mut(
-                    "tmp",
-                    RustExpr::scoped(["Parser"], "new")
-                        .call_with([RustExpr::vec_as_slice(bytes_expr.clone())]),
-                ));
-                let bind_ref_mut_parser = GenStmt::Embed(RustStmt::assign(
-                    INNER_NAME,
-                    RustExpr::BorrowMut(Box::new(RustExpr::local("tmp"))),
-                ));
-
-                inner_block.prepend_stmts([persist_parser, bind_ref_mut_parser]);
-                inner_block
-            }
-            DerivedLogic::Maybe(is_present, inner_cl) => {
-                let mut if_true = inner_cl.to_ast(ctxt);
-                match if_true.ret {
-                    None => unreachable!("UNEXPECTED: inner logic of Format::Maybe context does not have return-value"),
-                    Some(expr) => if_true.ret = Some(expr.wrap_some()),
-                }
-                let if_false = GenBlock::simple_expr(RustExpr::local("None"));
-                if is_present.is_complex() {
-                    let tmp_var_name = "tmp_is_present";
-
-                    let tmp_bind =
-                        GenStmt::Embed(RustStmt::assign("tmp_is_present", is_present.clone()));
-                    let ctrl = GenExpr::Control(Box::new(RustControl::If(
-                        RustExpr::local(tmp_var_name),
-                        if_true,
-                        Some(if_false),
-                    )));
-                    GenBlock::from_parts(vec![tmp_bind], Some(ctrl))
-                } else {
-                    let ctrl = GenExpr::Control(Box::new(RustControl::If(
-                        is_present.clone(),
-                        if_true,
-                        Some(if_false),
-                    )));
-                    GenBlock::single_expr(ctrl)
-                }
-            }
-            DerivedLogic::VariantOf(constr, inner) => {
-                const BIND_NAME: &str = "inner";
-                let sigbind_inner = GenStmt::assign(
-                    // REVIEW - consider adding a consts module for naming each used binding with greater global visibility
-                    BIND_NAME,
-                    inner.to_ast(ctxt),
-                );
-                let stmts = vec![sigbind_inner];
-                let ret = Some(GenExpr::TyValCon(RustExpr::Struct(
-                    constr.clone(),
-                    StructExpr::TupleExpr(vec![RustExpr::local(BIND_NAME)]),
-                )));
-                GenBlock::from_parts(stmts, ret)
-            }
-            DerivedLogic::WrapSome(inner) => {
-                let mut inner_block = inner.to_ast(ctxt);
-                if let Some(ret) = inner_block.ret.take() {
-                    inner_block.ret.replace(ret.wrap_some());
-                } else {
-                    unreachable!("SomeOf called on non-value-producing GenBlock: {inner_block:?}");
-                };
-                inner_block
-            }
-            DerivedLogic::UnitVariantOf(constr, inner) => {
-                let inner_block = inner.to_ast(ctxt);
-                if inner_block.stmts.last().is_some_and(|s| {
-                    matches!(s, GenStmt::Embed(RustStmt::Return(ReturnKind::Keyword, _)))
-                }) {
-                    debug_assert!(inner_block.ret.is_none(), "explicit return precedes implicitly returned value in block-scope expression");
-                    // NOTE - if the last statement is an explicit return, pass-through as-is because there is no variant to construct
-                    inner_block
-                } else {
-                    match RustStmt::assign_and_forget(RustExpr::from(inner_block)) {
-                        Some(inner) => GenBlock::lift_block(
-                            [inner],
-                            RustExpr::Struct(constr.clone(), StructExpr::EmptyExpr),
-                        ),
-                        None => GenBlock::simple_expr(RustExpr::Struct(
-                            constr.clone(),
-                            StructExpr::EmptyExpr,
-                        )),
-                    }
-                }
-            }
-            DerivedLogic::MapOf(f, inner) => {
-                let varname = f.get_head_var();
-                let assign_inner = GenStmt::assign(varname.clone(), inner.to_ast(ctxt));
-                GenBlock::from_parts(
-                    vec![assign_inner],
-                    // REVIEW - figure out how to mesh GenExpr/GenBlock and GenLambda models
-                    Some(GenExpr::Embed(f.apply(
-                        RustExpr::local(varname.clone()),
-                        ExprInfo::default(),
-                    ))),
-                )
-            }
-            DerivedLogic::Where(f, inner) => {
-                let assign_inner = GenStmt::assign("inner", inner.to_ast(ctxt));
-                let arg = RustExpr::local("inner");
-                let is_valid = f.apply(arg, ExprInfo::default());
-                let bind_cond = GenStmt::Embed(RustStmt::assign("is_valid", is_valid));
-                let ctrl = {
-                    let b_valid = GenBlock::simple_expr(RustExpr::local("inner"));
-                    let b_invalid = GenBlock::explicit_return(RustExpr::err(
-                        RustExpr::scoped(["ParseError"], "FalsifiedWhere")
-                            .call_with([RustExpr::u64lit(get_trace(&()))]),
-                    ));
-                    RustControl::If(RustExpr::local("is_valid"), b_valid, Some(b_invalid))
-                };
-                let stmts = vec![assign_inner, bind_cond];
-                GenBlock::from_parts(stmts, Some(GenExpr::Control(Box::new(ctrl))))
-            }
-            DerivedLogic::Let(name, expr, inner) => {
-                let mut stmts = Vec::new();
-                stmts.push(GenStmt::Embed(RustStmt::assign(name.clone(), expr.clone())));
-                let mut inner_block = inner.to_ast(ctxt);
-                // REVIEW - figure out indexing model that doesn't break on modification
-                stmts.append(&mut inner_block.stmts);
-                GenBlock {
-                    stmts,
-                    ..inner_block
-                }
-            }
-        }
+    fn depends_on_input(&self) -> bool {
+        // NOTE - this is fine because to_ast doesn't capture ctxt and so there can never be any silent divergence
+        false
     }
 }
 
-// ANCHOR[main-fn] - `generate_code` function
-pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment {
+// ANCHOR[epic=main-fn] - `generate_code` function
+/// Generates Rust code for a given `top_format` that is treated as the entry-point into a
+/// format-module `module`. Any formats within `module` that are inaccessible via exploration
+/// of `top_format` may be omitted from the resulting code-output.
+pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment + use<> {
     let mut items = Vec::new();
 
     let Generator {
@@ -3669,80 +4207,181 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     let mut fn_renames = BTreeSet::<Label>::new();
     let type_context = &elaborator.codegen.defined_types[..];
     let src_context = rust_ast::analysis::SourceContext::from(type_context);
-    let mut type_defs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_def| {
+    let mut type_decls = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_decl| {
         elaborator
             .codegen
             .name_gen
             .rev_map
-            .get_key_value(type_def)
+            .get_key_value(type_decl)
             .unwrap()
     }));
-    type_defs.sort_by_key(|(_, (ix, _))| ix);
+    type_decls.sort_by_key(|(_, (ix, _))| ix);
     const HEAP_STRATEGY: HeapStrategy =
         HeapStrategy::new().variant_cutoff(128)
         // .absolute_cutoff(128)
         ;
+    let catalog = catalog::make_index(&type_decls, &sourcemap.decoder_skels);
 
-    for (type_def, (_ix, path)) in type_defs.into_iter() {
+    let type_parse_info = model::traits::object_api::TypeParseInfo {
+        catalog: &catalog,
+        decoders: &sourcemap.decoder_skels,
+    };
+
+    let fixed_format_info = model::traits::smallsorts::FixedFormatInfo {
+        module,
+        targets: &elaborator.codegen.fixed_format_defs,
+        t_formats: &elaborator.t_formats,
+        defined_types: type_context,
+    };
+    // Tracks which `defined_types` indices already have a `ReadUnchecked` impl emitted, so that a
+    // `SpineElem::Indirect` target reachable from more than one array (directly, or recursively
+    // through a `Record` field -- see `ReadUnchecked::generate_impls_for`) only gets one impl in
+    // the final output.
+    let mut read_unchecked_emitted = BTreeSet::<usize>::new();
+
+    // SECTION - type-declaration generation loop
+    for (type_decl, (ix, path)) in type_decls.into_iter() {
         let name = elaborator
             .codegen
             .name_gen
             .ctxt
             .find_name_for(path)
             .expect("no name found");
-        let traits = if type_def.copy_hint(&src_context) {
+        let traits = if type_decl.def.copy_hint(&src_context) {
             // Derive `Copy` if we can statically infer the definition to be compatible with `Copy`
             // TODO - it might be possible to track which LocalDef items have already been marked Copy, but even that isn't perfect if the def follows its first reference
             TraitSet::DebugCopy
         } else {
             TraitSet::DebugClone
         };
-        let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, type_def.clone()), traits);
+        let it = RustItem::pub_decl_with_traits(
+            RustDecl::TypeDef(name.clone(), type_decl.clone()),
+            traits,
+        );
         let comments = {
+            let mut tmp = Vec::new();
             let sz_comment = format!(
                 "expected size: {}",
-                rust_ast::analysis::MemSize::size_hint(type_def, &src_context)
+                rust_ast::analysis::MemSize::size_hint(type_decl, &src_context)
             );
-            let outcome = HeapOptimize::heap_hint(type_def, HEAP_STRATEGY, &src_context);
-            if outcome.0.is_noop() {
-                vec![sz_comment]
-            } else {
-                let heap_comment = format!("heap outcome ({:?}): {:?}", HEAP_STRATEGY, outcome);
-                vec![sz_comment, heap_comment]
+            tmp.push(sz_comment);
+            let outcome = HeapOptimize::heap_hint(type_decl, HEAP_STRATEGY, &src_context);
+            if !outcome.0.is_noop() {
+                let heap_comment = format!("heap outcome ({HEAP_STRATEGY:?}): {outcome:?}");
+                tmp.push(heap_comment);
             }
+            let trait_comment = match catalog.get(*ix) {
+                None => unreachable!("missing key in catalog: {ix}"),
+                Some(dec_ixs) => match dec_ixs.len() {
+                    0 => format!("trait-orphaned: no decoder functions provided"),
+                    1 => {
+                        // TODO - decide on a better scheme but this should work for testing purposes
+                        items.extend(RustItem::from_decls(RustDecl::trait_blocks(
+                            model::traits::object_api::CommonObject::generate_impls(
+                                Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                                    *ix,
+                                    name.clone(),
+                                    type_decl
+                                        .lt_param()
+                                        .map(|lt| Box::new(UseParams::from_lt(lt.clone()))),
+                                )))),
+                                type_parse_info,
+                            ),
+                        )));
+                        format!(
+                            "trait-ready: unique decoder function (d#{})",
+                            dec_ixs.as_ref()[0]
+                        )
+                    }
+                    n => format!(
+                        "trait-unready: multiple ({n}) decoders exist (d#{:?})",
+                        dec_ixs
+                    ),
+                },
+            };
+            tmp.push(trait_comment);
+            if let Some(format_ref) = elaborator.codegen.fixed_format_defs.get(*ix) {
+                let decls = model::traits::impl_standalone_read_unchecked(
+                    Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                        *ix,
+                        name.clone(),
+                        type_decl
+                            .lt_param()
+                            .map(|lt| Box::new(UseParams::from_lt(lt.clone()))),
+                    )))),
+                    fixed_format_info,
+                );
+                // `decls` may include impls for other types reached via a nested
+                // `SpineElem::Indirect` (see `ReadUnchecked::generate_impls_for`); dedupe by the
+                // `defined_types` index each impl is `on_type`'d for, since the same dependency
+                // may be reached from more than one array (directly, or through more than one
+                // `Record` field) across separate iterations of this loop.
+                let mut n_emitted = 0usize;
+                for decl in decls {
+                    let target_ix = match &decl {
+                        RustDecl::TraitImpl(imp) => imp.on_type.as_decl_index(),
+                        _ => None,
+                    };
+                    if target_ix.is_none_or(|t_ix| read_unchecked_emitted.insert(t_ix)) {
+                        items.push(RustItem::from_decl(decl));
+                        n_emitted += 1;
+                    }
+                }
+                tmp.push(format!(
+                    "fixed-format: emits {n_emitted} `ReadUnchecked` impl(s) (format level {})",
+                    format_ref.get_level()
+                ));
+            }
+            tmp
         };
         items.push(it.with_comment(comments));
     }
+    // !SECTION
 
-    for mut decoder_fn in sourcemap.decoder_skels {
+    // SECTION - decoder-function generation loop
+    for (ix, ref mut decoder_fn) in sourcemap.decoder_skels.into_iter().enumerate() {
         decoder_fn.rebind(&table);
-        match &decoder_fn.adhoc_name {
-            Some(name) => {
-                let replacement_name = Label::from(format!("Decoder_{}", sanitize_label(name)));
-                // If the ideal name already exists, prevent it from being reused
-                if fn_renames.contains(&replacement_name) {
-                    let _ = decoder_fn.adhoc_name.take();
-                } else {
-                    fn_renames.insert(replacement_name.clone());
-                    table.insert(decoder_fname(decoder_fn.ixlabel), replacement_name);
-                }
+        if let Some(name) = &decoder_fn.adhoc_name {
+            let replacement_name = Label::from(format!("Decoder_{}", sanitize_label(name)));
+            // If the ideal name already exists, prevent it from being reused
+            if fn_renames.contains(&replacement_name) {
+                let _ = decoder_fn.adhoc_name.take();
+            } else {
+                fn_renames.insert(replacement_name.clone());
+                table.insert(decoder_fname(decoder_fn.ixlabel), replacement_name);
             }
-            None => (),
         };
         let func = decoder_fn.to_ast(ProdCtxt::default());
-        items.push(RustItem::from_decl(RustDecl::Function(func)));
+        items.push(RustItem::from_decl(RustDecl::Function(func)).with_comment([format!("d#{ix}")]));
     }
+    // !SECTION
 
     let mut content = RustProgram::from_iter(items);
     content.add_import(RustImport {
         path: vec!["doodle".into(), "prelude".into()],
         uses: RustImportItems::Wildcard,
     });
+    // content.add_import(RustImport {
+    //     path: vec!["doodle".into(), "alt".into(), "prelude".into()],
+    //     uses: RustImportItems::Wildcard,
+    // });
     content.add_import(RustImport {
         path: vec!["doodle".into()],
         uses: RustImportItems::Singleton(Label::Borrowed("try_sub")),
     });
-    for attr_string in ["non_camel_case_types", "non_snake_case", "dead_code"].into_iter() {
+    for attr_string in [
+        "unused_imports",
+        "non_camel_case_types",
+        "non_snake_case",
+        "dead_code",
+        // `ReadUnchecked::read_unchecked` impls (see `model::traits::smallsorts`) call other
+        // `unsafe fn`s (e.g. `U16Be::read_unchecked`) without wrapping each call in its own
+        // `unsafe {}` block, relying on pre-2024-edition semantics where an `unsafe fn` body is
+        // itself an implicit unsafe block -- same as `smallsorts` (edition 2021) itself does.
+        "unsafe_op_in_unsafe_fn",
+    ]
+    .into_iter()
+    {
         content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
     }
     content.add_module_attr(ModuleAttr::RustFmtSkip);
@@ -3753,27 +4392,23 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     content
 }
 
-#[derive(Clone, Debug)]
-pub struct DecoderFn<ExprT> {
-    adhoc_name: Option<Label>,
-    ixlabel: IxLabel,
-    logic: CaseLogic<ExprT>,
-    extra_args: Option<Vec<(Label, GenType)>>,
-    ret_type: RustType,
-}
-
-impl<ExprT> Rebindable for DecoderFn<ExprT> {
-    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
-        if let Some(ref mut name) = self.adhoc_name {
-            if table.contains_key(&*name) {
-                *name = table.index(&*name).clone();
-            }
-        }
-    }
-}
-
+/// Template-name production function for the default, pre-replacement-pass string to use for a Decoder-Function based on a unique IxLabel.
 fn decoder_fname(ixlabel: IxLabel) -> Label {
     Label::from(format!("Decoder{}", ixlabel.to_usize()))
+}
+
+#[derive(Clone, Debug)]
+pub struct DecoderFn<ExprT> {
+    /// If the return-type for the decoder happens to be a locally-defiend ad-hoc type, stores the raw identifier for said ad-hoc type.
+    adhoc_name: Option<Label>,
+    /// Unique index-based identifier fragment as the canonical identifier before ad-hoc name cribbing or rebinding passes.
+    ixlabel: IxLabel,
+    /// Semi-abstract parse-logic translated from the corresponding `TypedDecoder`.
+    logic: CaseLogic<ExprT>,
+    /// Possibly-none list of arguments, beyond the parse-object (`&mut Parser<'_>`), that the decoder depends on (for value-dependent or view-dependent formats).
+    extra_args: Option<Vec<(Label, GenType)>>,
+    /// RustType of the return-object (what `PResult` ends up being parametrized with).
+    ret_type: RustType,
 }
 
 impl<ExprT> ToAst for DecoderFn<ExprT>
@@ -3785,21 +4420,47 @@ where
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
         let name = decoder_fname(self.ixlabel);
-        let params = DefParams::new();
+
+        // properly capture associated lifetimes of extra arguments
+        let mut arg_lt = None;
+        for (_, t) in self.extra_args.iter().flatten() {
+            // specialize over views only, to avoid deep recursion - we mostly will not see explicit lt-params in any dependency-argument RustType other than `RustType::ViewObject`
+            match t {
+                // if any of the dep-args are a view-object with an associated lifetime, capture that lifetime and store it in `arg_lt`
+                GenType::Inline(RustType::ViewObject(lt)) => {
+                    let _ = arg_lt.insert(lt);
+                    break;
+                }
+                _ => continue,
+            }
+        }
+
+        let this_lt = self.ret_type.lt_param().or(arg_lt);
+        let params = this_lt
+            .as_ref()
+            .map(|lt| DefParams::from_lt(lt.as_ref().clone()));
+        let input_varname = if self.depends_on_input() {
+            "input"
+        } else {
+            "_input"
+        };
         let sig = {
             let args = {
                 let arg0 = {
-                    let name = "_input".into();
                     let ty = {
                         let mut params = RustParams::<RustLt, RustType>::new();
-                        params.push_lifetime(RustLt::Parametric("'_".into()));
+                        if let Some(lt) = this_lt {
+                            params.push_lifetime(lt.clone());
+                        } else {
+                            params.push_lifetime(RustLt::WILD);
+                        }
                         RustType::borrow_of(
                             None,
                             Mut::Mutable,
                             RustType::verbatim("Parser", Some(params)),
                         )
                     };
-                    (name, ty)
+                    (input_varname.into(), ty)
                 };
                 if let Some(ref args) = self.extra_args {
                     Iterator::chain(
@@ -3818,14 +4479,14 @@ where
             };
             FnSig::new(
                 args,
-                Some(RustType::result_of(
+                Some(Box::new(RustType::result_of(
                     self.ret_type.clone(),
                     RustType::imported("ParseError"),
-                )),
+                ))),
             )
         };
         let ctxt = ProdCtxt {
-            input_varname: &Label::from("_input"),
+            input_varname: &Label::from(input_varname),
         };
         // NOTE - this is the last place we can modify the GenBlock before it is manifested as pure RustAST constructs
         let self_block = self.logic.to_ast(ctxt);
@@ -3844,7 +4505,11 @@ where
             stmts
         };
 
-        RustFn::new(name, Some(params), sig, body)
+        RustFn::new(name, params, sig, body)
+    }
+
+    fn depends_on_input(&self) -> bool {
+        self.logic.depends_on_input()
     }
 }
 
@@ -3868,29 +4533,24 @@ pub struct Generator<'a> {
 
 impl<'a> Generator<'a> {
     pub fn compile(module: &'a FormatModule, top_format: &Format) -> Self {
-        let mut tc = TypeChecker::new();
-        let ctxt = crate::typecheck::Ctxt::new(module, &UScope::Empty);
-        let _ = tc
-            .infer_utype_format(top_format, ctxt)
-            .unwrap_or_else(|err| panic!("Failed to infer top-level format type: {err}"));
+        let tc = TypeChecker::infer_module(module, top_format)
+            .unwrap_or_else(|err| panic!("Failed to infer module-wide type annotations: {err}"));
         let mut cgen = Self {
             elaborator: Elaborator::new(module, tc, CodeGen::new()),
             sourcemap: SourceMap::new(),
         };
         let elab = &mut cgen.elaborator;
 
-        let top = elab.elaborate_format(top_format, &TypedDynScope::Empty);
-        // assert_eq!(elab.next_index, elab.tc.size());
-        let prog = GTCompiler::compile_program(module, &top).expect("failed to compile program");
+        let (top, extra) = elab.elaborate_module(module, top_format);
+        let prog =
+            GTCompiler::compile_program(module, &top, &extra).expect("failed to compile program");
         for (ix, (dec_ext, t)) in prog.decoders.iter().enumerate() {
             let dec_fn = {
                 let dec = dec_ext.get_dec();
                 let args = dec_ext.get_args();
                 let dec_gt = dec.get_type();
-                let adhoc_name = dec_gt.and_then(|t| match t.as_ref() {
-                    GenType::Def((_, name), ..) => Some(name.clone()),
-                    _ => None,
-                });
+                let adhoc_name =
+                    dec_gt.and_then(|t| t.try_as_adhoc().map(|(_, name, _)| name.clone()));
                 let cl = elab.codegen.translate(dec);
                 DecoderFn {
                     adhoc_name,
@@ -3923,7 +4583,7 @@ impl<'a> Elaborator<'a> {
         ret
     }
 
-    /// Increment the current `tree_index` by 1.
+    /// Increment the current `next_index` by 1.
     pub fn increment_index(&mut self) {
         self.next_index += 1;
     }
@@ -3953,6 +4613,80 @@ impl<'a> Elaborator<'a> {
         }
     }
 
+    fn elaborate_view_format(&mut self, view_format: &ViewFormat) -> TypedViewFormat<GenType> {
+        match view_format {
+            ViewFormat::CaptureBytes(len) => {
+                // for view_format itself
+                self.increment_index();
+                let t_len = self.elaborate_expr(len);
+                TypedViewFormat::CaptureBytes(Box::new(t_len))
+            }
+            ViewFormat::ReadArray(len, kind) => {
+                self.increment_index();
+                let t_len = self.elaborate_expr(len);
+                let t_kind = self.elaborate_kind(kind);
+                TypedViewFormat::ReadArray(Box::new(t_len), t_kind)
+            }
+            ViewFormat::ReifyView => {
+                self.increment_index();
+                TypedViewFormat::ReifyView
+            }
+        }
+    }
+
+    fn elaborate_kind(&mut self, kind: &FixedReadKind) -> GTFixedReadKind {
+        match kind {
+            FixedReadKind::Base(base_kind) => TypedFixedReadKind::Base(*base_kind),
+            FixedReadKind::FixedFormat(format_ref) => {
+                let level = format_ref.get_level();
+                // Mirrors `Format::ItemVar`'s handling of `t_inner` (below, in
+                // `elaborate_format`): the referenced format is only ever a zero-arg,
+                // zero-view top-level definition -- `record_fmt::analyze_fixed_shape` forbids
+                // anything but a flat record of primitive fields, which rules out formats that
+                // take parameters -- so unlike `ItemVar` there is no argument/view scope to
+                // elaborate here, only the level's own (memoized) body.
+                //
+                // NOTE - this reserves no `next_index`/uvar slot of its own (unlike
+                // `ItemVar`'s `newvar`), matching `typecheck::infer_var_view_format`'s
+                // `FixedFormat` arm, which likewise consumes none beyond what
+                // `infer_var_format_level` lazily assigns to `level`'s own body on first
+                // reference. Consistency between the two lazy, level-keyed caches
+                // (`TypeChecker::level_vars` there, `Elaborator::t_formats` here) is what keeps
+                // this index-alignment-free.
+                self.codegen
+                    .name_gen
+                    .ctxt
+                    .push_atom(NameAtom::Explicit(Label::from(
+                        self.module.get_name(level).to_string(),
+                    )));
+                let t_inner = if let Some(val) = self.t_formats.get(&level) {
+                    val.clone()
+                } else {
+                    let fmt = self.module.get_format(level);
+                    let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
+                    let ret = Rc::new(tmp);
+                    self.t_formats.insert(level, ret.clone());
+                    ret
+                };
+                self.codegen.name_gen.ctxt.escape();
+                let gt = t_inner.get_type().unwrap_or_else(|| {
+                    unreachable!(
+                        "FixedFormat-referenced format `{}` has no type",
+                        self.module.get_name(level),
+                    )
+                });
+                // Record the (defined_types-index -> FormatRef) association so that later,
+                // trait-impl generation (`model::traits::smallsorts::ReadUnchecked`) can recover
+                // the exact per-field primitive-read sequence via `record_fmt::analyze_fixed_shape`,
+                // rather than trying (and failing) to reconstruct it from the RustType alone.
+                if let Some((ix, ..)) = gt.try_as_adhoc() {
+                    self.codegen.register_fixed_format_target(ix, *format_ref);
+                }
+                TypedFixedReadKind::FixedFormat(gt.into_owned(), *format_ref)
+            }
+        }
+    }
+
     fn elaborate_pattern(&mut self, pat: &Pattern) -> TypedPattern<GenType> {
         let index = self.get_and_increment_index();
 
@@ -3970,6 +4704,14 @@ impl<'a> Elaborator<'a> {
             Pattern::Int(bounds) => {
                 let gt = self.get_gt_from_index(index);
                 GTPattern::Int(gt, *bounds)
+            }
+            Pattern::ZConst(z) => {
+                let gt = self.get_gt_from_index(index);
+                GTPattern::ZConst(gt, z.clone())
+            }
+            Pattern::ZRange(zb) => {
+                let gt = self.get_gt_from_index(index);
+                GTPattern::ZRange(gt, zb.clone())
             }
             Pattern::Char(c) => GTPattern::Char(*c),
             Pattern::Tuple(elts) => {
@@ -4062,7 +4804,7 @@ impl<'a> Elaborator<'a> {
 
     fn elaborate_format(&mut self, format: &Format, dyn_scope: &TypedDynScope<'_>) -> GTFormat {
         match format {
-            Format::ItemVar(level, args) => {
+            Format::ItemVar(level, args, views) => {
                 self.codegen
                     .name_gen
                     .ctxt
@@ -4074,15 +4816,44 @@ impl<'a> Elaborator<'a> {
 
                 self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let mut t_args = Vec::with_capacity(args.len());
-                for ((lbl, _), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
+                for ((lbl, ty), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
                     let t_arg = self.elaborate_expr(arg);
                     t_args.push((lbl.clone(), t_arg));
+                    self.force_unify_against_valuetype(ty);
                 }
                 self.codegen.name_gen.ctxt.escape();
+
+                // TODO[epic=view-dependent-formats] - figure out what needs to be done here, beyond a simple clone
+                let fm_views = &self.module.views[*level];
+                let mut t_views = Vec::with_capacity(views.len());
+                for (lbl, view) in Iterator::zip(fm_views.iter(), views.iter()) {
+                    let t_view = self.elaborate_view_expr(view);
+                    t_views.push((lbl.clone(), t_view));
+                }
 
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
                 } else {
+                    // Reserve a placeholder *before* recursing into the level's own body, so
+                    // that a self-reference reached during that recursion (which can only ever
+                    // occur inside a `Format::Phantom`, the one place `ItemVar` may validly name
+                    // its own not-yet-elaborated level) resolves to this placeholder instead of
+                    // re-entering this same call and recursing without bound.
+                    //
+                    // Unlike the analogous fix in `TypeChecker::infer_var_format_level`, the
+                    // placeholder's *content* is never actually consulted by anything that cares:
+                    // `GTCompiler::compile_gt_format` discards a `FormatCall` node's `t_inner`
+                    // whenever `decoder_map` already has an entry for that level, and a level's
+                    // entry is always inserted into `decoder_map` at the point its `FormatCall`
+                    // node is *discovered*, before its body is ever walked (body-walking is
+                    // deferred via `compile_queue`) - so by the time a self-reference nested in
+                    // that body is reached, the real entry is already present and this
+                    // placeholder is never read. `Format::from`'s reverse conversion likewise
+                    // discards `t_inner` entirely when reconstructing `Format::ItemVar`. This
+                    // insertion also performs no index/`UVar`-style allocation of its own, so it
+                    // cannot desynchronize the lockstep invariant with `TypeChecker`.
+                    let placeholder = Rc::new(TypedFormat::Fail);
+                    self.t_formats.insert(*level, placeholder);
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
                     let ret = Rc::new(tmp);
@@ -4091,7 +4862,7 @@ impl<'a> Elaborator<'a> {
                 };
                 let gt = self.get_gt_from_index(index);
                 self.codegen.name_gen.ctxt.escape();
-                TypedFormat::FormatCall(gt, *level, t_args, t_inner)
+                TypedFormat::FormatCall(gt, *level, t_args, t_views, t_inner)
             }
             Format::ForEach(expr, lbl, inner) => {
                 let index = self.get_and_increment_index();
@@ -4112,6 +4883,15 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::DecodeBytes(gt, Box::new(t_expr), Box::new(t_inner))
             }
+            Format::ParseFromView(view, inner) => {
+                let index = self.get_and_increment_index();
+
+                let t_view = self.elaborate_view_expr(view);
+
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::ParseFromView(gt, t_view, Box::new(t_inner))
+            }
             Format::Fail => {
                 self.increment_index();
                 TypedFormat::Fail
@@ -4129,8 +4909,9 @@ impl<'a> Elaborator<'a> {
                 TypedFormat::Align(*n)
             }
             Format::Pos => {
-                self.increment_index();
-                TypedFormat::Pos
+                let index = self.get_and_increment_index();
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Pos(gt)
             }
             Format::Byte(bs) => {
                 self.increment_index();
@@ -4150,10 +4931,10 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Enum)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[{}]: {gt:?}", index);
-                        eprintln!("[{}]: {after:?}", index + 1);
+                        log::debug!("Possible frame-shift error around {index} (looking for Enum)");
+                        log::debug!("[{}]: {before:?}", index - 1);
+                        log::debug!("[{index}]: {gt:?}");
+                        log::debug!("[{}]: {after:?}", index + 1);
                         // unreachable!("found non-adhoc type for variant format elaboration: {gt:?} @ {index} ({label}({inner:?})");
                     }
                 }
@@ -4269,12 +5050,7 @@ impl<'a> Elaborator<'a> {
             Format::Maybe(cond, inner) => {
                 let index = self.get_and_increment_index();
                 let t_cond = self.elaborate_expr(cond);
-                self.codegen
-                    .name_gen
-                    .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Yes));
                 let t_inner = self.elaborate_format(inner, dyn_scope);
-                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Maybe(gt, Box::new(t_cond), Box::new(t_inner))
             }
@@ -4317,27 +5093,47 @@ impl<'a> Elaborator<'a> {
                 )
             }
             Format::Map(inner, lambda) => {
-                // FIXME - adhoc types introduced by Map are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced by Map are properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
                     .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                    .push_atom(NameAtom::Derived(Derivation::Lhs));
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Map(gt, Box::new(t_inner), Box::new(t_lambda))
             }
-            Format::Where(inner, lambda) => {
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Enforce(gt, Box::new(t_inner))
+            }
+            Format::Permit(inner, dft) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let t_dft = self.elaborate_expr(dft);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Permit(gt, Box::new(t_inner), Box::new(t_dft))
+            }
+            Format::Where(inner, cond) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                // FIXME[epic=with-err] - implement with-err support appropriately.
+                let lambda = &cond.expr;
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Where(gt, Box::new(t_inner), Box::new(t_lambda))
+                TypedFormat::Where(
+                    gt,
+                    Box::new(t_inner),
+                    TypedCondition::new(t_lambda, cond.severity),
+                )
             }
             Format::Compute(expr) => {
-                // FIXME - adhoc types introduced by Compute are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced by Compute are properly path-named
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let gt = self.get_gt_from_index(index);
@@ -4349,6 +5145,12 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Let(gt, lbl.clone(), Box::new(t_expr), Box::new(t_inner))
+            }
+            Format::LetView(ident, inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::LetView(gt, ident.clone(), Box::new(t_inner))
             }
             Format::Match(x, branches) => {
                 let index = self.get_and_increment_index();
@@ -4390,7 +5192,7 @@ impl<'a> Elaborator<'a> {
                 TypedFormat::Apply(gt, lbl.clone(), t_dynf)
             }
             Format::LetFormat(f0, name, f) => {
-                // FIXME - adhoc types introduced in LetFormat are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced in LetFormat are properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
@@ -4403,12 +5205,12 @@ impl<'a> Elaborator<'a> {
                 TypedFormat::LetFormat(gt, Box::new(t_f0), name.clone(), Box::new(t_f))
             }
             Format::MonadSeq(f0, f) => {
-                // FIXME - adhoc types introduced in MonadSeq are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced in MonadSeq are properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
                     .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                    .push_atom(NameAtom::Derived(Derivation::Lhs));
                 let t_f0 = self.elaborate_format(f0, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let t_f = self.elaborate_format(f, dyn_scope);
@@ -4426,15 +5228,40 @@ impl<'a> Elaborator<'a> {
                             None => {
                                 let before = self.get_gt_from_index(index - 1);
                                 let after = self.get_gt_from_index(index + 1);
-                                eprintln!("Possible frame-shift error around {index} (looking for Struct)");
-                                eprintln!("[{}]: {before:?}", index - 1);
-                                eprintln!("[{}]: {gt:?}", index);
-                                eprintln!("[{}]: {after:?}", index + 1);
+                                log::debug!(
+                                    "StyleHint::Record found non-adhoc type for record format elaboration; possible frame-shift error around {index})"
+                                );
+                                log::info!("error encountered on elaboration of: {format:?}");
+                                log::debug!("[{}]: {before:?}", index - 1);
+                                log::debug!("[index]: {gt:?}");
+                                log::debug!("[{}]: {after:?}", index + 1);
                                 // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
                             }
                         }
                     }
-                    StyleHint::AsciiStr => (),
+                    StyleHint::AsciiStr => {
+                        // REVIEW - should we check for Seq(u8)-like types?
+                    }
+                    StyleHint::AsciiChar => {
+                        // REVIEW - should we check for u8-like types?
+                    }
+                    StyleHint::Common(common_op) => match common_op {
+                        CommonOp::EndianParse(base_kind) => {
+                            // double-check the base kind against the type
+                            // FIXME - extract into proper method that can then support future common-ops more adequately
+                            let ty = gt.to_rust_type();
+                            let prim1 = PrimType::from(BaseType::from(*base_kind));
+                            let Some(prim0) = ty.try_as_prim() else {
+                                unreachable!(
+                                    "found non-primitive type for common format elaboration: {ty:?} @ {index} (expected {prim1:?})"
+                                );
+                            };
+                            assert_eq!(
+                                prim0, prim1,
+                                "CommonOp: actual inner-parse type ({prim0:?}) does not match claimed type ({prim1:?})"
+                            );
+                        }
+                    },
                 }
                 TypedFormat::Hint(gt, style_hint.clone(), Box::new(t_inner))
             }
@@ -4451,15 +5278,86 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::LiftedOption(gt, inner)
             }
+            Format::WithView(view, view_format) => {
+                let index = self.get_and_increment_index();
+                let t_view = self.elaborate_view_expr(view);
+                let t_view_format = self.elaborate_view_format(view_format);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::WithView(gt, t_view, t_view_format)
+            }
+            Format::Phantom(inner) => {
+                let index = self.get_and_increment_index();
+
+                // Avoid reaching garden-path type-names by pruning anonymous descendants
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                self.codegen.name_gen.ctxt.escape();
+
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Phantom(gt, Box::new(t_inner))
+            }
         }
     }
 
     fn get_gt_from_index(&mut self, index: usize) -> GenType {
         let var = UVar::new(index);
-        let Some(vt) = self.tc.reify(var.into()) else {
-            unreachable!("unable to reify {var}")
-        };
-        self.codegen.lift_type(&vt)
+        self.codegen.lift_uvar(
+            &self.tc,
+            var,
+            &RustLt::Parametric(Label::Borrowed(model::DEFAULT_LT)),
+        )
+    }
+
+    fn elaborate_num_tree(&mut self, n_expr: &NumExpr) -> TypedNumExpr<GenType> {
+        let index = self.get_and_increment_index();
+        match n_expr {
+            NumExpr::Const(typed_const) => {
+                let t = self.get_gt_from_index(index);
+                TypedNumExpr::ElabConst(t, typed_const.clone())
+            }
+            NumExpr::BinOp(bin_op, x, y) => {
+                let t_x = self.elaborate_num_tree(x);
+                let t_y = self.elaborate_num_tree(y);
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabBinOp(
+                    gt.clone(),
+                    TypedBinOp {
+                        sig: ((t_x.get_type().clone(), t_y.get_type().clone()), gt),
+                        inner: *bin_op,
+                    },
+                    Box::new(t_x),
+                    Box::new(t_y),
+                )
+            }
+            NumExpr::UnaryOp(unary_op, inner) => {
+                let t_inner = self.elaborate_num_tree(inner);
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabUnaryOp(
+                    gt.clone(),
+                    TypedUnaryOp {
+                        sig: (t_inner.get_type().clone(), gt),
+                        inner: *unary_op,
+                    },
+                    Box::new(t_inner),
+                )
+            }
+            &NumExpr::Cast(op, ref inner) => {
+                let t_inner = self.elaborate_num_tree(inner);
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabCast(
+                    gt.clone(),
+                    TypedCast {
+                        sig: (t_inner.get_type().clone(), gt),
+                        op,
+                    },
+                    Box::new(t_inner),
+                )
+            }
+            NumExpr::NumVar(name) => {
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabNumVar(gt, name.clone())
+            }
+        }
     }
 
     fn elaborate_expr(&mut self, expr: &Expr) -> GTExpr {
@@ -4477,6 +5375,11 @@ impl<'a> Elaborator<'a> {
             Expr::U16(n) => TypedExpr::U16(*n),
             Expr::U32(n) => TypedExpr::U32(*n),
             Expr::U64(n) => TypedExpr::U64(*n),
+            Expr::Numeric(n) => {
+                let elab_n = self.elaborate_num_tree(n);
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::Numeric(gt, Box::new(elab_n))
+            }
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 self.codegen
@@ -4528,10 +5431,12 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Struct)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[{}]: {gt:?}", index);
-                        eprintln!("[{}]: {after:?}", index + 1);
+                        log::debug!(
+                            "Possible frame-shift error around {index} (looking for Struct)"
+                        );
+                        log::debug!("[{}]: {before:?}", index - 1);
+                        log::debug!("[index]: {gt:?}");
+                        log::debug!("[{}]: {after:?}", index + 1);
                         // unreachable!("found non-adhoc type for expr record elaboration: {gt:?} @ {index} ({flds:#?})");
                     }
                 }
@@ -4605,10 +5510,10 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Enum)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[{}]: {gt:?}", index);
-                        eprintln!("[{}]: {after:?}", index + 1);
+                        log::debug!("Possible frame-shift error around {index} (looking for Enum)");
+                        log::debug!("[{}]: {before:?}", index - 1);
+                        log::debug!("[index]: {gt:?}");
+                        log::debug!("[{}]: {after:?}", index + 1);
                         // unreachable!("found non-adhoc type for expr variant elaboration: {gt:?} @ {index} ({lbl}({inner?}))");
                     }
                 }
@@ -4849,13 +5754,107 @@ impl<'a> Elaborator<'a> {
             _ => unreachable!("elaborate_expr_lambda: unexpected non-lambda {expr:?}"),
         }
     }
+
+    fn elaborate_view_expr(&mut self, view: &ViewExpr) -> TypedViewExpr<GenType> {
+        match view {
+            ViewExpr::Var(lbl) => TypedViewExpr::Var(lbl.clone()),
+            ViewExpr::Offset(base, offs) => {
+                let t_base = self.elaborate_view_expr(base);
+                let t_offs = self.elaborate_expr(offs);
+                TypedViewExpr::Offset(Box::new(t_base), Box::new(t_offs))
+            }
+        }
+    }
+
+    /// NOTE - this *MUST* be kept in lockstep with [`TypeChecker::infer_module`]
+    fn elaborate_module(&mut self, module: &'a FormatModule, top_format: &Format) -> ElabForest {
+        let dyn_s = TypedDynScope::Empty;
+
+        let mut unexplored = BTreeSet::from_iter(0..module.formats.len());
+        let top = self.elaborate_format(top_format, &dyn_s);
+
+        let mut seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();
+        for already_seen in seen_levels.iter() {
+            unexplored.remove(already_seen);
+        }
+
+        let mut extra = Vec::new();
+
+        loop {
+            let Some(next_level) = unexplored.pop_first() else {
+                break;
+            };
+
+            // instantiate proper name-scope for extra levels
+            self.codegen
+                .name_gen
+                .ctxt
+                .push_atom(NameAtom::Explicit(Label::from(
+                    self.module.get_name(next_level).to_string(),
+                )));
+            let local_root = self.elaborate_format(module.get_format(next_level), &dyn_s);
+            // clean-up
+            self.codegen.name_gen.ctxt.escape();
+
+            extra.push(local_root);
+            let all_seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();
+            for just_seen in all_seen_levels.difference(&seen_levels) {
+                unexplored.remove(just_seen);
+            }
+            seen_levels = all_seen_levels;
+        }
+        (top, extra)
+    }
+
+    fn force_unify_against_valuetype(&mut self, vt: &ValueType) {
+        match UType::from_valuetype(vt) {
+            Some(_) => (),
+            _ => match vt {
+                ValueType::Union(branches) => self.force_unify_against_valuetype_union(branches),
+                ValueType::Record(fs) => {
+                    for (_, fvt) in fs.iter() {
+                        self.increment_index();
+                        self.force_unify_against_valuetype(fvt);
+                    }
+                }
+                ValueType::Tuple(ts) => {
+                    for t in ts.iter() {
+                        self.increment_index();
+                        self.force_unify_against_valuetype(t);
+                    }
+                }
+                ValueType::Seq(inner) | ValueType::Option(inner) => {
+                    self.increment_index();
+                    self.force_unify_against_valuetype(inner);
+                }
+                other => unreachable!(
+                    "force_unify_against_valuetype hit non-nested ValueType: {other:?}"
+                ),
+            },
+        }
+    }
+
+    fn force_unify_against_valuetype_union<'b>(
+        &mut self,
+        branches: impl IntoIterator<Item = (&'b Label, &'b ValueType)> + 'b,
+    ) {
+        for (_, branch_vt) in branches.into_iter() {
+            if let None = UType::from_valuetype(branch_vt) {
+                self.increment_index();
+                self.force_unify_against_valuetype(branch_vt);
+            }
+        }
+    }
 }
+
+type ElabForest = (GTFormat, Vec<GTFormat>);
 
 type GTFormat = TypedFormat<GenType>;
 type GTExpr = TypedExpr<GenType>;
 type GTPattern = TypedPattern<GenType>;
 
 type GTDynFormat = TypedDynFormat<GenType>;
+type GTFixedReadKind = TypedFixedReadKind<GenType>;
 
 #[derive(Clone, Debug, PartialEq)]
 enum TypedDynScope<'a> {
@@ -4901,22 +5900,230 @@ impl<'a> TypedDynScope<'a> {
     }
 }
 
+mod __impls {
+    use super::*;
+
+    impl<'a> Default for ProdCtxt<'a> {
+        fn default() -> Self {
+            Self {
+                input_varname: &Cow::Borrowed(""),
+            }
+        }
+    }
+
+    // SECTION - upcasts and conversions to Gen{Stmt,Expr,Block}
+    impl From<RustExpr> for GenBlock {
+        fn from(value: RustExpr) -> Self {
+            GenBlock {
+                stmts: Vec::new(),
+                ret: Some(GenExpr::Embed(value)),
+            }
+        }
+    }
+
+    impl From<GenExpr> for GenBlock {
+        fn from(value: GenExpr) -> Self {
+            GenBlock {
+                stmts: Vec::new(),
+                ret: Some(value),
+            }
+        }
+    }
+
+    impl From<GenControl> for GenBlock {
+        fn from(value: GenControl) -> Self {
+            GenBlock {
+                stmts: Vec::new(),
+                ret: Some(GenExpr::Control(Box::new(value))),
+            }
+        }
+    }
+
+    impl From<GenControl> for GenExpr {
+        fn from(value: GenControl) -> Self {
+            GenExpr::Control(Box::new(value))
+        }
+    }
+
+    impl From<Vec<GenStmt>> for GenBlock {
+        fn from(stmts: Vec<GenStmt>) -> Self {
+            GenBlock { stmts, ret: None }
+        }
+    }
+
+    impl From<RustStmt> for GenStmt {
+        fn from(value: RustStmt) -> Self {
+            GenStmt::Embed(value)
+        }
+    }
+
+    impl From<RustExpr> for GenStmt {
+        fn from(value: RustExpr) -> Self {
+            GenStmt::Expr(GenExpr::Embed(value))
+        }
+    }
+
+    impl From<GenExpr> for GenStmt {
+        fn from(value: GenExpr) -> Self {
+            GenStmt::Expr(value)
+        }
+    }
+
+    impl From<RustControl<GenBlock>> for GenStmt {
+        fn from(value: RustControl<GenBlock>) -> Self {
+            GenStmt::Expr(GenExpr::Control(Box::new(value)))
+        }
+    }
+
+    impl From<RustExpr> for GenExpr {
+        fn from(value: RustExpr) -> Self {
+            GenExpr::Embed(value)
+        }
+    }
+    // !SECTION
+
+    // SECTION - downcasts and conversions to Rust{Stmt,Expr}
+    impl From<GenBlock> for RustExpr {
+        fn from(value: GenBlock) -> Self {
+            let (stmts, ret) = value.synthesize();
+
+            // REVIEW - do we always want an explicit Unit here?
+            let val = ret.unwrap_or(RustExpr::Void);
+
+            if stmts.is_empty() {
+                val
+            } else {
+                RustExpr::BlockScope(stmts, Box::new(val))
+            }
+        }
+    }
+
+    impl From<GenBlock> for Vec<RustStmt> {
+        fn from(value: GenBlock) -> Vec<RustStmt> {
+            value.flatten()
+        }
+    }
+
+    impl From<GenStmt> for RustStmt {
+        fn from(value: GenStmt) -> Self {
+            match value {
+                GenStmt::Expr(gen_expr) => RustStmt::Expr(RustExpr::from(gen_expr)),
+                GenStmt::Embed(stmt) => stmt,
+                GenStmt::BindOnce(bind_name, block) => RustStmt::assign(bind_name, block.into()),
+            }
+        }
+    }
+
+    impl From<GenExpr> for RustExpr {
+        fn from(value: GenExpr) -> Self {
+            match value {
+                GenExpr::BlockScope(block) => RustExpr::from(*block),
+                GenExpr::Embed(expr) | GenExpr::TyValCon(.., expr) => expr,
+                GenExpr::Control(ctrl) => {
+                    RustExpr::Control(Box::new(RustControl::translate(*ctrl)))
+                }
+                GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
+                GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
+                GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
+                GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
+                GenExpr::CallThunk(thunk) => {
+                    let closure = if thunk.thunk_body.ret.is_none() {
+                        RustClosure::thunk_body(thunk.thunk_body.flatten())
+                    } else {
+                        RustClosure::thunk_expr(RustExpr::from(thunk.thunk_body))
+                    };
+                    RustExpr::Closure(closure).call()
+                }
+            }
+        }
+    }
+    // !SECTION
+
+    impl From<&ByteSet> for ByteCriterion {
+        fn from(value: &ByteSet) -> Self {
+            if value.is_full() {
+                ByteCriterion::Any
+            } else {
+                match value.len() {
+                    1 => {
+                        let elt = value.min_elem().expect("len == 1 but no min_elem");
+                        ByteCriterion::MustBe(elt)
+                    }
+                    255 => {
+                        let elt = (!value)
+                            .min_elem()
+                            .expect("len == 255 but no min_elem (on negation)");
+                        ByteCriterion::OtherThan(elt)
+                    }
+                    2..=254 => ByteCriterion::WithinSet(*value),
+                    other => unreachable!("unexpected byteset len in catch-all: {other}"),
+                }
+            }
+        }
+    }
+
+    impl ShortCircuit for GenBlock {
+        fn is_short_circuiting(&self) -> bool {
+            self.stmts.is_short_circuiting()
+                || self.ret.as_ref().is_some_and(GenExpr::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuit for GenStmt {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                GenStmt::Expr(gen_expr) => gen_expr.is_short_circuiting(),
+                GenStmt::Embed(stmt) => stmt.is_short_circuiting(),
+                GenStmt::BindOnce(_, block) => block.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl ShortCircuit for GenExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                GenExpr::Embed(expr) => expr.is_short_circuiting(),
+                GenExpr::TyValCon(expr) => expr.is_short_circuiting(),
+                GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
+                GenExpr::ResultOk(.., expr)
+                | GenExpr::ResultErr(expr)
+                | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
+                GenExpr::BlockScope(block) => block.is_short_circuiting(),
+                GenExpr::Try(..) => true,
+                GenExpr::CallThunk(..) => false,
+            }
+        }
+    }
+
+    impl<ExprT> Rebindable for DecoderFn<ExprT> {
+        fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+            if let Some(ref mut name) = self.adhoc_name {
+                if table.contains_key(&*name) {
+                    *name = table.index(&*name).clone();
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helper::{compute, record, ANY_BYTE};
-    use crate::{typecheck::Ctxt, TypeHint};
+    use crate::BaseKind;
+    use crate::TypeHint;
+    use crate::helper::{ANY_BYTE, compute, record, succ, var};
+    use crate::numeric::MachineRep;
+    use proptest::prelude::*;
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
-        let mut tc = TypeChecker::new();
-        let _fv = tc.infer_var_format(f, Ctxt::new(module, &UScope::Empty));
+        let tc = TypeChecker::infer_module(module, f).unwrap();
         let tc_pop = tc.size();
 
         // println!("{tc:?}");
 
         let cg = CodeGen::new();
         let mut tv = Elaborator::new(module, tc, cg);
-        let dec_f = tv.elaborate_format(f, &TypedDynScope::Empty);
+        let (dec_f, _extra) = tv.elaborate_module(module, f);
         let re_f = Format::from(dec_f.clone());
         assert_eq!(
             &re_f,
@@ -4941,6 +6148,8 @@ mod tests {
         );
     }
 
+    /// Returns a string containing the generated code for the given format and any registerd
+    /// subformats thereof within `module`.
     fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
         generate_code(module, f).to_fragment().to_string()
     }
@@ -5039,12 +6248,161 @@ mod tests {
         let fxs = compute(Expr::FlatMapAccum(
             Box::new(ix_dup),
             Box::new(Expr::U32(1)),
-            TypeHint::from(ValueType::Base(BaseType::U32)),
+            TypeHint::from(crate::ValueType::from(
+                crate::valuetype::augmented::AugValueType::from(BaseType::U32),
+            )),
             Box::new(Expr::Var("xs".into())),
         ));
 
         let f = Format::record(vec![("xs", xs), ("fxs", fxs)]);
         run_headcount(&[("test.compute_complex", f)]);
+    }
+
+    /// Builds the smallest module that exercises `FormatModule::define_format_phantom_rec`'s
+    /// intended use-case: a format that refers to itself solely underneath a `Format::Phantom`.
+    ///
+    /// Registration itself (via [`FormatModule::define_format_phantom_rec`]) succeeds - see
+    /// `crate::test::format_phantom_rec_registers_and_decodes` - and so does decoding via the
+    /// plain (untyped) `decoder::Compiler`. The blockers watermarked below are specific to the
+    /// *codegen* pipeline (`codegen::TypeChecker`/`codegen::Elaborator`), not registration or
+    /// plain decoding.
+    fn make_phantom_rec_module() -> (FormatModule, Format) {
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.phantom_rec",
+            |phantom_field| {
+                Format::record(vec![
+                    ("tag", Format::Byte(ByteSet::full())),
+                    ("child", phantom_field),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+        let f = self_ref.call();
+        (module, f)
+    }
+
+    /// Like `make_phantom_rec_module`, but with an extra field that genuinely needs a borrowed
+    /// lifetime (`ReadArray`) alongside the self-referencing one - used to confirm that the
+    /// self-reference itself never *causes* a lifetime parameter to be added (see
+    /// `phantom_rec_full_pipeline_repro`'s generated `test_phantom_rec`, which has none), while a
+    /// genuine need elsewhere in the same recursive type is still correctly detected and
+    /// consistently threaded through both the recursive reference and the type's own definition.
+    fn make_phantom_rec_module_with_borrow() -> (FormatModule, Format) {
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.phantom_rec_borrow",
+            |phantom_field| {
+                Format::record(vec![
+                    ("tag", Format::Byte(ByteSet::full())),
+                    (
+                        "arr",
+                        crate::helper::from_here(crate::helper::read_array(
+                            Expr::U8(3),
+                            BaseKind::U8,
+                        )),
+                    ),
+                    ("child", phantom_field),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+        let f = self_ref.call();
+        (module, f)
+    }
+
+    #[test]
+    fn phantom_rec_with_genuine_borrow_gets_lifetime() {
+        let (module, f) = make_phantom_rec_module_with_borrow();
+        let output = produce_string_gencode(&module, &f);
+        assert!(
+            output.contains("'input"),
+            "expected a lifetime parameter threaded through the recursive type, found none:\n{output}"
+        );
+    }
+
+    /// Like `make_phantom_rec_module`, but a self-referential `Union` (the shape relevant to the
+    /// real motivating case, COLRv1's `PaintTable`, a multi-branch alternation) rather than a
+    /// `Record`.
+    fn make_phantom_rec_union_module() -> (FormatModule, Format) {
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.phantom_rec_union",
+            |phantom_field| {
+                Format::Union(vec![
+                    Format::Variant(
+                        Label::Borrowed("Leaf"),
+                        Box::new(Format::Byte(ByteSet::full())),
+                    ),
+                    Format::Variant(Label::Borrowed("Node"), Box::new(phantom_field)),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+        let f = self_ref.call();
+        (module, f)
+    }
+
+    #[test]
+    fn phantom_rec_union_full_pipeline() {
+        let (module, f) = make_phantom_rec_union_module();
+        let output = produce_string_gencode(&module, &f);
+        assert!(!output.is_empty());
+        assert!(
+            !output.contains("'input"),
+            "no field here genuinely needs a lifetime - the self-reference alone shouldn't add one:\n{output}"
+        );
+    }
+
+    /// Regression test for the type-checking blocker against `define_format_phantom_rec`-defined
+    /// formats: `TypeChecker::infer_var_format_level` used to populate its `level_vars` cache only
+    /// *after* recursively inferring a level's own body, so a self-reference reached during that
+    /// recursion (necessarily confined within a `Format::Phantom`) found nothing cached and
+    /// recursed again without bound - this overflowed the stack and aborted the process outright
+    /// (not a catchable `panic!`/`Result::Err`). Fixed by seeding the cache with a placeholder
+    /// `UVar` *before* recursing (see `infer_var_format_level`'s doc comment).
+    ///
+    /// This test used to require `--ignored` and a subprocess-based watermark to observe its
+    /// failure safely (a stack overflow can't be asserted against directly); now that the blocker
+    /// is fixed, it runs as an ordinary test.
+    #[test]
+    fn phantom_rec_typecheck_resolves() {
+        let (module, f) = make_phantom_rec_module();
+        let tc = TypeChecker::infer_module(&module, &f).expect("infer_module failed");
+        assert!(tc.size() > 0);
+    }
+
+    /// Regression test for the full codegen pipeline (type-checking, then elaboration, then
+    /// codegen proper) against `define_format_phantom_rec`-defined formats.
+    ///
+    /// This exercised three distinct instances of the same bug class in turn, each fixed the same
+    /// way (reserve a placeholder in the relevant cache *before* recursing into a level's own
+    /// body, rather than inserting the real value only after):
+    /// - `TypeChecker::infer_var_format_level`'s `level_vars` cache (see
+    ///   `phantom_rec_typecheck_resolves` above).
+    /// - `Elaborator::elaborate_format`'s `t_formats` cache.
+    /// - `CodeGen::lift_uvar`'s `self.metavariables` cache (`Expansion::Record`/`Expansion::Union`
+    ///   handling) - empirically confirmed via depth-limited instrumentation to cycle
+    ///   `UVar(0) -> UVar(3) -> UVar(5) -> UVar(0) -> ...`. This last one needed a different
+    ///   shape of fix than the other two: `NameGen`'s naming cache (`rev_map`) is keyed by the
+    ///   *structural content* of a `RustTypeDecl`, not by `UVar`, so a naive placeholder-decl
+    ///   insert would get assigned a different name/index than the real decl once it's complete
+    ///   (different content -> different hash) - silently wrong codegen, not just a crash. The
+    ///   fix instead reserves a name/index from the active naming-context path up front (see
+    ///   `NameGen::reserve_name`/`commit_reservation`), before the real decl is known.
+    ///
+    /// A further subtlety specific to this last fix: a bare self-reference must never by itself
+    /// justify giving the type a lifetime parameter - forcing one unconditionally produces a
+    /// struct/enum whose lifetime parameter is otherwise unused (rustc E0392) whenever nothing
+    /// else in the type borrows anything. See `var_needs_lifetime` and the dedicated regression
+    /// tests `phantom_rec_with_genuine_borrow_gets_lifetime` and `phantom_rec_union_full_pipeline`
+    /// below, which check both directions (a genuine borrow elsewhere still gets a lifetime;
+    /// recursion alone does not).
+    #[test]
+    fn phantom_rec_full_pipeline_repro() {
+        let (module, f) = make_phantom_rec_module();
+        let output = produce_string_gencode(&module, &f);
+        assert!(!output.is_empty());
     }
 
     #[test]
@@ -5060,10 +6418,19 @@ mod tests {
     }
 
     #[test]
+    fn test_embed_expr_unit_variant() {
+        let f = Format::Variant(Label::Borrowed("Empty"), Box::new(Format::EMPTY));
+        let mut module = FormatModule::new();
+        module.define_format("test.empty", f.clone());
+        let output = produce_string_gencode(&module, &f);
+        println!("{}", output);
+    }
+
+    #[test]
     fn test_lambda_sanity() {
         const TU16: RustType = RustType::Atom(AtomType::Prim(PrimType::U16));
         const TU8: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8)));
-        const GTBOOL: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)));
+        const GEN_BOOL: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)));
         let lambda = {
             let names = ["totlen", "seq"];
             let body = {
@@ -5072,7 +6439,7 @@ mod tests {
                     TU8,
                     Label::Borrowed("point_count"),
                 )));
-                TypedExpr::IntRel(GTBOOL, IntRel::Gte, Box::new(x), Box::new(y))
+                TypedExpr::IntRel(GEN_BOOL, IntRel::Gte, Box::new(x), Box::new(y))
             };
             const HEAD_VAR: &str = "tuple_var";
             {
@@ -5094,7 +6461,7 @@ mod tests {
                         ),
                         body,
                     )];
-                    TypedExpr::Match(GTBOOL, Box::new(head), Vec::from_iter(branches))
+                    TypedExpr::Match(GEN_BOOL, Box::new(head), Vec::from_iter(branches))
                 };
 
                 GenLambda::new(
@@ -5134,5 +6501,219 @@ mod tests {
         let outer = module.define_format("test.outer", record([("inner", inner.call())]));
         let output = produce_string_gencode(&module, &outer.call());
         println!("{}", output);
+    }
+
+    #[test]
+    fn test_read_unchecked_generate_impl() {
+        use crate::helper::{base::u16be, record};
+        use intmap::IntMap;
+        use model::traits::smallsorts::{FixedFormatInfo, ReadUnchecked};
+
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+
+        let mut targets = IntMap::new();
+        targets.insert(0usize, point);
+        // `point`'s fields are both `Raw`, so `t_formats`/`defined_types` are never actually
+        // consulted here -- left empty rather than threading a real `Elaborator` through.
+        let t_formats: std::collections::BTreeMap<
+            usize,
+            Rc<typed_format::TypedFormat<typed_format::GenType>>,
+        > = std::collections::BTreeMap::new();
+        let defined_types: Vec<RustTypeDecl> = Vec::new();
+        let info = FixedFormatInfo {
+            module: &module,
+            targets: &targets,
+            t_formats: &t_formats,
+            defined_types: &defined_types,
+        };
+
+        let on_type = Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+            0,
+            Label::from("Point"),
+            None,
+        ))));
+
+        let impl_block = ReadUnchecked::generate_impls(on_type, info);
+        let output = impl_block
+            .iter()
+            .map(|imp| imp.to_fragment().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        println!("{output}");
+        assert!(
+            output.contains("impl ReadUnchecked for Point"),
+            "expected an `impl ReadUnchecked for Point` block:\n{output}"
+        );
+        assert!(
+            output.contains("unsafe fn read_unchecked"),
+            "expected `read_unchecked` to be declared `unsafe fn`:\n{output}"
+        );
+        assert!(
+            output.contains("U16Be::read_unchecked(ctxt)"),
+            "expected per-field reads via the `U16Be` marker type:\n{output}"
+        );
+        assert!(
+            output.contains("const SIZE: usize = 4"),
+            "expected SIZE to be the sum of per-field widths (2 + 2):\n{output}"
+        );
+    }
+
+    #[test]
+    fn test_fixed_format_read_array_codegen() {
+        use crate::helper::{base::u16be, from_here, read_array, record};
+
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+        let f = from_here(read_array(Expr::U8(2), point));
+        module.define_format("test.points", f.clone());
+        let output = produce_string_gencode(&module, &f);
+        println!("{output}");
+        assert!(
+            output.contains("ReadArray<'input, point>"),
+            "expected a `ReadArray<'input, point>` type referencing the adhoc `point` struct:\n{output}"
+        );
+        assert!(
+            output.contains("impl ReadUnchecked for point"),
+            "expected an `impl ReadUnchecked for point` block to have been generated:\n{output}"
+        );
+        assert!(
+            output.contains("as_read_array::<point>"),
+            "expected the turbofish call-site to reference the adhoc `point` type:\n{output}"
+        );
+    }
+
+    #[test]
+    fn test_numtree_codegen() {
+        use crate::numeric::core;
+        let mut module = FormatModule::new();
+        let f = module.define_format(
+            "test.math",
+            compute(Expr::Numeric(Box::new(core::Expr::Const(
+                core::TypedConst(8u8.into(), core::NumRep::Concrete(core::MachineRep::U8)),
+            )))),
+        );
+        let output = produce_string_gencode(&module, &f.call());
+        println!("{}", output);
+    }
+
+    #[test]
+    fn test_math_codegen() {
+        let tree = {
+            use crate::numeric::core::*;
+            let eightu8 = Expr::Const(TypedConst(8u8.into(), NumRep::Concrete(MachineRep::U8)));
+            let oneu16 = Expr::Const(TypedConst(1u16.into(), NumRep::Concrete(MachineRep::U16)));
+            let sumu32 = Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Add,
+                    out_rep: Some(MachineRep::U32),
+                },
+                Box::new(eightu8),
+                Box::new(oneu16),
+            );
+            sumu32
+        };
+        let mut module = FormatModule::new();
+        let f = module.define_format("test.math", compute(Expr::Numeric(Box::new(tree))));
+        let output = produce_string_gencode(&module, &f.call());
+        println!("{}", output);
+    }
+
+    fn is_valid_output(output: &str) -> bool {
+        // FIXME - write a more sophisticated check
+        output.len() > 0
+    }
+
+    #[test]
+    fn test_numtree_codegen_proptest() {
+        let log = std::fs::File::create("pbt.log").unwrap();
+        let handle = std::cell::RefCell::new(log);
+        proptest!(|(tree in crate::numeric::core::strategy::any_expr())| {
+            let mut log = handle.borrow_mut();
+            use std::io::Write;
+            writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
+            let mut module = FormatModule::new();
+            let f = module.define_format("test.arb", compute(Expr::Numeric(Box::new(tree))));
+            let output = produce_string_gencode(&module, &f.call());
+            writeln!(&mut log, "{}", output).unwrap();
+            writeln!(&mut log, "\n\n").unwrap();
+            prop_assert!(is_valid_output(&output))
+        });
+        proptest!(|(tree in crate::numeric::core::strategy::unsigned_expr())| {
+            let mut log = handle.borrow_mut();
+            use std::io::Write;
+            writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
+            let mut module = FormatModule::new();
+            let f = module.define_format("test.arb", compute(Expr::Numeric(Box::new(tree))));
+            let g = module.define_format("test.arb2", record([
+                ("a", f.call()),
+                ("b", compute(succ(var("a")))),
+            ]));
+            let output = produce_string_gencode(&module, &g.call());
+            writeln!(&mut log, "{}", output).unwrap();
+            writeln!(&mut log, "\n\n").unwrap();
+            prop_assert!(is_valid_output(&output))
+        });
+        let strat = crate::numeric::core::strategy::any_expr_with_vars([("x", MachineRep::U8)]);
+        proptest!(|(tree in strat)| {
+            let mut log = handle.borrow_mut();
+            use std::io::Write;
+            writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
+            let mut module = FormatModule::new();
+            let f = module.define_format("test.arb_var", record([
+                ("x", Format::Byte(ByteSet::full())),
+                ("tree", compute(Expr::Numeric(Box::new(tree)))),
+            ]));
+            let output = produce_string_gencode(&module, &f.call());
+            writeln!(&mut log, "{}", output).unwrap();
+            writeln!(&mut log, "\n\n").unwrap();
+            prop_assert!(is_valid_output(&output))
+        })
+    }
+
+    #[test]
+    /// Regression test for the unoptimized case of `Expr::SeqIx(Expr::EnumFromTo(a, b), c)`
+    ///
+    /// Current behavior results in `(a..b)[c]`, which isn't even valid Rust-code. Because there are
+    /// no compiler warnings to this effect, we can be sure that this case isn't happening in practice.
+    ///
+    /// Properly speaking, the outcome should be `a + c`, or a panic if `c >= b - a`.
+    fn test_regression_unoptimized_seqix_of_enum_from_to() {
+        let range = {
+            let min = GTExpr::U32(0);
+            let max = GTExpr::U32(100);
+            let seq_type = GenType::from(RustType::Atom(AtomType::Comp(CompType::Vec(Box::new(
+                RustType::from(MachineUint::U32),
+            )))));
+            GTExpr::EnumFromTo(seq_type, Box::new(min), Box::new(max))
+        };
+        let ix = GTExpr::U32(42);
+        let expr = GTExpr::SeqIx(
+            GenType::from(RustType::from(MachineUint::U32)),
+            Box::new(range),
+            Box::new(ix),
+        );
+        let actual = embed_expr_nat(&expr);
+        if let RustExpr::Index(lhs, rhs) = &actual
+            && let (
+                RustExpr::RangeExclusive(start, stop),
+                RustExpr::Operation(RustOp::AsCast(
+                    ix,
+                    RustType::Atom(AtomType::Prim(PrimType::Usize)),
+                )),
+            ) = (lhs.as_ref(), rhs.as_ref())
+            && let (
+                RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(a))),
+                RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(b))),
+                RustExpr::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(c))),
+            ) = (start.as_ref(), stop.as_ref(), ix.as_ref())
+            && *a == 0
+            && *b == 100
+            && *c == 42
+        {
+            ()
+        } else {
+            panic!("assertion failed! {actual:?} does not match expected shape")
+        }
     }
 }

@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
+mod compat;
+use compat::{FragmentBuilder, FragmentExt as _, Precedence, cond_paren};
+
 use crate::{Arith, Expr, Format, FormatModule, IntRel, RecurseCtx, Unary, decoder::Value};
 pub(crate) use doodle::output::Fragment;
-use doodle::{
-    output::{FragmentBuilder, Symbol},
-    precedence::{Precedence, cond_paren},
-};
+use doodle::output::Symbol;
 
 pub struct Flags {
     omit_implied_values: bool,
@@ -119,7 +119,7 @@ impl<'module> PPrinter<'module> {
         {
             Fragment::string(label.to_string())
         } else if self.is_atomic_value(value, format) {
-            let mut frag = Fragment::new();
+            let mut frag = Fragment::Empty;
             frag.append(Fragment::String(format!("{{ {label} := ").into()));
             if let Some((format, ctx)) = format {
                 frag.append(self.compile_decoded_value(value, format, ctx));
@@ -154,7 +154,7 @@ impl<'module> PPrinter<'module> {
         if vals.is_empty() {
             Fragment::String("()".into())
         } else {
-            let mut frag = Fragment::new();
+            let mut frag = Fragment::Empty;
             let last_index = vals.len() - 1;
             for index in 0..last_index {
                 frag.append(self.compile_field_value_continue(
@@ -182,7 +182,7 @@ impl<'module> PPrinter<'module> {
         if vals.is_empty() {
             Fragment::string("[]")
         } else {
-            let mut frag = Fragment::new();
+            let mut frag = Fragment::Empty;
             let last_index = vals.len() - 1;
             let (upper_bound, any_skipped) = match self.preview_len {
                 Some(preview_len) if vals.len() > preview_len => {
@@ -217,7 +217,7 @@ impl<'module> PPrinter<'module> {
         if vals.is_empty() {
             Fragment::String("[]".into())
         } else {
-            let mut frag = Fragment::new();
+            let mut frag = Fragment::Empty;
             let last_index = vals.len() - 1;
             let (upper_bound, any_skipped) = match self.preview_len {
                 Some(preview_len) if vals.len() > preview_len => {
