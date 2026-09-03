@@ -345,11 +345,64 @@ impl<'a> Compiler<'a> {
                 let da = Box::new(self.compile_format(a, Rc::new(Next::Empty), ctx)?);
                 Ok(Decoder::Maybe(x.clone(), da))
             }
+            Format::RepeatCount(count, a) => {
+                let n = count.eval_usize();
+                // The inner decoder is compiled once and looped `n` times at runtime (the loop
+                // counter enforces the exact count, not the continuation), so - like Repeat - it
+                // uses the generic self-referential `Next::Repeat` continuation rather than a
+                // distinct `Next::RepeatCount(k, ..)` per remaining count (which would otherwise
+                // force a separate compiled decoder per iteration for any ItemVar inside `a`
+                // whose `depends_on_next` is true).
+                let da =
+                    self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                Ok(Decoder::RepeatCount(n, Box::new(da)))
+            }
+            Format::RepeatBetween(min_expr, max_expr, a) => {
+                let (min, max) = (min_expr.eval_usize(), max_expr.eval_usize());
+                assert!(
+                    min <= max,
+                    "incoherent RepeatBetween: min {min} > max {max}"
+                );
+                if min == max {
+                    let da =
+                        self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                    return Ok(Decoder::RepeatCount(min, Box::new(da)));
+                }
+                if a.is_nullable(self.module) {
+                    return Err(anyhow!("cannot repeat nullable format: {a:?}"));
+                }
+                let da =
+                    self.compile_format(a, Rc::new(Next::Repeat(a, ctx, next.clone())), ctx)?;
+                let astar = Format::Repeat(a.clone());
+                let fa = Format::Tuple(vec![(**a).clone(), astar]);
+                let fb = Format::EMPTY;
+                if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next, ctx) {
+                    Ok(Decoder::RepeatBetween(min, max - min, tree, Box::new(da)))
+                } else {
+                    Err(anyhow!("cannot build match tree for {:?}", format))
+                }
+            }
+            Format::Peek(a) => {
+                let da = Box::new(self.compile_format(a, Rc::new(Next::Empty), ctx)?);
+                Ok(Decoder::Peek(da))
+            }
+            Format::PeekNot(a) => {
+                let da = Box::new(self.compile_format(a, Rc::new(Next::Empty), ctx)?);
+                Ok(Decoder::PeekNot(da))
+            }
         }
     }
 }
 
 impl Expr {
+    /// Evaluates `self` and extracts a `usize`, panicking if the result isn't numeric. Since
+    /// `Expr` has no `Var`, every `Expr` is compile-time-constant-foldable, so this is a total,
+    /// pure function - used wherever `RepeatCount`/`RepeatBetween` need a concrete repeat bound
+    /// (both in `MatchTree` construction and at decode time).
+    pub(crate) fn eval_usize(&self) -> usize {
+        self.eval().get_usize_with_precision().0
+    }
+
     pub fn eval(&self) -> Value {
         match self {
             Expr::U8(i) => Value::U8(*i),
@@ -524,6 +577,18 @@ pub enum Decoder {
     Seq(Vec<Decoder>),
     Tuple(Vec<Decoder>),
     Maybe(Box<Expr>, Box<Decoder>),
+
+    /// Runs the inner decoder exactly `usize` times.
+    RepeatCount(usize, Box<Decoder>),
+    /// Runs the inner decoder `usize` (min) times unconditionally, then up to `usize` (extra =
+    /// max - min) more times, deciding "one more repetition, or stop" via the `MatchTree` at each
+    /// of those additional positions (same 2-way decision `While` uses, just capped by `extra`).
+    RepeatBetween(usize, usize, MatchTree, Box<Decoder>),
+    /// Parses the inner decoder, then discards the position it advanced to, keeping the value.
+    Peek(Box<Decoder>),
+    /// Fails if the inner decoder successfully parses; otherwise succeeds with unit, at the
+    /// original (unadvanced) position.
+    PeekNot(Box<Decoder>),
 }
 
 pub(crate) mod error;
@@ -623,6 +688,51 @@ impl Decoder {
                     Ok((Value::Option(None), input))
                 }
             }
+            Decoder::RepeatCount(n, a) => {
+                let mut input = input;
+                let mut v = Vec::with_capacity(*n);
+                for _ in 0..*n {
+                    let (va, next_input) = a.parse(program, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                Ok((Value::Seq(v), input))
+            }
+            Decoder::RepeatBetween(min, extra, tree, a) => {
+                let mut input = input;
+                let mut v = Vec::with_capacity(*min);
+                for _ in 0..*min {
+                    let (va, next_input) = a.parse(program, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                for _ in 0..*extra {
+                    match tree.matches(input) {
+                        Some(0) => {
+                            let (va, next_input) = a.parse(program, input)?;
+                            input = next_input;
+                            v.push(va);
+                        }
+                        Some(_) => break,
+                        None => {
+                            return Err(DecodeError::NoValidBranch {
+                                offset: input.offset,
+                            });
+                        }
+                    }
+                }
+                Ok((Value::Seq(v), input))
+            }
+            Decoder::Peek(a) => {
+                let (v, _discarded) = a.parse(program, input)?;
+                Ok((v, input))
+            }
+            Decoder::PeekNot(a) => match a.parse(program, input) {
+                Ok(_) => Err(DecodeError::PeekNotMatched {
+                    offset: input.offset,
+                }),
+                Err(_) => Ok((Value::Tuple(vec![]), input)),
+            },
         }
     }
 }
@@ -674,6 +784,109 @@ mod tests {
         let input = ReadCtxt::new(b"SSSSZ");
         let (value, _) = program.run(input)?;
         eprintln!("{}", to_string_pretty(&value).unwrap());
+        Ok(())
+    }
+
+    fn seq_of_bytes(value: &Value) -> Vec<u8> {
+        match value {
+            Value::Seq(vals) => vals
+                .iter()
+                .map(|v| match v {
+                    Value::U8(b) => *b,
+                    other => panic!("expected U8, found {other:?}"),
+                })
+                .collect(),
+            other => panic!("expected Seq, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn repeat_count_decodes_exact_n() -> AResult<()> {
+        let f = Format::RepeatCount(
+            Box::new(Expr::U8(3)),
+            Box::new(Format::Byte(ByteSet::from(b'a'..=b'z'))),
+        );
+        let program = Compiler::compile_program(&FormatModule::new(), &f, RecurseCtx::NonRec)?;
+        let (value, remaining) = program.run(ReadCtxt::new(b"abcdef"))?;
+        assert_eq!(seq_of_bytes(&value), vec![b'a', b'b', b'c']);
+        assert_eq!(remaining.offset, 3);
+        Ok(())
+    }
+
+    #[test]
+    fn repeat_between_stops_within_bounds() -> AResult<()> {
+        // Between 1 and 3 'a's, followed by a mandatory 'b' - exercises the "one more, or stop"
+        // MatchTree decision at each of the two optional positions.
+        let f = Format::Tuple(vec![
+            Format::RepeatBetween(
+                Box::new(Expr::U8(1)),
+                Box::new(Expr::U8(3)),
+                Box::new(Format::Byte(ByteSet::from([b'a']))),
+            ),
+            Format::Byte(ByteSet::from([b'b'])),
+        ]);
+        let module = FormatModule::new();
+        let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
+
+        let (value, remaining) = program.run(ReadCtxt::new(b"ab"))?;
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert_eq!(seq_of_bytes(&fields[0]), vec![b'a']);
+        assert_eq!(remaining.offset, 2);
+
+        let (value, remaining) = program.run(ReadCtxt::new(b"aaab"))?;
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert_eq!(seq_of_bytes(&fields[0]), vec![b'a', b'a', b'a']);
+        assert_eq!(remaining.offset, 4);
+
+        // "aaaab" has 4 'a's, but max is 3 - the 4th 'a' is left for (and fails to match) the
+        // mandatory trailing 'b' field.
+        assert!(program.run(ReadCtxt::new(b"aaaab")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn peek_does_not_consume() -> AResult<()> {
+        let f = Format::Tuple(vec![
+            Format::Peek(Box::new(Format::Byte(ByteSet::from([b'a'])))),
+            Format::Byte(ByteSet::from([b'a'])),
+        ]);
+        let program = Compiler::compile_program(&FormatModule::new(), &f, RecurseCtx::NonRec)?;
+        let (value, remaining) = program.run(ReadCtxt::new(b"a"))?;
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert!(matches!(fields[0], Value::U8(b'a')));
+        assert!(matches!(fields[1], Value::U8(b'a')));
+        assert_eq!(remaining.offset, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn peek_not_matched_fails() {
+        let f = Format::PeekNot(Box::new(Format::Byte(ByteSet::from([b'a']))));
+        let program = Compiler::compile_program(&FormatModule::new(), &f, RecurseCtx::NonRec)
+            .expect("compiles");
+        assert!(program.run(ReadCtxt::new(b"a")).is_err());
+    }
+
+    #[test]
+    fn peek_not_unmatched_succeeds_without_consuming() -> AResult<()> {
+        let f = Format::Tuple(vec![
+            Format::PeekNot(Box::new(Format::Byte(ByteSet::from([b'a'])))),
+            Format::Byte(ByteSet::from([b'b'])),
+        ]);
+        let program = Compiler::compile_program(&FormatModule::new(), &f, RecurseCtx::NonRec)?;
+        let (value, remaining) = program.run(ReadCtxt::new(b"b"))?;
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert!(matches!(&fields[0], Value::Tuple(v) if v.is_empty()));
+        assert!(matches!(fields[1], Value::U8(b'b')));
+        assert_eq!(remaining.offset, 1);
         Ok(())
     }
 }

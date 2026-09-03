@@ -9,6 +9,87 @@ use crate::{
     determinations::{Choice, Entry, InterpError, PartialFormat, PathTrace, Traversal},
 };
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Expr, Label};
+
+    fn seq_of_bytes(value: &Value) -> Vec<u8> {
+        match value {
+            Value::Seq(vals) => vals
+                .iter()
+                .map(|v| match v {
+                    Value::U8(b) => *b,
+                    other => panic!("expected U8, found {other:?}"),
+                })
+                .collect(),
+            other => panic!("expected Seq, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn repeat_count_and_between() {
+        let f = Format::Tuple(vec![
+            Format::RepeatCount(
+                Box::new(Expr::U8(2)),
+                Box::new(Format::Byte(ByteSet::from(b'a'..=b'z'))),
+            ),
+            Format::RepeatBetween(
+                Box::new(Expr::U8(1)),
+                Box::new(Expr::U8(3)),
+                Box::new(Format::Byte(ByteSet::from([b'x']))),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let main = module.declare_format(Label::Borrowed("main"), f);
+        let interp = LL1Interpreter::new(&module);
+        let (value, remaining) = interp
+            .parse_level(main.get_level(), ReadCtxt::new(b"abxx"))
+            .expect("parses");
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert_eq!(seq_of_bytes(&fields[0]), vec![b'a', b'b']);
+        assert_eq!(seq_of_bytes(&fields[1]), vec![b'x', b'x']);
+        assert_eq!(remaining.offset, 4);
+    }
+
+    #[test]
+    fn peek_and_peek_not() {
+        let f = Format::Tuple(vec![
+            Format::Peek(Box::new(Format::Byte(ByteSet::from([b'a'])))),
+            Format::PeekNot(Box::new(Format::Byte(ByteSet::from([b'b'])))),
+            Format::Byte(ByteSet::from([b'a'])),
+        ]);
+        let mut module = FormatModule::new();
+        let main = module.declare_format(Label::Borrowed("main"), f);
+        let interp = LL1Interpreter::new(&module);
+        let (value, remaining) = interp
+            .parse_level(main.get_level(), ReadCtxt::new(b"a"))
+            .expect("parses");
+        let Value::Tuple(fields) = &value else {
+            panic!("expected Tuple, found {value:?}")
+        };
+        assert!(matches!(fields[0], Value::U8(b'a')));
+        assert!(matches!(&fields[1], Value::Tuple(v) if v.is_empty()));
+        assert!(matches!(fields[2], Value::U8(b'a')));
+        assert_eq!(remaining.offset, 1);
+    }
+
+    #[test]
+    fn peek_not_matched_fails() {
+        let f = Format::PeekNot(Box::new(Format::Byte(ByteSet::from([b'a']))));
+        let mut module = FormatModule::new();
+        let main = module.declare_format(Label::Borrowed("main"), f);
+        let interp = LL1Interpreter::new(&module);
+        assert!(
+            interp
+                .parse_level(main.get_level(), ReadCtxt::new(b"a"))
+                .is_err()
+        );
+    }
+}
+
 pub struct LL1Interpreter<'a> {
     module: &'a FormatModule,
 }
@@ -263,6 +344,107 @@ impl<'a> LL1Interpreter<'a> {
                     Ok((Value::Option(Some(Box::new(val))), input))
                 } else {
                     Ok((Value::Option(None), input))
+                }
+            }
+            Format::RepeatCount(count, format0) => {
+                let n = count.eval_usize();
+                let mut values = Vec::with_capacity(n);
+                let mut input = input;
+                for _ in 0..n {
+                    // Reuses `PartialFormat::Repeat` for every one of the `n` remnants (rather
+                    // than a dedicated bounded-count variant) - a conservative approximation
+                    // (`solve_determinations` sees "maybe more of format0, then remnant" instead
+                    // of the exact remaining count), same simplification as `Decoder`'s use of
+                    // `Next::Repeat` for `RepeatCount`'s compiled continuation.
+                    let remnant0 = Rc::new(PartialFormat::Repeat(format0, remnant.clone()));
+                    let (val, new_input) =
+                        self.parse_format(format0, remnant0, ctx, input, trace, visited)?;
+                    values.push(val);
+                    input = new_input;
+                }
+                Ok((Value::Seq(values), input))
+            }
+            Format::RepeatBetween(min, max, format0) => {
+                let (min, max) = (min.eval_usize(), max.eval_usize());
+                let mut values = Vec::with_capacity(min);
+                let mut input = input;
+                for _ in 0..min {
+                    let remnant0 = Rc::new(PartialFormat::Repeat(format0, remnant.clone()));
+                    let (val, new_input) =
+                        self.parse_format(format0, remnant0, ctx, input, trace, visited)?;
+                    values.push(val);
+                    input = new_input;
+                }
+                if min < max {
+                    let dets = format0
+                        .solve_determinations(self.module, visited, ctx)
+                        .unwrap();
+                    if dets.is_nullable {
+                        unreachable!("bad repeat of nullable format: {format0:?}");
+                    }
+                    let dets_next = {
+                        let mut visited = visited.fork();
+                        remnant
+                            .clone()
+                            .solve_determinations(self.module, &mut visited, ctx)
+                            .unwrap()
+                    };
+                    for _ in min..max {
+                        match input.read_byte() {
+                            None => {
+                                if dets_next.is_nullable {
+                                    break;
+                                } else {
+                                    return Err(InterpError::BadEpsilon {
+                                        expects: dets_next.first_set.union(&dets.first_set),
+                                    });
+                                }
+                            }
+                            Some((byte, _)) => {
+                                if dets.first_set.contains(byte) {
+                                    let remnant0 =
+                                        Rc::new(PartialFormat::Repeat(format0, remnant.clone()));
+                                    let (val, new_input) = self.parse_format(
+                                        format0, remnant0, ctx, input, trace, visited,
+                                    )?;
+                                    values.push(val);
+                                    input = new_input;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok((Value::Seq(values), input))
+            }
+            // The peek target is parsed against a fresh `PartialFormat::Empty` continuation - it
+            // doesn't consume input from the outer position, so the outer `remnant` is irrelevant
+            // to whether it matches. `visited` is passed through unforked, matching every other
+            // nested `parse_format` call in this function (its own `RecVar` handling already
+            // balances insert/escape).
+            Format::Peek(format0) => {
+                let (val, _discarded) = self.parse_format(
+                    format0,
+                    Rc::new(PartialFormat::Empty),
+                    ctx,
+                    input,
+                    trace,
+                    visited,
+                )?;
+                Ok((val, input))
+            }
+            Format::PeekNot(format0) => {
+                match self.parse_format(
+                    format0,
+                    Rc::new(PartialFormat::Empty),
+                    ctx,
+                    input,
+                    trace,
+                    visited,
+                ) {
+                    Ok(_) => Err(InterpError::PeekNotMatched),
+                    Err(_) => Ok((Value::Tuple(vec![]), input)),
                 }
             }
         }

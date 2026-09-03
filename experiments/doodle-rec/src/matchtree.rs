@@ -65,6 +65,59 @@ impl<'a> MatchTreeStep<'a> {
         self
     }
 
+    /// Returns a modified version of `self` that rejects any input that is not
+    /// accepted by `peek`.
+    fn peek(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        if peek.accept {
+            // can ignore peek as it has already accepted
+        } else if self.accept {
+            // can ignore self as it has already accepted
+            self.accept = peek.accept;
+            self.branches = peek.branches;
+        } else {
+            // take the intersection of peek and self branches
+            let mut branches = Vec::new();
+            for (bs1, next1) in self.branches {
+                for (bs2, next2) in &peek.branches {
+                    let bs = bs1.intersection(bs2);
+                    if !bs.is_empty() {
+                        let next = Rc::new(Next::Peek(next1.clone(), next2.clone()));
+                        branches.push((bs, next));
+                    }
+                }
+            }
+            self.branches = branches;
+        }
+        self
+    }
+
+    /// Returns a modified version of `self` that rejects any input that is
+    /// accepted by `peek`.
+    fn peek_not(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        if peek.accept {
+            self.accept = false;
+            self.branches = Vec::new();
+        } else {
+            let mut branches = Vec::new();
+            for (bs1, next1) in self.branches.into_iter() {
+                let mut diff = bs1;
+                for (bs2, next2) in &peek.branches {
+                    let common = bs1.intersection(bs2);
+                    if !common.is_empty() {
+                        let next = Rc::new(Next::PeekNot(next1.clone(), next2.clone()));
+                        branches.push((common, next));
+                    }
+                    diff = diff.difference(bs2);
+                }
+                if !diff.is_empty() {
+                    branches.push((diff, next1.clone()));
+                }
+            }
+            self.branches = branches;
+        }
+        self
+    }
+
     /// Constructs a [MatchTreeStep] that accepts a given tuple of sequential formats, with a trailing sequence of partially-consumed formats ([`Next`]s).
     fn from_sequential(
         module: &'a FormatModule,
@@ -133,6 +186,70 @@ impl<'a> MatchTreeStep<'a> {
                     module, *a, next1, *ctx, visited,
                 ))
             }
+            Next::RepeatCount(n, a, ctx, next0) => {
+                let n = *n;
+                let next = next0.clone();
+                if n > 0 {
+                    Self::from_format(
+                        module,
+                        *a,
+                        Rc::new(Next::RepeatCount(n - 1, *a, *ctx, next)),
+                        *ctx,
+                        visited,
+                    )
+                } else {
+                    Self::from_next(module, next, visited)
+                }
+            }
+            Next::RepeatMax(n, a, ctx, next0) => {
+                let n = *n;
+                if n == 0 {
+                    Self::from_next(module, next0.clone(), visited)
+                } else {
+                    let tree0 = MatchTreeStep::<'a>::from_next(module, next0.clone(), visited);
+                    tree0.union(MatchTreeStep::<'a>::from_format(
+                        module,
+                        *a,
+                        Rc::new(Next::RepeatMax(n - 1, *a, *ctx, next0.clone())),
+                        *ctx,
+                        visited,
+                    ))
+                }
+            }
+            Next::RepeatBetween(min, max, a, ctx, next0) => {
+                let (min, max) = (*min, *max);
+                if min == max {
+                    let next1 = Rc::new(Next::RepeatCount(min, *a, *ctx, next0.clone()));
+                    Self::from_next(module, next1, visited)
+                } else if min > 0 {
+                    Self::from_format(
+                        module,
+                        *a,
+                        Rc::new(Next::RepeatBetween(
+                            min - 1,
+                            max - 1,
+                            *a,
+                            *ctx,
+                            next0.clone(),
+                        )),
+                        *ctx,
+                        visited,
+                    )
+                } else {
+                    let next1 = Rc::new(Next::RepeatMax(max, *a, *ctx, next0.clone()));
+                    Self::from_next(module, next1, visited)
+                }
+            }
+            Next::Peek(next1, next2) => {
+                let tree1 = Self::from_next(module, next1.clone(), visited);
+                let tree2 = Self::from_next(module, next2.clone(), visited);
+                tree1.peek(tree2)
+            }
+            Next::PeekNot(next1, next2) => {
+                let tree1 = Self::from_next(module, next1.clone(), visited);
+                let tree2 = Self::from_next(module, next2.clone(), visited);
+                tree1.peek_not(tree2)
+            }
             Next::DelayRef(level, next) => {
                 if visited.insert(*level) == Entry::Novel {
                     let ctx = module.get_ctx(*level);
@@ -148,6 +265,65 @@ impl<'a> MatchTreeStep<'a> {
                     Self::reject()
                 }
             }
+        }
+    }
+
+    /// Constructs a [MatchTreeStep] that accepts a fixed-count repetition of a given format, with
+    /// a trailing sequence of partially-consumed formats ([`Next`]s).
+    fn from_repeat_count(
+        module: &'a FormatModule,
+        n: usize,
+        format: &'a Format,
+        ctx: RecurseCtx<'a>,
+        next: Rc<Next<'a>>,
+        visited: &mut Traversal,
+    ) -> MatchTreeStep<'a> {
+        if n > 0 {
+            Self::from_format(
+                module,
+                format,
+                Rc::new(Next::RepeatCount(n - 1, format, ctx, next)),
+                ctx,
+                visited,
+            )
+        } else {
+            Self::from_next(module, next, visited)
+        }
+    }
+
+    /// Constructs a [MatchTreeStep] that accepts a repetition whose count is bounded above and
+    /// below, with a trailing sequence of partially-consumed formats ([`Next`]s).
+    ///
+    /// Presupposes that the invariant `max >= min` is upheld.
+    fn from_repeat_between(
+        module: &'a FormatModule,
+        min_max: (usize, usize),
+        format: &'a Format,
+        ctx: RecurseCtx<'a>,
+        next: Rc<Next<'a>>,
+        visited: &mut Traversal,
+    ) -> MatchTreeStep<'a> {
+        let (min, max) = min_max;
+        assert!(
+            min <= max,
+            "min-max pair ({min}, {max}) incoherent (min > max)"
+        );
+        if min == max {
+            Self::from_repeat_count(module, min, format, ctx, next, visited)
+        } else if min > 0 {
+            Self::from_format(
+                module,
+                format,
+                Rc::new(Next::RepeatBetween(min - 1, max - 1, format, ctx, next)),
+                ctx,
+                visited,
+            )
+        } else {
+            Self::from_next(
+                module,
+                Rc::new(Next::RepeatMax(max, format, ctx, next)),
+                visited,
+            )
         }
     }
 
@@ -198,6 +374,33 @@ impl<'a> MatchTreeStep<'a> {
                 let level = ctx.convert_rec_var(*rec_ix).unwrap();
                 let next = Rc::new(Next::DelayRef(level, next));
                 Self::from_next(module, next, visited)
+            }
+            Format::RepeatCount(count, a) => {
+                Self::from_repeat_count(module, count.eval_usize(), a, ctx, next, visited)
+            }
+            Format::RepeatBetween(min, max, a) => {
+                let (min, max) = (min.eval_usize(), max.eval_usize());
+                assert!(
+                    min <= max,
+                    "incoherent RepeatBetween: min {min} > max {max}"
+                );
+                Self::from_repeat_between(module, (min, max), a, ctx, next, visited)
+            }
+            // The peek target is examined via a fresh `Next::Empty` continuation, never the
+            // ambient `next` - Peek/PeekNot are pure lookahead assertions that don't consume
+            // input, so what comes after is irrelevant to whether the peek target matches here.
+            // `visited` *is* shared with the ambient traversal (not reset), so a left-recursive
+            // cycle reached only through a `Peek`/`PeekNot` target (zero bytes consumed either
+            // way) is still caught by the same guard as ordinary left recursion.
+            Format::Peek(a) => {
+                let tree = Self::from_next(module, next.clone(), visited);
+                let peek = Self::from_format(module, a, Rc::new(Next::Empty), ctx, visited);
+                tree.peek(peek)
+            }
+            Format::PeekNot(a) => {
+                let tree = Self::from_next(module, next.clone(), visited);
+                let peek = Self::from_format(module, a, Rc::new(Next::Empty), ctx, visited);
+                tree.peek_not(peek)
             }
         }
     }
@@ -354,6 +557,18 @@ pub(crate) enum Next<'a> {
     Cat(&'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
     Sequence(&'a [Format], RecurseCtx<'a>, Rc<Next<'a>>),
     Repeat(&'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
+    RepeatCount(usize, &'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
+    /// Dual to `RepeatCount`, for 0..=N repeats - only ever constructed internally while
+    /// expanding a `RepeatBetween` (there's no corresponding `Format` variant).
+    RepeatMax(usize, &'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
+    RepeatBetween(usize, usize, &'a Format, RecurseCtx<'a>, Rc<Next<'a>>),
+    /// Neither `Peek` nor `PeekNot` needs its own `RecurseCtx`, unlike the raw-`&'a Format`-
+    /// carrying variants above: both fields are already-built `Next` subtrees (the "what comes
+    /// after" continuation and the lookahead-only "does the peek target match" continuation,
+    /// respectively), each self-sufficient regarding its own ctx the same way `Next::Union`'s two
+    /// fields are.
+    Peek(Rc<Next<'a>>, Rc<Next<'a>>),
+    PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
 #[derive(Debug, Clone)]
@@ -402,7 +617,7 @@ impl MatchTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::Label;
+    use crate::{Expr, Label};
 
     use super::*;
 
@@ -463,6 +678,47 @@ mod tests {
         // `RecVar` inside peano's body - reached only after `MatchTreeLevel::grow` has crossed
         // at least one lookahead-depth boundary (past the first consumed 'S'/'Z' byte) - no
         // longer panics via `ctx.convert_rec_var(_).unwrap()` on a stale/mismatched ambient ctx.
+        let tree = MatchTree::build(&module, &branches, Rc::new(Next::Empty), RecurseCtx::NonRec);
+        assert!(tree.is_none());
+    }
+
+    #[test]
+    fn repeat_count_ctx_across_depth_boundary() {
+        // Unlike `build_union_disambiguating_through_recursion` (where the recursive reference
+        // is reached via a fresh `ItemVar`, which always resets `ctx` itself via
+        // `module.get_ctx`, masking any bug in an *ambient* ctx passed to it), the
+        // `RepeatCount(2, RecVar(0))` here is embedded directly inside the batch's own
+        // self-recursive body, referencing `RecVar(0)` (not `ItemVar`) - so resolving it depends
+        // entirely on the ctx `Next::RepeatCount` itself carries once that node survives a
+        // lookahead-depth boundary (which the second byte of input, "SZ", forces).
+        let wrapper = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("stop"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("more"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RepeatCount(Box::new(Expr::U8(2)), Box::new(Format::RecVar(0))),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.wrapper"), wrapper)]);
+        let wrapper_ref = frefs[0];
+        let branches = vec![
+            Format::Tuple(vec![
+                wrapper_ref.call(),
+                Format::Byte(ByteSet::from([b'A'])),
+            ]),
+            Format::Tuple(vec![
+                wrapper_ref.call(),
+                Format::Byte(ByteSet::from([b'B'])),
+            ]),
+        ];
+        // Same fundamental undecidability as the test above (unboundedly-long common prefix) -
+        // `None` is correct, the point is no panic.
         let tree = MatchTree::build(&module, &branches, Rc::new(Next::Empty), RecurseCtx::NonRec);
         assert!(tree.is_none());
     }

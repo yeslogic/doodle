@@ -105,6 +105,12 @@ impl<'module> PPrinter<'module> {
                 }
                 _ => panic!("expected option, found {value}"),
             },
+            Format::RepeatCount(_, format) | Format::RepeatBetween(_, _, format) => match value {
+                Value::Seq(values) => self.compile_seq(values, Some((format, ctx))),
+                _ => panic!("expected sequence, found {value}"),
+            },
+            Format::Peek(format) => self.compile_decoded_value(value, format, ctx),
+            Format::PeekNot(_format) => self.compile_value(value),
         }
     }
 
@@ -471,6 +477,45 @@ impl<'module> PPrinter<'module> {
             }
             Format::Repeat(format) => cond_paren(
                 self.compile_nested_format("repeat", None, format, ctx, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
+            Format::RepeatCount(count, format) => {
+                let frag_count = self.compile_expr(count, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "repeat-count",
+                        Some(&[frag_count]),
+                        format,
+                        ctx,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::RepeatBetween(min, max, format) => {
+                let frag_min = self.compile_expr(min, Precedence::ATOM);
+                let frag_max = self.compile_expr(max, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "repeat-between",
+                        Some(&[frag_min, frag_max]),
+                        format,
+                        ctx,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::Peek(format) => cond_paren(
+                self.compile_nested_format("peek", None, format, ctx, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
+            Format::PeekNot(format) => cond_paren(
+                self.compile_nested_format("peek-not", None, format, ctx, prec),
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),

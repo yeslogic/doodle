@@ -23,6 +23,9 @@ pub enum DecodeError {
     NoValidBranch {
         offset: usize,
     },
+    PeekNotMatched {
+        offset: usize,
+    },
 }
 
 impl std::fmt::Display for DecodeError {
@@ -62,6 +65,9 @@ impl std::fmt::Display for DecodeError {
             }
             Self::NoValidBranch { offset } => {
                 write!(f, "no valid branch at offset {offset}")
+            }
+            Self::PeekNotMatched { offset } => {
+                write!(f, "peek-not target unexpectedly matched at offset {offset}")
             }
         }
     }

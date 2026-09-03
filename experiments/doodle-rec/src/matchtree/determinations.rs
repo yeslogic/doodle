@@ -516,6 +516,79 @@ impl Format {
                     ..det_format
                 })
             }
+            Format::RepeatCount(count, format) => {
+                let n = count.eval_usize();
+                let mut det_seq = Determinations::zero();
+                for _ in 0..n {
+                    let det_format = format.solve_determinations(module, visited, ctx)?;
+                    if !det_format.is_nullable {
+                        visited.guard();
+                    }
+                    det_seq = det_seq
+                        .merge_seq(det_format)
+                        .map_err(|e| e.add_context(self.clone()))?;
+                }
+                Ok(det_seq)
+            }
+            Format::RepeatBetween(min, max, format) => {
+                let (min, max) = (min.eval_usize(), max.eval_usize());
+                let mut det_seq = Determinations::zero();
+                // Mandatory prefix: `min` copies, exactly like `RepeatCount`.
+                for _ in 0..min {
+                    let det_format = format.solve_determinations(module, visited, ctx)?;
+                    if !det_format.is_nullable {
+                        visited.guard();
+                    }
+                    det_seq = det_seq
+                        .merge_seq(det_format)
+                        .map_err(|e| e.add_context(self.clone()))?;
+                }
+                // Optional tail: up to `max - min` more. Modeled as a *single* unit, exactly like
+                // `Format::Repeat`'s own body (one `solve_determinations` call, one `merge_seq`
+                // into `det_seq`) - not `max - min` separate `merge_seq` calls chained against
+                // each other. The latter would ask `merge_seq`'s static first/follow-set check to
+                // prove "one more repetition, or stop" is unambiguous against *another optional
+                // copy of the same format*, which it can't (both look identical - that's exactly
+                // the "no batteries left" case `should_not_follow_set` exists to guard against, so
+                // it fires as a false-positive `AmbiguousFollow` on an otherwise perfectly
+                // decidable-by-lookahead construct). The real decision procedure for "continue or
+                // stop" at each of the optional positions belongs to `MatchTree`/`Next::RepeatMax`
+                // at build/decode time, same as unbounded `Repeat`; this static pass only needs to
+                // check the boundary between the optional tail *as a whole* and whatever follows.
+                if min < max {
+                    let det_format = format.solve_determinations(module, visited, ctx)?;
+                    if det_format.is_nullable {
+                        return Err(GrammarError::RepeatNullable {
+                            format: format.as_ref().clone(),
+                            context: self.clone(),
+                        });
+                    }
+                    let det_optional = Determinations {
+                        is_nullable: true,
+                        should_not_follow_set: det_format.first_set,
+                        ..det_format
+                    };
+                    det_seq = det_seq
+                        .merge_seq(det_optional)
+                        .map_err(|e| e.add_context(self.clone()))?;
+                }
+                Ok(det_seq)
+            }
+            // Peek/PeekNot don't advance the real stream, so - unlike every other position -
+            // their target's first-set/nullability isn't folded into the surrounding sequence at
+            // all (modeled as the sequencing identity, same as `Compute`); precisely representing
+            // "conditional on the next byte(s), but consumes none of them" isn't attempted here.
+            // The target *is* still traversed, to catch left-recursion reached only through a
+            // peek - using a clone of `visited` (same as `Format::Union`'s branches), not the
+            // shared reference: this still tracks every currently-open level (so a genuine cycle
+            // through the peek target is still caught), while any `guard()` calls the target
+            // triggers - reflecting only hypothetical, lookahead-only progress - stay local to
+            // the clone rather than incorrectly marking real, unconsumed ancestor cycles guarded.
+            Format::Peek(format) | Format::PeekNot(format) => {
+                let mut peek_visited = visited.clone();
+                format.solve_determinations(module, &mut peek_visited, ctx)?;
+                Ok(Determinations::zero())
+            }
         }
     }
 }
@@ -755,6 +828,7 @@ pub enum InterpError {
         message: crate::Label,
     },
     ExpectsEnd,
+    PeekNotMatched,
 }
 
 impl std::fmt::Display for InterpError {
@@ -783,6 +857,9 @@ impl std::fmt::Display for InterpError {
             }
             InterpError::Fail { message } => {
                 write!(f, "fail: {message}")
+            }
+            InterpError::PeekNotMatched => {
+                write!(f, "peek-not target unexpectedly matched")
             }
         }
     }

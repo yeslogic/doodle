@@ -336,11 +336,24 @@ pub enum Format {
 
     // Sequential
     Repeat(Box<Format>),
+    /// Repeats a format an exact number of times. Since `Expr` has no `Var`, `count` is
+    /// necessarily a compile-time-constant expression today; kept `Box<Expr>` (rather than a bare
+    /// `usize`) to mirror `doodle::Format::RepeatCount`'s shape, so no signature change is needed
+    /// once `Expr::Var` lands.
+    RepeatCount(Box<Expr>, Box<Format>),
+    /// Repeats a format at least `min` and at most `max` times (both compile-time-constant, same
+    /// caveat as [`Format::RepeatCount`]).
+    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
     Seq(Vec<Format>),
 
     // Higher-Order
     Tuple(Vec<Format>),
     Maybe(Box<Expr>, Box<Format>),
+
+    /// Parses a format without advancing the stream position afterwards.
+    Peek(Box<Format>),
+    /// Attempts to parse a format and fails if it succeeds; yields unit on success (non-match).
+    PeekNot(Box<Format>),
 }
 
 impl Format {
@@ -422,6 +435,22 @@ impl Format {
                     "maybe expression type was inferred to be non-bool: {other:?}"
                 )),
             },
+            Format::RepeatCount(count, inner) => {
+                if !count.infer_type()?.is_numeric() {
+                    return Err(anyhow!("RepeatCount count expression must be numeric"));
+                }
+                let t = inner.infer_type(visited, module, batch)?;
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(t))))
+            }
+            Format::RepeatBetween(min, max, inner) => {
+                if !min.infer_type()?.is_numeric() || !max.infer_type()?.is_numeric() {
+                    return Err(anyhow!("RepeatBetween min/max expressions must be numeric"));
+                }
+                let t = inner.infer_type(visited, module, batch)?;
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(t))))
+            }
+            Format::Peek(inner) => inner.infer_type(visited, module, batch),
+            Format::PeekNot(_inner) => Ok(FormatType::UNIT),
         }
     }
 
@@ -482,11 +511,16 @@ impl Format {
             Format::Union(branches) => {
                 Format::union_depends_on_next(branches, module, ctx, visited)
             }
-            Format::Repeat(..) => true,
+            Format::Repeat(..) | Format::RepeatCount(..) | Format::RepeatBetween(..) => true,
             Format::Seq(formats) | Format::Tuple(formats) => formats
                 .iter()
                 .any(|f| f.depends_on_next_with(module, ctx, visited)),
             Format::Maybe(..) => true,
+            // Peek/PeekNot always compile their inner format against a fresh `Next::Empty`
+            // continuation (see `MatchTreeStep::from_format`'s Peek/PeekNot arms) - the peek
+            // target never sees, and so can never depend on, the enclosing `next`. Peek/PeekNot
+            // themselves don't consume input either, so there's nothing here for `next` to affect.
+            Format::Peek(..) | Format::PeekNot(..) => false,
         }
     }
 
@@ -532,6 +566,31 @@ impl Format {
                 // REVIEW - we cannot get better than this without a complex model, and certainly not without adding more parameters
                 Bounds::any()
             }
+            Format::RepeatCount(count, f) => {
+                let n = count.eval_usize();
+                Self::repeat_bounds(f.match_bounds(module), n, n)
+            }
+            Format::RepeatBetween(min, max, f) => {
+                Self::repeat_bounds(f.match_bounds(module), min.eval_usize(), max.eval_usize())
+            }
+            Format::Peek(_) | Format::PeekNot(_) => Bounds::exact(0),
+        }
+    }
+
+    /// Scales `inner` (the bounds of a single repetition) by a `[count_min, count_max]` repeat
+    /// count, both of which are already-concrete `usize`s (see [`Format::RepeatCount`]/
+    /// [`Format::RepeatBetween`] - `Expr` has no `Var` yet, so any repeat count is necessarily
+    /// compile-time-constant).
+    fn repeat_bounds(inner: Bounds, count_min: usize, count_max: usize) -> Bounds {
+        let min = inner.min() * count_min;
+        let max = if count_max == 0 {
+            Some(0)
+        } else {
+            inner.max().map(|m| m * count_max)
+        };
+        match max {
+            Some(max) => Bounds::new(min, max),
+            None => Bounds::at_least(min),
         }
     }
 }
