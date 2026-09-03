@@ -638,6 +638,17 @@ pub struct MatchTree {
 }
 
 impl MatchTree {
+    /// Exposes the decision tree's own shape for `codegen`'s benefit - it needs to translate
+    /// the exact same lookahead logic `Self::matches` performs at runtime into an equivalent
+    /// static Rust `match` on bytes.
+    pub(crate) fn accept(&self) -> Option<usize> {
+        self.accept
+    }
+
+    pub(crate) fn branches(&self) -> &[(ByteSet, MatchTree)] {
+        &self.branches
+    }
+
     /// Returns the accepting index associated with the input-sequence starting from the current offset of `input`,
     /// looking ahead as many bytes as necessary until a definitive index is found or the lookahead limit is reached.
     ///

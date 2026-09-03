@@ -1,3 +1,4 @@
+pub mod codegen;
 pub mod decoder;
 pub(crate) mod matchtree;
 pub use matchtree::determinations;
@@ -903,11 +904,11 @@ impl FormatModule {
         &self.decls[level]
     }
 
-    fn get_batch(&self, level: usize) -> Option<Span<FormatId>> {
+    pub(crate) fn get_batch(&self, level: usize) -> Option<Span<FormatId>> {
         self.decls[level].batch
     }
 
-    fn get_name(&self, level: usize) -> &Label {
+    pub(crate) fn get_name(&self, level: usize) -> &Label {
         &self.names[level]
     }
 }
