@@ -4909,6 +4909,9 @@ impl<'a> Elaborator<'a> {
                 self.codegen.name_gen.ctxt.escape();
                 TypedFormat::FormatCall(gt, *level, t_args, t_views, t_inner)
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::ForEach(expr, lbl, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);

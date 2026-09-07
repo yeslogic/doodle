@@ -1842,6 +1842,9 @@ mod __impls {
                 Format::ItemVar(level, exprs, views) => {
                     FormatExt::Ground(GroundFormat::ItemVar(level, exprs, views))
                 }
+                Format::RecVar(_) => unreachable!(
+                    "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+                ),
                 Format::Fail => FormatExt::Ground(GroundFormat::Fail),
                 Format::EndOfInput => FormatExt::Ground(GroundFormat::EndOfInput),
                 Format::Align(n) => FormatExt::Ground(GroundFormat::Align(n)),

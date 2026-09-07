@@ -312,6 +312,100 @@ silently produces a wrong (non-terminating-in-practice) tree instead of a clean 
 
 ---
 
+## Phase 1.5 — Batch construction API + three more unguarded-recursion bugs (added 2026-09-07, mid-port)
+
+Not in the original plan at all. Surfaced from a direct, explicit question from the user partway
+through Phase 1's follow-up work: *"what step of the plan would the actual `RecVar` and
+batch-definition model land in?"* Investigating the answer found that real doodle has **no way to
+construct a genuinely self-referential (non-`Phantom`) format through its public API at all** -
+`define_format_args_views` type-checks a format *before* the level it would occupy exists, so any
+out-of-bounds `Format::ItemVar` self-reference is rejected outright; the only existing escape hatch,
+`define_format_phantom_rec_args_views`, is hard-wired to require `Format::Phantom` wrapping. Without
+fixing this, Phase 3 onward literally cannot construct the peano/ping-pong test formats their own
+deliverables call for. This gap was never named as a phase because the original plan's glossary
+incorrectly asserted real doodle has no eager, pre-typecheck.rs type-inference pass at all
+("`FormatType`/`infer_type` does not exist") - it does: `FormatModule::infer_format_type`
+(`src/lib.rs`), a completely separate, earlier pipeline stage from `typecheck.rs`'s bidirectional
+`UType` model that Phase 2 targets. Confirmed via the plain interpreter's own imports
+(`src/decoder.rs` never touches `typecheck::TypeChecker`) that `infer_format_type` is *also* what
+gates the interpreter path, independent of codegen.
+
+**Design decision** (see conversation, not re-derived here): rather than avoid porting anything
+resembling doodle-rec's `Format::RecVar`/batch-relative addressing (the original plan's stance,
+based on "real doodle's `ItemVar` is already absolute, so there's nothing to port"), the user
+explicitly overrode that guidance after weighing the tradeoff directly - PLAN.md is LLM-authored and
+not automatically authoritative over the user's own judgment; this is the first recorded instance of
+that override, per the user's standing instruction to flag (not silently follow) any PLAN.md
+requirement that conflicts with their actual preference. Chosen shape ("Option C" in-conversation):
+`Format::RecVar(usize)` **is** a real variant (batch-relative index, `0` = self), giving
+`FormatModule::define_format_rec_batch(formats: Vec<(Label, Format)>) -> Vec<FormatRef>` doodle-rec's
+own flat, up-front-values signature - but it is construction-time sugar only. Every `RecVar`
+occurrence is rewritten to a real, absolute `Format::ItemVar` (via the new `Format::substitute_rec_var`)
+before the format is ever installed into the module, so no other pass ever sees one at runtme; every
+other exhaustive `match` over `Format` in the codebase (16 sites, found and fixed via the compiler's
+own exhaustiveness errors after adding the variant - `cargo build` enumerates them completely, so
+none can be silently missed) just carries a boilerplate `Format::RecVar(_) => unreachable!(...)` arm.
+This keeps the "avoid duplicating every phase's cycle-handling for a second variant" property the
+original plan's stance was actually protecting, while matching doodle-rec's ergonomics exactly.
+`define_format_rec_batch` itself reserves all batch levels up front (placeholder `Format::EMPTY` /
+`ValueType::Any`, mirroring `define_format_phantom_rec_args_views`'s own pattern), then rewrites and
+installs each real body, then runs `infer_format_type` per member in `formats`-order - no
+occurs-tracking needed here (unlike doodle-rec's own `FormatType::Ref`/`visited` machinery) because
+`infer_format_type`'s `ItemVar` arm never recurses into a referenced level's body, it only reads
+`format_types[level]` directly; a still-provisional sibling is read as `ValueType::Any`, which
+`ValueType::unify` always accepts, giving the same accepted order-dependent imprecision doodle-rec's
+own design already lives with.
+
+**Three further, independent unguarded-recursion bugs found** while actually exercising the new API
+end-to-end for the first time (each confirmed by direct, isolated repro before fixing, each fixed
+with a lightweight `&mut HashSet<usize>` "currently open" guard - no `MatchTree`-style total-failure
+propagation needed, since none of these have a "silently paper over a grammar defect" failure mode;
+a cycle here just means the conservative/correct answer, not an error):
+
+1. **`Format::depends_on_next`** (`src/format.rs`) - confirmed, in isolation, to stack-overflow on a
+   self-recursive format with zero `MatchTree`/compile machinery involved. This sits on the hot path
+   of *both* `decoder::Compiler::compile_format` and `codegen::GTCompiler::compile_gt_format`'s
+   `ItemVar`/`FormatCall` arms - unconditionally, before either one reaches the `MatchTree`-building
+   code Phase 1 fixed - so no self-referential format could be compiled by either pipeline before
+   this fix, regardless of Phase 1 already being in place. Fixed by threading `open` through a new
+   private `depends_on_next_open`/`union_depends_on_next_open`, returning `true` (the safe
+   default - a missed decoder-sharing optimization, not a soundness bug) on re-entry.
+2. **`Format::match_bounds`** and **`Format::lookahead_bounds`** (`src/format.rs`) - identical
+   unguarded shape, same file. Fixed the same way; on re-entry, `Bounds::any()` is returned directly -
+   not a conservative fallback but the *correct* answer, the same value `Format::Repeat`'s own
+   unbounded repetition already returns.
+3. **`decoder::Compiler::compile_format`'s and `codegen::typed_decoder::GTCompiler::compile_gt_format`'s
+   `Tuple`/`Sequence` arms** - a completely different bug, unrelated to the `ItemVar`-guard family
+   above: both unconditionally wrap `next` in `Next::Sequence(<remaining fields>, next)` on *every*
+   field, including the last one, where `<remaining fields>` is empty. Semantically a no-op (an empty
+   `Next::Sequence` unwraps to nothing downstream), but for a self-referential format it means `next`
+   gained one more structurally-distinct wrapper layer on every re-entry, defeating `decoder_map`'s
+   `(level, next)` memoization outright - not a stack overflow but an unbounded, ever-growing
+   `compile_queue` (confirmed via direct `log::trace!` instrumentation showing `next` growing a new
+   `Sequence(Untyped([]), ...)` layer on every single `ItemVar` encounter, never once hitting the
+   cache). Fixed by using `next` directly when no fields remain, in both `decoder.rs` and
+   `codegen/typed_decoder.rs`'s `Tuple`/`Sequence` arms.
+
+**Deliverables**: `Format::RecVar` + `Format::substitute_rec_var` (`src/format.rs`);
+`FormatModule::define_format_rec_batch` (`src/lib.rs`); the three bug fixes above; three new
+end-to-end regression tests in `src/lib.rs`'s `mod test`, all going through the *real* public API and
+the actual interpreter (not hand-poked `FormatModule` fields, unlike Phase 1's own tests) -
+self-recursive peano and mutually-recursive ping/pong both decoding real bytes correctly at depth ≥ 2,
+plus a left-recursion-still-rejected case reached via `decoder::Compiler::compile_program` rather than
+calling `MatchTree::build` directly. `cargo testall` clean; `cargo cg` byte-identical.
+
+**Known, deliberately deferred**: the same unguarded-`ItemVar`-recursion shape also exists in
+`Format::is_ascii_char_format`/`is_ascii_string_format` (`src/format.rs`) and several `output/`-module
+functions (`flat.rs`'s `check_covered`/`write_flat`; `tree.rs`'s `is_implied_value_format`,
+`is_atomic_format`, `try_as_record_with_atomic_fields`, `unwrap_itemvars`,
+`compile_decoded_parsedvalue`, `compile_decoded_value`). None of these sit on the core decode/codegen
+path - they're naming heuristics and `doodle format --output debug`-style pretty-printing/coverage
+tooling - and none block Phases 3-5's own deliverables, so they were left unfixed and are just
+flagged here as the same bug class, for whoever eventually exercises a recursive format through one
+of those tools.
+
+---
+
 ## Phase 2 — `TypeChecker::occurs_in` generalization
 
 **Read first**: doodle-rec's `src/typecheck.rs` in full, specifically the `occurs_in`/
@@ -524,7 +618,8 @@ complete.
 | Phase | Status | Commit(s) | Notes |
 |---|---|---|---|
 | 0 — Reconnaissance | Done | (uncommitted) | All anchors confirmed accurate modulo minor line drift; Phase 1 TRIAGE resolved (reuse `MatchTree::build`'s existing `Option`→`anyhow!` convention); see "Phase 0 findings" section above |
-| 1 — MatchTree cycle guard | Done | (pending) | `CycleGuard` (open-set + `detected` flag) threaded through `MatchTreeStep::from_format`/`from_gt_format`/`from_next`/helpers in `src/lib.rs`; `Format::ItemVar` and `TypedFormat::FormatCall` both insert/remove their own level around the recursive call; `MatchTreeLevel::grow` creates a fresh guard per top-level step and returns `None` outright the instant `detected` fires (reusing the existing "cannot build match tree" convention, not a silent per-branch `reject()`). See "Phase 1 design note" below for why total-failure-propagation was chosen over a local reject. 3 regression tests added directly in `src/lib.rs`'s `mod test` (guarded peano-shaped recursion terminates+disambiguates; genuine zero-progress self-reference sets `guard.detected`; `MatchTree::build` itself returns `None` on that case) - bypassing `define_format`'s type-checked registration on purpose, since it still cannot express a non-`Phantom` self-reference (see `reserve_recursive_level`'s doc comment) and these tests only need to exercise `MatchTreeStep`/`MatchTree` construction, not the full pipeline. Bug-injection verified: with the `ItemVar` guard temporarily removed, the left-recursion test reproduces a real stack overflow (not a hang or unrelated crash), confirming the test actually exercises the fix. `cargo testall` clean; `cargo cg` diff against pre-change `generated/gencode.rs` is byte-identical. `TypedFormat::FormatCall`'s guard mirrors `ItemVar`'s for correctness/symmetry, but is very likely dead code today - `MatchTree::build`'s only entry point takes `&[Format]` (untyped), and nothing outside this `impl` block calls `from_gt_format`/`from_mt_format` (confirmed via `find_references`) - so it wasn't given its own dedicated unit test/bug-injection round; flagged here for whoever eventually wires up a live typed entry point. |
+| 1 — MatchTree cycle guard | Done | 1d47955 | `CycleGuard` (open-set + `detected` flag) threaded through `MatchTreeStep::from_format`/`from_gt_format`/`from_next`/helpers in `src/lib.rs`; `Format::ItemVar` and `TypedFormat::FormatCall` both insert/remove their own level around the recursive call; `MatchTreeLevel::grow` creates a fresh guard per top-level step and returns `None` outright the instant `detected` fires (reusing the existing "cannot build match tree" convention, not a silent per-branch `reject()`). See "Phase 1 design note" below for why total-failure-propagation was chosen over a local reject. 3 regression tests added directly in `src/lib.rs`'s `mod test` (guarded peano-shaped recursion terminates+disambiguates; genuine zero-progress self-reference sets `guard.detected`; `MatchTree::build` itself returns `None` on that case) - bypassing `define_format`'s type-checked registration on purpose, since it still cannot express a non-`Phantom` self-reference (see `reserve_recursive_level`'s doc comment) and these tests only need to exercise `MatchTreeStep`/`MatchTree` construction, not the full pipeline. Bug-injection verified: with the `ItemVar` guard temporarily removed, the left-recursion test reproduces a real stack overflow (not a hang or unrelated crash), confirming the test actually exercises the fix. `cargo testall` clean; `cargo cg` diff against pre-change `generated/gencode.rs` is byte-identical. `TypedFormat::FormatCall`'s guard mirrors `ItemVar`'s for correctness/symmetry, but is very likely dead code today - `MatchTree::build`'s only entry point takes `&[Format]` (untyped), and nothing outside this `impl` block calls `from_gt_format`/`from_mt_format` (confirmed via `find_references`) - so it wasn't given its own dedicated unit test/bug-injection round; flagged here for whoever eventually wires up a live typed entry point. |
+| 1.5 — Batch construction API + 3 more unguarded-recursion bugs | Done | (pending) | Not in the original plan - see "Phase 1.5" section above. `Format::RecVar` (construction-time sugar, rewritten to `ItemVar` before install) + `FormatModule::define_format_rec_batch`; fixed `depends_on_next`/`match_bounds`/`lookahead_bounds` (unguarded `ItemVar` recursion, confirmed stack-overflowing in isolation) and the `Tuple`/`Sequence` `Next`-wrapping bug that broke `decoder_map` memoization for any self-reference. 3 new end-to-end tests (peano, ping/pong, left-recursion-rejected) via the real public API. `cargo testall` clean; `cargo cg` byte-identical. |
 | 2 — `occurs_in` generalization | Not started | | |
 | 3 — `CodeGen` Box placement | Not started | | |
 | 4 — Decode-time confirmation | Not started | | |

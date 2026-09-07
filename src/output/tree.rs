@@ -121,6 +121,9 @@ impl<'module> TreePrinter<'module> {
             Format::ItemVar(level, _args, _views) => {
                 self.is_implied_value_format(self.module.get_format(*level))
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::EndOfInput => true,
             Format::Phantom(_) => true,
             Format::Byte(bs) => bs.len() == 1,
@@ -468,6 +471,9 @@ impl<'module> TreePrinter<'module> {
                     self.compile_decoded_parsedvalue(value, self.module.get_format(*level))
                 }
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Fail => panic!("uninhabited format (value={value:?}"),
             Format::EndOfInput | Format::SkipRemainder => self.compile_parsed_value(value),
             Format::Align(_) => self.compile_parsed_value(value),
@@ -665,6 +671,9 @@ impl<'module> TreePrinter<'module> {
                     self.compile_decoded_value(value, self.module.get_format(*level))
                 }
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::DecodeBytes(_bytes, f) => self.compile_decoded_value(value, f),
             Format::ParseFromView(_view, f) => self.compile_decoded_value(value, f),
             Format::Fail => panic!("uninhabited format (value={value}"),
@@ -2201,6 +2210,9 @@ impl<'module> TreePrinter<'module> {
     fn compile_format(&self, format: &Format, prec: Precedence) -> Fragment {
         match format {
             Format::Phantom(_f) => Fragment::string("phantom"),
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Variant(label, f) => cond_paren(
                 self.compile_nested_format(
                     "variant",

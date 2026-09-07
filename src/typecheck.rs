@@ -3495,6 +3495,9 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::ForEach(expr, lbl, inner) => {
                 let newvar = self.get_new_uvar();
                 let v_expr = self.infer_var_expr(expr, ctxt.scope)?;
