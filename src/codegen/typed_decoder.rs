@@ -468,11 +468,17 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(
-                        MaybeTyped::Typed(fields.as_slice()),
-                        next.clone(),
-                    ));
-                    let df = self.compile_gt_format(f, None, next)?;
+                    let remaining = fields.as_slice();
+                    // See the identical fix in `decoder::Compiler::compile_format`'s `Tuple` arm:
+                    // an empty remaining-fields wrapper is semantically a no-op, but for a
+                    // self-referential format it breaks `decoder_map`'s `(level, next)`
+                    // memoization by making `next` grow a new layer on every re-entry.
+                    let field_next = if remaining.is_empty() {
+                        next.clone()
+                    } else {
+                        Rc::new(Next::Sequence(MaybeTyped::Typed(remaining), next.clone()))
+                    };
+                    let df = self.compile_gt_format(f, None, field_next)?;
                     dfields.push(df);
                 }
                 Ok(TypedDecoder::Tuple(gt.clone(), dfields))
@@ -481,11 +487,13 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(
-                        MaybeTyped::Typed(fields.as_slice()),
-                        next.clone(),
-                    ));
-                    let df = self.compile_gt_format(f, None, next)?;
+                    let remaining = fields.as_slice();
+                    let field_next = if remaining.is_empty() {
+                        next.clone()
+                    } else {
+                        Rc::new(Next::Sequence(MaybeTyped::Typed(remaining), next.clone()))
+                    };
+                    let df = self.compile_gt_format(f, None, field_next)?;
                     dfields.push(df);
                 }
                 Ok(TypedDecoder::Sequence(gt.clone(), dfields))

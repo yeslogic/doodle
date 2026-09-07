@@ -1089,6 +1089,72 @@ impl FormatModule {
         self_ref
     }
 
+    /// Registers a batch of mutually-referencing formats under the given names.
+    ///
+    /// Unlike [`Self::define_format_phantom_rec_args_views`] (which permits exactly one format to
+    /// reference only its own, [`Format::Phantom`]-confined level), this reserves
+    /// `formats.len()` levels up front, then rewrites every [`Format::RecVar`] in each supplied
+    /// body to the real, absolute [`Format::ItemVar`] for its batch position (`RecVar(0)` is the
+    /// first name in `formats`, `RecVar(1)` the second, and so on - "self" for a singly-recursive
+    /// member is just `RecVar` of its own batch position). Every occurrence is rewritten before
+    /// the format is ever installed into the module, so no other pass over `Format` ever
+    /// encounters a `RecVar` - see that variant's own doc comment.
+    ///
+    /// No `args`/`views` support (matching the shape of a plain [`Self::define_format`] call per
+    /// batch member); add a `_views`/`_args`-suffixed sibling if a real recursive format ever
+    /// needs them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any constructed format fails to type-check.
+    pub fn define_format_rec_batch<L: IntoLabel>(
+        &mut self,
+        formats: Vec<(L, Format)>,
+    ) -> Vec<FormatRef> {
+        let start = self.names.len();
+        let n = formats.len();
+
+        // Reserve every level in the batch before any body is installed, so that a RecVar-derived
+        // ItemVar reference to any batch member (including itself) resolves to a real (if still
+        // type-provisional) slot rather than indexing out of bounds.
+        let mut names = Vec::with_capacity(n);
+        let mut bodies = Vec::with_capacity(n);
+        for (name, format) in formats {
+            names.push(name.into());
+            bodies.push(format);
+        }
+        for name in &names {
+            self.names.push(name.clone());
+            self.args.push(Vec::new());
+            self.views.push(Vec::new());
+            self.formats.push(Format::EMPTY);
+            self.format_types.push(ValueType::Any);
+        }
+        for (ix, format) in bodies.into_iter().enumerate() {
+            self.formats[start + ix] = format.substitute_rec_var(start);
+        }
+
+        // `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
+        // level's body - it just reads `format_types[level]` directly (see that method) - so,
+        // unlike an eager equirecursive inference engine, no occurs-tracking is needed here: a
+        // still-provisional sibling (including self) is read as-is (currently `ValueType::Any`,
+        // which `ValueType::unify` always accepts unconditionally) and treated as an
+        // already-terminating leaf. Processing members in `formats`-order means a member
+        // referencing an *earlier* sibling sees that sibling's real, already-solved type, while
+        // one referencing a *later* sibling (or itself) sees the placeholder - an accepted,
+        // order-dependent imprecision, not a soundness gap for this module's own purposes.
+        for ix in start..start + n {
+            let scope = TypeScope::new();
+            let format_type = match self.infer_format_type(&scope, &self.formats[ix]) {
+                Ok(t) => t,
+                Err(msg) => panic!("Failed to solve type for {}: {msg}", self.names[ix]),
+            };
+            self.format_types[ix] = format_type;
+        }
+
+        (start..start + n).map(FormatRef).collect()
+    }
+
     pub fn get_name(&self, level: usize) -> &str {
         &self.names[level]
     }
@@ -1158,6 +1224,9 @@ impl FormatModule {
                 }
                 Ok(self.get_format_type(*level).clone())
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
                 match bytes_type {
@@ -2212,6 +2281,9 @@ impl<'a> MatchTreeStep<'a> {
                 guard.open.remove(&level);
                 step
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Phantom(..) => Self::accept(),
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
@@ -2838,6 +2910,150 @@ mod test {
             tree.is_none(),
             "MatchTree::build must fail outright (None) on a genuinely left-recursive format, \
              not silently drop the offending branch"
+        );
+    }
+
+    /// End-to-end test of `FormatModule::define_format_rec_batch` for a self-recursive format,
+    /// through the *real* public registration API (unlike the hand-poked-field tests above) and
+    /// the actual interpreter, at real recursion depth >= 2 - proving `Format::RecVar`'s
+    /// construction-time rewrite, `infer_format_type`'s registration-time type inference, and the
+    /// Phase 1 `MatchTree` cycle guard all compose correctly for a format nobody could have built
+    /// through the public API before this.
+    #[test]
+    fn define_format_rec_batch_self_recursive_peano_decodes() {
+        use crate::helper::is_byte;
+        use decoder::Value;
+
+        let mut module = FormatModule::new();
+        let peano_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let peano_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &peano_ref.call()).unwrap();
+        let buf = ReadCtxt::new(b"SSZ");
+        let (ret, _) = prog.run(buf).unwrap();
+
+        // Each layer is wrapped in `Value::Branch(index, ..)` recording which `Union` arm (Z=0,
+        // S=1) matched, on top of the `Value::Variant` labeling it - both added by the decoder,
+        // not spelled out in `peano_body` itself.
+        let expected = Value::Branch(
+            1,
+            Box::new(Value::Variant(
+                Label::Borrowed("S"),
+                Box::new(Value::Tuple(vec![
+                    Value::U8(b'S'),
+                    Value::Branch(
+                        1,
+                        Box::new(Value::Variant(
+                            Label::Borrowed("S"),
+                            Box::new(Value::Tuple(vec![
+                                Value::U8(b'S'),
+                                Value::Branch(
+                                    0,
+                                    Box::new(Value::Variant(
+                                        Label::Borrowed("Z"),
+                                        Box::new(Value::U8(b'Z')),
+                                    )),
+                                ),
+                            ])),
+                        )),
+                    ),
+                ])),
+            )),
+        );
+        assert_eq!(expected, ret, "peano-shaped self-recursion decoded incorrectly");
+    }
+
+    /// Same as above, but for genuine *mutual* recursion (two distinct batch members referencing
+    /// each other, not just themselves) - the shape doodle-rec's own port-planning found exercises
+    /// different code paths than self-recursion alone (e.g. Box-placement ordering across distinct
+    /// types, relevant to a later phase). Decodes real input alternating between both members at
+    /// depth >= 2.
+    #[test]
+    fn define_format_rec_batch_mutual_recursion_ping_pong_decodes() {
+        use crate::helper::is_byte;
+        use decoder::Value;
+
+        let mut module = FormatModule::new();
+        // ping (batch index 0) refers to pong (index 1); pong refers back to ping (index 0).
+        let ping_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'X'))),
+            Format::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(Format::Tuple(vec![is_byte(b'p'), Format::RecVar(1)])),
+            ),
+        ]);
+        let pong_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'Y'))),
+            Format::Variant(
+                Label::Borrowed("ToPing"),
+                Box::new(Format::Tuple(vec![is_byte(b'q'), Format::RecVar(0)])),
+            ),
+        ]);
+        let refs =
+            module.define_format_rec_batch(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
+        let ping_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
+        let buf = ReadCtxt::new(b"pqX");
+        let (ret, _) = prog.run(buf).unwrap();
+
+        // See the peano test above for why each layer is wrapped in `Value::Branch(index, ..)`
+        // (Stop=0, ToPong/ToPing=1 in both ping's and pong's own Union) on top of `Value::Variant`.
+        let expected = Value::Branch(
+            1,
+            Box::new(Value::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(Value::Tuple(vec![
+                    Value::U8(b'p'),
+                    Value::Branch(
+                        1,
+                        Box::new(Value::Variant(
+                            Label::Borrowed("ToPing"),
+                            Box::new(Value::Tuple(vec![
+                                Value::U8(b'q'),
+                                Value::Branch(
+                                    0,
+                                    Box::new(Value::Variant(
+                                        Label::Borrowed("Stop"),
+                                        Box::new(Value::U8(b'X')),
+                                    )),
+                                ),
+                            ])),
+                        )),
+                    ),
+                ])),
+            )),
+        );
+        assert_eq!(expected, ret, "ping/pong mutual recursion decoded incorrectly");
+    }
+
+    /// A batch member registered via the real public API can still be genuinely left-recursive
+    /// (`define_format_rec_batch` itself never checks for progress - `infer_format_type` has no
+    /// occurs-check at all, see its own doc comment on `Format::RecVar`) - proving Phase 1's guard
+    /// still catches it at `MatchTree`-build time, reached this time via the ordinary
+    /// `decoder::Compiler::compile_program` entry point rather than calling `MatchTree::build`
+    /// directly, and that registration itself does not hang or panic.
+    #[test]
+    fn define_format_rec_batch_left_recursion_still_rejected_at_compile_time() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        // bad := bad | 'Z' -- zero-progress self-reference in the first branch.
+        let bad_body = Format::Union(vec![Format::RecVar(0), is_byte(b'Z')]);
+        let refs = module.define_format_rec_batch(vec![("test.bad", bad_body)]);
+        let bad_ref = refs[0];
+
+        let result = super::decoder::Compiler::compile_program(&module, &bad_ref.call());
+        assert!(
+            result.is_err(),
+            "compiling a genuinely left-recursive format must fail cleanly, not panic or hang"
         );
     }
 }

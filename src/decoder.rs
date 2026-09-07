@@ -700,6 +700,9 @@ impl<'a> Compiler<'a> {
                 }
                 Ok(Decoder::Call(n, args, views))
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Phantom(_inner) => Ok(Decoder::Phantom),
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
@@ -746,11 +749,19 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(
-                        MaybeTyped::Untyped(fields.as_slice()),
-                        next.clone(),
-                    ));
-                    let df = self.compile_format(f, next)?;
+                    let remaining = fields.as_slice();
+                    // No remaining fields: use `next` as-is rather than wrapping in an empty
+                    // `Next::Sequence` - semantically equivalent, but for a self-referential
+                    // format this keeps `next` structurally identical to whatever the tuple's
+                    // own `next` was, so `decoder_map`'s memoization (keyed on `(level, next)`)
+                    // actually hits instead of growing an unbounded chain of otherwise-empty
+                    // wrappers, one per re-entry.
+                    let field_next = if remaining.is_empty() {
+                        next.clone()
+                    } else {
+                        Rc::new(Next::Sequence(MaybeTyped::Untyped(remaining), next.clone()))
+                    };
+                    let df = self.compile_format(f, field_next)?;
                     decs.push(df);
                 }
                 Ok(Decoder::Tuple(decs))
@@ -759,11 +770,13 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(formats.len());
                 let mut fields = formats.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(
-                        MaybeTyped::Untyped(fields.as_slice()),
-                        next.clone(),
-                    ));
-                    let df = self.compile_format(f, next)?;
+                    let remaining = fields.as_slice();
+                    let field_next = if remaining.is_empty() {
+                        next.clone()
+                    } else {
+                        Rc::new(Next::Sequence(MaybeTyped::Untyped(remaining), next.clone()))
+                    };
+                    let df = self.compile_format(f, field_next)?;
                     decs.push(df);
                 }
                 Ok(Decoder::Sequence(decs))
