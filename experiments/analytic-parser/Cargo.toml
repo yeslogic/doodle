@@ -9,5 +9,5 @@ lalrpop = "0.23.0"
 [dependencies]
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
 doodle = { path = "../../" }
-num-bigint = "0.4.6"
+num-bigint = "0.5.1"
 linefeed = "0.6.0"
