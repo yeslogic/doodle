@@ -594,6 +594,7 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
         self.lt_params.push(lt.into())
     }
 
+    #[expect(dead_code)]
     pub fn push_type(&mut self, ty: impl Into<Ty>) {
         self.ty_params.push(ty.into())
     }
@@ -2505,6 +2506,7 @@ impl RustExpr {
 
     /// Invokes `<self>.<name>::<ty_args>` as a callable method (i.e. using turbofish syntax to specify
     /// explicit generic type-arguments), passing in the argument list produced by iterating over `args`.
+    #[expect(dead_code)]
     pub fn call_method_turbofish(
         self,
         name: impl Into<Label>,
