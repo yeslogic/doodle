@@ -6,6 +6,7 @@ members = [
     "smallsorts",
     "experiments/analytic-parser",
     "doodle-numexpr-macro",
+    "experiments/doodle-rec/",
 ]
 
 [package]
