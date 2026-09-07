@@ -128,6 +128,65 @@ This mirrors how every claim in the sandbox itself was established — don't ski
 
 ---
 
+## Phase 0 findings (recorded 2026-09-07, against current tree on branch `archaephyrryx/doodle-recursion-graft`)
+
+Anchors confirmed accurate unless noted. Drift/new information found:
+
+1. `Format::ItemVar` arm: confirmed unchanged, exactly at `src/lib.rs:2121-2123`
+   (`Self::from_format(module, module.get_format(*level), next)`, zero guard). This is a plain
+   Rust-recursive tail call with **no depth bookkeeping of its own** — it is entirely independent of
+   `MatchTreeLevel::grow`'s `MAX_DEPTH: usize = 80` BFS-level counter (`src/lib.rs:2448-2456`). A
+   self-recursive format with no byte-consuming step before revisiting its own level will stack-overflow
+   *inside this single `from_format` call*, never even reaching `grow`'s depth-limited loop. Confirms
+   the plan's Phase 1 characterization exactly, and clarifies the guard belongs in `from_format` itself,
+   not e.g. as a `grow`-level depth check.
+2. `TypeChecker::occurs_in`: confirmed at `src/typecheck.rs:1333-1366` (glossary said 1330-1364, minor
+   line drift, same function/logic, still exempts exactly `PhantomData`). `UType` enum confirmed at
+   `src/typecheck.rs:330-348`, variant list **exact match** to the glossary's snapshot
+   (`Empty/Hole/ViewObj/Var/Base/Tuple/Record/Seq/Option/PhantomData/Int`) — no drift here at all.
+3. Found a second, unrelated `UType`-adjacent type: `NUType`/`NVType` in `src/typecheck/inference.rs`.
+   This belongs to the numeric/arithmetic-embedding extension (`crate::numeric`), a completely separate
+   system from the `Format`/`Expr` type system this plan targets — not drift, but flagged so a future
+   reader doesn't confuse the two modules by name similarity.
+4. `CodeGen::lift_uvar`: confirmed at `src/codegen/mod.rs:241`, `in_progress` field at `:107-108`
+   exactly as described (`StableMap<UVar, Option<(Label, usize, PathLabel)>, FxHash>`). Also found a
+   companion field `recursion_lt_needed: HashMap<UVar, bool>` not mentioned in the plan, and — more
+   importantly — the existing self-reference-handling code at `lift_uvar`'s `Expansion::Record` arm
+   carries an explicit comment asserting the self-reference case "always" occurs "via a
+   `Format::Phantom`, the only place this can validly occur." **This is the load-bearing assumption
+   Phase 3 needs to generalize** — it's currently hard-assumed to be Phantom-only, and that comment
+   text is the concrete thing to revisit/update when extending to genuine (non-Phantom) recursion.
+5. Drift: `CaseLogic`/`SimpleLogic` **enum definitions** actually live in `src/codegen/mod.rs`
+   (`CaseLogic` at `:3046`, `SimpleLogic` at `:3106`), not `src/codegen/typed_decoder.rs` as the
+   glossary implied. The `decoder_map`/`compile_queue`/reservation-before-walk *logic* (`GTCompiler`,
+   `queue_compile`, `compile_gt_format`'s `FormatCall` arm) is correctly in
+   `src/codegen/typed_decoder.rs`, spanning roughly `:283-410` (glossary's `:284-356` was close but
+   slightly stale).
+6. **Phase 4's core claim independently confirmed**, ahead of schedule: `queue_compile`
+   (`src/codegen/typed_decoder.rs`) pushes a placeholder decoder (`TypedDecoder::Fail`) into
+   `self.program.decoders` and the `FormatCall` arm inserts `(level, next) -> n` into `decoder_map`
+   *before* that queue item is ever popped/compiled. A self-referential `FormatCall` reaching the same
+   `(level, next)` key therefore resolves immediately via the `decoder_map` cache to
+   `TypedDecoder::Call(gt, n, args)`, without ever re-entering `compile_gt_format`. Matches the plan's
+   prediction exactly — pending Phases 1-3 actually landing so a recursive format can reach this path
+   for the first time.
+7. **Phase 1's TRIAGE resolved** (no user escalation needed): `MatchTree::build`
+   (`src/lib.rs:2448`) already returns `Option<MatchTree>`. All four call sites
+   (`src/decoder.rs:731,782,799,837` and `src/codegen/typed_decoder.rs:450,505,526,571`) already share
+   one established failure convention: `None` → `Err(anyhow!("cannot build match tree for {}", ...))`.
+   `src/format.rs:491` additionally uses `.is_none()` as a boolean "is this union ambiguous" check.
+   **Decision: Phase 1's left-recursion case should reuse this exact existing convention** (surface as
+   a `None` from `build`/`grow`, propagating to the same `anyhow!` error every other undisambiguable
+   union already hits) rather than inventing a new error type or panic path.
+8. `TypeChecker::infer_var_format_level`/`level_vars` reservation-before-recursion pattern confirmed
+   exactly as described at `src/typecheck.rs:999-1017`, reinforcing this as a third independently-proven
+   "reserve a placeholder before recursing" instance already live in the codebase.
+
+No other drift found; `doc/DESIGN.md`'s `MatchTree` description is unchanged and contains nothing about
+`ItemVar`/cycles to reconcile against yet (expected — that's what Phase 1 adds).
+
+---
+
 ## Phase 0 — Reconnaissance (run this first, and again if resuming after a gap)
 
 Goal: confirm every location in the glossary above still matches, before changing anything.
@@ -149,6 +208,41 @@ Goal: confirm every location in the glossary above still matches, before changin
 6. Record any drift found (new file locations, renamed types, structural changes) at the top of this
    document, above this Phase 0 section, before proceeding — that keeps the plan honest for the next
    time it's copied elsewhere.
+
+---
+
+## Phase 1 design note (recorded 2026-09-07, after implementation)
+
+Two things worth recording for whoever reads this next, beyond what the TRIAGE resolution in
+"Phase 0 findings" already settled:
+
+1. **`reject()`-on-cycle vs. total-failure-propagation.** Before implementing, direct analysis
+   confirmed the guard can *only* ever fire on a genuinely zero-progress self-reference (any
+   `Format::Byte` along the way already breaks eager descent into a deferred `Next`, evaluated
+   fresh - with an empty guard - at the next lookahead depth), so there is no false-positive risk
+   either way. The remaining question was what a fired guard should *do*. A local `reject()` (the
+   doodle-rec `Next::DelayRef` precedent) would let `MatchTree::build` quietly succeed with the
+   cyclic branch simply un-selectable - and neither `typecheck`'s `occurs_in` (a different,
+   structural property - `ItemVar(X)`'s type is just the same `UVar` as `X` itself, no new
+   structural wrapping to flag) nor either compile path's `decoder_map`/`compile_queue`
+   reservation (both terminate by design regardless of whether the self-reference is guarded or
+   genuinely left-recursive) would catch it later - so the failure would only ever surface as an
+   infinite loop the first time someone actually decodes a byte with it. `MatchTreeLevel::grow`
+   is the *only* pass with the right shape (eager, byte-by-byte descent) to notice "there's no
+   byte to look at here, ever," so it was made to `return None` the instant `guard.detected` fires
+   - reusing the `Option`/`anyhow!("cannot build match tree for {}", ...)` convention already used
+   by every `MatchTree::build` call site (`src/decoder.rs`, `src/codegen/typed_decoder.rs`).
+2. **`TypedFormat::FormatCall`'s guard is likely unreachable today.** For symmetry/correctness
+   (`guard.open` should reflect "currently expanding" precisely, not just "eventually correct
+   after one extra unwind through the untyped body") the same insert-before-recurse/remove-after
+   was added to `from_gt_format`'s `FormatCall` arm, mirroring `from_format`'s `ItemVar` arm.
+   However: `MatchTree::build`'s only parameter is `branches: &[Format]` (untyped - codegen's own
+   `TypedFormat::Union` arm erases branches via `.into()` before calling it), and `find_references`
+   confirmed nothing outside this one `impl<'a> MatchTreeStep<'a>` block calls `from_gt_format`/
+   `from_mt_format` at all - so the typed path appears to be dead code via any currently-live entry
+   point. It was fixed anyway (cheap, and correct-by-construction beats "correct by lucky
+   unreachability"), but wasn't given its own dedicated unit test/bug-injection round for that
+   reason - flag this if/when a live typed `MatchTree`-building entry point is ever wired up.
 
 ---
 
@@ -429,8 +523,8 @@ complete.
 
 | Phase | Status | Commit(s) | Notes |
 |---|---|---|---|
-| 0 — Reconnaissance | Not started | | |
-| 1 — MatchTree cycle guard | Not started | | |
+| 0 — Reconnaissance | Done | (uncommitted) | All anchors confirmed accurate modulo minor line drift; Phase 1 TRIAGE resolved (reuse `MatchTree::build`'s existing `Option`→`anyhow!` convention); see "Phase 0 findings" section above |
+| 1 — MatchTree cycle guard | Done | (pending) | `CycleGuard` (open-set + `detected` flag) threaded through `MatchTreeStep::from_format`/`from_gt_format`/`from_next`/helpers in `src/lib.rs`; `Format::ItemVar` and `TypedFormat::FormatCall` both insert/remove their own level around the recursive call; `MatchTreeLevel::grow` creates a fresh guard per top-level step and returns `None` outright the instant `detected` fires (reusing the existing "cannot build match tree" convention, not a silent per-branch `reject()`). See "Phase 1 design note" below for why total-failure-propagation was chosen over a local reject. 3 regression tests added directly in `src/lib.rs`'s `mod test` (guarded peano-shaped recursion terminates+disambiguates; genuine zero-progress self-reference sets `guard.detected`; `MatchTree::build` itself returns `None` on that case) - bypassing `define_format`'s type-checked registration on purpose, since it still cannot express a non-`Phantom` self-reference (see `reserve_recursive_level`'s doc comment) and these tests only need to exercise `MatchTreeStep`/`MatchTree` construction, not the full pipeline. Bug-injection verified: with the `ItemVar` guard temporarily removed, the left-recursion test reproduces a real stack overflow (not a hang or unrelated crash), confirming the test actually exercises the fix. `cargo testall` clean; `cargo cg` diff against pre-change `generated/gencode.rs` is byte-identical. `TypedFormat::FormatCall`'s guard mirrors `ItemVar`'s for correctness/symmetry, but is very likely dead code today - `MatchTree::build`'s only entry point takes `&[Format]` (untyped), and nothing outside this `impl` block calls `from_gt_format`/`from_mt_format` (confirmed via `find_references`) - so it wasn't given its own dedicated unit test/bug-injection round; flagged here for whoever eventually wires up a live typed entry point. |
 | 2 — `occurs_in` generalization | Not started | | |
 | 3 — `CodeGen` Box placement | Not started | | |
 | 4 — Decode-time confirmation | Not started | | |

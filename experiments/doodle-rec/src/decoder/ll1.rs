@@ -222,7 +222,8 @@ impl<'a> LL1Interpreter<'a> {
         level: usize,
         input: ReadCtxt<'x>,
     ) -> Result<(Value, ReadCtxt<'x>), InterpError>
-    where 'a: 'x
+    where
+        'a: 'x,
     {
         let ctx = self.module.get_ctx(level);
         let format = self.module.get_format(level);
@@ -247,7 +248,8 @@ impl<'a> LL1Interpreter<'a> {
         trace: &mut PathTrace,
         visited: &mut Traversal,
     ) -> Result<(Value, ReadCtxt<'x>), InterpError>
-    where 'a: 'x
+    where
+        'a: 'x,
     {
         match format {
             Format::ItemVar(level) => {
