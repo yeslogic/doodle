@@ -1372,13 +1372,25 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
         TypedExpr::Numeric(_gt, num) => embed_numeric_expr(num),
         TypedExpr::Record(gt, fields) => {
-            let tname = match gt {
-                GenType::Def((_, tname), _) => tname,
+            // `field_types` is `None` only for the `Inline(LocalDef)` case, which (unlike `Def`)
+            // carries no inline struct definition to consult - no known case has ever needed a
+            // `RecBox` field there, so it's left as a plain pass-through rather than speculatively
+            // threading a `defined_types` table into this free function to cover it.
+            let (tname, field_types) = match gt {
+                GenType::Def((_, tname), decl) => {
+                    let field_types = match &decl.def {
+                        RustTypeDef::Struct(RustStruct::Record(fts)) => Some(fts.as_slice()),
+                        other => unreachable!(
+                            "TypedExpr::Record's Def-type is not a Record struct: {other:?}"
+                        ),
+                    };
+                    (tname, field_types)
+                }
                 GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
                     _ix,
                     tname,
                     _,
-                )))) => tname,
+                )))) => (tname, None),
                 other => unreachable!(
                     "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
                 ),
@@ -1389,7 +1401,28 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     fields
                         .iter()
                         .map(|(name, val)| {
-                            let value = match embed_expr_nat(val) {
+                            // Mirrors `box_wrap_if_needed` (used for `Variant`/`Tuple`
+                            // construction) for a record field: if this field's own declared type
+                            // was promoted to `RecBox` (a self/mutually-recursive reference closing
+                            // a cycle through this record - see `CodeGen::lift_uvar`), the
+                            // constructed value must be `Box::new(..)`-wrapped to match, which also
+                            // rules out the field-init shorthand (`{ name }`) below.
+                            let is_rec_box = field_types.is_some_and(|fts| {
+                                fts.iter().any(|(lbl, ty)| {
+                                    lbl == name
+                                        && matches!(
+                                            ty,
+                                            RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
+                                        )
+                                })
+                            });
+                            let embedded = embed_expr_nat(val);
+                            let embedded = if is_rec_box {
+                                embedded.wrap_box()
+                            } else {
+                                embedded
+                            };
+                            let value = match embedded {
                                 RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
                                 other => Some(other),
                             };
@@ -6474,6 +6507,75 @@ mod tests {
         let top2 = frefs2[0].call();
         let src2 = produce_string_gencode(&module2, &top2);
         assert!(src2.contains("Box<ping>"), "source was:\n{src2}");
+    }
+
+    /// Regenerates `tests/recursion/mod.rs` (Phase 5's capstone fixture, see
+    /// `experiments/doodle-rec/PLAN.md` and `doc/RECURSION.md`) from the real production codegen
+    /// path, for provenance: that file should always be exactly what the last run of this test
+    /// produced, never hand-edited. `peano` and `ping` are the same Union-based shapes as
+    /// `phase3_final_check_peano_and_ping_pong` above, but `pong` is a named `Format::record`
+    /// here, not a raw `Tuple` - a raw-`Tuple` `pong` hits Finding A's still-open recompute
+    /// inconsistency (`Decoder_pong`'s own return-type signature disagreeing with `ping::More`'s
+    /// field type on whether `pong`'s back-reference to `ping` needs `Box`ing) the moment the
+    /// generated source is actually compiled, which `phase3_final_check_peano_and_ping_pong`
+    /// itself never does (string-level check only). Both batches are registered in one shared
+    /// `FormatModule`, with a synthetic `Tuple` of both entry points as the `generate_code` top
+    /// format - never actually decoded as such by `tests/recursion/codegen_tests.rs` (which calls
+    /// `Decoder_peano`/`Decoder_ping` directly), only used to make both batches reachable from one
+    /// codegen invocation so the fixture is one coherent, consistently-numbered artifact rather
+    /// than two separately-generated snippets pasted together.
+    ///
+    /// After changing the format definitions below, run:
+    /// ```sh
+    /// cargo test --lib -p doodle codegen::tests::regenerate_recursion_fixture -- --ignored
+    /// ```
+    /// then re-run `cargo test --test recursion` to confirm the frozen decoders still behave as
+    /// `codegen_tests.rs` expects.
+    #[test]
+    #[ignore = "regenerates tests/recursion/mod.rs from the real codegen path; run explicitly after changing the format definitions in this test"]
+    fn regenerate_recursion_fixture() {
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let ping = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Done"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("More"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'A'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let pong = record([
+            ("tag", Format::Byte(ByteSet::from([b'B']))),
+            ("next", Format::RecVar(0)),
+        ]);
+
+        let mut module = FormatModule::new();
+        let peano_refs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+        let pingpong_refs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("ping"), ping),
+            (Label::Borrowed("pong"), pong),
+        ]);
+        let top = Format::Tuple(vec![peano_refs[0].call(), pingpong_refs[0].call()]);
+
+        let src = produce_string_gencode(&module, &top);
+        let dest = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/recursion/mod.rs");
+        std::fs::write(dest, src).expect("failed to regenerate tests/recursion/mod.rs");
     }
 
     #[test]

@@ -734,6 +734,59 @@ complete.
 
 ---
 
+## Phase 5 findings (recorded 2026-09-09, after implementation)
+
+Used the recommended shape exactly (peano self-recursive, ping/pong mutually-recursive), built via
+`tests/recursion/` (`mod.rs`/`codegen_tests.rs`/`api_helper.rs`, matching the `tests/runtime_repeat`/
+`tests/permit_state_error` convention precisely, registered as its own `[[test]]` in `Cargo.toml`).
+`tests/recursion/mod.rs` is never hand-edited - it's frozen output of `src/codegen/mod.rs`'s
+`#[ignore]`d `regenerate_recursion_fixture` test (per the user's explicit direction, to keep the
+fixture's provenance traceable/reproducible rather than a one-off manual paste). Deliverables:
+
+- Typecheck: already covered by Phase 2's own end-to-end test plus every `define_format_rec_batch`
+  call's own panic-on-typecheck-failure registration; no new test needed here specifically.
+- MatchTree/interpreted-decode: existing Phase 1.5 tests already covered depth ≥ 2 decode for both
+  shapes. The one genuinely missing piece per this phase's own deliverable list - a malformed-input
+  rejection case through the *interpreter*, as opposed to the build-time left-recursion rejection
+  Phase 1.5 already covers - is new:
+  `define_format_rec_batch_self_recursive_peano_rejects_malformed_input` (`src/lib.rs`), proving a
+  well-formed recursive grammar's `MatchTree`/decoder still correctly rejects bad bytes reached mid-
+  recursion, not just at the top level.
+- Codegen: `tests/recursion/codegen_tests.rs`, a real `rustc`/`cargo test` round-trip (not a bare
+  `rustc` probe - `[[test]]` compiles it as part of the normal workspace build) - decodes real bytes
+  at depth ≥ 2 for both peano and ping/pong, plus a malformed-input rejection case for each.
+
+**A second, previously-undiscovered Box-placement gap was found and fixed**, the first time anyone
+actually tried to `rustc`-compile a self-referential `Format::record`'s generated output (every prior
+check of this shape - Phase 3's `phase3_final_check_peano_and_ping_pong`, Phase 4's
+`recursive_format_through_record_field_generates_no_dead_decoder` - was a string-level check only,
+never an actual compile): `box_wrap_if_needed` (Phase 3's Box-insertion helper) is only ever consulted
+from `CodeGen::translate`'s `TypedDecoder::Variant`/`TypedDecoder::Tuple` arms; a record's closing
+`Compute(Record(...))` step is a plain `Expr`, translated by the free function `embed_expr`'s
+`TypedExpr::Record` arm - a separate code path with no `RecBox` awareness at all. Concretely: `pong`'s
+*type* declaration correctly said `next: Box<ping>`, but `Decoder_pong`'s *construction* built
+`pong { tag, next }` (unboxed) - a real `E0308` type mismatch, not cosmetic. Fixed by having
+`embed_expr`'s `TypedExpr::Record` arm consult the record's own declared field types (available
+inline off `GenType::Def`'s `RustTypeDecl`, no `defined_types` table needed from this free function)
+and calling `.wrap_box()` on any field whose declared type is `RecBox`-wrapped, mirroring
+`box_wrap_if_needed` exactly. Bug-injection-verified: disabling the check reproduces the exact
+predicted `rustc` error (`expected Box<ping>, found ping`, with `rustc`'s own suggested fix matching
+what's already there) on `tests/recursion`'s own build. `cargo cg` byte-identical - a `RecBox`-wrapped
+field type only exists on an already-recursive format, so no existing non-recursive record is
+affected. See `doc/RECURSION.md`'s "Box placement in codegen" section for the permanent writeup.
+
+This also settled which shape to use for `pong`: a raw-`Tuple` `pong` (matching
+`phase3_final_check_peano_and_ping_pong`'s existing shape) hits Finding A's still-open recompute
+inconsistency instead (`Decoder_pong`'s own return-type signature disagreeing with `ping::More`'s
+field type on whether `pong`'s back-reference to `ping` needs boxing) the moment it's actually
+compiled - confirmed directly, not assumed. `tests/recursion/`'s `pong` is therefore a named
+`Format::record` (`{ tag, next }`), exactly the workaround Finding A's own writeup already
+anticipated. Finding A itself remains open and unfixed for the raw-`Tuple` shape.
+
+`cargo testall` clean; `cargo fmt` clean; `cargo cg` byte-identical.
+
+---
+
 ## Phase 6 — Full-suite verification and wrap-up
 
 1. `cargo fmt -- --check` (project-wide, not just changed files).
@@ -785,5 +838,5 @@ complete.
 | 2 — `occurs_in` generalization | Done | 35b978b | Both TRIAGE items resolved directly from code: indirection boundaries are `Tuple`/`Record`/`Seq`/`Option` plus `Constraints::Variant`'s labeled `VarMap` entries (real doodle has no `UType::Union` - sum-type-ness lives in `Constraints`, not `UType`) and `Constraint::Proj`'s `TupleWith`/`RecordWith`/`SeqOf`/`OptOf`; `Constraint::Equiv` and plain `Var`-forwarding are not boundaries. `PhantomData` keeps its existing unconditional exemption unchanged (already fully opaque, doesn't even bind its inner content). `occurs_in`/`occurs_in_constraints` now thread `indirected: bool` + `visited: &mut HashSet<(UVar, bool)>` (keyed by canonical constraint-index, never reset at boundaries) mirroring the design directly. 4 low-level tests mirroring doodle-rec's own names (`direct_self_alias_with_no_indirection_is_rejected`, `self_reference_behind_a_tuple_is_accepted`, `self_reference_behind_a_union_variant_is_accepted` - real doodle's Union analog, `an_unrelated_pre_existing_cycle_does_not_hang_occurs_check`) plus one end-to-end test proving a genuinely self-recursive format (built via Phase 1.5's `define_format_rec_batch`) now typechecks through the real `TypeChecker::infer_module` entry point, not just the isolated `occurs` check. Bug-injection verified in two rounds: disabling the base rejection breaks `direct_self_alias_...` as predicted; disabling just the `Tuple` boundary breaks exactly the two tests that rely on it (`self_reference_behind_a_tuple_is_accepted` and the unrelated-cycle test, which also crosses a `Tuple`) and no others. `cargo testall` clean; `cargo cg` byte-identical. |
 | 3 — `CodeGen` Box placement | Type+construction-site `Box` done; nominal-promotion for self-referential `Tuple` deliberately out of scope | (uncommitted) | See "Phase 3 & 4 findings" above. `CompType::RecBox` + full trait wiring; `RustExpr::wrap_box`/`GenExpr::WrapBox`/`DerivedLogic::WrapBox` construction-site insertion; `Expansion::Tuple`/`Seq`/`Option` cycle-guards (reject-loudly, not promote); `Format::Phantom` regression found and fixed (`in_phantom_context`). `cargo testall` clean, `cargo cg` byte-identical, bug-injection-verified. |
 | 4 — Decode-time confirmation | Done | (uncommitted) | Contra this phase's own "expected: no code changes": found, root-caused, and fixed Finding B. `LetFormat`/`MonadSeq`'s compile arms in both `decoder::Compiler::compile_format` and `codegen::typed_decoder::GTCompiler::compile_gt_format` now skip the `Next::Cat` wrap when the trailing continuation can only match zero bytes (`second.match_bounds(module).as_exact() == Some(0)`) and use `next` directly — same bug class and fix shape as Phase 1.5's `Tuple`/`Sequence` special-casing, unaudited for this pair until now. 2 new end-to-end regression tests: `define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes` (`src/lib.rs`, interpreter path) and `recursive_format_through_record_field_generates_no_dead_decoder` (`src/codegen/mod.rs`, codegen path). Bug-injection verified independently for each compile path: disabling the interpreter half hangs `compile_program` (unbounded `compile_queue` growth); disabling the codegen half reproduces the exact predicted `Decoder3(...) { return Err(ParseError::FailToken(...)) }` dead decoder. `cargo testall` clean. `cargo cg` diff is non-empty but confirmed pure `decoder_map` dedup/renumbering (see Finding B writeup above and the revised byte-identical rule in "Non-negotiable safety constraints") — not a regression. |
-| 5 — Capstone integration test | Not started | | |
+| 5 — Capstone integration test | Done | (uncommitted) | See "Phase 5 findings" above. `tests/recursion/` fixture (peano self-recursive, ping/pong mutually-recursive with `pong` as a `Format::record`) - real production codegen output, frozen by `src/codegen/mod.rs`'s `#[ignore]`d `regenerate_recursion_fixture`, actually compiled and run via `cargo test --test recursion` against real crafted bytes at depth ≥ 2 for both shapes plus malformed-input rejection for each. Found and fixed a second, previously-undiscovered Box-placement gap (`embed_expr`'s `TypedExpr::Record` arm never boxed a self-referential field's constructed value) - the first time this project actually `rustc`-compiled a self-referential `Format::record`'s output. Also added the one missing interpreter-path deliverable, a malformed-input rejection test (`define_format_rec_batch_self_recursive_peano_rejects_malformed_input`, `src/lib.rs`). `cargo testall` clean, `cargo fmt` clean, `cargo cg` byte-identical. |
 | 6 — Full-suite verification | Not started | | |

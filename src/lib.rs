@@ -2973,6 +2973,36 @@ mod test {
         );
     }
 
+    /// Phase 5's capstone (see `experiments/doodle-rec/PLAN.md`) explicitly calls for a
+    /// malformed-input rejection case through the interpreter, not just the build-time
+    /// left-recursion rejection `define_format_rec_batch_left_recursion_still_rejected_at_compile_time`
+    /// already covers - this proves a *well-formed* recursive grammar's `MatchTree`/decoder still
+    /// correctly rejects bad bytes deep inside a real recursive descent, not just at the top level.
+    #[test]
+    fn define_format_rec_batch_self_recursive_peano_rejects_malformed_input() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let peano_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let peano_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &peano_ref.call()).unwrap();
+        // Two valid 'S' layers deep, then a byte that is neither 'S' nor 'Z' - must be rejected
+        // from *within* the recursive descent, not just at the top-level call.
+        let buf = ReadCtxt::new(b"SSX");
+        assert!(
+            prog.run(buf).is_err(),
+            "a byte that is neither 'Z' nor 'S', reached mid-recursion, must be rejected"
+        );
+    }
+
     /// Same as above, but for genuine *mutual* recursion (two distinct batch members referencing
     /// each other, not just themselves) - the shape doodle-rec's own port-planning found exercises
     /// different code paths than self-recursion alone (e.g. Box-placement ordering across distinct
