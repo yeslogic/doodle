@@ -627,18 +627,26 @@ impl Format {
             Format::Variant(label, f) => {
                 Format::Variant(label, Box::new(f.substitute_rec_var(start)))
             }
-            Format::Union(fs) => {
-                Format::Union(fs.into_iter().map(|f| f.substitute_rec_var(start)).collect())
-            }
-            Format::UnionNondet(fs) => Format::UnionNondet(
-                fs.into_iter().map(|f| f.substitute_rec_var(start)).collect(),
+            Format::Union(fs) => Format::Union(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
             ),
-            Format::Tuple(fs) => {
-                Format::Tuple(fs.into_iter().map(|f| f.substitute_rec_var(start)).collect())
-            }
-            Format::Sequence(fs) => {
-                Format::Sequence(fs.into_iter().map(|f| f.substitute_rec_var(start)).collect())
-            }
+            Format::UnionNondet(fs) => Format::UnionNondet(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
+            Format::Tuple(fs) => Format::Tuple(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
+            Format::Sequence(fs) => Format::Sequence(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
             Format::Repeat(f) => Format::Repeat(Box::new(f.substitute_rec_var(start))),
             Format::Repeat1(f) => Format::Repeat1(Box::new(f.substitute_rec_var(start))),
             Format::RepeatCount(expr, f) => {
@@ -712,9 +720,7 @@ impl Format {
             Format::Phantom(f) => Format::Phantom(Box::new(f.substitute_rec_var(start))),
             #[cfg(feature = "format_enforce")]
             Format::Enforce(f) => Format::Enforce(Box::new(f.substitute_rec_var(start))),
-            Format::Permit(f, expr) => {
-                Format::Permit(Box::new(f.substitute_rec_var(start)), expr)
-            }
+            Format::Permit(f, expr) => Format::Permit(Box::new(f.substitute_rec_var(start)), expr),
         }
     }
 }

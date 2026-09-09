@@ -2967,7 +2967,10 @@ mod test {
                 ])),
             )),
         );
-        assert_eq!(expected, ret, "peano-shaped self-recursion decoded incorrectly");
+        assert_eq!(
+            expected, ret,
+            "peano-shaped self-recursion decoded incorrectly"
+        );
     }
 
     /// Same as above, but for genuine *mutual* recursion (two distinct batch members referencing
@@ -2996,8 +2999,8 @@ mod test {
                 Box::new(Format::Tuple(vec![is_byte(b'q'), Format::RecVar(0)])),
             ),
         ]);
-        let refs =
-            module.define_format_rec_batch(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
+        let refs = module
+            .define_format_rec_batch(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
         let ping_ref = refs[0];
 
         let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
@@ -3031,7 +3034,98 @@ mod test {
                 ])),
             )),
         );
-        assert_eq!(expected, ret, "ping/pong mutual recursion decoded incorrectly");
+        assert_eq!(
+            expected, ret,
+            "ping/pong mutual recursion decoded incorrectly"
+        );
+    }
+
+    /// Same mutual recursion as above, but with each variant's payload built via
+    /// [`crate::helper::record`] (the "1-tuple variant convention real doodle productions end up
+    /// with") rather than a raw `Tuple`. This is the exact shape that surfaced Phase 4's "Finding
+    /// B" (see `experiments/doodle-rec/PLAN.md`): `Format::record`'s desugaring to nested
+    /// `LetFormat`s ending in a zero-width `Compute(Record(...))` step wrapped `next` in a
+    /// `Next::Cat` for the recursive last field, even though that wrapper adds no real lookahead
+    /// information - giving the self-referential field a structurally different `next` than its
+    /// own top-level entry used, missing `decoder_map`'s `(level, next)` cache and (in
+    /// `codegen::typed_decoder`) compiling into a dead always-failing decoder. Here we exercise
+    /// `decoder::Compiler`'s identically-shaped bug in the plain interpreter path: before the
+    /// `LetFormat`/`MonadSeq` fix, `pong`'s `next` field failed to build a `MatchTree` for its
+    /// duplicate compile of `ping`, surfacing as an `anyhow!` error from `compile_program` rather
+    /// than a decode.
+    #[test]
+    fn define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes() {
+        use crate::helper::{is_byte, record};
+        use decoder::Value;
+
+        let mut module = FormatModule::new();
+        let ping_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'X'))),
+            Format::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(record([
+                    ("tag", is_byte(b'p')),
+                    ("next", Format::RecVar(1)),
+                ])),
+            ),
+        ]);
+        let pong_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'Y'))),
+            Format::Variant(
+                Label::Borrowed("ToPing"),
+                Box::new(record([
+                    ("tag", is_byte(b'q')),
+                    ("next", Format::RecVar(0)),
+                ])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![
+            ("test.ping_rec", ping_body),
+            ("test.pong_rec", pong_body),
+        ]);
+        let ping_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
+        let buf = ReadCtxt::new(b"pqX");
+        let (ret, _) = prog.run(buf).unwrap();
+
+        // Same `Value::Branch`/`Value::Variant` wrapping as the raw-`Tuple` version above; the
+        // variant payload itself is now a `Value::Record` (tag, next) rather than a `Value::Tuple`.
+        let expected = Value::Branch(
+            1,
+            Box::new(Value::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(Value::Record(vec![
+                    (Label::Borrowed("tag"), Value::U8(b'p')),
+                    (
+                        Label::Borrowed("next"),
+                        Value::Branch(
+                            1,
+                            Box::new(Value::Variant(
+                                Label::Borrowed("ToPing"),
+                                Box::new(Value::Record(vec![
+                                    (Label::Borrowed("tag"), Value::U8(b'q')),
+                                    (
+                                        Label::Borrowed("next"),
+                                        Value::Branch(
+                                            0,
+                                            Box::new(Value::Variant(
+                                                Label::Borrowed("Stop"),
+                                                Box::new(Value::U8(b'X')),
+                                            )),
+                                        ),
+                                    ),
+                                ])),
+                            )),
+                        ),
+                    ),
+                ])),
+            )),
+        );
+        assert_eq!(
+            expected, ret,
+            "ping/pong mutual recursion through Format::record decoded incorrectly"
+        );
     }
 
     /// A batch member registered via the real public API can still be genuinely left-recursive

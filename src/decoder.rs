@@ -956,14 +956,27 @@ impl<'a> Compiler<'a> {
             }
             Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
             Format::LetFormat(first, name, second) => {
-                let a_next = Next::Cat(MaybeTyped::Untyped(second), next.clone());
-                let da = Box::new(self.compile_format(first, Rc::new(a_next))?);
+                // If `second` can only ever match zero bytes (the common case for a record's
+                // closing `Compute(Record(...))` step), wrapping `next` in a `Next::Cat` adds no
+                // real lookahead information but does change `next`'s structure - for a
+                // self-referential `first`, that defeats `decoder_map`'s `(level, next)`
+                // memoization (see Phase 4's "Finding B"), so use `next` directly instead.
+                let a_next = if second.match_bounds(self.module).as_exact() == Some(0) {
+                    next.clone()
+                } else {
+                    Rc::new(Next::Cat(MaybeTyped::Untyped(second), next.clone()))
+                };
+                let da = Box::new(self.compile_format(first, a_next)?);
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::LetFormat(da, name.clone(), db))
             }
             Format::MonadSeq(first, second) => {
-                let a_next = Next::Cat(MaybeTyped::Untyped(second), next.clone());
-                let da = Box::new(self.compile_format(first, Rc::new(a_next))?);
+                let a_next = if second.match_bounds(self.module).as_exact() == Some(0) {
+                    next.clone()
+                } else {
+                    Rc::new(Next::Cat(MaybeTyped::Untyped(second), next.clone()))
+                };
+                let da = Box::new(self.compile_format(first, a_next)?);
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::MonadSeq(da, db))
             }

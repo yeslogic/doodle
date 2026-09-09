@@ -226,7 +226,9 @@ impl HeapOptimize for MachineSint {
 impl HeapOptimize for CompType<Box<RustType>> {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            CompType::Vec(..) | CompType::RecBox(..) => (HeapAction::Noop, mk_layout(self, context)),
+            CompType::Vec(..) | CompType::RecBox(..) => {
+                (HeapAction::Noop, mk_layout(self, context))
+            }
             CompType::Option(inner) => {
                 let (outcome, _) = inner.heap_hint(strategy, context);
                 match &outcome {
