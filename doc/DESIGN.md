@@ -153,3 +153,28 @@ UnifySteps(Steps: [(FormatIx, MatchTreeStep)]):
 ```
 
 (This is effectively an outline of a a left-fold expansion of the method `MatchTreeLevel::merge_step`).
+
+## Cycle guard for self-referential formats
+
+`MatchTreeStep::from_format`'s eager descent needs its own termination check wherever it recurses
+into a `Format::ItemVar`, since a genuinely self-referential format (one whose level transitively
+refers back to itself, built via `FormatModule::define_format_rec_batch` - see `doc/RECURSION.md`
+for the full recursion-model writeup, this section only covers `MatchTree`'s own piece of it) would
+otherwise recurse in plain Rust call-stack fashion with no depth bookkeeping at all, independent of
+`MatchTreeLevel::grow`'s own `MAX_DEPTH` BFS-level counter.
+
+A `CycleGuard` (open-level set + a `detected` flag) is threaded through the whole `from_format` call
+chain, opened around the recursive descent into an `ItemVar`'s target level and closed on the way
+back out. Re-entering an already-open level can only happen with **zero bytes consumed** since it was
+opened - any `Format::Byte` reached along the way already breaks eager descent into a deferred,
+lazily-expanded `Next` (evaluated fresh, with an empty guard, at the next lookahead depth) - so a
+guarded self-reference (e.g. a `'S' peano`-style format, where a byte is consumed before the cycle
+repeats) never re-opens an already-open level and `MatchTree` construction terminates and
+disambiguates normally, exactly as if the reference weren't recursive at all.
+
+A **genuinely left-recursive** format (the cycle repeats with zero possible progress) sets
+`CycleGuard::detected`, and `MatchTreeLevel::grow` returns `None` the instant that fires - reusing the
+same `Option`-based "cannot build a match tree" convention every other undisambiguable, non-recursive
+`Union` already uses. This isn't a new failure mode: a zero-progress cycle genuinely is a `Union` that
+can never be disambiguated no matter how much lookahead is allowed, so it belongs in the same category
+as any other ambiguous grammar this model already rejects.
