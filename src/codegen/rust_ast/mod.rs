@@ -867,7 +867,9 @@ impl RustType {
                     CompType::Vec(..) => true,
                     CompType::RecBox(..) => {
                         // NOTE - it doesn't seem likely that RecBox will ever crop up in a Decoder function argument, but we neither want to ignore that happening nor panic
-                        log::warn!("RecBox unexpected to ocur in param-lists, but it does here: {self:?}");
+                        log::warn!(
+                            "RecBox unexpected to ocur in param-lists, but it does here: {self:?}"
+                        );
                         true
                     }
                     CompType::Borrow(..) => false,

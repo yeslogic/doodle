@@ -625,10 +625,7 @@ impl CodeGen {
     /// a position whose declared type may have been promoted to `RecBox` by a self/mutually-
     /// recursive reference.
     fn box_wrap_if_needed(cl: CaseLogic<GTExpr>, ty: &RustType) -> CaseLogic<GTExpr> {
-        if matches!(
-            ty,
-            RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
-        ) {
+        if matches!(ty, RustType::Atom(AtomType::Comp(CompType::RecBox(_)))) {
             CaseLogic::Derived(DerivedLogic::WrapBox(Box::new(cl)))
         } else {
             cl
@@ -6375,6 +6372,52 @@ mod tests {
             module.define_format(*name, f.clone());
             population_check(&module, f, None);
         }
+    }
+
+    /// Phase 4's codegen-path counterpart to `lib.rs`'s
+    /// `define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes`: the same
+    /// record-shaped mutual recursion, but run through the real production codegen path
+    /// (`generate_code`/`GTCompiler`) rather than the interpreter, since Phase 4's "Finding B"
+    /// (see `experiments/doodle-rec/PLAN.md`) found the identically-shaped `LetFormat`/`MonadSeq`
+    /// bug in `codegen::typed_decoder::GTCompiler::compile_gt_format` compiled `pong`'s reference
+    /// back to `ping` into a dead, always-failing decoder rather than reusing `ping`'s real one.
+    #[test]
+    fn recursive_format_through_record_field_generates_no_dead_decoder() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let ping_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'X'))),
+            Format::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(record([
+                    ("tag", is_byte(b'p')),
+                    ("next", Format::RecVar(1)),
+                ])),
+            ),
+        ]);
+        let pong_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'Y'))),
+            Format::Variant(
+                Label::Borrowed("ToPing"),
+                Box::new(record([
+                    ("tag", is_byte(b'q')),
+                    ("next", Format::RecVar(0)),
+                ])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![
+            ("test.ping_rec_cg", ping_body),
+            ("test.pong_rec_cg", pong_body),
+        ]);
+        let ping_ref = refs[0];
+
+        let src = produce_string_gencode(&module, &ping_ref.call());
+        assert!(
+            !src.contains("FailToken"),
+            "generated decoder for a self-referential record field must not contain a dead \
+             always-failing decoder:\n{src}"
+        );
     }
 
     #[test]

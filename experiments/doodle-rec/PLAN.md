@@ -7,6 +7,19 @@ but is still recognizably the same architecture as described in the root `CLAUDE
 with no memory of the sandbox work should be able to execute it end to end, pausing only at the
 `TRIAGE:` checkpoints called out explicitly below.
 
+**Disclaimer added 2026-09-09** (per the user, after a real case where a written requirement below
+turned out not to reflect their actual intent): this document was drafted largely by an LLM. Its
+stated requirements, constraints, and "non-negotiable" language are LLM-authored scaffolding, not
+automatically an accurate reflection of what the user (the actual programmer directing this work)
+intends - they were never individually reviewed and endorsed line-by-line. **Only requirements
+written in ALLCAPS have been explicitly confirmed by the user as genuinely binding.** Everything
+else is a draft default. If work is ever blocked by a non-ALLCAPS requirement or limitation stated
+here, stop and ask the user before assuming it's intentionally binding, rather than treating it as
+settled - do not silently comply with it, and do not silently override it either. If the user
+confirms it should hold, rewrite it in ALLCAPS at that point (updating this disclaimer's own
+description of what's confirmed is not required, the convention itself covers it); if they disagree
+with it, remove it entirely rather than leaving it as dead text.
+
 ## Purpose
 
 `experiments/doodle-rec` is a sandbox crate that worked out, in isolation, exactly what real
@@ -64,11 +77,25 @@ can never reintroduce a cycle). Do not re-investigate these; see "Explicitly out
   executing this plan — it is the design source, not the deliverable.
 - Every change in Phases 1–3 touches code shared by **every existing format** in `doodle-formats/`
   (`MatchTreeStep::from_format`, `occurs_in`, `CodeGen::lift_uvar` all run on every format, recursive
-  or not). Every change must be **strictly additive/permissive for the new recursive case and
-  behavior-preserving for everything else.** After each phase, run the full test suite (`cargo
-  testall`, not just a spot check) and diff `generated/gencode.rs` before/after regenerating it
-  (`cargo cg`) — it must come out byte-identical for all currently-supported (non-recursive) formats.
-  A diff there is a regression, not a sign the port is "improving" existing output.
+  or not). EVERY CHANGE MUST BE STRICTLY ADDITIVE/PERMISSIVE FOR THE NEW RECURSIVE CASE AND
+  BEHAVIOR-PRESERVING FOR EVERYTHING ELSE. After each phase, RUN THE FULL TEST SUITE (`cargo
+  testall`, not just a spot check) AND DIFF `generated/gencode.rs` BEFORE/AFTER REGENERATING IT
+  (`cargo cg`).
+  **(Revised 2026-09-09, per the user, after Phase 4's Finding B fix produced a real, confirmed-benign
+  `gencode.rs` diff — see the disclaimer at the top of this document.)** The original form of this
+  requirement — that the diff must come out **byte-identical**, full stop, with any diff automatically
+  treated as a regression — was an LLM-authored overstatement the user did not endorse at that
+  strength: a change can legitimately improve `codegen`'s existing decoder-sharing (`decoder_map`
+  merging two previously-accidentally-distinct decoders for the same job into one, causing pure
+  renumbering/rehashing with no behavior change) as a side effect of a real fix, and that is not a
+  regression. THE ACTUALLY-BINDING RULE IS: A `cargo cg` DIFF WHOSE ONLY CONTENT IS THE KIND OF CHANGE
+  EXPECTED FROM ADDING/CHANGING A FORMAT DEFINITION (NEW DECODERS APPEARING, AND THE CONSEQUENT
+  RENUMBERING/REHASHING OF EVERYTHING AFTER THEM) — INCLUDING A CONFIRMED-BENIGN DEDUP/MERGE LIKE
+  FINDING B'S — IS ACCEPTABLE TO COMMIT. ANY DIFF THAT ISN'T OBVIOUSLY THAT SHAPE (A DECODER'S ACTUAL
+  LOGIC CHANGING FOR AN UNRELATED EXISTING FORMAT, A TYPE CHANGING, CONTROL FLOW CHANGING, ETC. —
+  ANYTHING WHERE "IS THIS STILL BEHAVIOR-PRESERVING" ISN'T SELF-EVIDENT FROM THE DIFF ALONE) MUST BE
+  REPORTED TO THE USER FOR REVIEW BEFORE BEING COMMITTED, NEVER SILENTLY SUPPRESSED, ACCEPTED, OR
+  COMMITTED AS-IS ON THE ASSUMPTION IT'S FINE.
 - Do this work on a dedicated branch, with one commit per phase (not one giant commit), each with a
   real "why" message. If a phase's fix turns out to be a no-op after investigation (e.g. Phase 3's
   alias-vs-nominal question, see below), commit that finding as a comment/doc update, don't skip
@@ -602,19 +629,43 @@ pipeline (not just reading the code):
      `Tuple`/`Sequence`'s trailing-field handling** (`decoder.rs`/`typed_decoder.rs`, unconditional
      `Next::Sequence` wrapping even for an empty/zero-progress remainder) — it was simply never audited
      for `LetFormat`/`MonadSeq`, because Phase 1.5's own test formats used bare `Tuple`, never
-     `Format::record`. **Not fixed this session** — diagnosis is complete and precise (confirmed
-     identically present in both the interpreter and codegen compile paths) but the fix itself (mirror
-     Phase 1.5's exact special-casing: collapse the wrap when the trailing continuation is genuinely
-     zero-progress) was left for a future session at the user's direction.
+     `Format::record`.
+
+     **Fixed 2026-09-09** (a later session): both arms now skip the `Next::Cat`/wrap when `second`
+     can only ever match zero bytes (`second.match_bounds(module).as_exact() == Some(0)`, delegating
+     to the existing `Format::match_bounds`/`Bounds::as_exact`, which already treats `Compute` as
+     exact-zero and `Hint` as transparent) and use `next` directly instead — mirroring Phase 1.5's
+     `Tuple`/`Sequence` special-casing exactly, as originally planned. Bug-injection verified in both
+     compile paths independently: disabling the `decoder.rs` half makes `compile_program` hang
+     (unbounded `compile_queue` growth from cascading duplicate compiles, not a clean error - a new,
+     real observation this plan hadn't predicted) on
+     `define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes` (new test,
+     `src/lib.rs`); disabling the `typed_decoder.rs` half reproduces the *exact* predicted
+     `Decoder3(...) { return Err(ParseError::FailToken(...)) }` dead decoder on
+     `recursive_format_through_record_field_generates_no_dead_decoder` (new test, `src/codegen/mod.rs`).
+     `cargo testall` clean.
+
+     This fix is **not** narrowly scoped to the recursive case the way Phases 1–3's changes were:
+     `Format::record`'s last field always has this exact zero-width-trailing-`Compute` shape, so the
+     bypass also fires for every *non*-recursive record in `doodle-formats/` whose last field happens
+     to be a named sub-format call. Regenerating `generated/gencode.rs` confirmed this in practice —
+     a large diff (1758 insertions / 2103 deletions) across ELF, gzip, OpenType, etc., all pure
+     `decoder_map` dedup/renumbering (concretely verified: on-disk `Decoder79`, a pure
+     `Decoder80(input)` forwarding wrapper, and on-disk `Decoder80`, the real `Vec<char>` decode loop
+     it forwarded to, both disappear post-fix, merged into the decoder already doing that job
+     elsewhere) — **not a correctness change**. Per the user, this is itself a genuine (if minor,
+     pre-existing) codegen inefficiency this fix incidentally also cleans up, not a regression to
+     avoid; see the disclaimer at the top of this document and the revised "Non-negotiable safety
+     constraints" entry above for the resulting change to this plan's own byte-identical requirement.
 
 **Net effect**: points 1–2 (a real `Box` type, correctly inserted at both type and construction sites,
 with the `Phantom` regression caught and fixed) are solid, committed-quality work — `cargo testall`
 clean, `cargo cg` byte-identical throughout, bug-injection-verified. Point 3 is a deliberate, narrow
-scope cut. Point 4 (Findings A and B) means the Phase 3/4/5 capstone — a real recursive format actually
-compiling and decoding through the full production pipeline — is **not yet achieved**; Finding B
-specifically blocks it, and is squarely Phase 4's own "confirm decode-time dispatch" investigation
-target turning out **not** to hold for a cycle reached through a `Format::record`, contra this
-document's original "expected: no code changes" framing for that phase.
+scope cut. Point 4's Finding A is still open (the `Tuple`-recompute inconsistency, worked around for
+the capstone shape but not fixed in general); **Finding B is now fixed** (see above) — Phase 4's own
+"confirm decode-time dispatch" investigation target turned out **not** to hold as originally stated for
+a cycle reached through a `Format::record`, contra this document's original "expected: no code
+changes" framing for that phase, but does hold once this fix is applied.
 
 ---
 
@@ -689,10 +740,11 @@ complete.
 2. `cargo testall` (`cargo test --workspace --exclude smallsorts --exclude analytic-engine --exclude
    analytic-parser`) — must be fully clean, not just "no new failures."
 3. `cargo build` (full workspace).
-4. `cargo cg` (regenerate `generated/gencode.rs`) and diff against the pre-port version — must be
-   byte-identical. If it isn't, something in Phases 1–3 changed behavior for an existing,
-   non-recursive format; treat as a regression to fix, not an acceptable side effect, before
-   considering any phase done.
+4. `cargo cg` (regenerate `generated/gencode.rs`) and diff against the pre-port version. Per the
+   revised "Non-negotiable safety constraints" entry above, a diff limited to the expected
+   new-decoders-plus-renumbering/rehashing shape (including a confirmed-benign `decoder_map`
+   dedup/merge, as found in Phase 4's Finding B) is acceptable; anything else must be reported to
+   the user for review before being treated as done, not silently committed.
 5. Update or add to root-level docs where this plan's changes are now load-bearing for future readers:
    `doc/DESIGN.md` (MatchTree's cycle-guard behavior is now part of the model it describes),
    `TYPECHECKER.md` (the `occurs_in` exemption rule changed — TYPECHECKER.md is described in root
@@ -732,6 +784,6 @@ complete.
 | 1.5 — Batch construction API + 3 more unguarded-recursion bugs | Done | a6f328b | Not in the original plan - see "Phase 1.5" section above. `Format::RecVar` (construction-time sugar, rewritten to `ItemVar` before install) + `FormatModule::define_format_rec_batch`; fixed `depends_on_next`/`match_bounds`/`lookahead_bounds` (unguarded `ItemVar` recursion, confirmed stack-overflowing in isolation) and the `Tuple`/`Sequence` `Next`-wrapping bug that broke `decoder_map` memoization for any self-reference. 3 new end-to-end tests (peano, ping/pong, left-recursion-rejected) via the real public API. `cargo testall` clean; `cargo cg` byte-identical. |
 | 2 — `occurs_in` generalization | Done | 35b978b | Both TRIAGE items resolved directly from code: indirection boundaries are `Tuple`/`Record`/`Seq`/`Option` plus `Constraints::Variant`'s labeled `VarMap` entries (real doodle has no `UType::Union` - sum-type-ness lives in `Constraints`, not `UType`) and `Constraint::Proj`'s `TupleWith`/`RecordWith`/`SeqOf`/`OptOf`; `Constraint::Equiv` and plain `Var`-forwarding are not boundaries. `PhantomData` keeps its existing unconditional exemption unchanged (already fully opaque, doesn't even bind its inner content). `occurs_in`/`occurs_in_constraints` now thread `indirected: bool` + `visited: &mut HashSet<(UVar, bool)>` (keyed by canonical constraint-index, never reset at boundaries) mirroring the design directly. 4 low-level tests mirroring doodle-rec's own names (`direct_self_alias_with_no_indirection_is_rejected`, `self_reference_behind_a_tuple_is_accepted`, `self_reference_behind_a_union_variant_is_accepted` - real doodle's Union analog, `an_unrelated_pre_existing_cycle_does_not_hang_occurs_check`) plus one end-to-end test proving a genuinely self-recursive format (built via Phase 1.5's `define_format_rec_batch`) now typechecks through the real `TypeChecker::infer_module` entry point, not just the isolated `occurs` check. Bug-injection verified in two rounds: disabling the base rejection breaks `direct_self_alias_...` as predicted; disabling just the `Tuple` boundary breaks exactly the two tests that rely on it (`self_reference_behind_a_tuple_is_accepted` and the unrelated-cycle test, which also crosses a `Tuple`) and no others. `cargo testall` clean; `cargo cg` byte-identical. |
 | 3 — `CodeGen` Box placement | Type+construction-site `Box` done; nominal-promotion for self-referential `Tuple` deliberately out of scope | (uncommitted) | See "Phase 3 & 4 findings" above. `CompType::RecBox` + full trait wiring; `RustExpr::wrap_box`/`GenExpr::WrapBox`/`DerivedLogic::WrapBox` construction-site insertion; `Expansion::Tuple`/`Seq`/`Option` cycle-guards (reject-loudly, not promote); `Format::Phantom` regression found and fixed (`in_phantom_context`). `cargo testall` clean, `cargo cg` byte-identical, bug-injection-verified. |
-| 4 — Decode-time confirmation | Blocked — real bug found, not fixed | (uncommitted) | Contra this phase's own "expected: no code changes": found and root-caused Finding B (`LetFormat`/`MonadSeq` unconditionally wrap `next`, defeating `decoder_map` memoization for a cycle reached through `Format::record`'s `chain`/`monad_seq` desugaring — same bug class as Phase 1.5's `Tuple`/`Sequence` fix, unaudited for this pair). Diagnosis complete and precise (confirmed identically in `decoder.rs` and `typed_decoder.rs`); fix deferred to a future session at the user's direction. |
+| 4 — Decode-time confirmation | Done | (uncommitted) | Contra this phase's own "expected: no code changes": found, root-caused, and fixed Finding B. `LetFormat`/`MonadSeq`'s compile arms in both `decoder::Compiler::compile_format` and `codegen::typed_decoder::GTCompiler::compile_gt_format` now skip the `Next::Cat` wrap when the trailing continuation can only match zero bytes (`second.match_bounds(module).as_exact() == Some(0)`) and use `next` directly — same bug class and fix shape as Phase 1.5's `Tuple`/`Sequence` special-casing, unaudited for this pair until now. 2 new end-to-end regression tests: `define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes` (`src/lib.rs`, interpreter path) and `recursive_format_through_record_field_generates_no_dead_decoder` (`src/codegen/mod.rs`, codegen path). Bug-injection verified independently for each compile path: disabling the interpreter half hangs `compile_program` (unbounded `compile_queue` growth); disabling the codegen half reproduces the exact predicted `Decoder3(...) { return Err(ParseError::FailToken(...)) }` dead decoder. `cargo testall` clean. `cargo cg` diff is non-empty but confirmed pure `decoder_map` dedup/renumbering (see Finding B writeup above and the revised byte-identical rule in "Non-negotiable safety constraints") — not a regression. |
 | 5 — Capstone integration test | Not started | | |
 | 6 — Full-suite verification | Not started | | |
