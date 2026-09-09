@@ -124,6 +124,17 @@ pub struct CodeGen {
     /// sequence that `RustType`/`SourceContext` cannot reconstruct on their own (in particular,
     /// per-field endianness).
     fixed_format_defs: IntMap<usize, FormatRef>,
+    /// `true` while resolving a type reachable only through `Format::Phantom`'s content (i.e.
+    /// transitively inside `Expansion::PhantomData`'s own recursive descent, not just its
+    /// immediate child - an in-between `Option`/`Tuple`/etc. layer still counts). Suppresses
+    /// `RecBox`-insertion at an `in_progress`-ancestor reference (see `lift_whnf_solution`):
+    /// `std::marker::PhantomData<T>` never actually stores a `T` no matter how deeply `T` is
+    /// nested, so a self-reference reached anywhere under it needs no `Box` to close the cycle,
+    /// unlike the same reference reached through a genuinely-decoded structural position. Without
+    /// this, Phase 3's `RecBox`-insertion (correctly needed for a *real* recursive reference)
+    /// would also incorrectly fire for `Format::Phantom`'s own, pre-existing self-reference case
+    /// (`doodle-formats/src/format/opentype/colr.rs`'s `paint`), changing its generated output.
+    in_phantom_context: bool,
 }
 
 impl CodeGen {
@@ -139,6 +150,7 @@ impl CodeGen {
             in_progress: StableMap::<_, _, util::FxHash>::default(),
             recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
             fixed_format_defs,
+            in_phantom_context: false,
         }
     }
 
@@ -231,7 +243,17 @@ impl CodeGen {
         match sol {
             WHNFSolution::Base(bt) => Self::lift_base(bt),
             WHNFSolution::Int(it) => Self::lift_int(it),
-            WHNFSolution::Var(var) => self.lift_uvar(tc, var, lt).to_rust_type(),
+            WHNFSolution::Var(var) => {
+                let canonical = tc.get_canonical_uvar(var);
+                let needs_rec_box =
+                    !self.in_phantom_context && self.in_progress.contains_key(&canonical);
+                let rt = self.lift_uvar(tc, var, lt).to_rust_type();
+                if needs_rec_box {
+                    RustType::from(CompType::RecBox(Box::new(rt)))
+                } else {
+                    rt
+                }
+            }
         }
     }
 
@@ -408,7 +430,17 @@ impl CodeGen {
                                     }
                                 },
                                 _ => {
-                                    let inner = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
+                                    let canonical = tc.get_canonical_uvar(*branch_v);
+                                    let needs_rec_box = !self.in_phantom_context
+                                        && self.in_progress.contains_key(&canonical);
+                                    let inner = {
+                                        let raw = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
+                                        if needs_rec_box {
+                                            RustType::from(CompType::RecBox(Box::new(raw)))
+                                        } else {
+                                            raw
+                                        }
+                                    };
                                     RustVariant::Tuple(name, vec![inner])
                                 }
                             }
@@ -452,7 +484,28 @@ impl CodeGen {
                 GenType::Def((ix, tname), rt_decl)
             }
             Expansion::Seq(sol, hint) => {
+                // `Vec<..>` is always heap-indirected, so a reference to an *ancestor* var
+                // reached via `sol` needs no special handling here at all - `lift_whnf_solution`
+                // (the reference site) already boxes it if needed, and the ancestor's own
+                // Record/Union/Tuple frame is what's actually marked `in_progress` for that case.
+                // The only thing this guards against is `var` (this Seq's own identity) being
+                // reached again from within its own element type - a `Vec<..>` that would need to
+                // recursively contain itself with no Tuple/Record/Union boundary in between. That
+                // shape has no legitimate construction path from any current `Format` combinator,
+                // so rather than silently mishandling it (or looping forever), it's reported
+                // loudly - matching this codebase's existing convention for other structurally
+                // out-of-scope shapes (e.g. `CompType::Result`'s "unexpected result in structural
+                // type" elsewhere in this module).
+                if self.in_progress.contains_key(&var) {
+                    unreachable!(
+                        "Expansion::Seq({var:?}) is directly self-referential (a Vec<..> whose \
+                         element type is itself, with no Tuple/Record/Union boundary in between) \
+                         - not yet supported by codegen"
+                    );
+                }
+                self.in_progress.insert(var, None);
                 let inner = self.lift_whnf_solution(tc, sol, lt);
+                self.in_progress.remove(&var);
                 match hint {
                     SeqBorrowHint::ReadArray => {
                         if let Some(p) = inner.try_as_prim()
@@ -492,28 +545,93 @@ impl CodeGen {
                     .into(),
                 }
             }
-            Expansion::Option(sol) => GenType::Inline(
-                CompType::Option(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
-            ),
-            Expansion::PhantomData(sol) => GenType::Inline(
-                CompType::PhantomData(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
-            ),
-            Expansion::Tuple(vs) => match &vs[..] {
-                [] => RustType::AnonTuple(Vec::new()).into(),
-                // REVIEW - should one-tuples be preserved?
-                [v] => RustType::AnonTuple(vec![self.lift_whnf_solution(tc, *v, lt)]).into(),
-                _ => {
-                    let mut buf = Vec::with_capacity(vs.len());
-                    self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                    for v in vs.iter() {
-                        buf.push(self.lift_whnf_solution(tc, *v, lt));
-                        self.name_gen.ctxt.increment_index();
-                    }
-                    self.name_gen.ctxt.escape();
-                    RustType::AnonTuple(buf).into()
+            Expansion::Option(sol) => {
+                // Same reasoning as `Expansion::Seq` just above: `Option<..>` needs `Box` around
+                // a reference to an *ancestor* (already handled at the `lift_whnf_solution`
+                // reference site via Step 2), but guards here against `var` itself being reached
+                // again with no intervening Tuple/Record/Union boundary - not constructible from
+                // any current `Format` combinator, so reported loudly rather than looped forever.
+                if self.in_progress.contains_key(&var) {
+                    unreachable!(
+                        "Expansion::Option({var:?}) is directly self-referential (an Option<..> \
+                         whose payload type is itself, with no Tuple/Record/Union boundary in \
+                         between) - not yet supported by codegen"
+                    );
                 }
-            },
+                self.in_progress.insert(var, None);
+                let inner = self.lift_whnf_solution(tc, sol, lt);
+                self.in_progress.remove(&var);
+                GenType::Inline(CompType::Option(Box::new(inner)).into())
+            }
+            Expansion::PhantomData(sol) => {
+                // Suppress `RecBox`-insertion (see `in_phantom_context`'s doc comment) for the
+                // whole subtree resolved below, not just `sol` itself directly - an in-between
+                // `Option`/`Tuple`/etc. layer between here and the actual self-reference (as in
+                // the real `opentype/colr.rs` `paint` case, which nests an `Option` here) must
+                // still see the suppression.
+                let outer_in_phantom_context =
+                    std::mem::replace(&mut self.in_phantom_context, true);
+                let inner = self.lift_whnf_solution(tc, sol, lt);
+                self.in_phantom_context = outer_in_phantom_context;
+                GenType::Inline(CompType::PhantomData(Box::new(inner)).into())
+            }
+            Expansion::Tuple(vs) => {
+                // Same reasoning as `Expansion::Seq`/`Expansion::Option` above: a reference to an
+                // *ancestor* reached via one of `vs` is already handled at the `lift_whnf_solution`
+                // reference site (Step 2). This only guards against `var` itself (this Tuple's own
+                // identity) being reached again with no intervening Record/Union boundary - a
+                // genuinely self-referential anonymous tuple, which has no name to close the cycle
+                // through and so cannot simply be `Box`-wrapped like a Record/Union field can.
+                // Neither of Phase 3's target recursive shapes (peano, ping/pong) ever hits this -
+                // both close their cycle through a `Union`. Rather than build promotion-to-a-real-
+                // struct support for a shape with no concrete requirements yet, this is rejected
+                // loudly here, matching `Expansion::Seq`/`Expansion::Option`'s own treatment just
+                // above - if a real format ever needs this, its actual requirements (nominal name?
+                // field layout? doodle-rec parity?) can be worked out against that concrete case
+                // instead of speculatively now.
+                if self.in_progress.contains_key(&var) {
+                    unreachable!(
+                        "Expansion::Tuple({var:?}) is directly self-referential (an anonymous \
+                         tuple whose own element type is itself, with no Record/Union boundary in \
+                         between) - not yet supported by codegen"
+                    );
+                }
+                self.in_progress.insert(var, None);
+                let rt = match &vs[..] {
+                    [] => RustType::AnonTuple(Vec::new()),
+                    // REVIEW - should one-tuples be preserved?
+                    [v] => RustType::AnonTuple(vec![self.lift_whnf_solution(tc, *v, lt)]),
+                    _ => {
+                        let mut buf = Vec::with_capacity(vs.len());
+                        self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                        for v in vs.iter() {
+                            buf.push(self.lift_whnf_solution(tc, *v, lt));
+                            self.name_gen.ctxt.increment_index();
+                        }
+                        self.name_gen.ctxt.escape();
+                        RustType::AnonTuple(buf)
+                    }
+                };
+                self.in_progress.remove(&var);
+                rt.into()
+            }
             Expansion::ViewObj => GenType::Inline(model::view_obj_type(lt.clone())),
+        }
+    }
+
+    /// If `ty` is `RecBox`-wrapped (see `lift_uvar`'s own `RecBox`-insertion on the type side),
+    /// wraps the constructed value of `cl` in `Box::new(..)` to match - the value-construction
+    /// counterpart of that type-side decision, needed wherever a decoded sub-value is placed into
+    /// a position whose declared type may have been promoted to `RecBox` by a self/mutually-
+    /// recursive reference.
+    fn box_wrap_if_needed(cl: CaseLogic<GTExpr>, ty: &RustType) -> CaseLogic<GTExpr> {
+        if matches!(
+            ty,
+            RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
+        ) {
+            CaseLogic::Derived(DerivedLogic::WrapBox(Box::new(cl)))
+        } else {
+            cl
         }
     }
 
@@ -591,9 +709,9 @@ impl CodeGen {
                                             }
                                         } else {
                                             let mut cl_args = Vec::new();
-                                            for dec in decs.iter() {
+                                            for (dec, ty) in decs.iter().zip(types.iter()) {
                                                 let cl_arg = self.translate(dec.get_dec());
-                                                cl_args.push(cl_arg);
+                                                cl_args.push(Self::box_wrap_if_needed(cl_arg, ty));
                                             }
                                             CaseLogic::Sequential(SequentialLogic::AccumTuple {
                                                 constructor: Some(constr),
@@ -604,6 +722,8 @@ impl CodeGen {
                                     _ => {
                                         if types.len() == 1 {
                                             let cl_mono = self.translate(inner.get_dec());
+                                            let cl_mono =
+                                                Self::box_wrap_if_needed(cl_mono, &types[0]);
                                             CaseLogic::Derived(DerivedLogic::VariantOf(
                                                 constr,
                                                 Box::new(cl_mono),
@@ -638,12 +758,15 @@ impl CodeGen {
                     .collect(),
             )),
             TypedDecoder::Tuple(gt, elts) => match gt {
-                GenType::Inline(RustType::AnonTuple(_tys)) => {
+                GenType::Inline(RustType::AnonTuple(tys)) => {
                     CaseLogic::Sequential(SequentialLogic::AccumTuple {
                         constructor: None,
                         elements: elts
                             .iter()
-                            .map(|elt| self.translate(elt.get_dec()))
+                            .zip(tys.iter())
+                            .map(|(elt, ty)| {
+                                Self::box_wrap_if_needed(self.translate(elt.get_dec()), ty)
+                            })
                             .collect(),
                     })
                 }
@@ -1829,6 +1952,9 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                 },
                 AtomType::Comp(ct) => match ct {
                     CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                    CompType::RecBox(_t) => {
+                        unreachable!("Box is not a sensible scrutinee for match-expressions");
+                    }
                     CompType::PhantomData(..) => {
                         unreachable!("PhantomData is not a sensible scrutinee");
                         // Refutability::Irrefutable
@@ -2494,6 +2620,8 @@ enum GenExpr {
     ResultErr(Box<GenExpr>),
     /// Wrapping a `GenExpr` in a `Some` value
     WrapSome(Box<GenExpr>),
+    /// Wrapping a `GenExpr` in `Box::new(..)` - see `RustExpr::wrap_box`.
+    WrapBox(Box<GenExpr>),
     /// Applies the `?` operator to a given `GenExpr`
     Try(Box<GenExpr>),
     /// Calls a value-producing thunk directly
@@ -2581,6 +2709,19 @@ impl GenExpr {
         }
     }
 
+    /// Mirrors `wrap_some` exactly, but for `Box::new(..)` instead of `Some(..)` - used at a
+    /// construction site whose target position is `CompType::RecBox`-wrapped.
+    fn wrap_box(self) -> GenExpr {
+        match self {
+            Self::ResultOk(t, inner) => Self::ResultOk(t, Box::new(inner.wrap_box())),
+            Self::BlockScope(mut block) => {
+                block.wrap_box_final_value();
+                Self::BlockScope(block)
+            }
+            this => Self::WrapBox(Box::new(this)),
+        }
+    }
+
     /// Applies the most natural form of `Try` construction to self.
     ///
     /// If self happens to `ResultOk(.., inner)`, returns `inner`.
@@ -2633,6 +2774,7 @@ impl GenExpr {
             GenExpr::BlockScope(block) => block.is_simple(),
 
             GenExpr::WrapSome(g_expr)
+            | GenExpr::WrapBox(g_expr)
             | GenExpr::Try(g_expr)
             | GenExpr::ResultOk(_, g_expr)
             | GenExpr::ResultErr(g_expr) => g_expr.is_simple(),
@@ -2819,6 +2961,15 @@ impl GenBlock {
             Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_some())))
         };
         self.transform_return_value(GenExpr::wrap_some, fallback)
+            .unwrap()
+    }
+
+    /// Mirrors `wrap_some_final_value` exactly, but for `Box::new(..)` instead of `Some(..)`.
+    fn wrap_box_final_value(&mut self) {
+        let fallback = || -> Result<_, std::convert::Infallible> {
+            Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_box())))
+        };
+        self.transform_return_value(GenExpr::wrap_box, fallback)
             .unwrap()
     }
 
@@ -3990,6 +4141,10 @@ where
 #[derive(Clone, Debug)]
 enum DerivedLogic<ExprT> {
     WrapSome(Box<CaseLogic<ExprT>>),
+    /// Wraps the constructed value of `inner` in `Box::new(..)` - used at a construction site
+    /// whose target position is `CompType::RecBox`-wrapped (a self/mutually-recursive reference
+    /// closing a cycle). Mirrors `WrapSome` exactly.
+    WrapBox(Box<CaseLogic<ExprT>>),
     VariantOf(Constructor, Box<CaseLogic<ExprT>>),
     UnitVariantOf(Constructor, Box<CaseLogic<ExprT>>),
     MapOf(Box<GenLambda>, Box<CaseLogic<ExprT>>),
@@ -4122,6 +4277,15 @@ impl ToAst for DerivedLogic<GTExpr> {
                 };
                 inner_block
             }
+            DerivedLogic::WrapBox(inner) => {
+                let mut inner_block = inner.to_ast(ctxt);
+                if let Some(ret) = inner_block.ret.take() {
+                    inner_block.ret.replace(ret.wrap_box());
+                } else {
+                    unreachable!("WrapBox called on non-value-producing GenBlock: {inner_block:?}");
+                };
+                inner_block
+            }
             DerivedLogic::UnitVariantOf(constr, inner) => {
                 let inner_block = inner.to_ast(ctxt);
                 if inner_block.stmts.last().is_some_and(|s| {
@@ -4209,6 +4373,7 @@ impl ToAst for DerivedLogic<GTExpr> {
             | DerivedLogic::Let(.., inner)
             | DerivedLogic::MapOf(_, inner)
             | DerivedLogic::WrapSome(inner)
+            | DerivedLogic::WrapBox(inner)
             | DerivedLogic::VariantOf(_, inner)
             | DerivedLogic::UnitVariantOf(_, inner) => inner.depends_on_input(),
             DerivedLogic::Dynamic(dynamic, inner) => {
@@ -6071,6 +6236,7 @@ mod __impls {
                     RustExpr::Control(Box::new(RustControl::translate(*ctrl)))
                 }
                 GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
+                GenExpr::WrapBox(expr) => RustExpr::from(*expr).wrap_box(),
                 GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
                 GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
                 GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
@@ -6135,7 +6301,8 @@ mod __impls {
                 GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
                 GenExpr::ResultOk(.., expr)
                 | GenExpr::ResultErr(expr)
-                | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
+                | GenExpr::WrapSome(expr)
+                | GenExpr::WrapBox(expr) => expr.is_short_circuiting(),
                 GenExpr::BlockScope(block) => block.is_short_circuiting(),
                 GenExpr::Try(..) => true,
                 GenExpr::CallThunk(..) => false,
@@ -6219,6 +6386,65 @@ mod tests {
             ("test.any_byte", Format::Byte(ByteSet::full())),
         ];
         run_headcount(&formats);
+    }
+
+    #[test]
+    fn phase3_final_check_peano_and_ping_pong() {
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+        let top = frefs[0].call();
+        let src = produce_string_gencode(&module, &top);
+        assert!(src.contains("Box<peano>"), "source was:\n{src}");
+
+        let ping = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Done"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("More"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'A'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let pong = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
+        let mut module2 = FormatModule::new();
+        let frefs2 = module2.define_format_rec_batch(vec![
+            (Label::Borrowed("ping"), ping),
+            (Label::Borrowed("pong"), pong),
+        ]);
+        let top2 = frefs2[0].call();
+        let src2 = produce_string_gencode(&module2, &top2);
+        assert!(src2.contains("Box<ping>"), "source was:\n{src2}");
+    }
+
+    #[test]
+    #[should_panic(expected = "not yet supported")]
+    fn phase3_final_check_pure_tuple_cycle_rejects_cleanly() {
+        let pair_a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
+        let pair_b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
+        let mut module = FormatModule::new();
+        let frefs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("pair_a"), pair_a),
+            (Label::Borrowed("pair_b"), pair_b),
+        ]);
+        let top = frefs[0].call();
+        let _src = produce_string_gencode(&module, &top);
     }
 
     #[test]

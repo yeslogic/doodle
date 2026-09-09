@@ -508,6 +508,116 @@ the un-boxed back-edge, matching the sandbox's own confirmed result for the same
 
 ---
 
+## Phase 3 & 4 findings (recorded 2026-09-08, session paused here — uncommitted)
+
+Phase 3's TRIAGE was resolved directly from code, same as prior phases: real doodle's `lift_uvar`
+never emits a bare `type X = Y;` alias for anything — `Record`/`Union` always become nominal
+`struct`/`enum`; `Tuple`/`Seq`/`Option`/`PhantomData` become anonymous inline compound types. So the
+E0391 bug doodle-rec found is not reachable here in that form; that half of Phase 3 really was
+verification-only, as the TRIAGE's "already-nominal" branch predicted. What *was* missing turned out
+to be substantially larger than "extend `in_progress` to add `Box`" — four more layers of work were
+needed, in order, each surfaced only by actually running a genuinely recursive format through the real
+pipeline (not just reading the code):
+
+1. **A `Box` type didn't exist anywhere in real doodle's codegen model.** Added `CompType::RecBox(T)`
+   (`src/codegen/rust_ast/mod.rs`), threaded through `ToFragment`, `lt_param`/`alpha_convert_lifetime`,
+   `MemSize`/`CanOptimize`/`CopyEligible` (`analysis.rs`), `HeapOptimize` (`analysis/heap_optimize.rs`),
+   `Rebindable` (`rebind.rs`), and the `OwnedKind`-resolution `solve_comp_type` (`resolve.rs`) — every
+   site found via `cargo build`'s own exhaustiveness errors, same technique as Phase 1.5's `RecVar`.
+   Every arm added is a **non-recursive, constant-answer** case (pointer size, 1 niche, never `Copy`,
+   `Noop` for heap-strategy) — this is what actually fixes the `CopyEligible::copy_hint` infinite
+   recursion confirmed by direct reproduction (a genuinely self-referential `RustTypeDecl` graph, with
+   no `Box` marking the boundary, sent `copy_hint`'s existing `Named`/`LocalDef` dereferencing into an
+   unbounded loop — `analysis.rs:630`'s own pre-existing comment, *"this can be circular if we are not
+   careful, but we don't expect circularity in practice"*, named the exact assumption this port breaks).
+2. **`Box` insertion at the value-construction sites was never done** — Steps 1–3 only fixed the type
+   *declaration* side; the code that actually builds a decoded value (`CodeGen::translate`,
+   `SequentialLogic::AccumTuple` construction) never learned to wrap a sub-result in `Box::new(...)`
+   when its target position was `RecBox`-wrapped, so a self-recursive format's generated Rust flatly
+   didn't compile (`peano::S(arg0, arg1)` where the field type says `Box<peano>` but `arg1: peano`).
+   Fixed by mirroring the existing `RustExpr::wrap_some`/`GenExpr::WrapSome` machinery exactly:
+   `RustExpr::wrap_box`/`GenExpr::WrapBox`/`GenBlock::wrap_box_final_value`/`DerivedLogic::WrapBox`, and
+   a `CodeGen::box_wrap_if_needed(cl, ty)` helper called at both `TypedDecoder::Variant`'s
+   tuple-arity-match construction and `TypedDecoder::Tuple`'s own bare-tuple construction — the same
+   spot a pre-existing `// FIXME - ... we also want to selectively box the elements` comment in
+   `SequentialLogic::AccumTuple`'s `to_ast` (`src/codegen/mod.rs`, near the `AccumTuple` match arm) had
+   already flagged as unaddressed, unrelated to this port. Verified: peano now generates and (via a
+   `cargo cg`-style round-trip) compiles correctly; `cargo testall` clean, `cargo cg` byte-identical
+   throughout — including catching and fixing a real regression along the way, where the naive
+   `RecBox`-insertion check also fired for real doodle's one pre-existing self-reference
+   (`Format::Phantom`, `doodle-formats/src/format/opentype/colr.rs`'s `paint`), which never needed
+   boxing (`PhantomData<T>` never stores a `T`). Fixed with a `CodeGen::in_phantom_context: bool` flag,
+   set for the whole subtree under `Expansion::PhantomData` (not just its immediate child), suppressing
+   `RecBox` insertion throughout; bug-injection confirmed the exact same regression reappears with the
+   suppression disabled.
+3. **`Expansion::Tuple` needed its own cycle-termination guard**, same as `Seq`/`Option` — confirmed by
+   direct reproduction that a pure-`Tuple` mutual cycle (no `Union` anywhere, e.g. two batch members
+   that are each just `Tuple[Byte, ItemVar(other)]`) stack-overflows `lift_uvar` itself, since only
+   `Record`/`Union` had `in_progress`-based termination before this port. **Scope explicitly narrowed by
+   the user, overriding this document's own original framing**: rather than build promotion-to-a-real-
+   nominal-struct support for a self-referential `Tuple` (the shape doodle-rec's own `elaborate.rs`
+   handles by giving every batch member a name), `Expansion::Tuple`/`Seq`/`Option` now just detect a
+   genuine self-hit and reject it loudly (`unreachable!("... not yet supported by codegen")`) rather
+   than hang or produce broken output — mirroring the existing convention elsewhere in this file for
+   out-of-scope shapes (`"unexpected result in structural type"` etc.). Neither peano nor ping/pong
+   needs this path (both close their cycle through `Union`), so nothing about the two target capstone
+   shapes is blocked by leaving it unimplemented; if a real format ever needs it, its actual
+   requirements can be worked out against that concrete case instead of speculatively now.
+4. **A deeper, still-unresolved inconsistency**, found while actually trying to build the Phase 4/5
+   capstone fixture (below) — **not fixed, left for a future session**:
+   - **Finding A — mixed shapes cause silently-inconsistent `Box` decisions.** A `Tuple`-shaped batch
+     member that merely *contains* a reference to something recursive (not itself the cycle point, e.g.
+     `pong := Tuple[Byte, ItemVar(ping)]` where `ping` is the one that's actually self-referential) gets
+     its `RustType` recomputed **fresh, uncached** every time it's referenced (per point 3's scope
+     narrowing — `Tuple` deliberately isn't memoized like `Record`/`Union` are). This is fine/idempotent
+     for an ordinary non-recursive `Tuple`, but not when a nested element's `RecBox`-eligibility depends
+     on live `in_progress` state: the *same* reference gets `Box`-wrapped when computed while nested
+     inside `ping`'s own in-progress `Union` processing, but *not* when computed later/separately for
+     `pong`'s own top-level decode-function signature (by which point `ping` is no longer
+     `in_progress`) — producing two disagreeing types for what should be one. **Worked around** (per the
+     user's direction) by reshaping the capstone test format itself rather than fixing the underlying
+     inconsistency: rebuilt both `pong` *and* `ping`'s "More" variant payload as named `Format::record`s
+     (single-value `Union`-variant payloads — *"the 1-tuple variant convention real doodle productions
+     end up with"* — rather than raw multi-field `Tuple`s), since `Record` is always cached and so
+     doesn't have this problem. This resolved Finding A for the capstone shape, but the underlying
+     `Tuple`-recompute inconsistency is still real and unfixed; flagged here for whoever next needs a
+     recursive format whose cycle genuinely must pass through a raw multi-field `Tuple`.
+   - **Finding B — a separate, deeper pre-existing bug in `decoder_map`/`compile_queue`.** Even after
+     Finding A's type-level fix (both `pong` and `ping`'s variant payload as records), the *decode
+     logic* itself compiled `pong`'s reference back to `ping` (its `next` field) into a **dead decoder
+     that unconditionally fails** (`fn Decoder3(...) -> Result<ping, ParseError> { return
+     Err(ParseError::FailToken(...)); }`), rather than reusing `ping`'s real decoder. Root-caused
+     precisely: `Format::record` desugars to nested `Format::LetFormat`/`Format::MonadSeq` (`chain`/
+     `monad_seq`), and **both** `TypedFormat::LetFormat` and `TypedFormat::MonadSeq`'s compile arms — in
+     *both* `src/decoder.rs`'s `Compiler::compile_format` *and* `src/codegen/typed_decoder.rs`'s
+     `GTCompiler::compile_gt_format` — unconditionally wrap `next` with `Next::Cat(Typed(second),
+     next.clone())` for the first component, regardless of whether `second` (here, the record's final
+     `Format::Compute(Expr::Record(...))` construction step) ever consumes a byte. This produces a
+     structurally-different `next` (`Cat(Typed(compute_expr), Empty)`) for what is semantically the
+     identical "nothing more to look ahead at" continuation that `ping`'s own top-level entry used
+     (bare `Empty`) — `decoder_map`'s `(level, next)` key misses, queues a **second, duplicate**
+     compilation of `ping` under the mismatched `next`, and compiling `ping`'s `Union` body against that
+     wrong continuation makes `MatchTree`/lookahead construction fail, which becomes
+     `TypedDecoder::Fail`. **This is the exact same bug class Phase 1.5 already found and fixed for
+     `Tuple`/`Sequence`'s trailing-field handling** (`decoder.rs`/`typed_decoder.rs`, unconditional
+     `Next::Sequence` wrapping even for an empty/zero-progress remainder) — it was simply never audited
+     for `LetFormat`/`MonadSeq`, because Phase 1.5's own test formats used bare `Tuple`, never
+     `Format::record`. **Not fixed this session** — diagnosis is complete and precise (confirmed
+     identically present in both the interpreter and codegen compile paths) but the fix itself (mirror
+     Phase 1.5's exact special-casing: collapse the wrap when the trailing continuation is genuinely
+     zero-progress) was left for a future session at the user's direction.
+
+**Net effect**: points 1–2 (a real `Box` type, correctly inserted at both type and construction sites,
+with the `Phantom` regression caught and fixed) are solid, committed-quality work — `cargo testall`
+clean, `cargo cg` byte-identical throughout, bug-injection-verified. Point 3 is a deliberate, narrow
+scope cut. Point 4 (Findings A and B) means the Phase 3/4/5 capstone — a real recursive format actually
+compiling and decoding through the full production pipeline — is **not yet achieved**; Finding B
+specifically blocks it, and is squarely Phase 4's own "confirm decode-time dispatch" investigation
+target turning out **not** to hold for a cycle reached through a `Format::record`, contra this
+document's original "expected: no code changes" framing for that phase.
+
+---
+
 ## Phase 4 — Confirm decode-time dispatch (expected: no code changes)
 
 **Read first**: doodle-rec's Step 3 finding in full ("CaseLogic for auto-recursive references
@@ -620,9 +730,8 @@ complete.
 | 0 — Reconnaissance | Done | (uncommitted) | All anchors confirmed accurate modulo minor line drift; Phase 1 TRIAGE resolved (reuse `MatchTree::build`'s existing `Option`→`anyhow!` convention); see "Phase 0 findings" section above |
 | 1 — MatchTree cycle guard | Done | 1d47955 | `CycleGuard` (open-set + `detected` flag) threaded through `MatchTreeStep::from_format`/`from_gt_format`/`from_next`/helpers in `src/lib.rs`; `Format::ItemVar` and `TypedFormat::FormatCall` both insert/remove their own level around the recursive call; `MatchTreeLevel::grow` creates a fresh guard per top-level step and returns `None` outright the instant `detected` fires (reusing the existing "cannot build match tree" convention, not a silent per-branch `reject()`). See "Phase 1 design note" below for why total-failure-propagation was chosen over a local reject. 3 regression tests added directly in `src/lib.rs`'s `mod test` (guarded peano-shaped recursion terminates+disambiguates; genuine zero-progress self-reference sets `guard.detected`; `MatchTree::build` itself returns `None` on that case) - bypassing `define_format`'s type-checked registration on purpose, since it still cannot express a non-`Phantom` self-reference (see `reserve_recursive_level`'s doc comment) and these tests only need to exercise `MatchTreeStep`/`MatchTree` construction, not the full pipeline. Bug-injection verified: with the `ItemVar` guard temporarily removed, the left-recursion test reproduces a real stack overflow (not a hang or unrelated crash), confirming the test actually exercises the fix. `cargo testall` clean; `cargo cg` diff against pre-change `generated/gencode.rs` is byte-identical. `TypedFormat::FormatCall`'s guard mirrors `ItemVar`'s for correctness/symmetry, but is very likely dead code today - `MatchTree::build`'s only entry point takes `&[Format]` (untyped), and nothing outside this `impl` block calls `from_gt_format`/`from_mt_format` (confirmed via `find_references`) - so it wasn't given its own dedicated unit test/bug-injection round; flagged here for whoever eventually wires up a live typed entry point. |
 | 1.5 — Batch construction API + 3 more unguarded-recursion bugs | Done | a6f328b | Not in the original plan - see "Phase 1.5" section above. `Format::RecVar` (construction-time sugar, rewritten to `ItemVar` before install) + `FormatModule::define_format_rec_batch`; fixed `depends_on_next`/`match_bounds`/`lookahead_bounds` (unguarded `ItemVar` recursion, confirmed stack-overflowing in isolation) and the `Tuple`/`Sequence` `Next`-wrapping bug that broke `decoder_map` memoization for any self-reference. 3 new end-to-end tests (peano, ping/pong, left-recursion-rejected) via the real public API. `cargo testall` clean; `cargo cg` byte-identical. |
-| 2 — `occurs_in` generalization | Done | (pending) | Both TRIAGE items resolved directly from code: indirection boundaries are `Tuple`/`Record`/`Seq`/`Option` plus `Constraints::Variant`'s labeled `VarMap` entries (real doodle has no `UType::Union` - sum-type-ness lives in `Constraints`, not `UType`) and `Constraint::Proj`'s `TupleWith`/`RecordWith`/`SeqOf`/`OptOf`; `Constraint::Equiv` and plain `Var`-forwarding are not boundaries. `PhantomData` keeps its existing unconditional exemption unchanged (already fully opaque, doesn't even bind its inner content). `occurs_in`/`occurs_in_constraints` now thread `indirected: bool` + `visited: &mut HashSet<(UVar, bool)>` (keyed by canonical constraint-index, never reset at boundaries) mirroring the design directly. 4 low-level tests mirroring doodle-rec's own names (`direct_self_alias_with_no_indirection_is_rejected`, `self_reference_behind_a_tuple_is_accepted`, `self_reference_behind_a_union_variant_is_accepted` - real doodle's Union analog, `an_unrelated_pre_existing_cycle_does_not_hang_occurs_check`) plus one end-to-end test proving a genuinely self-recursive format (built via Phase 1.5's `define_format_rec_batch`) now typechecks through the real `TypeChecker::infer_module` entry point, not just the isolated `occurs` check. Bug-injection verified in two rounds: disabling the base rejection breaks `direct_self_alias_...` as predicted; disabling just the `Tuple` boundary breaks exactly the two tests that rely on it (`self_reference_behind_a_tuple_is_accepted` and the unrelated-cycle test, which also crosses a `Tuple`) and no others. `cargo testall` clean; `cargo cg` byte-identical. |
-| 3 — `CodeGen` Box placement | Not started | | |
-| 3 — `CodeGen` Box placement | Not started | | |
-| 4 — Decode-time confirmation | Not started | | |
+| 2 — `occurs_in` generalization | Done | 35b978b | Both TRIAGE items resolved directly from code: indirection boundaries are `Tuple`/`Record`/`Seq`/`Option` plus `Constraints::Variant`'s labeled `VarMap` entries (real doodle has no `UType::Union` - sum-type-ness lives in `Constraints`, not `UType`) and `Constraint::Proj`'s `TupleWith`/`RecordWith`/`SeqOf`/`OptOf`; `Constraint::Equiv` and plain `Var`-forwarding are not boundaries. `PhantomData` keeps its existing unconditional exemption unchanged (already fully opaque, doesn't even bind its inner content). `occurs_in`/`occurs_in_constraints` now thread `indirected: bool` + `visited: &mut HashSet<(UVar, bool)>` (keyed by canonical constraint-index, never reset at boundaries) mirroring the design directly. 4 low-level tests mirroring doodle-rec's own names (`direct_self_alias_with_no_indirection_is_rejected`, `self_reference_behind_a_tuple_is_accepted`, `self_reference_behind_a_union_variant_is_accepted` - real doodle's Union analog, `an_unrelated_pre_existing_cycle_does_not_hang_occurs_check`) plus one end-to-end test proving a genuinely self-recursive format (built via Phase 1.5's `define_format_rec_batch`) now typechecks through the real `TypeChecker::infer_module` entry point, not just the isolated `occurs` check. Bug-injection verified in two rounds: disabling the base rejection breaks `direct_self_alias_...` as predicted; disabling just the `Tuple` boundary breaks exactly the two tests that rely on it (`self_reference_behind_a_tuple_is_accepted` and the unrelated-cycle test, which also crosses a `Tuple`) and no others. `cargo testall` clean; `cargo cg` byte-identical. |
+| 3 — `CodeGen` Box placement | Type+construction-site `Box` done; nominal-promotion for self-referential `Tuple` deliberately out of scope | (uncommitted) | See "Phase 3 & 4 findings" above. `CompType::RecBox` + full trait wiring; `RustExpr::wrap_box`/`GenExpr::WrapBox`/`DerivedLogic::WrapBox` construction-site insertion; `Expansion::Tuple`/`Seq`/`Option` cycle-guards (reject-loudly, not promote); `Format::Phantom` regression found and fixed (`in_phantom_context`). `cargo testall` clean, `cargo cg` byte-identical, bug-injection-verified. |
+| 4 — Decode-time confirmation | Blocked — real bug found, not fixed | (uncommitted) | Contra this phase's own "expected: no code changes": found and root-caused Finding B (`LetFormat`/`MonadSeq` unconditionally wrap `next`, defeating `decoder_map` memoization for a cycle reached through `Format::record`'s `chain`/`monad_seq` desugaring — same bug class as Phase 1.5's `Tuple`/`Sequence` fix, unaudited for this pair). Diagnosis complete and precise (confirmed identically in `decoder.rs` and `typed_decoder.rs`); fix deferred to a future session at the user's direction. |
 | 5 — Capstone integration test | Not started | | |
 | 6 — Full-suite verification | Not started | | |

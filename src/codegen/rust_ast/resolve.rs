@@ -1,20 +1,30 @@
+//! Static analysis module to determine the correct form to normalize an [`OwnedRustExpr`] to, based on the type of the expression
+//! and the codegen [`SourceContext`] that stores various type properties (e.g. whether a type is copyable, etc.) for ad-hoc types.
 use super::*;
 use crate::codegen::{
     model::{READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY},
     rust_ast::analysis::SourceContext,
 };
 
-/// Represents the aggregate 'answers' for certain queries on types
-///   - is_copy: whether the type is copyable
-///   - is_ref: whether the type is held as a reference
+/// Minimal property-set used to determine the correct [`OwnedKind`] for an [`OwnedRustExpr`]
+/// based on inference over its type.
+///
+/// There are three possible [`OwnedKind`]s that a [`Solution`] can entail:
+///
+/// * [`OwnedKind::Copied`] - the type is `Copy` and not a reference, so it can be copied by value without extra syntax (`x` becomes `x`)
+/// * [`OwnedKind::Deref`] - the underlying type is `Copy` but it is held behind a reference, so it needs to be dereferenced to copy to an owned value (`x` becomes `*x`)
+/// * [`OwnedKind::Cloned`] - the underlying type is not `Copy`, so whether or not it is a reference, it must be cloned to produce an owned value (`x` becomes `x.clone()`)
 pub(crate) struct Solution {
+    /// `true` if the type in question implements `Copy`, `false` otherwise
     is_copy: bool,
+    /// `true` if the type in question is a reference, `false` otherwise
     is_ref: bool,
 }
 
-/// Trait for things that can be resolved (i.e. collapsed to ground-state based on contextual Solutions)
+/// Trait used for in-place mutative [`OwnedKind`] resolution for an AST node-type whose values can potentially embed [`OwnedRustExpr`] that might be unresolved.
 pub trait Resolvable {
-    /// Modify self to be ground-state
+    /// Performs a recursive traversal of the AST node, mutating any unresolved [`OwnedRustExpr`]s it contains to subsitute the correct [`OwnedKind`]
+    /// based on the type of the expression and the [`SourceContext`] provided.
     fn resolve(&mut self, ctx: &SourceContext<'_>);
 }
 
@@ -90,7 +100,6 @@ impl Resolvable for RustStmt {
             | RustStmt::Reassign(.., expr)
             | RustStmt::Return(.., expr)
             | RustStmt::Expr(expr) => expr.resolve(ctx),
-            // RustStmt::Control(ctrl) => ctrl.resolve(ctx),
         }
     }
 }
@@ -266,37 +275,7 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
                 }
                 LocalType::External(..) => unreachable!("external type cannot be solved"),
             },
-            AtomType::Comp(ct) => match ct {
-                CompType::Vec(..) => Solution {
-                    is_copy: false,
-                    is_ref: false,
-                },
-                CompType::RawSlice(elt) => {
-                    let Solution { is_copy, .. } = solve_type(elt, ctx);
-                    Solution {
-                        is_copy,
-                        is_ref: false,
-                    }
-                }
-                CompType::Option(inner) | CompType::Result(inner, _) => {
-                    let Solution { is_copy, .. } = solve_type(inner, ctx);
-                    Solution {
-                        is_copy,
-                        is_ref: false,
-                    }
-                }
-                CompType::Borrow(.., t) => {
-                    let Solution { is_copy, .. } = solve_type(t, ctx);
-                    Solution {
-                        is_copy,
-                        is_ref: true,
-                    }
-                }
-                CompType::PhantomData(_t) => Solution {
-                    is_copy: true,
-                    is_ref: false,
-                },
-            },
+            AtomType::Comp(ct) => solve_comp_type(ct, ctx),
         },
         RustType::AnonTuple(rust_types) => {
             let mut is_copy = true;
@@ -318,6 +297,41 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
             is_ref: false,
         },
         RustType::Verbatim(..) => unreachable!("unsolvable verbatim type: {ty:?}"),
+    }
+}
+
+fn solve_comp_type(ct: &CompType, ctx: &SourceContext<'_>) -> Solution {
+    match ct {
+        CompType::Vec(..) | CompType::RecBox(..) => Solution {
+            is_copy: false,
+            is_ref: false,
+        },
+        CompType::RawSlice(..) => {
+            Solution {
+                // NOTE - [T] is never copy, even for `T: Copy`; only known-size `[T; N]` can be Copy
+                is_copy: false,
+                // NOTE - even though &[T] is a reference, [T] itself is not a reference; this doesn't end up mattering because `[T]` can never be the type of a legal expression
+                is_ref: false,
+            }
+        }
+        CompType::Option(inner) | CompType::Result(inner, _) => {
+            let Solution { is_copy, .. } = solve_type(inner, ctx);
+            Solution {
+                is_copy,
+                is_ref: false,
+            }
+        }
+        CompType::Borrow(.., t) => {
+            let Solution { is_copy, .. } = solve_type(t, ctx);
+            Solution {
+                is_copy,
+                is_ref: true,
+            }
+        }
+        CompType::PhantomData(..) => Solution {
+            is_copy: true,
+            is_ref: false,
+        },
     }
 }
 
