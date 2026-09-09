@@ -84,6 +84,65 @@ mod elaboration {
         run_headcount(&formats);
     }
 
+    #[test]
+    fn phase3_final_check_peano_and_ping_pong() {
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+        let top = frefs[0].call();
+        let src = produce_string_gencode(&module, &top);
+        assert!(src.contains("Box<peano>"), "source was:\n{src}");
+
+        let ping = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Done"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("More"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'A'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let pong = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
+        let mut module2 = FormatModule::new();
+        let frefs2 = module2.define_format_rec_batch(vec![
+            (Label::Borrowed("ping"), ping),
+            (Label::Borrowed("pong"), pong),
+        ]);
+        let top2 = frefs2[0].call();
+        let src2 = produce_string_gencode(&module2, &top2);
+        assert!(src2.contains("Box<ping>"), "source was:\n{src2}");
+    }
+
+    #[test]
+    #[should_panic(expected = "not yet supported")]
+    fn phase3_final_check_pure_tuple_cycle_rejects_cleanly() {
+        let pair_a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
+        let pair_b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
+        let mut module = FormatModule::new();
+        let frefs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("pair_a"), pair_a),
+            (Label::Borrowed("pair_b"), pair_b),
+        ]);
+        let top = frefs[0].call();
+        let _src = produce_string_gencode(&module, &top);
+    }
+
     /// Headcount test for a record-format consisting of only leaf-node field-formats
     #[test]
     fn test_headcount_record_simple() {
