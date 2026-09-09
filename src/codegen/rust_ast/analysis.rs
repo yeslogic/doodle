@@ -473,6 +473,7 @@ where
     fn size_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
             CompType::Vec(..) => size_of::<Vec<Cement>>(),
+            CompType::RecBox(..) => size_of::<Box<Cement>>(),
             CompType::Option(inner) => {
                 if inner.is_optimized(context) {
                     inner.size_hint(context)
@@ -481,19 +482,20 @@ where
                 }
             }
             CompType::PhantomData(..) => size_of::<std::marker::PhantomData<Cement>>(),
+            CompType::Borrow(..) => size_of::<&'static Cement>(),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
-            CompType::Borrow(..) => size_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
 
     fn align_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
-            CompType::PhantomData(..) => align_of::<std::marker::PhantomData<Cement>>(),
             CompType::Vec(..) => align_of::<Vec<Cement>>(),
+            CompType::RecBox(..) => align_of::<Box<Cement>>(),
+            CompType::PhantomData(..) => align_of::<std::marker::PhantomData<Cement>>(),
             CompType::Option(inner) => inner.align_hint(context),
+            CompType::Borrow(..) => align_of::<&'static Cement>(),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
-            CompType::Borrow(..) => align_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
@@ -518,7 +520,8 @@ where
                 n => n - 1,
             },
             CompType::PhantomData(..) => 0,
-            CompType::Borrow(..) => 1,
+            // Both pointers and smart-pointers have only one true niche value, null.
+            CompType::Borrow(..) | CompType::RecBox(..) => 1,
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
@@ -537,7 +540,7 @@ where
                 unreachable!("unexpected mutable borrow in generative type: {self:?}")
             }
             CompType::PhantomData(..) => true,
-            CompType::Vec(..) => false,
+            CompType::Vec(..) | CompType::RecBox(..) => false,
             CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
             CompType::Option(inner) => inner.copy_hint(context),
             CompType::Result(ok_t, err_t) => ok_t.copy_hint(context) && err_t.copy_hint(context),

@@ -857,14 +857,19 @@ impl RustType {
         Self::Verbatim(con.into(), params.map(Box::new))
     }
 
-    /// Predicate function that determines whether values of RustType `self` should be borrowed
+    /// Predicate function that determines whether concrete values of the given RustType should be borrowed
     /// before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
     pub fn should_borrow_for_arg(&self) -> bool {
         match self {
             RustType::Atom(atom_type) => match atom_type {
                 AtomType::Comp(ct) => match ct {
-                    // REVIEW - this may lead to code divergence and may not be stable...
+                    // REVIEW - arbitrarily altering the types of parameters from their elaborated type in generated code leads to extraneous clones where references occur
                     CompType::Vec(..) => true,
+                    CompType::RecBox(..) => {
+                        // NOTE - it doesn't seem likely that RecBox will ever crop up in a Decoder function argument, but we neither want to ignore that happening nor panic
+                        log::warn!("RecBox unexpected to ocur in param-lists, but it does here: {self:?}");
+                        true
+                    }
                     CompType::Borrow(..) => false,
                     CompType::Option(t) => t.should_borrow_for_arg(),
                     CompType::Result(t_ok, _t_err) => t_ok.should_borrow_for_arg(),
@@ -885,7 +890,6 @@ impl RustType {
             // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
             RustType::AnonTuple(_elts) => false,
             RustType::Verbatim(..) => false,
-            // FIXME - is this correct?
             RustType::ReadArray(..) => !READ_ARRAY_IS_COPY,
             RustType::ViewObject(..) => false,
         }
@@ -1032,26 +1036,29 @@ impl RustType {
     /// Returns `true` if `self` is a primitive type, an immutable reference, or if it is an anonymous tuple or `Result` consisting only of such value-types.
     ///
     /// Because inference is performed locally, no embedded `LocalDef` values are considered to be Copyable, even when they are locally-defined with a `#[derive(Copy)]` attribute.
+    ///
+    /// For a true answer that solves for LocalDef using additionally provided state, use [`CopyEligible::copy_hint`](analysis::CopyEligible::copy_hint) instead.
     pub(crate) fn can_be_copy(&self) -> bool {
         match self {
             RustType::Atom(at) => match at {
                 AtomType::Prim(..) => true,
                 AtomType::Signed(..) => true,
-                // Without passing around high-level type-maps, we can't check any externally-defined or local ad-hoc types for Copy-safety
+                // This estimate is conservative and stateless, so we cannot solve TypeRef and instead default to false, the more consevative answer
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
-                    CompType::Vec(_) => false,
+                    CompType::Vec(_) | CompType::RecBox(_) => false,
                     CompType::Option(t) => t.can_be_copy(),
                     CompType::Result(t_ok, t_err) => t_ok.can_be_copy() && t_err.can_be_copy(),
                     CompType::Borrow(_lt, m, _t) => !m.is_mutable(),
                     CompType::RawSlice(_) => {
-                        unreachable!("raw slice should not exist outside of ref context")
+                        log::error!("raw slice should not exist outside of ref context");
+                        false
                     }
                     CompType::PhantomData(..) => true,
                 },
             },
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
-            // Without lexical analysis rules, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
+            // NOTE - Without lexical analysis rules or more information stored in Verbatim, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
             RustType::Verbatim(..) => false,
             RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
             RustType::ViewObject(..) => VIEW_OBJECT_IS_COPY,
@@ -1620,12 +1627,20 @@ impl ToFragment for RustLt {
 /// If not specified, `U` will implicitly have the same type as `T`
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum CompType<T = Box<RustType>, U = T> {
+    /// Representation of `Vec<X>`
     Vec(T),
+    /// Representation of `[X]`, which is only valid in the context of a borrow, e.g. `&[X]` or `&mut [X]`
     RawSlice(T),
+    /// Representation of `Option<X>`
     Option(T),
+    /// Representation of `Result<X, Y>`
     Result(T, U),
+    /// Common representation of `&X` or `&mut X`, with an optional lifetime parameter
     Borrow(Option<RustLt>, Mut, T),
+    /// Representation of `std::marker::PhantomData<X>`
     PhantomData(T),
+    /// Representation of `Box<X>` specifically in the context of auto-recursive or mutually-recursive types (separate from the theoretical boxing done via `HeapOptimize`)
+    RecBox(T),
 }
 
 impl CompType {
@@ -1637,6 +1652,7 @@ impl CompType {
             CompType::Result(t, _) => t.lt_param(),
             CompType::Borrow(rust_lt, _, t) => rust_lt.as_ref().or_else(|| t.lt_param()),
             CompType::PhantomData(t) => t.lt_param(),
+            CompType::RecBox(t) => t.lt_param(),
         }
     }
 
@@ -1654,6 +1670,7 @@ impl CompType {
             }
             CompType::Borrow(None, _, t) => t.alpha_convert_lifetime(new_lt),
             CompType::PhantomData(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::RecBox(t) => t.alpha_convert_lifetime(new_lt),
         }
     }
 }
@@ -1697,6 +1714,10 @@ where
                     Fragment::string("std::marker::PhantomData<"),
                     Fragment::Char('>'),
                 )
+            }
+            CompType::RecBox(inner) => {
+                let tmp = inner.to_fragment();
+                tmp.delimit(Fragment::string("Box<"), Fragment::Char('>'))
             }
         }
     }
@@ -2953,6 +2974,19 @@ impl RustExpr {
             }
             // REVIEW - should we have a standalone primitive for Some?
             this => RustExpr::local("Some").call_with([this]),
+        }
+    }
+
+    /// Wraps `self` in `Box::new(..)` - used at a construction site whose target position is a
+    /// `CompType::RecBox`-wrapped type (a self/mutually-recursive reference closing a cycle - see
+    /// `CodeGen::lift_uvar`'s own `RecBox`-insertion on the type side, which this mirrors on the
+    /// value-construction side).
+    pub(crate) fn wrap_box(self) -> RustExpr {
+        match self.into_normal() {
+            RustExpr::BlockScope(stmts, tail) => {
+                RustExpr::BlockScope(stmts, Box::new(tail.wrap_box()))
+            }
+            this => RustExpr::scoped(["Box"], "new").call_with([this]),
         }
     }
 
