@@ -1374,13 +1374,25 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
         TypedExpr::Numeric(_gt, num) => embed_numeric_expr(num),
         TypedExpr::Record(gt, fields) => {
-            let tname = match gt {
-                GenType::Def((_, tname), _) => tname,
+            // `field_types` is `None` only for the `Inline(LocalDef)` case, which (unlike `Def`)
+            // carries no inline struct definition to consult - no known case has ever needed a
+            // `RecBox` field there, so it's left as a plain pass-through rather than speculatively
+            // threading a `defined_types` table into this free function to cover it.
+            let (tname, field_types) = match gt {
+                GenType::Def((_, tname), decl) => {
+                    let field_types = match &decl.def {
+                        RustTypeDef::Struct(RustStruct::Record(fts)) => Some(fts.as_slice()),
+                        other => unreachable!(
+                            "TypedExpr::Record's Def-type is not a Record struct: {other:?}"
+                        ),
+                    };
+                    (tname, field_types)
+                }
                 GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
                     _ix,
                     tname,
                     _,
-                )))) => tname,
+                )))) => (tname, None),
                 other => unreachable!(
                     "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
                 ),
@@ -1391,7 +1403,28 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     fields
                         .iter()
                         .map(|(name, val)| {
-                            let value = match embed_expr_nat(val) {
+                            // Mirrors `box_wrap_if_needed` (used for `Variant`/`Tuple`
+                            // construction) for a record field: if this field's own declared type
+                            // was promoted to `RecBox` (a self/mutually-recursive reference closing
+                            // a cycle through this record - see `CodeGen::lift_uvar`), the
+                            // constructed value must be `Box::new(..)`-wrapped to match, which also
+                            // rules out the field-init shorthand (`{ name }`) below.
+                            let is_rec_box = field_types.is_some_and(|fts| {
+                                fts.iter().any(|(lbl, ty)| {
+                                    lbl == name
+                                        && matches!(
+                                            ty,
+                                            RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
+                                        )
+                                })
+                            });
+                            let embedded = embed_expr_nat(val);
+                            let embedded = if is_rec_box {
+                                embedded.wrap_box()
+                            } else {
+                                embedded
+                            };
+                            let value = match embedded {
                                 RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
                                 other => Some(other),
                             };
