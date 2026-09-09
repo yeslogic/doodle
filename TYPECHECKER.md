@@ -82,6 +82,35 @@ of the two sets, and repointing the two metavariables to the same identifier
 (`VMId`) to ensure that by the end of the process, all metavariables that point
 to the same union-type agree on the full set of variants in that union.
 
+### Occurs-check and representability (relevant to any new indirection-shaped primitive)
+
+`TypeChecker::occurs`/`occurs_in`/`occurs_in_constraints` reject a `?X` whose own definition embeds
+`?X` again with no intervening indirection - the same criterion Rust's own E0072 uses (`type X =
+Box<X>` illegal, `enum X { Y(Box<X>) }` fine). This is tracked with an `indirected: bool` flag that
+starts `false` and flips to `true` the instant the walk crosses a **representability boundary**: a
+`Tuple`/`Record`/`Seq`/`Option` position, or a `Constraints::Variant`'s labeled union-arm (this
+codebase's analog of an enum-variant boundary, since there is no `UType::Union` - sum-type-ness lives
+in `Constraints`, not `UType`). A plain `Var`-forwarding dereference, or `Constraint::Equiv` (direct
+type equivalence, not an embedding), is *not* a boundary and carries `indirected` through unchanged.
+`visited` is keyed by `(canonical constraint index, indirected)` and threaded through the whole walk
+without resetting at boundaries, so an already-indirected cycle reached while searching for an
+unrelated target can't cause an infinite loop.
+
+**If a new primitive's `UType`/`Constraint` shape embeds another `UType` behind some wrapper** (the
+way `Tuple`/`Record`/`Seq`/`Option`/`Proj` already do), decide explicitly whether that wrapper is a
+representability boundary (does Rust need to indirect through it, the way `Box`/`Vec`/a named
+`struct`/`enum` field does?) and extend `occurs_in`/`occurs_in_constraints` accordingly - getting this
+wrong under-rejects (accepts a genuinely unrepresentable infinite type) rather than over-rejects, so
+it's worth a dedicated test per new boundary kind, not just inspection.
+
+`PhantomData` keeps a separate, unconditional exemption from this check entirely (it's structurally
+inert content that a decoder never actually walks, so it can't build an unrepresentable *decoded*
+type regardless of what it contains) - it does not go through the indirection-tracking machinery
+above at all. See `doc/RECURSION.md` for the full recursion-model writeup this occurs-check
+generalization was built for (self/mutually-recursive formats built via
+`FormatModule::define_format_rec_batch`), including where the analogous reservation-before-recursing
+pattern shows up again in `MatchTree` construction and codegen's `CodeGen::lift_uvar`.
+
 ### Basic Unification Guide
 
 Below is a guide for a variety of 'shapes' of `Format`, `Pattern`, and `Expr`
