@@ -37,6 +37,7 @@ pub mod parser;
 mod precedence;
 pub mod prelude;
 pub mod read;
+pub(crate) mod recursion;
 
 mod scope;
 
@@ -1642,24 +1643,41 @@ pub struct MatchTree {
 /// [`MatchTreeLevel::grow`]'s per-index loop), so that construction terminates instead of
 /// recursing forever on a self-referential format.
 ///
-/// Re-entering a level that's still open here can only happen with zero bytes consumed since it
-/// was opened: any `Format::Byte` reached along the way already stops eager descent (it returns a
-/// `branch()` step whose continuation is a deferred [`Next`], only expanded at the *next*
-/// lookahead depth, with a fresh, empty `CycleGuard`) - so this only ever fires on a format that
-/// is unconditionally self-referential, with no possible progress before recursing again. That is
-/// a grammar defect (the same class of error as left recursion in a traditional parser), not a
-/// decidable recursive grammar, so `detected` is surfaced to [`MatchTreeLevel::grow`], which fails
-/// the whole build rather than silently treating the offending branch as though it simply
-/// contributed no further disambiguating information.
+/// A level is added to `open_levels` immediately before recursing into [`MatchTreeStep::from_format`]
+/// on `module.get_format(level)`, and is removed just after that call returns.
+///
+/// If a level would be added to `open_levels` for the second time, then there must be a zero-progress cycle
+/// (provided that a fresh `CycleGuard` is instantiated for each separate pass within [`MatchTreeLevel::grow`]).
+/// When this happens, `has_cycle` is set to true, and the return value can be arbitrarily chosen as
+/// `MatchTreeStep::reject()`; the calling `MatchTreeLevel::grow` is responsible for checking `has_cycle`,
+/// and if it is set, then an exceptional value of `None` is returned.
 #[derive(Default)]
 struct CycleGuard {
-    open: HashSet<usize>,
-    detected: bool,
+    open_levels: HashSet<usize>,
+    has_cycle: bool,
 }
 
 impl CycleGuard {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    /// Inserts `level` into the open-set, updating `has_cycle` based on whether the insertion was novel
+    /// (i.e. setting it to `true` if the `level` was already open).
+    ///
+    /// Returns the value of `self.has_cycle`.
+    fn open(&mut self, level: usize) -> bool {
+        if !self.open_levels.insert(level) {
+            self.has_cycle = true;
+        }
+        self.has_cycle
+    }
+
+    /// Marks `level` as closed, removing it from the open-set.
+    ///
+    /// This should be called after returning from a recursive call to [`MatchTreeStep::from_format`] on `module.get_format(level)`.
+    fn close(&mut self, level: usize) {
+        self.open_levels.remove(&level);
     }
 }
 
@@ -2004,6 +2022,22 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
+    /// Internal helper to dedup and simplify the common ItemVar/FormatCall handling between `from_format` and `from_gt_format`
+    ///
+    /// Insterts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
+    /// its value after marking `level` as closed.
+    fn guarded<F>(level: usize, guard: &mut CycleGuard, f: F) -> Self
+    where
+        F: FnOnce(&mut CycleGuard) -> Self,
+    {
+        if guard.open(level) {
+            return Self::reject();
+        }
+        let step = f(guard);
+        guard.close(level);
+        step
+    }
+
     pub fn from_gt_format(
         module: &'a FormatModule,
         f: &'a TypedFormat<GenType>,
@@ -2011,20 +2045,9 @@ impl<'a> MatchTreeStep<'a> {
         guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match f {
-            TypedFormat::FormatCall(_, level, ..) => {
-                let level = *level;
-                if !guard.open.insert(level) {
-                    // Already being expanded on this same eager descent - see `CycleGuard`'s
-                    // docs. `Format::ItemVar`'s arm (below, via `from_format`) applies the same
-                    // check for the untyped side; this keeps the two symmetric instead of
-                    // relying on the untyped body's own re-entry to catch it one level later.
-                    guard.detected = true;
-                    return Self::reject();
-                }
-                let step = Self::from_format(module, module.get_format(level), next, guard);
-                guard.open.remove(&level);
-                step
-            }
+            TypedFormat::FormatCall(_, level, ..) => Self::guarded(*level, guard, move |guard| {
+                Self::from_format(module, module.get_format(*level), next, guard)
+            }),
             TypedFormat::Fail => Self::reject(),
             TypedFormat::EndOfInput => Self::accept(),
             TypedFormat::Align(_) => {
@@ -2270,16 +2293,9 @@ impl<'a> MatchTreeStep<'a> {
         match f {
             Format::ItemVar(level, _args, _views) => {
                 let level = *level;
-                if !guard.open.insert(level) {
-                    // Already being expanded on this same eager descent, with no byte consumed
-                    // in between - see `CycleGuard`'s docs for why that can only mean genuine,
-                    // zero-progress left recursion.
-                    guard.detected = true;
-                    return Self::reject();
-                }
-                let step = Self::from_format(module, module.get_format(level), next, guard);
-                guard.open.remove(&level);
-                step
+                Self::guarded(level, guard, move |guard| {
+                    Self::from_format(module, module.get_format(level), next, guard)
+                })
             }
             Format::RecVar(_) => unreachable!(
                 "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
@@ -2576,17 +2592,16 @@ impl<'a> MatchTreeLevel<'a> {
             let mut tmp = Vec::from_iter(nexts);
             tmp.sort_by_key(|(ix, _)| *ix);
             for (i, next) in tmp.into_iter() {
-                // Fresh per top-level step: no bytes are consumed within a single `from_next`
-                // call, so a level re-entered here can only be genuine (zero-progress) left
-                // recursion, not merely a level revisited from an unrelated sibling branch -
-                // see `CycleGuard`'s docs.
+                let _next = next.clone();
+                // instantiate a fresh CycleGuard to detect zero-progress ItemVar cycles in `from_next` call-stack
                 let mut guard = CycleGuard::new();
                 let subtree = MatchTreeStep::from_next(module, next, &mut guard);
-                if guard.detected {
-                    // A definite grammar defect (unconditional self-reference), not just "not
-                    // disambiguable within this depth" - fail the whole build rather than let
-                    // `merge_step` silently treat the cyclic branch as though it simply
-                    // contributed no further disambiguating information.
+                if guard.has_cycle {
+                    // Upon detecting a zero-progress cycle, we know the format is not well-formed, and we return None early to surface the error to the caller.
+                    log::error!(
+                        "zero-progress recursive cycle detected in format; cannot construct a valid match tree ({next:?})",
+                        next = _next.as_ref()
+                    );
                     return None;
                 }
                 tree = tree.merge_step(i, subtree).ok()?;
@@ -2846,7 +2861,7 @@ mod test {
         let mut guard = CycleGuard::new();
         let step = MatchTreeStep::from_format(&module, &peano, Rc::new(Next::Empty), &mut guard);
         assert!(
-            !guard.detected,
+            !guard.has_cycle,
             "guarded (byte-first) recursion must not be misclassified as left recursion"
         );
         assert!(!step.accept, "peano itself never accepts zero bytes");
@@ -2876,7 +2891,7 @@ mod test {
         let mut guard = CycleGuard::new();
         let _ = MatchTreeStep::from_format(&module, &bad, Rc::new(Next::Empty), &mut guard);
         assert!(
-            guard.detected,
+            guard.has_cycle,
             "an unconditional (zero-progress) self-reference must be flagged as a cycle"
         );
     }
