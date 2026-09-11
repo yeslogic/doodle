@@ -234,6 +234,12 @@ impl Format {
         }
     }
 
+    /// Processes an arbitrary sequence of field-like Formats (which may or may not be named) in the order they are provided,
+    /// and then processes a final Format which may have data-depenencies on any variables captured along the way.
+    ///
+    /// Designed to support [`pseudo_record`](crate::helper::pseudo_record), which mimics the operation of
+    /// standard record-processing but doesn't construct a record from the field-like formats that are given
+    /// names.
     pub fn chaining<Name: IntoLabel>(
         formats: impl IntoIterator<Item = (Option<Name>, Format), IntoIter: DoubleEndedIterator>,
         format: Format,

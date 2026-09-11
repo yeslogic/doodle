@@ -73,7 +73,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let rle = run_length::main(module);
     // NOTE - ztext would commonly clash with arbitrary gzip so we include it in the forest but not the main alternation
     let text_or_ztext = utf8_maybe_gzipped(module, text, gzip);
-    let bson = bson::main(module);
+    let bson = bson::main(module, utf8nz);
 
     let opentype = opentype::main(module, text_or_ztext);
 
