@@ -5210,19 +5210,24 @@ impl<'a> Elaborator<'a> {
                     // its own not-yet-elaborated level) resolves to this placeholder instead of
                     // re-entering this same call and recursing without bound.
                     //
-                    // Unlike the analogous fix in `TypeChecker::infer_var_format_level`, the
-                    // placeholder's *content* is never actually consulted by anything that cares:
-                    // `GTCompiler::compile_gt_format` discards a `FormatCall` node's `t_inner`
-                    // whenever `decoder_map` already has an entry for that level, and a level's
-                    // entry is always inserted into `decoder_map` at the point its `FormatCall`
-                    // node is *discovered*, before its body is ever walked (body-walking is
-                    // deferred via `compile_queue`) - so by the time a self-reference nested in
-                    // that body is reached, the real entry is already present and this
-                    // placeholder is never read. `Format::from`'s reverse conversion likewise
-                    // discards `t_inner` entirely when reconstructing `Format::ItemVar`. This
-                    // insertion also performs no index/`UVar`-style allocation of its own, so it
-                    // cannot desynchronize the lockstep invariant with `TypeChecker`.
-                    let placeholder = Rc::new(TypedFormat::Fail);
+                    // `GTCompiler::compile_gt_format` never trusts this placeholder's *content*:
+                    // it discards a `FormatCall` node's `t_inner` whenever `decoder_map` already
+                    // has an entry for that level, and a level's entry is always inserted into
+                    // `decoder_map` at the point its `FormatCall` node is *discovered*, before its
+                    // body is ever walked (body-walking is deferred via `compile_queue`) - so by
+                    // the time a self-reference nested in that body is reached, the real entry is
+                    // already present and this placeholder is never read there. `Format::from`'s
+                    // reverse conversion likewise discards `t_inner` entirely when reconstructing
+                    // `Format::ItemVar`. This insertion also performs no index/`UVar`-style
+                    // allocation of its own, so it cannot desynchronize the lockstep invariant
+                    // with `TypeChecker`.
+                    //
+                    // `TypedFormat::match_bounds`/`lookahead_bounds`, unlike the two consumers
+                    // above, *do* walk straight into `t_inner` on an arbitrary, possibly-nested
+                    // `FormatCall` - so they specifically must use this single, canonical
+                    // `TypedFormat::recursion_placeholder()` value (rather than an unmarked, fresh
+                    // `Rc::new(TypedFormat::Fail)`) to stay recognizable via `Rc::ptr_eq` later.
+                    let placeholder = TypedFormat::recursion_placeholder();
                     self.t_formats.insert(*level, placeholder);
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
