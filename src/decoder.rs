@@ -749,16 +749,11 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
-                    let field_next = match fields.as_slice() {
-                        // Special-case empty field-suffixes to avoid extraneous `Next::Sequence`
-                        [] => next.clone(),
-                        #[cfg(any())]
-                        [last] if last.is_nonproductive(self.module) => next.clone(),
-                        remaining => {
-                            // REVIEW - do we properly guard against `remaining` consisting of only non-productive formats?
-                            Rc::new(Next::Sequence(MaybeTyped::Untyped(remaining), next.clone()))
-                        }
-                    };
+                    let field_next = Next::sequence(
+                        self.module,
+                        MaybeTyped::Untyped(fields.as_slice()),
+                        next.clone(),
+                    );
                     let df = self.compile_format(f, field_next)?;
                     decs.push(df);
                 }
@@ -768,16 +763,11 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(formats.len());
                 let mut fields = formats.iter();
                 while let Some(f) = fields.next() {
-                    let field_next = match fields.as_slice() {
-                        // Special-case empty field-suffixes to avoid extraneous `Next::Sequence`
-                        [] => next.clone(),
-                        #[cfg(any())]
-                        [last] if last.is_nonproductive(self.module) => next.clone(),
-                        remaining => {
-                            // REVIEW - do we properly guard against `remaining` consisting of only non-productive formats?
-                            Rc::new(Next::Sequence(MaybeTyped::Untyped(remaining), next.clone()))
-                        }
-                    };
+                    let field_next = Next::sequence(
+                        self.module,
+                        MaybeTyped::Untyped(fields.as_slice()),
+                        next.clone(),
+                    );
                     let df = self.compile_format(f, field_next)?;
                     decs.push(df);
                 }
@@ -959,22 +949,14 @@ impl<'a> Compiler<'a> {
             Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
             Format::LetFormat(first, name, second) => {
                 // When `second` is a non-productive format (e.g. `Format::Compute`), we compile against `next` directly and avoid cache-misses in `decoder_map` for self-referential `first` formats
-                let a_next = if second.is_nonproductive(self.module) {
-                    next.clone()
-                } else {
-                    Rc::new(Next::Cat(MaybeTyped::Untyped(second), next.clone()))
-                };
+                let a_next = Next::cat(self.module, MaybeTyped::Untyped(second), next.clone());
                 let da = Box::new(self.compile_format(first, a_next)?);
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::LetFormat(da, name.clone(), db))
             }
             Format::MonadSeq(first, second) => {
                 // When `second` is a non-productive format (e.g. `Format::Compute`), we compile against `next` directly and avoid cache-misses in `decoder_map` for self-referential `first` formats
-                let a_next = if second.is_nonproductive(self.module) {
-                    next.clone()
-                } else {
-                    Rc::new(Next::Cat(MaybeTyped::Untyped(second), next.clone()))
-                };
+                let a_next = Next::cat(self.module, MaybeTyped::Untyped(second), next.clone());
                 let da = Box::new(self.compile_format(first, a_next)?);
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::MonadSeq(da, db))

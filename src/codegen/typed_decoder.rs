@@ -468,16 +468,11 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let field_next = match fields.as_slice() {
-                        // Special-case empty field-suffixes to avoid extraneous `Next::Sequence`
-                        [] => next.clone(),
-                        #[cfg(any())]
-                        [last] if last.is_nonproductive(self.module) => next.clone(),
-                        remaining => {
-                            // REVIEW - do we properly guard against `remaining` consisting of only non-productive formats?
-                            Rc::new(Next::Sequence(MaybeTyped::Typed(remaining), next.clone()))
-                        }
-                    };
+                    let field_next = Next::sequence(
+                        self.module,
+                        MaybeTyped::Typed(fields.as_slice()),
+                        next.clone(),
+                    );
                     let df = self.compile_gt_format(f, None, field_next)?;
                     dfields.push(df);
                 }
@@ -487,16 +482,11 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let field_next = match fields.as_slice() {
-                        // Special-case empty field-suffixes to avoid extraneous `Next::Sequence`
-                        [] => next.clone(),
-                        #[cfg(any())]
-                        [last] if last.is_nonproductive(self.module) => next.clone(),
-                        remaining => {
-                            // REVIEW - do we properly guard against `remaining` consisting of only non-productive formats?
-                            Rc::new(Next::Sequence(MaybeTyped::Typed(remaining), next.clone()))
-                        }
-                    };
+                    let field_next = Next::sequence(
+                        self.module,
+                        MaybeTyped::Typed(fields.as_slice()),
+                        next.clone(),
+                    );
                     let df = self.compile_gt_format(f, None, field_next)?;
                     dfields.push(df);
                 }
@@ -732,23 +722,13 @@ impl<'a> GTCompiler<'a> {
                 // arm (Phase 4's "Finding B"): skip the `Next::Cat` wrapping when `f` can only
                 // ever match zero bytes, so a self-referential `f0` sees the same `next` here as
                 // it would compiled directly, letting `decoder_map` actually memoize it.
-                let erased: Format = f.as_ref().clone().into();
-                let a_next = if erased.match_bounds(self.module).as_exact() == Some(0) {
-                    next.clone()
-                } else {
-                    Rc::new(Next::Cat(MaybeTyped::Typed(f.as_ref()), next.clone()))
-                };
+                let a_next = Next::cat(self.module, MaybeTyped::Typed(f.as_ref()), next.clone());
                 let d0 = Box::new(self.compile_gt_format(f0, None, a_next)?);
                 let d = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::LetFormat(gt.clone(), d0, name.clone(), d))
             }
             TypedFormat::MonadSeq(gt, f0, f) => {
-                let erased: Format = f.as_ref().clone().into();
-                let a_next = if erased.match_bounds(self.module).as_exact() == Some(0) {
-                    next.clone()
-                } else {
-                    Rc::new(Next::Cat(MaybeTyped::Typed(f.as_ref()), next.clone()))
-                };
+                let a_next = Next::cat(self.module, MaybeTyped::Typed(f.as_ref()), next.clone());
                 let d0 = Box::new(self.compile_gt_format(f0, None, a_next)?);
                 let d = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::MonadSeq(gt.clone(), d0, d))
