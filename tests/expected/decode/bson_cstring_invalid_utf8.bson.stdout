@@ -1,0 +1,4 @@
+└── cstring <- bson.cstring :=
+(FALLBACK)
+    └── invalid :=
+        └── 0 := 128
