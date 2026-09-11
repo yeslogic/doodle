@@ -20,6 +20,9 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
     )
 }
 
+/// Registers and returns two UTF-8 text formats, in order:
+///   - `text.string`: arbitrary string of UTF-8 characters
+///   - `text.string.utf8.non-null`: string consisting of non-null UTF-8 characters
 pub fn main(module: &mut FormatModule) -> (FormatRef, FormatRef) {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
