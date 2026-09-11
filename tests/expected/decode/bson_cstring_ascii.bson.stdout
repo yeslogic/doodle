@@ -1,0 +1,7 @@
+└── cstring <- bson.cstring :=
+    └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+        ├── 0 := 'h'
+        ├── 1 := 'e'
+        ├── 2 := 'l'
+        ├── 3 := 'l'
+        └── 4 := 'o'

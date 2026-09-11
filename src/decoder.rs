@@ -1417,6 +1417,13 @@ impl Decoder {
                 let new_input = ReadCtxt::from_value(&bytes);
                 try_with!(a.parse(program, scope, new_input) => ("DecodeBytes", bytes.len())).join(
                     |(va, rem_input)| {
+                        // FIXME: trailing bytes here are reported as a warning embedded in an
+                        // `Ok(WithErr)`, not a hard `Err`. `Decoder::Permit` only branches on
+                        // `Err` from its first sub-decoder, so it can never see this warning and
+                        // therefore can't fall back to its second branch when `DecodeBytes`'s
+                        // held format under-consumes the sub-buffer. `permit(decode_bytes(...))`
+                        // used as a strict "fully valid or not" gate is silently unsound as a
+                        // result. Tracked in a separate issue (see git issue tracker).
                         Ok(match rem_input.read_byte() {
                             Some((b, _)) => {
                                 let err = rem_input.kind.trailing(b, rem_input.offset).into();
