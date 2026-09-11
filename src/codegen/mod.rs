@@ -5080,19 +5080,24 @@ impl<'a> Elaborator<'a> {
                     // its own not-yet-elaborated level) resolves to this placeholder instead of
                     // re-entering this same call and recursing without bound.
                     //
-                    // Unlike the analogous fix in `TypeChecker::infer_var_format_level`, the
-                    // placeholder's *content* is never actually consulted by anything that cares:
-                    // `GTCompiler::compile_gt_format` discards a `FormatCall` node's `t_inner`
-                    // whenever `decoder_map` already has an entry for that level, and a level's
-                    // entry is always inserted into `decoder_map` at the point its `FormatCall`
-                    // node is *discovered*, before its body is ever walked (body-walking is
-                    // deferred via `compile_queue`) - so by the time a self-reference nested in
-                    // that body is reached, the real entry is already present and this
-                    // placeholder is never read. `Format::from`'s reverse conversion likewise
-                    // discards `t_inner` entirely when reconstructing `Format::ItemVar`. This
-                    // insertion also performs no index/`UVar`-style allocation of its own, so it
-                    // cannot desynchronize the lockstep invariant with `TypeChecker`.
-                    let placeholder = Rc::new(TypedFormat::Fail);
+                    // `GTCompiler::compile_gt_format` never trusts this placeholder's *content*:
+                    // it discards a `FormatCall` node's `t_inner` whenever `decoder_map` already
+                    // has an entry for that level, and a level's entry is always inserted into
+                    // `decoder_map` at the point its `FormatCall` node is *discovered*, before its
+                    // body is ever walked (body-walking is deferred via `compile_queue`) - so by
+                    // the time a self-reference nested in that body is reached, the real entry is
+                    // already present and this placeholder is never read there. `Format::from`'s
+                    // reverse conversion likewise discards `t_inner` entirely when reconstructing
+                    // `Format::ItemVar`. This insertion also performs no index/`UVar`-style
+                    // allocation of its own, so it cannot desynchronize the lockstep invariant
+                    // with `TypeChecker`.
+                    //
+                    // `TypedFormat::match_bounds`/`lookahead_bounds`, unlike the two consumers
+                    // above, *do* walk straight into `t_inner` on an arbitrary, possibly-nested
+                    // `FormatCall` - so they specifically must use this single, canonical
+                    // `TypedFormat::recursion_placeholder()` value (rather than an unmarked, fresh
+                    // `Rc::new(TypedFormat::Fail)`) to stay recognizable via `Rc::ptr_eq` later.
+                    let placeholder = TypedFormat::recursion_placeholder();
                     self.t_formats.insert(*level, placeholder);
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
@@ -6509,6 +6514,232 @@ mod tests {
         assert!(src2.contains("Box<ping>"), "source was:\n{src2}");
     }
 
+    /// All direct child [`TypedFormat`]s of `tf`, for a generic (variant-agnostic) traversal.
+    fn typed_format_children(tf: &GTFormat) -> Vec<&GTFormat> {
+        use TypedFormat::*;
+        match tf {
+            FormatCall(_, _, _, _, def) => vec![def.as_ref()],
+            ForEach(_, _, _, f) => vec![f.as_ref()],
+            Fail | EndOfInput | Align(_) | Byte(_) | Pos(_) | SkipRemainder | WithView(..) => {
+                vec![]
+            }
+            Variant(_, _, f) => vec![f.as_ref()],
+            Union(_, fs) | UnionNondet(_, fs) | Tuple(_, fs) | Sequence(_, fs) => {
+                fs.iter().collect()
+            }
+            Repeat(_, f) | Repeat1(_, f) => vec![f.as_ref()],
+            RepeatCount(_, _, f) => vec![f.as_ref()],
+            RepeatBetween(_, _, _, f) => vec![f.as_ref()],
+            RepeatUntilLast(_, _, f) | RepeatUntilSeq(_, _, f) => vec![f.as_ref()],
+            Maybe(_, _, f) => vec![f.as_ref()],
+            Peek(_, f) | PeekNot(_, f) => vec![f.as_ref()],
+            Slice(_, _, f) => vec![f.as_ref()],
+            Bits(_, f) => vec![f.as_ref()],
+            WithRelativeOffset(_, _, _, f) => vec![f.as_ref()],
+            Map(_, f, _) => vec![f.as_ref()],
+            Where(_, f, _) => vec![f.as_ref()],
+            Compute(_, _) => vec![],
+            Let(_, _, _, f) => vec![f.as_ref()],
+            Match(_, _, branches) => branches.iter().map(|(_, f)| f).collect(),
+            Dynamic(_, _, _, f) => vec![f.as_ref()],
+            Apply(_, _, _) => vec![],
+            DecodeBytes(_, _, f) => vec![f.as_ref()],
+            ParseFromView(_, _, f) => vec![f.as_ref()],
+            LetFormat(_, f0, _, f1) => vec![f0.as_ref(), f1.as_ref()],
+            MonadSeq(_, f0, f1) => vec![f0.as_ref(), f1.as_ref()],
+            Hint(_, _, f) => vec![f.as_ref()],
+            AccumUntil(_, _, _, _, _, f) => vec![f.as_ref()],
+            LiftedOption(_, f) => f.as_deref().into_iter().collect(),
+            LetView(_, _, f) => vec![f.as_ref()],
+            Phantom(_, f) => vec![f.as_ref()],
+            #[cfg(feature = "format_enforce")]
+            Enforce(_, f) => vec![f.as_ref()],
+            Permit(_, f, _) => vec![f.as_ref()],
+        }
+    }
+
+    /// Recursively checks that [`TypedFormat::is_nonproductive`] agrees with the
+    /// outcome of calling [`Format::is_nonproductive`] on `Format::from(tf.clone())`,
+    /// on every distinct (structurally unique) `TypedFormat` node reachable from `tf`.
+    ///
+    /// `seen` is used to dedup nodes that are reached more than once (e.g. Rc-shared
+    /// `def` of multiple FormatCalls pointing to the same level) so each unique format
+    /// is only tested once.
+    fn check_is_nonproductive_agrees(
+        tf: &GTFormat,
+        module: &FormatModule,
+        seen: &mut std::collections::HashSet<GTFormat>,
+    ) {
+        if !seen.insert(tf.clone()) {
+            return;
+        }
+        let erased: Format = tf.clone().into();
+        assert_eq!(
+            tf.is_nonproductive(),
+            erased.is_nonproductive(module),
+            "TypedFormat::is_nonproductive disagreed with erase-then-Format::is_nonproductive for {tf:?}"
+        );
+        for child in typed_format_children(tf) {
+            check_is_nonproductive_agrees(child, module, seen);
+        }
+    }
+
+    /// Builds a JSON-like, 4-member mutually-recursive format (value/member/array/object -
+    /// deliberately a bit more elaborate than `doodle-rec`'s own `json_lite` sandbox format, though
+    /// still far short of full JSON: no escapes, no floats/negatives, unquoted-alpha-only keys),
+    /// elaborates it exactly as the real `Generator::compile` pipeline does, and checks that
+    /// `TypedFormat::is_nonproductive` agrees with the clone-erase-`Format::is_nonproductive` path
+    /// at every distinct node of the elaborated tree - including, critically, nested `FormatCall`
+    /// occurrences reached while their own level was still open during elaboration (whose `def` is
+    /// only the elaborator's placeholder `TypedFormat::Fail`, per its own doc comment in
+    /// `Elaborator::elaborate_format`'s `Format::ItemVar` arm - see `src/codegen/mod.rs`).
+    #[test]
+    fn is_nonproductive_agrees() {
+        use crate::helper::{alts, byte_seq, is_byte, optional, record, repeat, repeat1, tuple};
+
+        fn digit() -> Format {
+            Format::Byte(ByteSet::from(b'0'..=b'9'))
+        }
+        fn alpha() -> Format {
+            Format::Byte(ByteSet::from(b'a'..=b'z').union(&ByteSet::from(b'A'..=b'Z')))
+        }
+        fn string_lit() -> Format {
+            tuple([is_byte(b'"'), repeat(alpha()), is_byte(b'"')])
+        }
+
+        // Batch layout: 0 = value, 1 = member, 2 = array, 3 = object
+        let value = alts([
+            ("Null", byte_seq(b"null")),
+            ("True", byte_seq(b"true")),
+            ("False", byte_seq(b"false")),
+            ("Number", repeat1(digit())),
+            ("String", string_lit()),
+            ("Array", Format::RecVar(2)),
+            ("Object", Format::RecVar(3)),
+        ]);
+        let member = record([
+            ("key", string_lit()),
+            ("colon", is_byte(b':')),
+            ("value", Format::RecVar(0)),
+        ]);
+        let array = tuple([
+            is_byte(b'['),
+            optional(tuple([
+                Format::RecVar(0),
+                repeat(tuple([is_byte(b','), Format::RecVar(0)])),
+            ])),
+            is_byte(b']'),
+        ]);
+        let object = tuple([
+            is_byte(b'{'),
+            optional(tuple([
+                Format::RecVar(1),
+                repeat(tuple([is_byte(b','), Format::RecVar(1)])),
+            ])),
+            is_byte(b'}'),
+        ]);
+
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("json.value"), value),
+            (Label::Borrowed("json.member"), member),
+            (Label::Borrowed("json.array"), array),
+            (Label::Borrowed("json.object"), object),
+        ]);
+        let top = refs[0].call();
+
+        let tc = TypeChecker::infer_module(&module, &top).unwrap();
+        let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+        let (top_typed, extra_typed) = elaborator.elaborate_module(&module, &top);
+
+        let mut seen = std::collections::HashSet::new();
+        check_is_nonproductive_agrees(&top_typed, &module, &mut seen);
+        for extra in &extra_typed {
+            check_is_nonproductive_agrees(extra, &module, &mut seen);
+        }
+        assert!(
+            seen.len() > 10,
+            "expected to have walked a nontrivial number of distinct TypedFormat nodes, only saw {}",
+            seen.len()
+        );
+    }
+
+    /// Generates small, non-recursive `Format` trees biased toward the variants
+    /// `is_nonproductive_agrees` above doesn't exercise (that test's JSON-like format never
+    /// constructs `Peek`/`PeekNot`/`Slice`/`RepeatCount`/`RepeatBetween`/`Match`/`UnionNondet`/
+    /// `Map`/`Where`/`WithRelativeOffset`) - a fresh, arm-by-arm check on the mechanical port of
+    /// `TypedFormat::match_bounds_recursive`/`lookahead_bounds_recursive`, independent of the
+    /// recursion/placeholder concern the other test targets. Still not exhaustive: `Let`, `Dynamic`,
+    /// `Apply`, `DecodeBytes`, `ParseFromView`, `AccumUntil`, `ForEach`, `LetView`, `WithView`,
+    /// `Phantom`, `Permit`, `Bits` are left uncovered (each needs either dynamic-format registration
+    /// or view machinery to construct validly, and are lower-value here since they're rare in real
+    /// `doodle-formats` definitions).
+    fn arb_gap_filling_format() -> impl Strategy<Value = Format> {
+        use crate::helper::{
+            f_id, fmt_match, map, record, repeat_between, repeat_count, repeat1, slice,
+            union_nondet, where_lambda, with_relative_offset,
+        };
+
+        let leaf = prop_oneof![
+            Just(Format::Byte(ByteSet::full())),
+            Just(Format::EndOfInput),
+            Just(Format::Fail),
+            Just(Format::Align(4)),
+            Just(Format::Compute(Box::new(Expr::U8(0)))),
+        ];
+
+        leaf.prop_recursive(3, 12, 2, |inner| {
+            prop_oneof![
+                inner.clone().prop_map(|f| Format::Peek(Box::new(f))),
+                inner.clone().prop_map(|f| Format::PeekNot(Box::new(f))),
+                inner.clone().prop_map(repeat1),
+                inner.clone().prop_map(|f| repeat_count(Expr::U8(2), f)),
+                inner
+                    .clone()
+                    .prop_map(|f| repeat_between(Expr::U8(0), Expr::U8(2), f)),
+                inner.clone().prop_map(|f| slice(Expr::U8(1), f)),
+                inner.clone().prop_map(|f| map(f, f_id())),
+                inner
+                    .clone()
+                    .prop_map(|f| where_lambda(f, "x", Expr::Bool(true))),
+                inner
+                    .clone()
+                    .prop_map(|f| fmt_match(Expr::U8(0), [(Pattern::Wildcard, f)])),
+                inner
+                    .clone()
+                    .prop_map(|f| with_relative_offset(None, Expr::U8(0), f)),
+                inner.clone().prop_map(|f| record([("x", f)])),
+                proptest::collection::vec(inner.clone(), 1..3)
+                    .prop_map(|fs| union_nondet::<&str>(fs)),
+            ]
+        })
+    }
+
+    proptest! {
+        /// Property-test counterpart to `is_nonproductive_agrees`: over many small, arbitrary,
+        /// non-recursive `Format` trees drawn from `arb_gap_filling_format`, checks the same
+        /// `TypedFormat::is_nonproductive`-agrees-with-erasure property at every distinct node.
+        /// A generated tree that fails to typecheck is discarded (not a property violation - just
+        /// an input `arb_gap_filling_format` shouldn't have produced, e.g. from an unforeseen
+        /// interaction between two combined combinators); genuine mismatches still panic through
+        /// `check_is_nonproductive_agrees`'s `assert_eq!` and fail the test normally.
+        #[test]
+        fn is_nonproductive_agrees_over_arbitrary_formats(f in arb_gap_filling_format()) {
+            let module = FormatModule::new();
+            let Ok(tc) = TypeChecker::infer_module(&module, &f) else {
+                return Ok(());
+            };
+            let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+            let (top_typed, extra_typed) = elaborator.elaborate_module(&module, &f);
+
+            let mut seen = std::collections::HashSet::new();
+            check_is_nonproductive_agrees(&top_typed, &module, &mut seen);
+            for extra in &extra_typed {
+                check_is_nonproductive_agrees(extra, &module, &mut seen);
+            }
+        }
+    }
+
     /// Regenerates `tests/recursion/mod.rs` (Phase 5's capstone fixture, see
     /// `experiments/doodle-rec/PLAN.md` and `doc/RECURSION.md`) from the real production codegen
     /// path, for provenance: that file should always be exactly what the last run of this test
@@ -7038,6 +7269,7 @@ mod tests {
         println!("{}", output);
     }
 
+    /// Watermark heuristic designed to check that generated-code looks 'sensible'
     fn is_valid_output(output: &str) -> bool {
         // FIXME - write a more sophisticated check
         output.len() > 0

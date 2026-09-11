@@ -1,4 +1,23 @@
 use crate::bounds::Bounds;
+use std::collections::HashSet;
+
+/// Alias for clarifying the semantics in `match_bounds` and `lookahead_bounds` on `Format` and `TypedFormat`
+pub type OpenSet = HashSet<usize>;
+
+/// Analog to [`MatchTreeStep::guarded`](crate::MatchTreeStep::guarded) for the purposes
+/// of Format bounds-prediction using [`OpenSet`].
+pub(crate) fn guarded_bounds<F>(level: usize, open: &mut OpenSet, f: F) -> RecursiveBounds
+where
+    F: FnOnce(&mut OpenSet) -> RecursiveBounds,
+{
+    if !open.insert(level) {
+        RecursiveBounds::unresolved()
+    } else {
+        let ret = f(open);
+        open.remove(&level);
+        ret
+    }
+}
 
 /// Bounds computed by a recursion-aware traversal (see `Format::match_bounds`/`Format::lookahead_bounds`),
 /// paired with whether `bounds.min` is still provisional because the traversal passed through a
