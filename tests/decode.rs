@@ -236,6 +236,66 @@ mod rle {
     }
 }
 
+// TEMPORARY: `bson.main` currently aliases straight to `bson.cstring` (see
+// doodle-formats/src/format/bson.rs, Phase 1 of the BSON recursion stress-test).
+// These tests are only meaningful while that holds — remove this module once
+// `bson.main` is wired up to the full `document` format instead.
+mod bson_cstring_temp {
+    use super::*;
+
+    #[test]
+    fn test_decode_bson_cstring_empty() {
+        let output = doodle()
+            .args([
+                "file",
+                "--as-format",
+                "bson",
+                "--output",
+                "tree",
+                "bson_cstring_empty.bson",
+            ])
+            .output()
+            .unwrap();
+        let expected = expect_test::expect_file!("expected/decode/bson_cstring_empty.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_bson_cstring_ascii() {
+        let output = doodle()
+            .args([
+                "file",
+                "--as-format",
+                "bson",
+                "--output",
+                "tree",
+                "bson_cstring_ascii.bson",
+            ])
+            .output()
+            .unwrap();
+        let expected = expect_test::expect_file!("expected/decode/bson_cstring_ascii.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_bson_cstring_invalid_utf8() {
+        let output = doodle()
+            .args([
+                "file",
+                "--output",
+                "tree",
+                "--as-format",
+                "bson",
+                "bson_cstring_invalid_utf8.bson",
+            ])
+            .output()
+            .unwrap();
+        let expected =
+            expect_test::expect_file!("expected/decode/bson_cstring_invalid_utf8.bson.stdout");
+        check_output(output, expected)
+    }
+}
+
 mod numbers {
     use super::*;
 
