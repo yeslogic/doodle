@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::ops::Add;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -11,6 +10,7 @@ use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::numeric::core::Bounds as NumBounds;
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
+use crate::recursion::{OpenSet, RecursiveBounds, guarded_bounds};
 use crate::validation::TypedCondition;
 use crate::{Arith, BaseKind, Endian, FormatRef, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
@@ -317,12 +317,69 @@ pub enum TypedFormat<TypeRep> {
     Permit(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
 }
 
+std::thread_local! {
+    /// Canonical sentinel installed as a `FormatCall::def` by `Elaborator::elaborate_format`'s
+    /// `Format::ItemVar` arm (`src/codegen/mod.rs`) to reserve a level's slot *before* recursing
+    /// into that level's own body - see [`TypedFormat::recursion_placeholder`].
+    static RECURSION_PLACEHOLDER: Rc<TypedFormat<GenType>> = Rc::new(TypedFormat::Fail);
+}
+
 impl TypedFormat<GenType> {
     pub const EMPTY: Self = TypedFormat::Tuple(GenType::Inline(RustType::UNIT), Vec::new());
 
+    /// Returns the canonical placeholder `Rc` that `Elaborator::elaborate_format` installs as a
+    /// `FormatCall::def` before recursing into that level's own body, so that a self-reference
+    /// reached while the level is still open resolves to *this* value rather than looping forever.
+    ///
+    /// Every reservation uses this single, thread-local `Rc` (rather than a fresh
+    /// `Rc::new(TypedFormat::Fail)` per level) specifically so that [`Self::is_recursion_placeholder`]
+    /// can recognize it later via `Rc::ptr_eq` - a structural check against `TypedFormat::Fail`
+    /// would also true-positive on a level whose real, resolved body is *itself* just `Fail`.
+    pub(crate) fn recursion_placeholder() -> Rc<TypedFormat<GenType>> {
+        RECURSION_PLACEHOLDER.with(|p| p.clone())
+    }
+
+    /// True if `def` is [`Self::recursion_placeholder`]'s sentinel - i.e. `def` was reserved before
+    /// its level's own body had been elaborated, and is not a genuine, resolvable body. Consulted by
+    /// [`Self::match_bounds_recursive`]/[`Self::lookahead_bounds_recursive`] so a placeholder-tainted
+    /// `FormatCall` reports [`RecursiveBounds::unresolved`] instead of trusting `def`'s content
+    /// (which would otherwise silently under-report a genuinely recursive, byte-consuming reference
+    /// as `Fail`'s trivial `exact(0)`).
+    fn is_recursion_placeholder(def: &Rc<TypedFormat<GenType>>) -> bool {
+        RECURSION_PLACEHOLDER.with(|p| Rc::ptr_eq(p, def))
+    }
+
+    /// One-to-one analogue for [`Format::lookahead_bounds`] that can be called referentially
+    /// on a `TypedFormat` without needing to clone and erase type information.
+    ///
+    /// Because `TypedFormat::FormatCall` stores the resolved definition of the format it is calling into,
+    /// this method does not need a `&FormatModule` parameter, unlike `Format::lookahead_bounds`.
     pub(crate) fn lookahead_bounds(&self) -> Bounds {
+        self.lookahead_bounds_recursive(&mut OpenSet::new())
+            .into_bounds()
+    }
+
+    /// Analog of [`Format::lookahead_bounds_recursive`] (`src/format.rs`). Two distinct hazards are
+    /// guarded against here, since `FormatCall`'s indirection is resolved once, eagerly, at
+    /// elaboration time (unlike `Format::ItemVar`'s always-fresh `module.get_format` lookup):
+    ///
+    /// - `def` may be [`Self::recursion_placeholder`]'s sentinel, reserved by the elaborator before
+    ///   its own level's body was available (see that method's docs) - trusting it would silently
+    ///   under-report a genuinely recursive, byte-consuming reference as `Fail`'s `exact(0)`.
+    /// - `open` additionally tracks which `FormatCall` levels this *traversal* is currently walking,
+    ///   as a defensive backstop against any other route to a live re-entrant `def` (none is known to
+    ///   exist given the elaborator always resolves self-reference via the placeholder above, but
+    ///   this costs little to keep).
+    fn lookahead_bounds_recursive(&self, open: &mut OpenSet) -> RecursiveBounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, _views, def) => def.lookahead_bounds(),
+            TypedFormat::FormatCall(_gt, level, _args, _views, def) => {
+                if Self::is_recursion_placeholder(def) {
+                    return RecursiveBounds::unresolved();
+                }
+                guarded_bounds(*level, open, move |open| {
+                    def.lookahead_bounds_recursive(open)
+                })
+            }
 
             TypedFormat::DecodeBytes(_, _, _)
             | TypedFormat::SkipRemainder
@@ -330,84 +387,121 @@ impl TypedFormat<GenType> {
             | TypedFormat::Compute(_, _)
             | TypedFormat::EndOfInput
             | TypedFormat::ParseFromView(_, _, _)
-            | TypedFormat::Fail => Bounds::exact(0),
+            | TypedFormat::Fail => RecursiveBounds::exact(0),
 
             TypedFormat::Peek(_, inner) | TypedFormat::PeekNot(_, inner) => {
-                inner.lookahead_bounds()
+                inner.lookahead_bounds_recursive(open)
             }
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
-            TypedFormat::Byte(_) => Bounds::exact(1),
-            TypedFormat::Variant(_, _, f) => f.lookahead_bounds(),
-            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
-                .iter()
-                .map(TypedFormat::lookahead_bounds)
-                .reduce(Bounds::union)
-                .unwrap(),
+            TypedFormat::Align(n) => RecursiveBounds::new(0, n - 1),
+            TypedFormat::Byte(_) => RecursiveBounds::exact(1),
+            TypedFormat::Variant(_, _, f) => f.lookahead_bounds_recursive(open),
+            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for f in branches {
+                    let b = f.lookahead_bounds_recursive(open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
             // REVIEW - we have a more sophisticated algorithm in Format::lookahead_bounds for Sequence, should we use that here?
-            TypedFormat::Tuple(_, elts) | TypedFormat::Sequence(_, elts) => elts
-                .iter()
-                .map(TypedFormat::lookahead_bounds)
-                .reduce(<Bounds as Add>::add)
-                .unwrap_or(Bounds::exact(0)),
-            TypedFormat::RepeatCount(_, t_exp, f) => f.lookahead_bounds() * t_exp.bounds(),
+            TypedFormat::Tuple(_, elts) | TypedFormat::Sequence(_, elts) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for f in elts {
+                    let b = f.lookahead_bounds_recursive(open);
+                    acc = Some(acc.map_or(b, |a| a + b));
+                }
+                acc.unwrap_or(RecursiveBounds::exact(0))
+            }
+            TypedFormat::RepeatCount(_, t_exp, f) => {
+                f.lookahead_bounds_recursive(open) * t_exp.bounds()
+            }
             TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
-                f.lookahead_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
+                f.lookahead_bounds_recursive(open) * Bounds::union(t_min.bounds(), t_max.bounds())
             }
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
-                f.lookahead_bounds() * Bounds::at_least(1)
+                f.lookahead_bounds_recursive(open) * Bounds::at_least(1)
             }
 
             TypedFormat::Repeat(_, _f)
             | TypedFormat::RepeatUntilSeq(_, _, _f)
-            | TypedFormat::AccumUntil(.., _f) => Bounds::any(),
+            | TypedFormat::AccumUntil(.., _f) => RecursiveBounds::any(),
             // REVIEW - can we do any better than this?
-            TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
-            TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds()),
+            TypedFormat::ForEach(_, _expr, _lbl, _f) => RecursiveBounds::any(),
+            TypedFormat::Maybe(_, _, f) => {
+                RecursiveBounds::exact(0).union(f.lookahead_bounds_recursive(open))
+            }
 
-            TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
+            TypedFormat::Slice(_, t_expr, _) => RecursiveBounds::resolved(t_expr.bounds()),
 
-            TypedFormat::Bits(_, f) => f.lookahead_bounds().bits_to_bytes(),
+            TypedFormat::Bits(_, f) => f.lookahead_bounds_recursive(open).bits_to_bytes(),
 
             TypedFormat::WithRelativeOffset(_, _base_addr_expr, _offset_expr, _inner) => {
-                Bounds::any()
+                RecursiveBounds::any()
             }
 
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
             | TypedFormat::Let(_, _, _, f)
-            | TypedFormat::LetView(_, _, f) => f.lookahead_bounds(),
+            | TypedFormat::LetView(_, _, f) => f.lookahead_bounds_recursive(open),
 
-            TypedFormat::Match(_, _, branches) => branches
-                .iter()
-                .map(|(_, f)| f.lookahead_bounds())
-                .reduce(Bounds::union)
-                .unwrap(),
-
-            TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
-            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => Bounds::union(
-                f0.lookahead_bounds(),
-                f0.match_bounds() + f.lookahead_bounds(),
-            ),
-            #[cfg(feature = "format_enforce")]
-            TypedFormat::Enforce(.., inner) => inner.lookahead_bounds(),
-            TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
-                inner.lookahead_bounds()
+            TypedFormat::Match(_, _, branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for (_, f) in branches {
+                    let b = f.lookahead_bounds_recursive(open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
             }
-            TypedFormat::LiftedOption(_, f) => f
-                .as_ref()
-                .map_or(Bounds::exact(0), |f| f.lookahead_bounds()),
+
+            TypedFormat::Apply(_, _, _) => RecursiveBounds::at_least(1),
+            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => f
+                .lookahead_bounds_recursive(open)
+                .union(f0.lookahead_bounds_recursive(open) + f0.match_bounds()),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(.., inner) => inner.lookahead_bounds_recursive(open),
+            TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
+                inner.lookahead_bounds_recursive(open)
+            }
+            TypedFormat::LiftedOption(_, f) => f.as_ref().map_or(RecursiveBounds::exact(0), |f| {
+                f.lookahead_bounds_recursive(open)
+            }),
             // REVIEW[epic=view-format] - is this correct?
-            TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
-            TypedFormat::Phantom(..) => Bounds::exact(0),
+            TypedFormat::WithView(_, _ident, _vf) => RecursiveBounds::exact(0),
+            TypedFormat::Phantom(..) => RecursiveBounds::exact(0),
         }
     }
 
+    /// Returns `true` if the format will always match zero bytes, i.e. it is non-productive.
+    ///
+    /// This is a conservative approximation: some formats that can match zero bytes in some cases but not others may return `false` here.
+    pub(crate) fn is_nonproductive(&self) -> bool {
+        // NOTE - this is a placeholder but the logic itself is sound; we only need to reimplement if we want more precision
+        self.match_bounds().as_exact() == Some(0)
+    }
+
+    /// One-to-one analogue for [`Format::match_bounds`] that can be called referentially
+    /// on a `TypedFormat` without needing to clone and erase type information.
+    ///
+    /// Because `TypedFormat::FormatCall` stores the resolved definition of the format it is calling into,
+    /// this method does not need a `&FormatModule` parameter, unlike `Format::match_bounds`.
     pub(crate) fn match_bounds(&self) -> Bounds {
+        self.match_bounds_recursive(&mut OpenSet::new())
+            .into_bounds()
+    }
+
+    /// Analog of [`Format::match_bounds_recursive`] (`src/format.rs`) - see
+    /// [`Self::lookahead_bounds_recursive`] for why `open` is needed here.
+    fn match_bounds_recursive(&self, open: &mut OpenSet) -> RecursiveBounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, _views, def) => def.match_bounds(),
+            TypedFormat::FormatCall(_gt, level, _args, _views, def) => {
+                if Self::is_recursion_placeholder(def) {
+                    return RecursiveBounds::unresolved();
+                }
+                guarded_bounds(*level, open, move |open| def.match_bounds_recursive(open))
+            }
 
             TypedFormat::DecodeBytes(_, _, _)
             | TypedFormat::ParseFromView(_, _, _)
@@ -416,72 +510,85 @@ impl TypedFormat<GenType> {
             | TypedFormat::PeekNot(_, _)
             | TypedFormat::EndOfInput
             | TypedFormat::Pos(_)
-            | TypedFormat::Fail => Bounds::exact(0),
+            | TypedFormat::Fail => RecursiveBounds::exact(0),
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
-            TypedFormat::Byte(_) => Bounds::exact(1),
-            TypedFormat::Variant(_, _, f) => f.match_bounds(),
-            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
-                .iter()
-                .map(TypedFormat::match_bounds)
-                .reduce(Bounds::union)
-                .unwrap(),
-            TypedFormat::Sequence(_, elts) | TypedFormat::Tuple(_, elts) => elts
-                .iter()
-                .map(TypedFormat::match_bounds)
-                .reduce(<Bounds as Add>::add)
-                .unwrap_or(Bounds::exact(0)),
-            TypedFormat::RepeatCount(_, t_exp, f) => f.match_bounds() * t_exp.bounds(),
+            TypedFormat::Align(n) => RecursiveBounds::new(0, n - 1),
+            TypedFormat::Byte(_) => RecursiveBounds::exact(1),
+            TypedFormat::Variant(_, _, f) => f.match_bounds_recursive(open),
+            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for f in branches {
+                    let b = f.match_bounds_recursive(open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
+            TypedFormat::Sequence(_, elts) | TypedFormat::Tuple(_, elts) => {
+                let mut total = RecursiveBounds::exact(0);
+                for f in elts {
+                    let b = f.match_bounds_recursive(open);
+                    total = total + b;
+                }
+                total
+            }
+            TypedFormat::RepeatCount(_, t_exp, f) => {
+                f.match_bounds_recursive(open) * t_exp.bounds()
+            }
             TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
-                f.match_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
+                f.match_bounds_recursive(open) * Bounds::union(t_min.bounds(), t_max.bounds())
             }
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
-                f.match_bounds() * Bounds::at_least(1)
+                f.match_bounds_recursive(open) * Bounds::at_least(1)
             }
 
             TypedFormat::Repeat(_, _f)
             | TypedFormat::RepeatUntilSeq(_, _, _f)
-            | TypedFormat::AccumUntil(.., _f) => Bounds::any(),
+            | TypedFormat::AccumUntil(.., _f) => RecursiveBounds::any(),
             // REVIEW - can we do any better than this?
-            TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
-            TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.match_bounds()),
+            TypedFormat::ForEach(_, _expr, _lbl, _f) => RecursiveBounds::any(),
+            TypedFormat::Maybe(_, _, f) => {
+                RecursiveBounds::exact(0).union(f.match_bounds_recursive(open))
+            }
 
-            TypedFormat::SkipRemainder => Bounds::any(),
+            TypedFormat::SkipRemainder => RecursiveBounds::any(),
 
-            TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
+            TypedFormat::Slice(_, t_expr, _) => RecursiveBounds::resolved(t_expr.bounds()),
 
-            TypedFormat::Bits(_, f) => f.match_bounds().bits_to_bytes(),
+            TypedFormat::Bits(_, f) => f.match_bounds_recursive(open).bits_to_bytes(),
 
-            TypedFormat::WithRelativeOffset(_, _, _, _) => Bounds::exact(0),
+            TypedFormat::WithRelativeOffset(_, _, _, _) => RecursiveBounds::exact(0),
 
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
             | TypedFormat::Let(_, _, _, f)
-            | TypedFormat::LetView(_, _, f) => f.match_bounds(),
+            | TypedFormat::LetView(_, _, f) => f.match_bounds_recursive(open),
 
-            TypedFormat::Match(_, _, branches) => branches
-                .iter()
-                .map(|(_, f)| f.match_bounds())
-                .reduce(Bounds::union)
-                .unwrap(),
+            TypedFormat::Match(_, _, branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for (_, f) in branches {
+                    let b = f.match_bounds_recursive(open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
 
-            TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
+            TypedFormat::Apply(_, _, _) => RecursiveBounds::at_least(1),
             TypedFormat::LetFormat(_, f0, _, f1) | TypedFormat::MonadSeq(_, f0, f1) => {
-                f0.match_bounds() + f1.match_bounds()
+                f0.match_bounds_recursive(open) + f1.match_bounds_recursive(open)
             }
             #[cfg(feature = "format_enforce")]
-            TypedFormat::Enforce(.., inner) => inner.match_bounds(),
+            TypedFormat::Enforce(.., inner) => inner.match_bounds_recursive(open),
             TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
-                inner.match_bounds()
+                inner.match_bounds_recursive(open)
             }
-            TypedFormat::LiftedOption(_, f) => {
-                f.as_ref().map_or(Bounds::exact(0), |f| f.match_bounds())
-            }
+            TypedFormat::LiftedOption(_, f) => f.as_ref().map_or(RecursiveBounds::exact(0), |f| {
+                f.match_bounds_recursive(open)
+            }),
             // REVIEW[epic=view-format] - is this correct?
-            TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
-            TypedFormat::Phantom(..) => Bounds::exact(0),
+            TypedFormat::WithView(_, _ident, _vf) => RecursiveBounds::exact(0),
+            TypedFormat::Phantom(..) => RecursiveBounds::exact(0),
         }
     }
 

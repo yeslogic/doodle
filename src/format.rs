@@ -1,4 +1,4 @@
-use std::ops::Add as _;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use serde::Serialize;
@@ -12,6 +12,7 @@ use crate::FormatModule;
 use crate::byte_set::ByteSet;
 use crate::pattern::Pattern;
 use crate::record_fmt::RecordFormat;
+use crate::recursion::RecursiveBounds;
 use crate::validation::Condition;
 
 /// Binary format descriptions
@@ -59,6 +60,17 @@ use crate::validation::Condition;
 pub enum Format {
     /// Reference to a top-level item
     ItemVar(usize, Vec<Expr>, Vec<ViewExpr>), // FIXME - do the exprs here need type(+) info?
+    /// Reference to a format within the same recursive batch-definition, given by batch-local index
+    /// (`0` is the first format in the batch, or "self" when the batch has only one member).
+    ///
+    /// Construction-time sugar only: written literally by a caller of `FormatModule::define_format_rec_batch`
+    /// to allow formats to refer to one another even before they are assigned `ItemVar` levels;
+    /// during this registratio, `RecVar` is invariably converted to the proper `ItemVar` before
+    /// it  is stored in the module, so it should never appear in a `Format` after that point.
+    ///
+    /// This Format has no individual semantics and it should be treated as an unsupported value
+    /// anywhere other than `define_format_rec_batch`.
+    RecVar(usize),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -222,6 +234,12 @@ impl Format {
         }
     }
 
+    /// Processes an arbitrary sequence of field-like Formats (which may or may not be named) in the order they are provided,
+    /// and then processes a final Format which may have data-depenencies on any variables captured along the way.
+    ///
+    /// Designed to support [`pseudo_record`](crate::helper::pseudo_record), which mimics the operation of
+    /// standard record-processing but doesn't construct a record from the field-like formats that are given
+    /// names.
     pub fn chaining<Name: IntoLabel>(
         formats: impl IntoIterator<Item = (Option<Name>, Format), IntoIter: DoubleEndedIterator>,
         format: Format,
@@ -255,172 +273,247 @@ impl Format {
             }
         }
     }
+
+    /// Returns `true` if the format will always match zero bytes, i.e. it is non-productive.
+    ///
+    /// This is a conservative approximation: some formats that can match zero bytes in some cases but not others may return `false` here.
+    pub(crate) fn is_nonproductive(&self, module: &FormatModule) -> bool {
+        // NOTE - this is a placeholder but the logic itself is sound; we only need to reimplement if we want more precision
+        self.match_bounds(module).as_exact() == Some(0)
+    }
 }
 
 impl Format {
     /// Conservative bounds for number of byte-positions advanced after a format is matched (i.e. parsed)
     pub(crate) fn match_bounds(&self, module: &FormatModule) -> Bounds {
+        self.match_bounds_recursive(module, &mut HashSet::new())
+            .into_bounds()
+    }
+
+    /// Internal helper for `match_bounds` that avoids infinite recursion for recursive formats.
+    ///
+    /// Takes an extra parameter, `open`, an open-set that is used to track which `ItemVar` levels
+    /// have been crossed but not fully resolved. If called on `Format::ItemVar` with a level that
+    /// happens to be in `open`, we are on a recursive path, so the result is
+    /// [`RecursiveBounds::unresolved`] (unbounded, with a minimum that is not yet trustworthy)
+    /// rather than recursing any further. See [`RecursiveBounds`] for how that gets resolved by
+    /// an enclosing `Union`/`Match`/`Maybe`, if any.
+    fn match_bounds_recursive(
+        &self,
+        module: &FormatModule,
+        open: &mut HashSet<usize>,
+    ) -> RecursiveBounds {
         match self {
-            Format::ItemVar(level, _args, _views) => module.get_format(*level).match_bounds(module),
-            Format::Fail => Bounds::exact(0),
-            Format::EndOfInput => Bounds::exact(0),
-            Format::SkipRemainder => Bounds::any(),
+            &Format::ItemVar(level, ..) => {
+                crate::recursion::guarded_bounds(level, open, move |open| {
+                    module
+                        .get_format(level)
+                        .match_bounds_recursive(module, open)
+                })
+            }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
+            Format::Fail => RecursiveBounds::exact(0),
+            Format::EndOfInput => RecursiveBounds::exact(0),
+            Format::SkipRemainder => RecursiveBounds::any(),
             Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
-            Format::Align(n) => Bounds::new(0, n - 1),
-            Format::Byte(_) => Bounds::exact(1),
-            Format::Variant(_label, f) => f.match_bounds(module),
-            Format::Union(branches) | Format::UnionNondet(branches) => branches
-                .iter()
-                .map(|f| f.match_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Tuple(fields) => fields
-                .iter()
-                .map(|f| f.match_bounds(module))
-                .reduce(Bounds::add)
-                .unwrap_or(Bounds::exact(0)),
-            Format::Repeat(_) => Bounds::any(),
-            Format::Repeat1(f) => f.match_bounds(module) * Bounds::at_least(1),
-            Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
+            Format::Align(n) => RecursiveBounds::new(0, n - 1),
+            Format::Byte(_) => RecursiveBounds::exact(1),
+            Format::Variant(_label, f) => f.match_bounds_recursive(module, open),
+            Format::Union(branches) | Format::UnionNondet(branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for f in branches {
+                    let b = f.match_bounds_recursive(module, open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
+            Format::Repeat(_) => RecursiveBounds::any(),
+            Format::Repeat1(f) => f.match_bounds_recursive(module, open) * Bounds::at_least(1),
+            Format::RepeatCount(expr, f) => f.match_bounds_recursive(module, open) * expr.bounds(),
             Format::RepeatBetween(xmin, xmax, f) => {
-                f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds()))
+                f.match_bounds_recursive(module, open)
+                    * (Bounds::union(xmin.bounds(), xmax.bounds()))
             }
-            Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::at_least(1),
-            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
-            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.match_bounds(module)),
-            Format::Peek(_) => Bounds::exact(0),
-            Format::PeekNot(_) => Bounds::exact(0),
-            Format::Slice(expr, _) => expr.bounds(),
-            Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
-            Format::WithRelativeOffset(..) => Bounds::exact(0),
-            Format::Map(f, _expr) => f.match_bounds(module),
-            Format::Where(f, _expr) => f.match_bounds(module),
-            Format::Compute(_) | Format::Pos => Bounds::exact(0),
-            Format::Let(_name, _expr, f) => f.match_bounds(module),
-            Format::LetView(_name, f) => f.match_bounds(module),
-            Format::Match(_, branches) => branches
-                .iter()
-                .map(|(_, f)| f.match_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Dynamic(_name, _dynformat, f) => f.match_bounds(module),
-            Format::Apply(_) => Bounds::at_least(1),
+            Format::RepeatUntilLast(_, f) => {
+                f.match_bounds_recursive(module, open) * Bounds::at_least(1)
+            }
+            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => RecursiveBounds::any(),
+            Format::Maybe(_, f) => {
+                RecursiveBounds::exact(0).union(f.match_bounds_recursive(module, open))
+            }
+            Format::Peek(_) => RecursiveBounds::exact(0),
+            Format::PeekNot(_) => RecursiveBounds::exact(0),
+            Format::Slice(expr, _) => RecursiveBounds::resolved(expr.bounds()),
+            Format::Bits(f) => f.match_bounds_recursive(module, open).bits_to_bytes(),
+            Format::WithRelativeOffset(..) => RecursiveBounds::exact(0),
+            Format::Map(f, _expr) => f.match_bounds_recursive(module, open),
+            Format::Where(f, _expr) => f.match_bounds_recursive(module, open),
+            Format::Compute(_) | Format::Pos => RecursiveBounds::exact(0),
+            Format::Let(_name, _expr, f) => f.match_bounds_recursive(module, open),
+            Format::LetView(_name, f) => f.match_bounds_recursive(module, open),
+            Format::Match(_, branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for (_, f) in branches {
+                    let b = f.match_bounds_recursive(module, open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
+            Format::Dynamic(_name, _dynformat, f) => f.match_bounds_recursive(module, open),
+            Format::Apply(_) => RecursiveBounds::at_least(1),
             // FIXME - do we have any way of approximating this better?
-            Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
+            Format::ForEach(_expr, _lbl, _f) => RecursiveBounds::any(),
             // NOTE - because we are parsing a sequence of bytes, we do not interact with the actual buffer
-            Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
+            Format::DecodeBytes(_bytes, _f) => RecursiveBounds::exact(0),
             Format::LetFormat(first, _, second) | Format::MonadSeq(first, second) => {
-                first.match_bounds(module) + second.match_bounds(module)
+                first.match_bounds_recursive(module, open)
+                    + second.match_bounds_recursive(module, open)
             }
-            Format::Permit(inner, ..) | Format::Hint(.., inner) => inner.match_bounds(module),
+            Format::Permit(inner, ..) | Format::Hint(.., inner) => {
+                inner.match_bounds_recursive(module, open)
+            }
             #[cfg(feature = "format_enforce")]
-            Format::Enforce(inner) => inner.match_bounds(module),
+            Format::Enforce(inner) => inner.match_bounds_recursive(module, open),
             Format::LiftedOption(opt) => match opt {
-                None => Bounds::exact(0),
-                Some(f) => f.match_bounds(module),
+                None => RecursiveBounds::exact(0),
+                Some(f) => f.match_bounds_recursive(module, open),
             },
-            Format::Sequence(fmts) => {
-                let mut total = Bounds::exact(0);
-                for fmt in fmts.iter() {
-                    let bounds = fmt.match_bounds(module);
+            Format::Sequence(fmts) | Format::Tuple(fmts) => {
+                let mut total = RecursiveBounds::exact(0);
+                for fmt in fmts {
+                    let bounds = fmt.match_bounds_recursive(module, open);
                     total = total + bounds;
                 }
                 total
             }
             Format::WithView(_v_expr, vf) => match vf {
-                ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
-                ViewFormat::ReadArray(_len, _kind) => Bounds::exact(0),
-                ViewFormat::ReifyView => Bounds::exact(0),
+                ViewFormat::CaptureBytes(_len) => RecursiveBounds::exact(0),
+                ViewFormat::ReadArray(_len, _kind) => RecursiveBounds::exact(0),
+                ViewFormat::ReifyView => RecursiveBounds::exact(0),
             },
-            Format::ParseFromView(_v_expr, _inner) => Bounds::exact(0),
-            Format::Phantom(_) => Bounds::exact(0),
+            Format::ParseFromView(_v_expr, _inner) => RecursiveBounds::exact(0),
+            Format::Phantom(_) => RecursiveBounds::exact(0),
         }
     }
 
     /// Conservative bounds for number of bytes that may be read in order to fully parse the given Format, regardless of how many
     /// are consumed as opposed to being left untouched in the buffer.
     pub(crate) fn lookahead_bounds(&self, module: &FormatModule) -> Bounds {
+        self.lookahead_bounds_recursive(module, &mut HashSet::new())
+            .into_bounds()
+    }
+
+    /// Analog of [`match_bounds_recursive`] for [`lookahead_bounds`]
+    fn lookahead_bounds_recursive(
+        &self,
+        module: &FormatModule,
+        open: &mut HashSet<usize>,
+    ) -> RecursiveBounds {
         match self {
-            Format::ItemVar(level, _args, _views) => {
-                module.get_format(*level).lookahead_bounds(module)
+            &Format::ItemVar(level, ..) => {
+                crate::recursion::guarded_bounds(level, open, move |open| {
+                    module
+                        .get_format(level)
+                        .lookahead_bounds_recursive(module, open)
+                })
             }
-            Format::Fail => Bounds::exact(0),
-            Format::EndOfInput => Bounds::exact(0),
-            // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
-            Format::SkipRemainder => Bounds::any(),
-            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
-            Format::Align(n) => Bounds::new(0, n - 1),
-            Format::Byte(_) => Bounds::exact(1),
-            Format::Variant(_label, f) => f.lookahead_bounds(module),
-            Format::Union(branches) | Format::UnionNondet(branches) => branches
-                .iter()
-                .map(|f| f.lookahead_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Tuple(fields) => fields
-                .iter()
-                .map(|f| f.lookahead_bounds(module))
-                .reduce(Bounds::add)
-                .unwrap_or(Bounds::exact(0)),
-            Format::Repeat(_) => Bounds::any(),
-            // FIXME - do we have any way of approximating this better?
-            Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
-            Format::Repeat1(f) => f.lookahead_bounds(module) * Bounds::at_least(1),
-            Format::RepeatCount(expr, f) => f.lookahead_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => {
-                f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds())
-            }
-            Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::at_least(1),
-            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
-            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds(module)),
-            Format::Peek(f) => f.lookahead_bounds(module),
-            Format::PeekNot(f) => f.lookahead_bounds(module),
-            Format::Slice(expr, _) => expr.bounds(),
-            Format::Bits(f) => f.lookahead_bounds(module).bits_to_bytes(),
-            // REVIEW - do we have a way of approximating this better?
-            Format::WithRelativeOffset(..) => Bounds::any(),
-            Format::Map(f, _expr) => f.lookahead_bounds(module),
-            Format::Where(f, _expr) => f.lookahead_bounds(module),
-            Format::Compute(_) | Format::Pos => Bounds::exact(0),
-            Format::Let(_name, _expr, f) => f.lookahead_bounds(module),
-            Format::LetView(_name, f) => f.lookahead_bounds(module),
-            Format::Match(_, branches) => branches
-                .iter()
-                .map(|(_, f)| f.lookahead_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds(module),
-            Format::Apply(_) => Bounds::at_least(1),
-            Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
-            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => Bounds::union(
-                f0.lookahead_bounds(module),
-                f0.match_bounds(module) + f.lookahead_bounds(module),
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
             ),
-            Format::Permit(f, _expr) => f.lookahead_bounds(module),
+            Format::Fail => RecursiveBounds::exact(0),
+            Format::EndOfInput => RecursiveBounds::exact(0),
+            // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
+            Format::SkipRemainder => RecursiveBounds::any(),
+            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
+            Format::Align(n) => RecursiveBounds::new(0, n - 1),
+            Format::Byte(_) => RecursiveBounds::exact(1),
+            Format::Variant(_label, f) => f.lookahead_bounds_recursive(module, open),
+            Format::Union(branches) | Format::UnionNondet(branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for f in branches {
+                    let b = f.lookahead_bounds_recursive(module, open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
+            Format::Tuple(fields) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for f in fields {
+                    let b = f.lookahead_bounds_recursive(module, open);
+                    acc = Some(acc.map_or(b, |a| a + b));
+                }
+                acc.unwrap_or(RecursiveBounds::exact(0))
+            }
+            Format::Repeat(_) => RecursiveBounds::any(),
+            // FIXME - do we have any way of approximating this better?
+            Format::ForEach(_expr, _lbl, _f) => RecursiveBounds::any(),
+            Format::Repeat1(f) => f.lookahead_bounds_recursive(module, open) * Bounds::at_least(1),
+            Format::RepeatCount(expr, f) => {
+                f.lookahead_bounds_recursive(module, open) * expr.bounds()
+            }
+            Format::RepeatBetween(xmin, xmax, f) => {
+                f.lookahead_bounds_recursive(module, open)
+                    * Bounds::union(xmin.bounds(), xmax.bounds())
+            }
+            Format::RepeatUntilLast(_, f) => {
+                f.lookahead_bounds_recursive(module, open) * Bounds::at_least(1)
+            }
+            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => RecursiveBounds::any(),
+            Format::Maybe(_, f) => {
+                RecursiveBounds::exact(0).union(f.lookahead_bounds_recursive(module, open))
+            }
+            Format::Peek(f) => f.lookahead_bounds_recursive(module, open),
+            Format::PeekNot(f) => f.lookahead_bounds_recursive(module, open),
+            Format::Slice(expr, _) => RecursiveBounds::resolved(expr.bounds()),
+            Format::Bits(f) => f.lookahead_bounds_recursive(module, open).bits_to_bytes(),
+            // REVIEW - do we have a way of approximating this better?
+            Format::WithRelativeOffset(..) => RecursiveBounds::any(),
+            Format::Map(f, _expr) => f.lookahead_bounds_recursive(module, open),
+            Format::Where(f, _expr) => f.lookahead_bounds_recursive(module, open),
+            Format::Compute(_) | Format::Pos => RecursiveBounds::exact(0),
+            Format::Let(_name, _expr, f) => f.lookahead_bounds_recursive(module, open),
+            Format::LetView(_name, f) => f.lookahead_bounds_recursive(module, open),
+            Format::Match(_, branches) => {
+                let mut acc: Option<RecursiveBounds> = None;
+                for (_, f) in branches {
+                    let b = f.lookahead_bounds_recursive(module, open);
+                    acc = Some(acc.map_or(b, |a| a.union(b)));
+                }
+                acc.unwrap()
+            }
+            Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds_recursive(module, open),
+            Format::Apply(_) => RecursiveBounds::at_least(1),
+            Format::DecodeBytes(_bytes, _f) => RecursiveBounds::exact(0),
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => f
+                .lookahead_bounds_recursive(module, open)
+                .union(f0.lookahead_bounds_recursive(module, open) + f0.match_bounds(module)),
+            Format::Permit(f, _expr) => f.lookahead_bounds_recursive(module, open),
             #[cfg(feature = "format_enforce")]
-            Format::Enforce(f) => f.lookahead_bounds(module),
-            Format::Hint(_, f) => f.lookahead_bounds(module),
+            Format::Enforce(f) => f.lookahead_bounds_recursive(module, open),
+            Format::Hint(_, f) => f.lookahead_bounds_recursive(module, open),
             Format::LiftedOption(opt) => match opt {
-                None => Bounds::exact(0),
-                Some(f) => f.lookahead_bounds(module),
+                None => RecursiveBounds::exact(0),
+                Some(f) => f.lookahead_bounds_recursive(module, open),
             },
             Format::Sequence(fmts) => {
                 let mut sum_match = Bounds::exact(0);
-                let mut max_lookahead = Bounds::exact(0);
+                let mut max_lookahead = RecursiveBounds::exact(0);
                 for fmt in fmts.iter() {
-                    max_lookahead =
-                        Bounds::union(max_lookahead, sum_match + fmt.lookahead_bounds(module));
+                    max_lookahead = max_lookahead
+                        .union(fmt.lookahead_bounds_recursive(module, open) + sum_match);
                     sum_match = sum_match + fmt.match_bounds(module);
                 }
                 max_lookahead
             }
             Format::WithView(_v_expr, vf) => match vf {
-                ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
-                ViewFormat::ReadArray(_len, _kind) => Bounds::exact(0),
-                ViewFormat::ReifyView => Bounds::exact(0),
+                ViewFormat::CaptureBytes(_len) => RecursiveBounds::exact(0),
+                ViewFormat::ReadArray(_len, _kind) => RecursiveBounds::exact(0),
+                ViewFormat::ReifyView => RecursiveBounds::exact(0),
             },
-            Format::ParseFromView(_v_expr, _f) => Bounds::exact(0),
-            Format::Phantom(_) => Bounds::exact(0),
+            Format::ParseFromView(_v_expr, _f) => RecursiveBounds::exact(0),
+            Format::Phantom(_) => RecursiveBounds::exact(0),
         }
     }
 
@@ -431,10 +524,28 @@ impl Format {
 
     /// True if the compilation of this format depends on the format that follows it
     pub(crate) fn depends_on_next(&self, module: &FormatModule) -> bool {
+        self.depends_on_next_open(module, &mut HashSet::new())
+    }
+
+    /// See [`Self::match_bounds_open`]'s docs for `open`'s general role. Here, re-entering an
+    /// already-open level conservatively returns `true` (the safe default: answering `false`
+    /// incorrectly could make the compiled decoder use `Next::Empty` when it actually needed the
+    /// real continuation - a soundness bug - whereas `true` only costs a missed decoder-sharing
+    /// optimization).
+    fn depends_on_next_open(&self, module: &FormatModule, open: &mut HashSet<usize>) -> bool {
         match self {
             Format::ItemVar(level, _args, _views) => {
-                module.get_format(*level).depends_on_next(module)
+                let level = *level;
+                if !open.insert(level) {
+                    return true;
+                }
+                let b = module.get_format(level).depends_on_next_open(module, open);
+                open.remove(&level);
+                b
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Fail => false,
             Format::EndOfInput => false,
             // NOTE - compiling SkipRemainder doesn't depend on the next format because the next format can only ever match the empty byte string at that point
@@ -442,12 +553,19 @@ impl Format {
             Format::Align(..) => false,
             Format::Byte(..) => false,
             Format::WithView(..) => false,
-            Format::Variant(_label, f) => f.depends_on_next(module),
+            Format::Variant(_label, f) => f.depends_on_next_open(module, open),
             Format::Union(branches) | Format::UnionNondet(branches) => {
-                Format::union_depends_on_next(branches, module)
+                Format::union_depends_on_next_open(branches, module, open)
             }
             Format::Tuple(fmts) | Format::Sequence(fmts) => {
-                fmts.iter().any(|f| f.depends_on_next(module))
+                let mut any = false;
+                for f in fmts {
+                    if f.depends_on_next_open(module, open) {
+                        any = true;
+                        break;
+                    }
+                }
+                any
             }
             Format::Repeat(..) | Format::Repeat1(..) | Format::RepeatBetween(..) => true,
             Format::RepeatCount(..) | Format::RepeatUntilLast(..) | Format::RepeatUntilSeq(..) => {
@@ -459,36 +577,166 @@ impl Format {
             Format::Slice(..) => false,
             Format::Bits(..) => false,
             Format::WithRelativeOffset(..) => false,
-            Format::Map(f, _expr) => f.depends_on_next(module),
-            Format::Where(f, _expr) => f.depends_on_next(module),
+            Format::Map(f, _expr) => f.depends_on_next_open(module, open),
+            Format::Where(f, _expr) => f.depends_on_next_open(module, open),
             Format::Compute(..) | Format::Pos => false,
-            Format::Let(_name, _expr, f) => f.depends_on_next(module),
-            Format::LetView(_name, f) => f.depends_on_next(module),
-            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
-            Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
+            Format::Let(_name, _expr, f) => f.depends_on_next_open(module, open),
+            Format::LetView(_name, f) => f.depends_on_next_open(module, open),
+            Format::Match(_, branches) => {
+                let mut any = false;
+                for (_, f) in branches {
+                    if f.depends_on_next_open(module, open) {
+                        any = true;
+                        break;
+                    }
+                }
+                any
+            }
+            Format::Dynamic(_name, _dynformat, f) => f.depends_on_next_open(module, open),
             Format::Apply(..) => false,
-            Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
+            Format::ForEach(_expr, _lbl, f) => f.depends_on_next_open(module, open),
             Format::DecodeBytes(..) | Format::ParseFromView(..) => false,
             Format::MonadSeq(first, second) | Format::LetFormat(first, _, second) => {
-                first.depends_on_next(module) || second.depends_on_next(module)
+                first.depends_on_next_open(module, open)
+                    || second.depends_on_next_open(module, open)
             }
             #[cfg(feature = "format_enforce")]
-            Format::Enforce(f) => f.depends_on_next(module),
-            Format::Permit(f, _) | Format::Hint(_, f) => f.depends_on_next(module),
-            Format::LiftedOption(opt) => opt.as_ref().is_some_and(|f| f.depends_on_next(module)),
+            Format::Enforce(f) => f.depends_on_next_open(module, open),
+            Format::Permit(f, _) | Format::Hint(_, f) => f.depends_on_next_open(module, open),
+            Format::LiftedOption(opt) => match opt {
+                None => false,
+                Some(f) => f.depends_on_next_open(module, open),
+            },
             Format::Phantom(_) => false,
         }
     }
 
-    pub(crate) fn union_depends_on_next(branches: &[Format], module: &FormatModule) -> bool {
+    fn union_depends_on_next_open(
+        branches: &[Format],
+        module: &FormatModule,
+        open: &mut HashSet<usize>,
+    ) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for f in branches {
-            if f.depends_on_next(module) {
+            if f.depends_on_next_open(module, open) {
                 return true;
             }
             fs.push(f.clone());
         }
         MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
+    }
+
+    /// Rewrites every `Format::RecVar(ix)` in `self` to `Format::ItemVar(start + ix, vec![], vec![])`,
+    /// recursively. Used exactly once, by `FormatModule::define_format_rec_batch`, to desugar a
+    /// batch member's body (written using batch-relative `RecVar` indices) into the real, absolute
+    /// `ItemVar` references every other pass over `Format` expects to see - see `Format::RecVar`'s
+    /// own doc comment.
+    pub(crate) fn substitute_rec_var(self, start: usize) -> Format {
+        match self {
+            Format::RecVar(ix) => Format::ItemVar(start + ix, Vec::new(), Vec::new()),
+            Format::ItemVar(level, args, views) => Format::ItemVar(level, args, views),
+            Format::Fail => Format::Fail,
+            Format::EndOfInput => Format::EndOfInput,
+            Format::Align(n) => Format::Align(n),
+            Format::Byte(bs) => Format::Byte(bs),
+            Format::Variant(label, f) => {
+                Format::Variant(label, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::Union(fs) => Format::Union(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
+            Format::UnionNondet(fs) => Format::UnionNondet(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
+            Format::Tuple(fs) => Format::Tuple(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
+            Format::Sequence(fs) => Format::Sequence(
+                fs.into_iter()
+                    .map(|f| f.substitute_rec_var(start))
+                    .collect(),
+            ),
+            Format::Repeat(f) => Format::Repeat(Box::new(f.substitute_rec_var(start))),
+            Format::Repeat1(f) => Format::Repeat1(Box::new(f.substitute_rec_var(start))),
+            Format::RepeatCount(expr, f) => {
+                Format::RepeatCount(expr, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::RepeatBetween(min, max, f) => {
+                Format::RepeatBetween(min, max, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::RepeatUntilLast(cond, f) => {
+                Format::RepeatUntilLast(cond, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::RepeatUntilSeq(cond, f) => {
+                Format::RepeatUntilSeq(cond, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::AccumUntil(cond, acc, init, vt, f) => {
+                Format::AccumUntil(cond, acc, init, vt, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::ForEach(expr, lbl, f) => {
+                Format::ForEach(expr, lbl, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::Maybe(expr, f) => Format::Maybe(expr, Box::new(f.substitute_rec_var(start))),
+            Format::Peek(f) => Format::Peek(Box::new(f.substitute_rec_var(start))),
+            Format::PeekNot(f) => Format::PeekNot(Box::new(f.substitute_rec_var(start))),
+            Format::Slice(expr, f) => Format::Slice(expr, Box::new(f.substitute_rec_var(start))),
+            Format::Bits(f) => Format::Bits(Box::new(f.substitute_rec_var(start))),
+            Format::WithRelativeOffset(base, off, f) => {
+                Format::WithRelativeOffset(base, off, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::Map(f, expr) => Format::Map(Box::new(f.substitute_rec_var(start)), expr),
+            Format::Where(f, cond) => Format::Where(Box::new(f.substitute_rec_var(start)), cond),
+            Format::Compute(expr) => Format::Compute(expr),
+            Format::Let(name, expr, f) => {
+                Format::Let(name, expr, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::Match(expr, branches) => Format::Match(
+                expr,
+                branches
+                    .into_iter()
+                    .map(|(pat, f)| (pat, f.substitute_rec_var(start)))
+                    .collect(),
+            ),
+            Format::Dynamic(name, dynf, f) => {
+                Format::Dynamic(name, dynf, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::Apply(name) => Format::Apply(name),
+            Format::Pos => Format::Pos,
+            Format::SkipRemainder => Format::SkipRemainder,
+            Format::DecodeBytes(expr, f) => {
+                Format::DecodeBytes(expr, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::LetFormat(f0, name, f1) => Format::LetFormat(
+                Box::new(f0.substitute_rec_var(start)),
+                name,
+                Box::new(f1.substitute_rec_var(start)),
+            ),
+            Format::MonadSeq(f0, f1) => Format::MonadSeq(
+                Box::new(f0.substitute_rec_var(start)),
+                Box::new(f1.substitute_rec_var(start)),
+            ),
+            Format::Hint(hint, f) => Format::Hint(hint, Box::new(f.substitute_rec_var(start))),
+            Format::LiftedOption(opt) => {
+                Format::LiftedOption(opt.map(|f| Box::new(f.substitute_rec_var(start))))
+            }
+            Format::LetView(name, f) => {
+                Format::LetView(name, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::WithView(vexpr, vf) => Format::WithView(vexpr, vf),
+            Format::ParseFromView(vexpr, f) => {
+                Format::ParseFromView(vexpr, Box::new(f.substitute_rec_var(start)))
+            }
+            Format::Phantom(f) => Format::Phantom(Box::new(f.substitute_rec_var(start))),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(f) => Format::Enforce(Box::new(f.substitute_rec_var(start))),
+            Format::Permit(f, expr) => Format::Permit(Box::new(f.substitute_rec_var(start)), expr),
+        }
     }
 }
 
@@ -532,5 +780,71 @@ impl Format {
     pub fn is_record_format(&self) -> bool {
         // we take it on faith that a format is a record iff it is hinted as such
         matches!(self, Format::Hint(StyleHint::Record { .. }, _))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::helper::*;
+
+    /// Tests that `match_bounds` correctly estimates the minimum bytes consumed when processing
+    /// a recursive `Union`.
+    ///
+    /// Test-case is a recursive union whose recursive branch has a 1-byte prefix and whose
+    /// non-recursive branch consists of a simple byte-sequence of length 10.
+    /// If the value of `match_bounds` called on this format is `Bounds::at_least(10)`,
+    /// then the test passes. Otherwise, it fails.
+    ///
+    /// The most likely cause of potential failure would be the recursive self-call in
+    /// the 1-byte-prefix branch returning `Bounds::any()`.
+    #[test]
+    fn match_bounds_recursive_union_excludes_open_branch_from_minimum() {
+        let mut module = FormatModule::new();
+        let body = alts([
+            ("Long", byte_seq(&[b'A'; 10])),
+            ("Rec", tuple([is_byte(b'x'), Format::RecVar(0)])),
+        ]);
+        let refs = module.define_format_rec_batch(vec![("test.rec", body)]);
+        let bounds = refs[0].call().match_bounds(&module);
+        assert_eq!(
+            bounds.min(),
+            10,
+            "recursive branch's open self-reference must not drag the union's minimum down to its own non-recursive prefix"
+        );
+        assert_eq!(
+            bounds.max(),
+            None,
+            "the recursive branch keeps the format's maximum genuinely unbounded"
+        );
+    }
+
+    /// Tests that `match_bounds` finds the path with the fewest-bytes to report as minimum,
+    /// even when that path happens to follow one or more mutually-recursive layers.
+    #[test]
+    fn match_bounds_mutual_recursion_picks_shortest_path() {
+        let mut module = FormatModule::new();
+        let refs = {
+            let a0 = alts([
+                ("Longer", byte_seq(&[b'A'; 10])),
+                ("Rec", tuple([is_byte(b'x'), Format::RecVar(1)])),
+            ]);
+            let b1 = alts([
+                ("Shorter", byte_seq(&[b'B'; 7])),
+                ("Rec", tuple([is_byte(b'y'), Format::RecVar(0)])),
+            ]);
+            module.define_format_rec_batch(vec![("test.a", a0), ("test.b", b1)])
+        };
+        let bounds = refs[0].call().match_bounds(&module);
+        assert_eq!(
+            bounds.min(),
+            8,
+            "mutual-recursion incorrectly discounted shorter recursive path in favor of non-recursive path when comuting match_bounds"
+        );
+        assert_eq!(
+            bounds.max(),
+            None,
+            "mutual recursion should always report unbounded maximum"
+        );
     }
 }

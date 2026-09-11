@@ -6,6 +6,7 @@ members = [
     "smallsorts",
     "experiments/analytic-engine/",
     "experiments/analytic-parser",
+    "experiments/doodle-rec/",
 ]
 
 [package]
@@ -21,6 +22,11 @@ test = true
 [[test]]
 name = "permit_state_error"
 path = "tests/permit_state_error/mod.rs"
+test = true
+
+[[test]]
+name = "recursion"
+path = "tests/recursion/mod.rs"
 test = true
 
 [features]

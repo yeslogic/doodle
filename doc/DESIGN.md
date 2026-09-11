@@ -153,3 +153,64 @@ UnifySteps(Steps: [(FormatIx, MatchTreeStep)]):
 ```
 
 (This is effectively an outline of a a left-fold expansion of the method `MatchTreeLevel::merge_step`).
+
+## Cycle guard for self-referential formats
+
+Before recursive-format support was added to `doodle`, the eager descent performed by `MatchTreeStep::from_format`
+when encountering `Format::ItemVar` could never form cycles, as the only way for a format to refer to itself
+(outside of a phantom context that is exempt from MatchTree analysis) or form mutual cycles would be to artificially
+create an `ItemVar` pointing to an as-yet-uninhabited level, which would break at time of registration when the
+out-of-bounds level is used as an index into the module's `formats` field.
+
+However, the introduction of support for auto- and mutually-recursive formats breaks this invariant by allowing
+batch-definition with `RecVar`, which makes it possible to have self-referential or co-referential cycles when
+expanding `Format::ItemVar` on a properly defined format. Because of this, any time a `MatchTreeStep` would
+normally descend on a `Format::ItemVar` whose level it has already witnessed in the same call-stack, it needs
+to detect the cycle and escape it rather than recurse indefinitely.
+
+To address this, `MatchTreeLevel::grow` instantiates a fresh mutable state-object, of novel type `CycleGuard`,
+which it threads through each call into `MatchTreeStep::from_next`. All of the related methods of `MatchTreeStep`
+that can call into `from_format` (e.g. `from_format`, `from_sequential`, `from_repeat_count`) now take an additional
+parameter of type `&mut CycleGuard`.
+
+`CycleGuard`, defined in `src/lib.rs`, is a struct with two fields:
+
+* `open_levels`: a set of 'open' `ItemVar` levels
+* `has_cycle`: a boolean flag used to indicate that a cycle was detected, to avoid having to panic or introduce fallibility to `MatchTreeStep::from_format`
+
+The concept of an 'open' level is somewhat circular, but it is best summed up as follows:
+
+```pseudocode
+MatchTreeStep::from_format(Module, F, Next, CycleGuard):
+    if Format::ItemVar(Level, ..) == F:
+        if Level is marked open in CycleGuard:
+            CycleGuard->has_cycle := true
+            return MatchTreeStep::reject()
+        else:
+            mark Level as open in CycleGuard
+            let Ret = from_format(Module, Module.get_format(Level), Next, CycleGuard)
+            mark Level as closed in CycleGuard
+            return Ret
+    ...
+```
+
+Namely, a call that sees `ItemVar` opens the corresponding level just before, and closes it just after, it performs the usual
+recursive call on `module.get_format(level)`. Within that call-stack, `level` remains open and is only closed once the
+recursive call returns a value.
+
+Upon reaching `Format::ItemVar(level, ..)`, `from_format` inserts `level` into the open-set of the `CycleGuard` it is holding,
+using the return-value to determine whether a cycle has been found. Provided the exit-condition is not already met,
+it then performs the usual recursive introspection into the expanded format at `level`, and once that call terminates,
+removes `level` from the `CycleGuard` to 'close' it out.
+
+Because `MatchTreeStep` constitues exactly one byte of lookahead down a given parse-branch,
+any path where a byte is unconditionally consumed (most commonly `Format::Byte`) forms a base-case
+for the recursive definition of `from_format`, and the remainder of the format is delegated to delayed
+processing via `Next`. Because each call that `MatchTreeLevel::grow` makes to `MatchTreeStep::from_next`
+instantiates a fresh `CycleGuard`, any cycle witnessed during `from_format` processing is necessarily
+an instance of unguarded left-recursion, as it would not have reached the second occurrence if even one
+byte had been consumed since that level was opened.
+
+After the call to `MatchTreeStep::from_next` returns to the original `MatchTreeLevel::grow` that called it,
+the `CycleGuard` that was mutably passed into that call is inspected, and if the `has_cycle` flag
+is set to `true`, the function returns early with a value of `None` (`MatchTreeLevel::grow` returns `Option<MatchTree>`).
