@@ -700,6 +700,9 @@ impl<'a> Compiler<'a> {
                 }
                 Ok(Decoder::Call(n, args, views))
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Phantom(_inner) => Ok(Decoder::Phantom),
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
@@ -746,11 +749,12 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(
+                    let field_next = Next::sequence(
+                        self.module,
                         MaybeTyped::Untyped(fields.as_slice()),
                         next.clone(),
-                    ));
-                    let df = self.compile_format(f, next)?;
+                    );
+                    let df = self.compile_format(f, field_next)?;
                     decs.push(df);
                 }
                 Ok(Decoder::Tuple(decs))
@@ -759,11 +763,12 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(formats.len());
                 let mut fields = formats.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Sequence(
+                    let field_next = Next::sequence(
+                        self.module,
                         MaybeTyped::Untyped(fields.as_slice()),
                         next.clone(),
-                    ));
-                    let df = self.compile_format(f, next)?;
+                    );
+                    let df = self.compile_format(f, field_next)?;
                     decs.push(df);
                 }
                 Ok(Decoder::Sequence(decs))
@@ -943,14 +948,16 @@ impl<'a> Compiler<'a> {
             }
             Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
             Format::LetFormat(first, name, second) => {
-                let a_next = Next::Cat(MaybeTyped::Untyped(second), next.clone());
-                let da = Box::new(self.compile_format(first, Rc::new(a_next))?);
+                // When `second` is a non-productive format (e.g. `Format::Compute`), we compile against `next` directly and avoid cache-misses in `decoder_map` for self-referential `first` formats
+                let a_next = Next::cat(self.module, MaybeTyped::Untyped(second), next.clone());
+                let da = Box::new(self.compile_format(first, a_next)?);
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::LetFormat(da, name.clone(), db))
             }
             Format::MonadSeq(first, second) => {
-                let a_next = Next::Cat(MaybeTyped::Untyped(second), next.clone());
-                let da = Box::new(self.compile_format(first, Rc::new(a_next))?);
+                // When `second` is a non-productive format (e.g. `Format::Compute`), we compile against `next` directly and avoid cache-misses in `decoder_map` for self-referential `first` formats
+                let a_next = Next::cat(self.module, MaybeTyped::Untyped(second), next.clone());
+                let da = Box::new(self.compile_format(first, a_next)?);
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::MonadSeq(da, db))
             }

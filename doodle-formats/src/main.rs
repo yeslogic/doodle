@@ -400,6 +400,9 @@ mod census {
                 let format = module.get_format(*level);
                 crawl(format, module, pop);
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Fail => (),
             Format::EndOfInput => (),
             Format::Align(_) => (),

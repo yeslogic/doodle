@@ -37,6 +37,7 @@ pub mod parser;
 mod precedence;
 pub mod prelude;
 pub mod read;
+pub(crate) mod recursion;
 
 mod scope;
 
@@ -1089,6 +1090,72 @@ impl FormatModule {
         self_ref
     }
 
+    /// Registers a batch of mutually-referencing formats under the given names.
+    ///
+    /// Unlike [`Self::define_format_phantom_rec_args_views`] (which permits exactly one format to
+    /// reference only its own, [`Format::Phantom`]-confined level), this reserves
+    /// `formats.len()` levels up front, then rewrites every [`Format::RecVar`] in each supplied
+    /// body to the real, absolute [`Format::ItemVar`] for its batch position (`RecVar(0)` is the
+    /// first name in `formats`, `RecVar(1)` the second, and so on - "self" for a singly-recursive
+    /// member is just `RecVar` of its own batch position). Every occurrence is rewritten before
+    /// the format is ever installed into the module, so no other pass over `Format` ever
+    /// encounters a `RecVar` - see that variant's own doc comment.
+    ///
+    /// No `args`/`views` support (matching the shape of a plain [`Self::define_format`] call per
+    /// batch member); add a `_views`/`_args`-suffixed sibling if a real recursive format ever
+    /// needs them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any constructed format fails to type-check.
+    pub fn define_format_rec_batch<L: IntoLabel>(
+        &mut self,
+        formats: Vec<(L, Format)>,
+    ) -> Vec<FormatRef> {
+        let start = self.names.len();
+        let n = formats.len();
+
+        // Reserve every level in the batch before any body is installed, so that a RecVar-derived
+        // ItemVar reference to any batch member (including itself) resolves to a real (if still
+        // type-provisional) slot rather than indexing out of bounds.
+        let mut names = Vec::with_capacity(n);
+        let mut bodies = Vec::with_capacity(n);
+        for (name, format) in formats {
+            names.push(name.into());
+            bodies.push(format);
+        }
+        for name in &names {
+            self.names.push(name.clone());
+            self.args.push(Vec::new());
+            self.views.push(Vec::new());
+            self.formats.push(Format::EMPTY);
+            self.format_types.push(ValueType::Any);
+        }
+        for (ix, format) in bodies.into_iter().enumerate() {
+            self.formats[start + ix] = format.substitute_rec_var(start);
+        }
+
+        // `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
+        // level's body - it just reads `format_types[level]` directly (see that method) - so,
+        // unlike an eager equirecursive inference engine, no occurs-tracking is needed here: a
+        // still-provisional sibling (including self) is read as-is (currently `ValueType::Any`,
+        // which `ValueType::unify` always accepts unconditionally) and treated as an
+        // already-terminating leaf. Processing members in `formats`-order means a member
+        // referencing an *earlier* sibling sees that sibling's real, already-solved type, while
+        // one referencing a *later* sibling (or itself) sees the placeholder - an accepted,
+        // order-dependent imprecision, not a soundness gap for this module's own purposes.
+        for ix in start..start + n {
+            let scope = TypeScope::new();
+            let format_type = match self.infer_format_type(&scope, &self.formats[ix]) {
+                Ok(t) => t,
+                Err(msg) => panic!("Failed to solve type for {}: {msg}", self.names[ix]),
+            };
+            self.format_types[ix] = format_type;
+        }
+
+        (start..start + n).map(FormatRef).collect()
+    }
+
     pub fn get_name(&self, level: usize) -> &str {
         &self.names[level]
     }
@@ -1158,6 +1225,9 @@ impl FormatModule {
                 }
                 Ok(self.get_format_type(*level).clone())
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
                 match bytes_type {
@@ -1544,6 +1614,46 @@ enum Next<'a> {
     PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
+impl<'a> Next<'a> {
+    /// Smart constructor for [`Next::Cat`]: when `content` is guaranteed to match zero bytes (e.g.
+    /// a trailing `Format::Compute`), wrapping it around `next` adds no real information but *does*
+    /// add a structurally distinct `Next` layer - which, for a self-referential reference compiled
+    /// under it, can miss `decoder_map`'s `(level, next)` cache and queue a doomed duplicate compile
+    /// (see `doc/RECURSION.md`'s mechanism 4). Skips the wrapper in that case and returns `next`
+    /// directly instead.
+    fn cat(module: &FormatModule, content: MTFormatRef<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        let nonproductive = match content {
+            MaybeTyped::Untyped(f) => f.is_nonproductive(module),
+            MaybeTyped::Typed(f) => f.is_nonproductive(),
+        };
+        if nonproductive {
+            next
+        } else {
+            Rc::new(Next::Cat(content, next))
+        }
+    }
+
+    /// Smart constructor for [`Next::Sequence`]: analogous to [`Self::cat`], but for a `Tuple`/
+    /// `Sequence`'s trailing field-suffix as a whole - skips the wrapper when every element of
+    /// `content` is nonproductive, which is vacuously true for an empty slice (the previously
+    /// special-cased `remaining == []` case falls out of this for free).
+    fn sequence(
+        module: &FormatModule,
+        content: MTFormatSlice<'a>,
+        next: Rc<Next<'a>>,
+    ) -> Rc<Next<'a>> {
+        let nonproductive = match content {
+            MaybeTyped::Untyped(fs) => fs.iter().all(|f| f.is_nonproductive(module)),
+            MaybeTyped::Typed(fs) => fs.iter().all(|f| f.is_nonproductive()),
+        };
+        if nonproductive {
+            next
+        } else {
+            Rc::new(Next::Sequence(content, next))
+        }
+    }
+}
+
 /// A single choice-point in a conceptual [MatchTree] structure.
 #[derive(Clone, Debug)]
 struct MatchTreeStep<'a> {
@@ -1566,6 +1676,49 @@ type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 pub struct MatchTree {
     accept: Option<usize>,
     branches: Vec<(ByteSet, MatchTree)>,
+}
+
+/// Tracks which `Format::ItemVar`/`TypedFormat::FormatCall` levels are currently being eagerly
+/// expanded within a single top-level [`MatchTreeStep`] construction (one iteration of
+/// [`MatchTreeLevel::grow`]'s per-index loop), so that construction terminates instead of
+/// recursing forever on a self-referential format.
+///
+/// A level is added to `open_levels` immediately before recursing into [`MatchTreeStep::from_format`]
+/// on `module.get_format(level)`, and is removed just after that call returns.
+///
+/// If a level would be added to `open_levels` for the second time, then there must be a zero-progress cycle
+/// (provided that a fresh `CycleGuard` is instantiated for each separate pass within [`MatchTreeLevel::grow`]).
+/// When this happens, `has_cycle` is set to true, and the return value can be arbitrarily chosen as
+/// `MatchTreeStep::reject()`; the calling `MatchTreeLevel::grow` is responsible for checking `has_cycle`,
+/// and if it is set, then an exceptional value of `None` is returned.
+#[derive(Default)]
+struct CycleGuard {
+    open_levels: HashSet<usize>,
+    has_cycle: bool,
+}
+
+impl CycleGuard {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    /// Inserts `level` into the open-set, updating `has_cycle` based on whether the insertion was novel
+    /// (i.e. setting it to `true` if the `level` was already open).
+    ///
+    /// Returns the value of `self.has_cycle`.
+    fn open(&mut self, level: usize) -> bool {
+        if !self.open_levels.insert(level) {
+            self.has_cycle = true;
+        }
+        self.has_cycle
+    }
+
+    /// Marks `level` as closed, removing it from the open-set.
+    ///
+    /// This should be called after returning from a recursive call to [`MatchTreeStep::from_format`] on `module.get_format(level)`.
+    fn close(&mut self, level: usize) {
+        self.open_levels.remove(&level);
+    }
 }
 
 impl<'a> MatchTreeStep<'a> {
@@ -1681,13 +1834,15 @@ impl<'a> MatchTreeStep<'a> {
         module: &'a FormatModule,
         fields: &'a [Format],
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
-            None => Self::from_next(module, next),
+            None => Self::from_next(module, next, guard),
             Some((f, fs)) => Self::from_format(
                 module,
                 f,
                 Rc::new(Next::Sequence(MaybeTyped::Untyped(fs), next)),
+                guard,
             ),
         }
     }
@@ -1698,15 +1853,17 @@ impl<'a> MatchTreeStep<'a> {
         n: usize,
         format: &'a Format,
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         if n > 0 {
             Self::from_format(
                 module,
                 format,
                 Rc::new(Next::RepeatCount(n - 1, MaybeTyped::Untyped(format), next)),
+                guard,
             )
         } else {
-            Self::from_next(module, next)
+            Self::from_next(module, next, guard)
         }
     }
 
@@ -1720,6 +1877,7 @@ impl<'a> MatchTreeStep<'a> {
         min_max: (usize, usize),
         format: &'a Format,
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         let (min, max) = min_max;
         assert!(
@@ -1727,7 +1885,7 @@ impl<'a> MatchTreeStep<'a> {
             "min-max pair ({min}, {max}) incoherent (min > max)",
         );
         if min == max {
-            Self::from_repeat_count(module, min, format, next)
+            Self::from_repeat_count(module, min, format, next, guard)
         } else if min > 0 {
             Self::from_format(
                 module,
@@ -1738,6 +1896,7 @@ impl<'a> MatchTreeStep<'a> {
                     MaybeTyped::Untyped(format),
                     next,
                 )),
+                guard,
             )
         } else {
             Self::from_next(
@@ -1747,6 +1906,7 @@ impl<'a> MatchTreeStep<'a> {
                     MaybeTyped::Untyped(format),
                     next.clone(),
                 )),
+                guard,
             )
         }
     }
@@ -1757,9 +1917,10 @@ impl<'a> MatchTreeStep<'a> {
         n: usize,
         inner: Rc<Next<'a>>,
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         if n > 0 {
-            let mut tree = Self::from_next(module, inner);
+            let mut tree = Self::from_next(module, inner, guard);
             tree.accept = false;
             if tree.branches.is_empty() {
                 let next = Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone()));
@@ -1771,48 +1932,56 @@ impl<'a> MatchTreeStep<'a> {
             }
             tree
         } else {
-            Self::from_next(module, next.clone())
+            Self::from_next(module, next.clone(), guard)
         }
     }
 
     /// Constructs a [MatchTreeStep] from a [`Next`]
-    fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+    fn from_next(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
+    ) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
-                let tree1 = Self::from_next(module, next1.clone());
-                let tree2 = Self::from_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone(), guard);
+                let tree2 = Self::from_next(module, next2.clone(), guard);
                 tree1.union(tree2)
             }
             Next::Cat(f, next) => {
                 let next0: Rc<Next<'a>> = next.clone();
-                MatchTreeStep::<'a>::from_mt_format(module, *f, next0)
+                MatchTreeStep::<'a>::from_mt_format(module, *f, next0, guard)
             }
             Next::Sequence(fields, next) => {
                 let next = next.clone();
                 match fields {
                     MaybeTyped::Untyped(fields) => match fields.split_first() {
-                        None => Self::from_next(module, next),
+                        None => Self::from_next(module, next, guard),
                         Some((f, fs)) => Self::from_format(
                             module,
                             f,
                             Rc::new(Next::Sequence(MaybeTyped::Untyped(fs), next)),
+                            guard,
                         ),
                     },
                     MaybeTyped::Typed(fields) => match fields.split_first() {
-                        None => Self::from_next(module, next),
+                        None => Self::from_next(module, next, guard),
                         Some((f, fs)) => Self::from_gt_format(
                             module,
                             f,
                             Rc::new(Next::Sequence(MaybeTyped::Typed(fs), next)),
+                            guard,
                         ),
                     },
                 }
             }
             Next::Repeat(a, next0) => {
-                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone());
+                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone(), guard);
                 let next1 = next.clone();
-                tree.union(MatchTreeStep::<'a>::from_mt_format(module, *a, next1))
+                tree.union(MatchTreeStep::<'a>::from_mt_format(
+                    module, *a, next1, guard,
+                ))
             }
             Next::RepeatBetween(n, m, a, next0) => {
                 let min = *n;
@@ -1820,28 +1989,34 @@ impl<'a> MatchTreeStep<'a> {
                 if min == max {
                     log::warn!("RepeatBetween({min}, {max}) converted to RepeatCount({min})");
                     let next1 = Next::RepeatCount(min, *a, next0.clone());
-                    return Self::from_next(module, Rc::new(next1));
+                    return Self::from_next(module, Rc::new(next1), guard);
                 }
                 if min > 0 {
                     Self::from_mt_format(
                         module,
                         *a,
                         Rc::new(Next::RepeatBetween(min - 1, max - 1, *a, next0.clone())),
+                        guard,
                     )
                 } else {
-                    Self::from_next(module, Rc::new(Next::RepeatMax(max, *a, next0.clone())))
+                    Self::from_next(
+                        module,
+                        Rc::new(Next::RepeatMax(max, *a, next0.clone())),
+                        guard,
+                    )
                 }
             }
             Next::RepeatMax(n, a, next0) => {
                 let n = *n;
                 if n == 0 {
-                    Self::from_next(module, next0.clone())
+                    Self::from_next(module, next0.clone(), guard)
                 } else {
-                    let tree0 = MatchTreeStep::<'a>::from_next(module, next0.clone());
+                    let tree0 = MatchTreeStep::<'a>::from_next(module, next0.clone(), guard);
                     tree0.union(MatchTreeStep::<'a>::from_mt_format(
                         module,
                         *a,
                         Rc::new(Next::RepeatMax(n - 1, *a, next0.clone())),
+                        guard,
                     ))
                 }
             }
@@ -1849,22 +2024,27 @@ impl<'a> MatchTreeStep<'a> {
                 let n = *n;
                 let next = next0.clone();
                 if n > 0 {
-                    Self::from_mt_format(module, *a, Rc::new(Next::RepeatCount(n - 1, *a, next)))
+                    Self::from_mt_format(
+                        module,
+                        *a,
+                        Rc::new(Next::RepeatCount(n - 1, *a, next)),
+                        guard,
+                    )
                 } else {
-                    Self::from_next(module, next)
+                    Self::from_next(module, next, guard)
                 }
             }
             Next::Slice(n, inside, next0) => {
-                Self::from_slice(module, *n, inside.clone(), next0.clone())
+                Self::from_slice(module, *n, inside.clone(), next0.clone(), guard)
             }
             Next::Peek(next1, next2) => {
-                let tree1 = Self::from_next(module, next1.clone());
-                let tree2 = Self::from_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone(), guard);
+                let tree2 = Self::from_next(module, next2.clone(), guard);
                 tree1.peek(tree2)
             }
             Next::PeekNot(next1, next2) => {
-                let tree1 = Self::from_next(module, next1.clone());
-                let tree2 = Self::from_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone(), guard);
+                let tree2 = Self::from_next(module, next2.clone(), guard);
                 tree1.peek_not(tree2)
             }
         }
@@ -1874,22 +2054,40 @@ impl<'a> MatchTreeStep<'a> {
         module: &'a FormatModule,
         f: MTFormatRef<'a>,
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match f {
-            MaybeTyped::Untyped(f) => Self::from_format(module, f, next),
-            MaybeTyped::Typed(tf) => Self::from_gt_format(module, tf, next),
+            MaybeTyped::Untyped(f) => Self::from_format(module, f, next, guard),
+            MaybeTyped::Typed(tf) => Self::from_gt_format(module, tf, next, guard),
         }
+    }
+
+    /// Internal helper to dedup and simplify the common ItemVar/FormatCall handling between `from_format` and `from_gt_format`
+    ///
+    /// Insterts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
+    /// its value after marking `level` as closed.
+    fn guarded<F>(level: usize, guard: &mut CycleGuard, f: F) -> Self
+    where
+        F: FnOnce(&mut CycleGuard) -> Self,
+    {
+        if guard.open(level) {
+            return Self::reject();
+        }
+        let step = f(guard);
+        guard.close(level);
+        step
     }
 
     pub fn from_gt_format(
         module: &'a FormatModule,
         f: &'a TypedFormat<GenType>,
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match f {
-            TypedFormat::FormatCall(_, level, ..) => {
-                Self::from_format(module, module.get_format(*level), next)
-            }
+            TypedFormat::FormatCall(_, level, ..) => Self::guarded(*level, guard, move |guard| {
+                Self::from_format(module, module.get_format(*level), next, guard)
+            }),
             TypedFormat::Fail => Self::reject(),
             TypedFormat::EndOfInput => Self::accept(),
             TypedFormat::Align(_) => {
@@ -1898,34 +2096,38 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Phantom(..) => Self::accept(),
             TypedFormat::SkipRemainder => Self::accept(),
             TypedFormat::Byte(bs) => Self::branch(*bs, next),
-            TypedFormat::Variant(_, _label, f) => Self::from_gt_format(module, f, next.clone()),
+            TypedFormat::Variant(_, _label, f) => {
+                Self::from_gt_format(module, f, next.clone(), guard)
+            }
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
-                    tree = tree.union(Self::from_gt_format(module, f, next.clone()));
+                    tree = tree.union(Self::from_gt_format(module, f, next.clone(), guard));
                 }
                 tree
             }
             TypedFormat::Sequence(_, fields) | TypedFormat::Tuple(_, fields) => {
                 match fields.split_first() {
-                    None => Self::from_next(module, next),
+                    None => Self::from_next(module, next, guard),
                     Some((f, fs)) => Self::from_gt_format(
                         module,
                         f,
                         Rc::new(Next::Sequence(MaybeTyped::Typed(fs), next)),
+                        guard,
                     ),
                 }
             }
             TypedFormat::Repeat(_, a) => {
-                let tree = Self::from_next(module, next.clone());
+                let tree = Self::from_next(module, next.clone(), guard);
                 tree.union(Self::from_gt_format(
                     module,
                     a,
                     Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                    guard,
                 ))
             }
             TypedFormat::ForEach(_, _expr, _lbl, a) => {
-                let tree = Self::from_next(module, next.clone());
+                let tree = Self::from_next(module, next.clone(), guard);
                 // FIXME - we might want a more robust solution to nullable formats in ForEach
                 let bounds = a.match_bounds();
                 if bounds.min() == 0 {
@@ -1942,6 +2144,7 @@ impl<'a> MatchTreeStep<'a> {
                         module,
                         a,
                         Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                        guard,
                     ))
                 }
             }
@@ -1949,6 +2152,7 @@ impl<'a> MatchTreeStep<'a> {
                 module,
                 a,
                 Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                guard,
             ),
             TypedFormat::RepeatCount(_, expr, a) => {
                 let bounds = expr.bounds();
@@ -1960,9 +2164,10 @@ impl<'a> MatchTreeStep<'a> {
                                 module,
                                 a,
                                 Rc::new(Next::RepeatCount(n - 1, MaybeTyped::Typed(a), next)),
+                                guard,
                             )
                         } else {
-                            Self::from_next(module, next)
+                            Self::from_next(module, next, guard)
                         }
                     }
                 } else {
@@ -1974,9 +2179,10 @@ impl<'a> MatchTreeStep<'a> {
                                 module,
                                 a,
                                 Rc::new(Next::RepeatCount(n - 1, MaybeTyped::Typed(a), next)),
+                                guard,
                             )
                         } else {
-                            Self::from_next(module, next)
+                            Self::from_next(module, next, guard)
                         }
                     }
                 }
@@ -1997,6 +2203,7 @@ impl<'a> MatchTreeStep<'a> {
                                         MaybeTyped::Typed(&**a),
                                         next,
                                     )),
+                                    guard,
                                 )
                             } else {
                                 Self::from_next(
@@ -2006,6 +2213,7 @@ impl<'a> MatchTreeStep<'a> {
                                         MaybeTyped::Typed(&**a),
                                         next.clone(),
                                     )),
+                                    guard,
                                 )
                             }
                         }
@@ -2020,9 +2228,10 @@ impl<'a> MatchTreeStep<'a> {
                                         MaybeTyped::Typed(&**a),
                                         next,
                                     )),
+                                    guard,
                                 )
                             } else {
-                                Self::from_next(module, next)
+                                Self::from_next(module, next, guard)
                             }
                         }
                         Ordering::Greater => {
@@ -2046,20 +2255,20 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             TypedFormat::Maybe(_, _cond, a) => {
-                let tree_some = Self::from_gt_format(module, a, next.clone());
-                let tree_none = Self::from_next(module, next);
+                let tree_some = Self::from_gt_format(module, a, next.clone(), guard);
+                let tree_none = Self::from_next(module, next, guard);
                 tree_none.union(tree_some)
             }
-            TypedFormat::LiftedOption(_, None) => Self::from_next(module, next),
-            TypedFormat::LiftedOption(_, Some(a)) => Self::from_gt_format(module, a, next),
+            TypedFormat::LiftedOption(_, None) => Self::from_next(module, next, guard),
+            TypedFormat::LiftedOption(_, Some(a)) => Self::from_gt_format(module, a, next, guard),
             TypedFormat::Peek(_, a) => {
-                let tree = Self::from_next(module, next.clone());
-                let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty));
+                let tree = Self::from_next(module, next.clone(), guard);
+                let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty), guard);
                 tree.peek(peek)
             }
             TypedFormat::PeekNot(_, a) => {
-                let tree = Self::from_next(module, next.clone());
-                let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty));
+                let tree = Self::from_next(module, next.clone(), guard);
+                let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty), guard);
                 tree.peek_not(peek)
             }
             TypedFormat::Slice(_, expr, f) => {
@@ -2069,9 +2278,9 @@ impl<'a> MatchTreeStep<'a> {
                 ));
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.as_exact() {
-                    Self::from_slice(module, n, inside, next)
+                    Self::from_slice(module, n, inside, next, guard)
                 } else {
-                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
+                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty), guard)
                 }
             }
             TypedFormat::Bits(_, _a) => {
@@ -2081,34 +2290,36 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             TypedFormat::Map(_, f, _) | TypedFormat::Where(_, f, _) => {
-                Self::from_gt_format(module, f, next)
+                Self::from_gt_format(module, f, next, guard)
             }
 
             TypedFormat::DecodeBytes(..)
             | TypedFormat::ParseFromView(..)
-            | TypedFormat::Compute(..) => Self::from_next(module, next),
+            | TypedFormat::Compute(..) => Self::from_next(module, next, guard),
 
-            TypedFormat::Pos(_) => Self::from_next(module, next),
-            TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
-            TypedFormat::LetView(_, _name, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::Pos(_) => Self::from_next(module, next, guard),
+            TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next, guard),
+            TypedFormat::LetView(_, _name, f) => Self::from_gt_format(module, f, next, guard),
             TypedFormat::Match(_, _, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
-                    tree = tree.union(Self::from_gt_format(module, f, next.clone()));
+                    tree = tree.union(Self::from_gt_format(module, f, next.clone(), guard));
                 }
                 tree
             }
-            TypedFormat::Dynamic(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::Dynamic(_, _name, _expr, f) => {
+                Self::from_gt_format(module, f, next, guard)
+            }
             TypedFormat::Apply(..) => Self::accept(),
             TypedFormat::MonadSeq(_, f0, f) | TypedFormat::LetFormat(_, f0, _, f) => {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Typed(f), next));
-                Self::from_gt_format(module, f0, next0)
+                Self::from_gt_format(module, f0, next0, guard)
             }
-            TypedFormat::Hint(_, _hint, f) => Self::from_gt_format(module, f, next),
-            TypedFormat::Permit(_, f, _expr) => Self::from_gt_format(module, f, next),
+            TypedFormat::Hint(_, _hint, f) => Self::from_gt_format(module, f, next, guard),
+            TypedFormat::Permit(_, f, _expr) => Self::from_gt_format(module, f, next, guard),
             #[cfg(feature = "format_enforce")]
-            TypedFormat::Enforce(_, f) => Self::from_gt_format(module, f, next),
-            TypedFormat::WithView(_, _ident, _vf) => Self::from_next(module, next),
+            TypedFormat::Enforce(_, f) => Self::from_gt_format(module, f, next, guard),
+            TypedFormat::WithView(_, _ident, _vf) => Self::from_next(module, next, guard),
         }
     }
 
@@ -2117,40 +2328,48 @@ impl<'a> MatchTreeStep<'a> {
         module: &'a FormatModule,
         f: &'a Format,
         next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match f {
             Format::ItemVar(level, _args, _views) => {
-                Self::from_format(module, module.get_format(*level), next)
+                let level = *level;
+                Self::guarded(level, guard, move |guard| {
+                    Self::from_format(module, module.get_format(level), next, guard)
+                })
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Phantom(..) => Self::accept(),
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::SkipRemainder => Self::accept(),
-            Format::Align(n) => Self::from_align(module, next, *n),
-            Format::DecodeBytes(_bytes, _f) => Self::from_next(module, next),
-            Format::ParseFromView(_view, _f) => Self::from_next(module, next),
+            Format::Align(n) => Self::from_align(module, next, *n, guard),
+            Format::DecodeBytes(_bytes, _f) => Self::from_next(module, next, guard),
+            Format::ParseFromView(_view, _f) => Self::from_next(module, next, guard),
             Format::Byte(bs) => Self::branch(*bs, next),
-            Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
+            Format::Variant(_label, f) => Self::from_format(module, f, next, guard),
             Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
-                    tree = tree.union(Self::from_format(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone(), guard));
                 }
                 tree
             }
             Format::Sequence(fields) | Format::Tuple(fields) => {
-                Self::from_sequential(module, fields, next)
+                Self::from_sequential(module, fields, next, guard)
             }
             Format::Repeat(a) => {
-                let tree = Self::from_next(module, next.clone());
+                let tree = Self::from_next(module, next.clone(), guard);
                 tree.union(Self::from_format(
                     module,
                     a,
                     Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+                    guard,
                 ))
             }
             Format::ForEach(_expr, _lbl, a) => {
-                let tree = Self::from_next(module, next.clone());
+                let tree = Self::from_next(module, next.clone(), guard);
                 // FIXME - we might want a more robust solution to nullable formats in ForEach
                 let bounds = a.match_bounds(module);
                 if bounds.min() == 0 {
@@ -2167,6 +2386,7 @@ impl<'a> MatchTreeStep<'a> {
                         module,
                         a,
                         Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+                        guard,
                     ))
                 }
             }
@@ -2174,13 +2394,14 @@ impl<'a> MatchTreeStep<'a> {
                 module,
                 a,
                 Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+                guard,
             ),
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.as_exact() {
-                    Self::from_repeat_count(module, n, a, next.clone())
+                    Self::from_repeat_count(module, n, a, next.clone(), guard)
                 } else {
-                    Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
+                    Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty), guard)
                 }
             }
             Format::RepeatBetween(xmin, xmax, a) => {
@@ -2189,9 +2410,11 @@ impl<'a> MatchTreeStep<'a> {
                 match (min_bounds.as_exact(), max_bounds.as_exact()) {
                     (Some(min), Some(max)) => match min.cmp(&max) {
                         Ordering::Less => {
-                            Self::from_repeat_between(module, (min, max), a, next.clone())
+                            Self::from_repeat_between(module, (min, max), a, next.clone(), guard)
                         }
-                        Ordering::Equal => Self::from_repeat_count(module, min, a, next.clone()),
+                        Ordering::Equal => {
+                            Self::from_repeat_count(module, min, a, next.clone(), guard)
+                        }
                         Ordering::Greater => {
                             panic!("incoherent repeat-between: min {min} > max {max}")
                         }
@@ -2214,18 +2437,18 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::Maybe(_expr, a) => {
-                let tree_some = Self::from_format(module, a, next.clone());
-                let tree_none = Self::from_next(module, next);
+                let tree_some = Self::from_format(module, a, next.clone(), guard);
+                let tree_none = Self::from_next(module, next, guard);
                 tree_some.union(tree_none)
             }
             Format::Peek(a) => {
-                let tree = Self::from_next(module, next.clone());
-                let peek = Self::from_format(module, a, Rc::new(Next::Empty));
+                let tree = Self::from_next(module, next.clone(), guard);
+                let peek = Self::from_format(module, a, Rc::new(Next::Empty), guard);
                 tree.peek(peek)
             }
             Format::PeekNot(a) => {
-                let tree = Self::from_next(module, next.clone());
-                let peek = Self::from_format(module, a, Rc::new(Next::Empty));
+                let tree = Self::from_next(module, next.clone(), guard);
+                let peek = Self::from_format(module, a, Rc::new(Next::Empty), guard);
                 tree.peek_not(peek)
             }
             Format::Slice(expr, f) => {
@@ -2235,9 +2458,9 @@ impl<'a> MatchTreeStep<'a> {
                 ));
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.as_exact() {
-                    Self::from_slice(module, n, inside, next)
+                    Self::from_slice(module, n, inside, next, guard)
                 } else {
-                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
+                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty), guard)
                 }
             }
             Format::Bits(_a) => {
@@ -2246,37 +2469,37 @@ impl<'a> MatchTreeStep<'a> {
             Format::WithRelativeOffset(_addr, _offset, _a) => {
                 Self::accept() // FIXME
             }
-            Format::Map(f, _expr) => Self::from_format(module, f, next),
-            Format::Where(f, _expr) => Self::from_format(module, f, next),
-            Format::Pos => Self::from_next(module, next),
-            Format::Compute(_expr) => Self::from_next(module, next),
-            Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
+            Format::Map(f, _expr) => Self::from_format(module, f, next, guard),
+            Format::Where(f, _expr) => Self::from_format(module, f, next, guard),
+            Format::Pos => Self::from_next(module, next, guard),
+            Format::Compute(_expr) => Self::from_next(module, next, guard),
+            Format::Let(_name, _expr, f) => Self::from_format(module, f, next, guard),
             Format::LetView(_name, f) => {
                 // FIXME - does the construction of a view-binding affect our matchtree?
-                Self::from_format(module, f, next)
+                Self::from_format(module, f, next, guard)
             }
             // REVIEW - it isn't fully clear whether Permit should affect the matchtree in some way...
-            Format::Permit(f, _) => Self::from_format(module, f, next),
+            Format::Permit(f, _) => Self::from_format(module, f, next, guard),
             #[cfg(feature = "format_enforce")]
-            Format::Enforce(f) => Self::from_format(module, f, next),
+            Format::Enforce(f) => Self::from_format(module, f, next, guard),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
-                    tree = tree.union(Self::from_format(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone(), guard));
                 }
                 tree
             }
-            Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next),
+            Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next, guard),
             Format::Apply(_name) => Self::accept(),
             Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Untyped(f), next));
-                Self::from_format(module, f0, next0)
+                Self::from_format(module, f0, next0, guard)
             }
-            Format::Hint(_hint, f) => Self::from_format(module, f, next),
-            Format::LiftedOption(None) => Self::from_next(module, next),
-            Format::LiftedOption(Some(f)) => Self::from_format(module, f, next),
+            Format::Hint(_hint, f) => Self::from_format(module, f, next, guard),
+            Format::LiftedOption(None) => Self::from_next(module, next, guard),
+            Format::LiftedOption(Some(f)) => Self::from_format(module, f, next, guard),
             // REVIEW - is this a sound implementation?
-            Format::WithView(_ident, _vf) => Self::from_next(module, next),
+            Format::WithView(_ident, _vf) => Self::from_next(module, next, guard),
         }
     }
 
@@ -2288,11 +2511,16 @@ impl<'a> MatchTreeStep<'a> {
     /// # Panics
     ///
     /// Will panic if `n` happens to be `0`, as it is impossible to align modulo `0`.
-    fn from_align(module: &'a FormatModule, next: Rc<Next<'a>>, n: usize) -> MatchTreeStep<'a> {
+    fn from_align(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        n: usize,
+        guard: &mut CycleGuard,
+    ) -> MatchTreeStep<'a> {
         match n {
             // FIXME - we might want to construct an auto-rejecting tree here, but this is perhaps less murky in terms of expected behavior
             0 => unreachable!("alignment modulus 0 has no valid possible interpretation"),
-            1 => Self::from_next(module, next), // guaranteed to already be in alignment
+            1 => Self::from_next(module, next, guard), // guaranteed to already be in alignment
             2.. => {
                 // FIXME - this is still hackish but it is at least somewhat better than before
                 // TODO - consider handling very small cases like 2..=4, with bespoke tree-unions over each potential distance from `next` we might skip over
@@ -2404,7 +2632,18 @@ impl<'a> MatchTreeLevel<'a> {
             let mut tmp = Vec::from_iter(nexts);
             tmp.sort_by_key(|(ix, _)| *ix);
             for (i, next) in tmp.into_iter() {
-                let subtree = MatchTreeStep::from_next(module, next);
+                let _next = next.clone();
+                // instantiate a fresh CycleGuard to detect zero-progress ItemVar cycles in `from_next` call-stack
+                let mut guard = CycleGuard::new();
+                let subtree = MatchTreeStep::from_next(module, next, &mut guard);
+                if guard.has_cycle {
+                    // Upon detecting a zero-progress cycle, we know the format is not well-formed, and we return None early to surface the error to the caller.
+                    log::error!(
+                        "zero-progress recursive cycle detected in format; cannot construct a valid match tree ({next:?})",
+                        next = _next.as_ref()
+                    );
+                    return None;
+                }
                 tree = tree.merge_step(i, subtree).ok()?;
             }
             let mut branches = Vec::new();
@@ -2617,5 +2856,383 @@ mod test {
         )
 
         // STUB - add more cases to test
+    }
+
+    /// Reserves a slot for a self-referential (non-`Phantom`) format at a known level, without
+    /// going through `define_format`'s type-checked registration - which cannot yet express such
+    /// a self-reference at all (see `define_format_phantom_rec_args_views`'s own doc comment: the
+    /// only self-reference it permits is one confined under `Format::Phantom`). These tests only
+    /// exercise `MatchTreeStep`/`MatchTree` construction directly, not the full
+    /// typecheck/codegen pipeline, so bypassing that registration path here is sufficient and
+    /// keeps the test focused on the cycle guard itself.
+    fn reserve_recursive_level(module: &mut FormatModule) -> usize {
+        let level = module.names.len();
+        module.names.push(Label::Borrowed("test.recursive"));
+        module.args.push(Vec::new());
+        module.views.push(Vec::new());
+        module.formats.push(Format::EMPTY);
+        module.format_types.push(ValueType::Any);
+        level
+    }
+
+    /// Guarded (byte-first) self-recursion - `peano := 'Z' | 'S' ~ peano` - must terminate
+    /// `MatchTreeStep::from_format` and disambiguate correctly, without ever tripping the
+    /// left-recursion guard: the `ItemVar` self-reference is reached only after the `'S'` byte
+    /// has already been consumed, which defers it into a `Next::Sequence` continuation rather
+    /// than re-entering `Format::ItemVar` within this same eager descent.
+    #[test]
+    fn matchtree_guarded_self_reference_terminates_and_disambiguates() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let level = reserve_recursive_level(&mut module);
+        let peano = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'S'),
+                    Format::ItemVar(level, Vec::new(), Vec::new()),
+                ])),
+            ),
+        ]);
+        module.formats[level] = peano.clone();
+
+        let mut guard = CycleGuard::new();
+        let step = MatchTreeStep::from_format(&module, &peano, Rc::new(Next::Empty), &mut guard);
+        assert!(
+            !guard.has_cycle,
+            "guarded (byte-first) recursion must not be misclassified as left recursion"
+        );
+        assert!(!step.accept, "peano itself never accepts zero bytes");
+        assert_eq!(
+            step.branches.len(),
+            2,
+            "expected exactly one branch each for the 'Z' and 'S' prefixes, got {:?}",
+            step.branches
+        );
+    }
+
+    /// A genuinely left-recursive format - `bad := bad | 'Z'` - recurses into its own `ItemVar`
+    /// with zero bytes consumed in between, which `MatchTreeStep::from_format`'s guard must
+    /// detect (`guard.detected`) instead of looping/overflowing the stack.
+    #[test]
+    fn matchtree_zero_progress_self_reference_is_detected_as_left_recursion() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let level = reserve_recursive_level(&mut module);
+        let bad = Format::Union(vec![
+            Format::ItemVar(level, Vec::new(), Vec::new()),
+            is_byte(b'Z'),
+        ]);
+        module.formats[level] = bad.clone();
+
+        let mut guard = CycleGuard::new();
+        let _ = MatchTreeStep::from_format(&module, &bad, Rc::new(Next::Empty), &mut guard);
+        assert!(
+            guard.has_cycle,
+            "an unconditional (zero-progress) self-reference must be flagged as a cycle"
+        );
+    }
+
+    /// The same genuine left recursion as above, but reached through `MatchTree::build` (the
+    /// actual entry point every real `Union`/`RepeatBetween` compile site uses): the whole build
+    /// must fail outright (`None`, matching the existing "cannot build match tree" convention
+    /// used for undisambiguable unions) rather than silently treating the cyclic branch as though
+    /// it simply contributed no further disambiguating information.
+    #[test]
+    fn matchtree_build_fails_outright_on_genuine_left_recursion() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let level = reserve_recursive_level(&mut module);
+        let bad = Format::Union(vec![
+            Format::ItemVar(level, Vec::new(), Vec::new()),
+            is_byte(b'Z'),
+        ]);
+        module.formats[level] = bad;
+
+        let branches = vec![
+            Format::Tuple(vec![
+                Format::ItemVar(level, Vec::new(), Vec::new()),
+                is_byte(b'A'),
+            ]),
+            is_byte(b'B'),
+        ];
+        let tree = MatchTree::build(&module, &branches, Rc::new(Next::Empty));
+        assert!(
+            tree.is_none(),
+            "MatchTree::build must fail outright (None) on a genuinely left-recursive format, \
+             not silently drop the offending branch"
+        );
+    }
+
+    /// End-to-end test of `FormatModule::define_format_rec_batch` for a self-recursive format,
+    /// through the *real* public registration API (unlike the hand-poked-field tests above) and
+    /// the actual interpreter, at real recursion depth >= 2 - proving `Format::RecVar`'s
+    /// construction-time rewrite, `infer_format_type`'s registration-time type inference, and the
+    /// Phase 1 `MatchTree` cycle guard all compose correctly for a format nobody could have built
+    /// through the public API before this.
+    #[test]
+    fn define_format_rec_batch_self_recursive_peano_decodes() {
+        use crate::helper::is_byte;
+        use decoder::Value;
+
+        let mut module = FormatModule::new();
+        let peano_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let peano_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &peano_ref.call()).unwrap();
+        let buf = ReadCtxt::new(b"SSZ");
+        let (ret, _) = prog.run(buf).unwrap();
+
+        // Each layer is wrapped in `Value::Branch(index, ..)` recording which `Union` arm (Z=0,
+        // S=1) matched, on top of the `Value::Variant` labeling it - both added by the decoder,
+        // not spelled out in `peano_body` itself.
+        let expected = Value::Branch(
+            1,
+            Box::new(Value::Variant(
+                Label::Borrowed("S"),
+                Box::new(Value::Tuple(vec![
+                    Value::U8(b'S'),
+                    Value::Branch(
+                        1,
+                        Box::new(Value::Variant(
+                            Label::Borrowed("S"),
+                            Box::new(Value::Tuple(vec![
+                                Value::U8(b'S'),
+                                Value::Branch(
+                                    0,
+                                    Box::new(Value::Variant(
+                                        Label::Borrowed("Z"),
+                                        Box::new(Value::U8(b'Z')),
+                                    )),
+                                ),
+                            ])),
+                        )),
+                    ),
+                ])),
+            )),
+        );
+        assert_eq!(
+            expected, ret,
+            "peano-shaped self-recursion decoded incorrectly"
+        );
+    }
+
+    /// Phase 5's capstone (see `experiments/doodle-rec/PLAN.md`) explicitly calls for a
+    /// malformed-input rejection case through the interpreter, not just the build-time
+    /// left-recursion rejection `define_format_rec_batch_left_recursion_still_rejected_at_compile_time`
+    /// already covers - this proves a *well-formed* recursive grammar's `MatchTree`/decoder still
+    /// correctly rejects bad bytes deep inside a real recursive descent, not just at the top level.
+    #[test]
+    fn define_format_rec_batch_self_recursive_peano_rejects_malformed_input() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let peano_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let peano_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &peano_ref.call()).unwrap();
+        // Two valid 'S' layers deep, then a byte that is neither 'S' nor 'Z' - must be rejected
+        // from *within* the recursive descent, not just at the top-level call.
+        let buf = ReadCtxt::new(b"SSX");
+        assert!(
+            prog.run(buf).is_err(),
+            "a byte that is neither 'Z' nor 'S', reached mid-recursion, must be rejected"
+        );
+    }
+
+    /// Same as above, but for genuine *mutual* recursion (two distinct batch members referencing
+    /// each other, not just themselves) - the shape doodle-rec's own port-planning found exercises
+    /// different code paths than self-recursion alone (e.g. Box-placement ordering across distinct
+    /// types, relevant to a later phase). Decodes real input alternating between both members at
+    /// depth >= 2.
+    #[test]
+    fn define_format_rec_batch_mutual_recursion_ping_pong_decodes() {
+        use crate::helper::is_byte;
+        use decoder::Value;
+
+        let mut module = FormatModule::new();
+        // ping (batch index 0) refers to pong (index 1); pong refers back to ping (index 0).
+        let ping_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'X'))),
+            Format::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(Format::Tuple(vec![is_byte(b'p'), Format::RecVar(1)])),
+            ),
+        ]);
+        let pong_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'Y'))),
+            Format::Variant(
+                Label::Borrowed("ToPing"),
+                Box::new(Format::Tuple(vec![is_byte(b'q'), Format::RecVar(0)])),
+            ),
+        ]);
+        let refs = module
+            .define_format_rec_batch(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
+        let ping_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
+        let buf = ReadCtxt::new(b"pqX");
+        let (ret, _) = prog.run(buf).unwrap();
+
+        // See the peano test above for why each layer is wrapped in `Value::Branch(index, ..)`
+        // (Stop=0, ToPong/ToPing=1 in both ping's and pong's own Union) on top of `Value::Variant`.
+        let expected = Value::Branch(
+            1,
+            Box::new(Value::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(Value::Tuple(vec![
+                    Value::U8(b'p'),
+                    Value::Branch(
+                        1,
+                        Box::new(Value::Variant(
+                            Label::Borrowed("ToPing"),
+                            Box::new(Value::Tuple(vec![
+                                Value::U8(b'q'),
+                                Value::Branch(
+                                    0,
+                                    Box::new(Value::Variant(
+                                        Label::Borrowed("Stop"),
+                                        Box::new(Value::U8(b'X')),
+                                    )),
+                                ),
+                            ])),
+                        )),
+                    ),
+                ])),
+            )),
+        );
+        assert_eq!(
+            expected, ret,
+            "ping/pong mutual recursion decoded incorrectly"
+        );
+    }
+
+    /// Same mutual recursion as above, but with each variant's payload built via
+    /// [`crate::helper::record`] (the "1-tuple variant convention real doodle productions end up
+    /// with") rather than a raw `Tuple`. This is the exact shape that surfaced Phase 4's "Finding
+    /// B" (see `experiments/doodle-rec/PLAN.md`): `Format::record`'s desugaring to nested
+    /// `LetFormat`s ending in a zero-width `Compute(Record(...))` step wrapped `next` in a
+    /// `Next::Cat` for the recursive last field, even though that wrapper adds no real lookahead
+    /// information - giving the self-referential field a structurally different `next` than its
+    /// own top-level entry used, missing `decoder_map`'s `(level, next)` cache and (in
+    /// `codegen::typed_decoder`) compiling into a dead always-failing decoder. Here we exercise
+    /// `decoder::Compiler`'s identically-shaped bug in the plain interpreter path: before the
+    /// `LetFormat`/`MonadSeq` fix, `pong`'s `next` field failed to build a `MatchTree` for its
+    /// duplicate compile of `ping`, surfacing as an `anyhow!` error from `compile_program` rather
+    /// than a decode.
+    #[test]
+    fn define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes() {
+        use crate::helper::{is_byte, record};
+        use decoder::Value;
+
+        let mut module = FormatModule::new();
+        let ping_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'X'))),
+            Format::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(record([
+                    ("tag", is_byte(b'p')),
+                    ("next", Format::RecVar(1)),
+                ])),
+            ),
+        ]);
+        let pong_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'Y'))),
+            Format::Variant(
+                Label::Borrowed("ToPing"),
+                Box::new(record([
+                    ("tag", is_byte(b'q')),
+                    ("next", Format::RecVar(0)),
+                ])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![
+            ("test.ping_rec", ping_body),
+            ("test.pong_rec", pong_body),
+        ]);
+        let ping_ref = refs[0];
+
+        let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
+        let buf = ReadCtxt::new(b"pqX");
+        let (ret, _) = prog.run(buf).unwrap();
+
+        // Same `Value::Branch`/`Value::Variant` wrapping as the raw-`Tuple` version above; the
+        // variant payload itself is now a `Value::Record` (tag, next) rather than a `Value::Tuple`.
+        let expected = Value::Branch(
+            1,
+            Box::new(Value::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(Value::Record(vec![
+                    (Label::Borrowed("tag"), Value::U8(b'p')),
+                    (
+                        Label::Borrowed("next"),
+                        Value::Branch(
+                            1,
+                            Box::new(Value::Variant(
+                                Label::Borrowed("ToPing"),
+                                Box::new(Value::Record(vec![
+                                    (Label::Borrowed("tag"), Value::U8(b'q')),
+                                    (
+                                        Label::Borrowed("next"),
+                                        Value::Branch(
+                                            0,
+                                            Box::new(Value::Variant(
+                                                Label::Borrowed("Stop"),
+                                                Box::new(Value::U8(b'X')),
+                                            )),
+                                        ),
+                                    ),
+                                ])),
+                            )),
+                        ),
+                    ),
+                ])),
+            )),
+        );
+        assert_eq!(
+            expected, ret,
+            "ping/pong mutual recursion through Format::record decoded incorrectly"
+        );
+    }
+
+    /// A batch member registered via the real public API can still be genuinely left-recursive
+    /// (`define_format_rec_batch` itself never checks for progress - `infer_format_type` has no
+    /// occurs-check at all, see its own doc comment on `Format::RecVar`) - proving Phase 1's guard
+    /// still catches it at `MatchTree`-build time, reached this time via the ordinary
+    /// `decoder::Compiler::compile_program` entry point rather than calling `MatchTree::build`
+    /// directly, and that registration itself does not hang or panic.
+    #[test]
+    fn define_format_rec_batch_left_recursion_still_rejected_at_compile_time() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        // bad := bad | 'Z' -- zero-progress self-reference in the first branch.
+        let bad_body = Format::Union(vec![Format::RecVar(0), is_byte(b'Z')]);
+        let refs = module.define_format_rec_batch(vec![("test.bad", bad_body)]);
+        let bad_ref = refs[0];
+
+        let result = super::decoder::Compiler::compile_program(&module, &bad_ref.call());
+        assert!(
+            result.is_err(),
+            "compiling a genuinely left-recursive format must fail cleanly, not panic or hang"
+        );
     }
 }

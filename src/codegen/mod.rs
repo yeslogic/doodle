@@ -124,6 +124,17 @@ pub struct CodeGen {
     /// sequence that `RustType`/`SourceContext` cannot reconstruct on their own (in particular,
     /// per-field endianness).
     fixed_format_defs: IntMap<usize, FormatRef>,
+    /// `true` while resolving a type reachable only through `Format::Phantom`'s content (i.e.
+    /// transitively inside `Expansion::PhantomData`'s own recursive descent, not just its
+    /// immediate child - an in-between `Option`/`Tuple`/etc. layer still counts). Suppresses
+    /// `RecBox`-insertion at an `in_progress`-ancestor reference (see `lift_whnf_solution`):
+    /// `std::marker::PhantomData<T>` never actually stores a `T` no matter how deeply `T` is
+    /// nested, so a self-reference reached anywhere under it needs no `Box` to close the cycle,
+    /// unlike the same reference reached through a genuinely-decoded structural position. Without
+    /// this, Phase 3's `RecBox`-insertion (correctly needed for a *real* recursive reference)
+    /// would also incorrectly fire for `Format::Phantom`'s own, pre-existing self-reference case
+    /// (`doodle-formats/src/format/opentype/colr.rs`'s `paint`), changing its generated output.
+    in_phantom_context: bool,
 }
 
 impl CodeGen {
@@ -139,6 +150,7 @@ impl CodeGen {
             in_progress: StableMap::<_, _, util::FxHash>::default(),
             recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
             fixed_format_defs,
+            in_phantom_context: false,
         }
     }
 
@@ -231,7 +243,17 @@ impl CodeGen {
         match sol {
             WHNFSolution::Base(bt) => Self::lift_base(bt),
             WHNFSolution::Int(it) => Self::lift_int(it),
-            WHNFSolution::Var(var) => self.lift_uvar(tc, var, lt).to_rust_type(),
+            WHNFSolution::Var(var) => {
+                let canonical = tc.get_canonical_uvar(var);
+                let needs_rec_box =
+                    !self.in_phantom_context && self.in_progress.contains_key(&canonical);
+                let rt = self.lift_uvar(tc, var, lt).to_rust_type();
+                if needs_rec_box {
+                    RustType::from(CompType::RecBox(Box::new(rt)))
+                } else {
+                    rt
+                }
+            }
         }
     }
 
@@ -408,7 +430,17 @@ impl CodeGen {
                                     }
                                 },
                                 _ => {
-                                    let inner = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
+                                    let canonical = tc.get_canonical_uvar(*branch_v);
+                                    let needs_rec_box = !self.in_phantom_context
+                                        && self.in_progress.contains_key(&canonical);
+                                    let inner = {
+                                        let raw = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
+                                        if needs_rec_box {
+                                            RustType::from(CompType::RecBox(Box::new(raw)))
+                                        } else {
+                                            raw
+                                        }
+                                    };
                                     RustVariant::Tuple(name, vec![inner])
                                 }
                             }
@@ -452,7 +484,28 @@ impl CodeGen {
                 GenType::Def((ix, tname), rt_decl)
             }
             Expansion::Seq(sol, hint) => {
+                // `Vec<..>` is always heap-indirected, so a reference to an *ancestor* var
+                // reached via `sol` needs no special handling here at all - `lift_whnf_solution`
+                // (the reference site) already boxes it if needed, and the ancestor's own
+                // Record/Union/Tuple frame is what's actually marked `in_progress` for that case.
+                // The only thing this guards against is `var` (this Seq's own identity) being
+                // reached again from within its own element type - a `Vec<..>` that would need to
+                // recursively contain itself with no Tuple/Record/Union boundary in between. That
+                // shape has no legitimate construction path from any current `Format` combinator,
+                // so rather than silently mishandling it (or looping forever), it's reported
+                // loudly - matching this codebase's existing convention for other structurally
+                // out-of-scope shapes (e.g. `CompType::Result`'s "unexpected result in structural
+                // type" elsewhere in this module).
+                if self.in_progress.contains_key(&var) {
+                    unreachable!(
+                        "Expansion::Seq({var:?}) is directly self-referential (a Vec<..> whose \
+                         element type is itself, with no Tuple/Record/Union boundary in between) \
+                         - not yet supported by codegen"
+                    );
+                }
+                self.in_progress.insert(var, None);
                 let inner = self.lift_whnf_solution(tc, sol, lt);
+                self.in_progress.remove(&var);
                 match hint {
                     SeqBorrowHint::ReadArray => {
                         if let Some(p) = inner.try_as_prim()
@@ -492,28 +545,90 @@ impl CodeGen {
                     .into(),
                 }
             }
-            Expansion::Option(sol) => GenType::Inline(
-                CompType::Option(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
-            ),
-            Expansion::PhantomData(sol) => GenType::Inline(
-                CompType::PhantomData(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
-            ),
-            Expansion::Tuple(vs) => match &vs[..] {
-                [] => RustType::AnonTuple(Vec::new()).into(),
-                // REVIEW - should one-tuples be preserved?
-                [v] => RustType::AnonTuple(vec![self.lift_whnf_solution(tc, *v, lt)]).into(),
-                _ => {
-                    let mut buf = Vec::with_capacity(vs.len());
-                    self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                    for v in vs.iter() {
-                        buf.push(self.lift_whnf_solution(tc, *v, lt));
-                        self.name_gen.ctxt.increment_index();
-                    }
-                    self.name_gen.ctxt.escape();
-                    RustType::AnonTuple(buf).into()
+            Expansion::Option(sol) => {
+                // Same reasoning as `Expansion::Seq` just above: `Option<..>` needs `Box` around
+                // a reference to an *ancestor* (already handled at the `lift_whnf_solution`
+                // reference site via Step 2), but guards here against `var` itself being reached
+                // again with no intervening Tuple/Record/Union boundary - not constructible from
+                // any current `Format` combinator, so reported loudly rather than looped forever.
+                if self.in_progress.contains_key(&var) {
+                    unreachable!(
+                        "Expansion::Option({var:?}) is directly self-referential (an Option<..> \
+                         whose payload type is itself, with no Tuple/Record/Union boundary in \
+                         between) - not yet supported by codegen"
+                    );
                 }
-            },
+                self.in_progress.insert(var, None);
+                let inner = self.lift_whnf_solution(tc, sol, lt);
+                self.in_progress.remove(&var);
+                GenType::Inline(CompType::Option(Box::new(inner)).into())
+            }
+            Expansion::PhantomData(sol) => {
+                // Suppress `RecBox`-insertion (see `in_phantom_context`'s doc comment) for the
+                // whole subtree resolved below, not just `sol` itself directly - an in-between
+                // `Option`/`Tuple`/etc. layer between here and the actual self-reference (as in
+                // the real `opentype/colr.rs` `paint` case, which nests an `Option` here) must
+                // still see the suppression.
+                let outer_in_phantom_context =
+                    std::mem::replace(&mut self.in_phantom_context, true);
+                let inner = self.lift_whnf_solution(tc, sol, lt);
+                self.in_phantom_context = outer_in_phantom_context;
+                GenType::Inline(CompType::PhantomData(Box::new(inner)).into())
+            }
+            Expansion::Tuple(vs) => {
+                // Same reasoning as `Expansion::Seq`/`Expansion::Option` above: a reference to an
+                // *ancestor* reached via one of `vs` is already handled at the `lift_whnf_solution`
+                // reference site (Step 2). This only guards against `var` itself (this Tuple's own
+                // identity) being reached again with no intervening Record/Union boundary - a
+                // genuinely self-referential anonymous tuple, which has no name to close the cycle
+                // through and so cannot simply be `Box`-wrapped like a Record/Union field can.
+                // Neither of Phase 3's target recursive shapes (peano, ping/pong) ever hits this -
+                // both close their cycle through a `Union`. Rather than build promotion-to-a-real-
+                // struct support for a shape with no concrete requirements yet, this is rejected
+                // loudly here, matching `Expansion::Seq`/`Expansion::Option`'s own treatment just
+                // above - if a real format ever needs this, its actual requirements (nominal name?
+                // field layout? doodle-rec parity?) can be worked out against that concrete case
+                // instead of speculatively now.
+                if self.in_progress.contains_key(&var) {
+                    unreachable!(
+                        "Expansion::Tuple({var:?}) is directly self-referential (an anonymous \
+                         tuple whose own element type is itself, with no Record/Union boundary in \
+                         between) - not yet supported by codegen"
+                    );
+                }
+                self.in_progress.insert(var, None);
+                let rt = match &vs[..] {
+                    [] => RustType::AnonTuple(Vec::new()),
+                    // REVIEW - should one-tuples be preserved?
+                    [v] => RustType::AnonTuple(vec![self.lift_whnf_solution(tc, *v, lt)]),
+                    _ => {
+                        let mut buf = Vec::with_capacity(vs.len());
+                        self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                        for v in vs.iter() {
+                            buf.push(self.lift_whnf_solution(tc, *v, lt));
+                            self.name_gen.ctxt.increment_index();
+                        }
+                        self.name_gen.ctxt.escape();
+                        RustType::AnonTuple(buf)
+                    }
+                };
+                self.in_progress.remove(&var);
+                rt.into()
+            }
             Expansion::ViewObj => GenType::Inline(model::view_obj_type(lt.clone())),
+        }
+    }
+
+    /// If `ty` is `RecBox`-wrapped (see `lift_uvar`'s own `RecBox`-insertion on the type side),
+    /// wraps the constructed value of `cl` in `Box::new(..)` to match - the value-construction
+    /// counterpart of that type-side decision, needed wherever a decoded sub-value is placed into
+    /// a position whose declared type may have been promoted to `RecBox` by a self/mutually-
+    /// recursive reference.
+    fn box_wrap_if_needed(cl: CaseLogic<GTExpr>, ty: &RustType) -> CaseLogic<GTExpr> {
+        if matches!(ty, RustType::Atom(AtomType::Comp(CompType::RecBox(_)))) {
+            CaseLogic::Derived(DerivedLogic::WrapBox(Box::new(cl)))
+        } else {
+            cl
         }
     }
 
@@ -591,9 +706,9 @@ impl CodeGen {
                                             }
                                         } else {
                                             let mut cl_args = Vec::new();
-                                            for dec in decs.iter() {
+                                            for (dec, ty) in decs.iter().zip(types.iter()) {
                                                 let cl_arg = self.translate(dec.get_dec());
-                                                cl_args.push(cl_arg);
+                                                cl_args.push(Self::box_wrap_if_needed(cl_arg, ty));
                                             }
                                             CaseLogic::Sequential(SequentialLogic::AccumTuple {
                                                 constructor: Some(constr),
@@ -604,6 +719,8 @@ impl CodeGen {
                                     _ => {
                                         if types.len() == 1 {
                                             let cl_mono = self.translate(inner.get_dec());
+                                            let cl_mono =
+                                                Self::box_wrap_if_needed(cl_mono, &types[0]);
                                             CaseLogic::Derived(DerivedLogic::VariantOf(
                                                 constr,
                                                 Box::new(cl_mono),
@@ -638,12 +755,15 @@ impl CodeGen {
                     .collect(),
             )),
             TypedDecoder::Tuple(gt, elts) => match gt {
-                GenType::Inline(RustType::AnonTuple(_tys)) => {
+                GenType::Inline(RustType::AnonTuple(tys)) => {
                     CaseLogic::Sequential(SequentialLogic::AccumTuple {
                         constructor: None,
                         elements: elts
                             .iter()
-                            .map(|elt| self.translate(elt.get_dec()))
+                            .zip(tys.iter())
+                            .map(|(elt, ty)| {
+                                Self::box_wrap_if_needed(self.translate(elt.get_dec()), ty)
+                            })
                             .collect(),
                     })
                 }
@@ -1252,13 +1372,25 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
         TypedExpr::Numeric(_gt, num) => embed_numeric_expr(num),
         TypedExpr::Record(gt, fields) => {
-            let tname = match gt {
-                GenType::Def((_, tname), _) => tname,
+            // `field_types` is `None` only for the `Inline(LocalDef)` case, which (unlike `Def`)
+            // carries no inline struct definition to consult - no known case has ever needed a
+            // `RecBox` field there, so it's left as a plain pass-through rather than speculatively
+            // threading a `defined_types` table into this free function to cover it.
+            let (tname, field_types) = match gt {
+                GenType::Def((_, tname), decl) => {
+                    let field_types = match &decl.def {
+                        RustTypeDef::Struct(RustStruct::Record(fts)) => Some(fts.as_slice()),
+                        other => unreachable!(
+                            "TypedExpr::Record's Def-type is not a Record struct: {other:?}"
+                        ),
+                    };
+                    (tname, field_types)
+                }
                 GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
                     _ix,
                     tname,
                     _,
-                )))) => tname,
+                )))) => (tname, None),
                 other => unreachable!(
                     "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
                 ),
@@ -1269,7 +1401,28 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     fields
                         .iter()
                         .map(|(name, val)| {
-                            let value = match embed_expr_nat(val) {
+                            // Mirrors `box_wrap_if_needed` (used for `Variant`/`Tuple`
+                            // construction) for a record field: if this field's own declared type
+                            // was promoted to `RecBox` (a self/mutually-recursive reference closing
+                            // a cycle through this record - see `CodeGen::lift_uvar`), the
+                            // constructed value must be `Box::new(..)`-wrapped to match, which also
+                            // rules out the field-init shorthand (`{ name }`) below.
+                            let is_rec_box = field_types.is_some_and(|fts| {
+                                fts.iter().any(|(lbl, ty)| {
+                                    lbl == name
+                                        && matches!(
+                                            ty,
+                                            RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
+                                        )
+                                })
+                            });
+                            let embedded = embed_expr_nat(val);
+                            let embedded = if is_rec_box {
+                                embedded.wrap_box()
+                            } else {
+                                embedded
+                            };
+                            let value = match embedded {
                                 RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
                                 other => Some(other),
                             };
@@ -1829,6 +1982,9 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                 },
                 AtomType::Comp(ct) => match ct {
                     CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                    CompType::RecBox(_t) => {
+                        unreachable!("Box is not a sensible scrutinee for match-expressions");
+                    }
                     CompType::PhantomData(..) => {
                         unreachable!("PhantomData is not a sensible scrutinee");
                         // Refutability::Irrefutable
@@ -2494,6 +2650,8 @@ enum GenExpr {
     ResultErr(Box<GenExpr>),
     /// Wrapping a `GenExpr` in a `Some` value
     WrapSome(Box<GenExpr>),
+    /// Wrapping a `GenExpr` in `Box::new(..)` - see `RustExpr::wrap_box`.
+    WrapBox(Box<GenExpr>),
     /// Applies the `?` operator to a given `GenExpr`
     Try(Box<GenExpr>),
     /// Calls a value-producing thunk directly
@@ -2581,6 +2739,19 @@ impl GenExpr {
         }
     }
 
+    /// Mirrors `wrap_some` exactly, but for `Box::new(..)` instead of `Some(..)` - used at a
+    /// construction site whose target position is `CompType::RecBox`-wrapped.
+    fn wrap_box(self) -> GenExpr {
+        match self {
+            Self::ResultOk(t, inner) => Self::ResultOk(t, Box::new(inner.wrap_box())),
+            Self::BlockScope(mut block) => {
+                block.wrap_box_final_value();
+                Self::BlockScope(block)
+            }
+            this => Self::WrapBox(Box::new(this)),
+        }
+    }
+
     /// Applies the most natural form of `Try` construction to self.
     ///
     /// If self happens to `ResultOk(.., inner)`, returns `inner`.
@@ -2633,6 +2804,7 @@ impl GenExpr {
             GenExpr::BlockScope(block) => block.is_simple(),
 
             GenExpr::WrapSome(g_expr)
+            | GenExpr::WrapBox(g_expr)
             | GenExpr::Try(g_expr)
             | GenExpr::ResultOk(_, g_expr)
             | GenExpr::ResultErr(g_expr) => g_expr.is_simple(),
@@ -2819,6 +2991,15 @@ impl GenBlock {
             Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_some())))
         };
         self.transform_return_value(GenExpr::wrap_some, fallback)
+            .unwrap()
+    }
+
+    /// Mirrors `wrap_some_final_value` exactly, but for `Box::new(..)` instead of `Some(..)`.
+    fn wrap_box_final_value(&mut self) {
+        let fallback = || -> Result<_, std::convert::Infallible> {
+            Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_box())))
+        };
+        self.transform_return_value(GenExpr::wrap_box, fallback)
             .unwrap()
     }
 
@@ -3990,6 +4171,10 @@ where
 #[derive(Clone, Debug)]
 enum DerivedLogic<ExprT> {
     WrapSome(Box<CaseLogic<ExprT>>),
+    /// Wraps the constructed value of `inner` in `Box::new(..)` - used at a construction site
+    /// whose target position is `CompType::RecBox`-wrapped (a self/mutually-recursive reference
+    /// closing a cycle). Mirrors `WrapSome` exactly.
+    WrapBox(Box<CaseLogic<ExprT>>),
     VariantOf(Constructor, Box<CaseLogic<ExprT>>),
     UnitVariantOf(Constructor, Box<CaseLogic<ExprT>>),
     MapOf(Box<GenLambda>, Box<CaseLogic<ExprT>>),
@@ -4122,6 +4307,15 @@ impl ToAst for DerivedLogic<GTExpr> {
                 };
                 inner_block
             }
+            DerivedLogic::WrapBox(inner) => {
+                let mut inner_block = inner.to_ast(ctxt);
+                if let Some(ret) = inner_block.ret.take() {
+                    inner_block.ret.replace(ret.wrap_box());
+                } else {
+                    unreachable!("WrapBox called on non-value-producing GenBlock: {inner_block:?}");
+                };
+                inner_block
+            }
             DerivedLogic::UnitVariantOf(constr, inner) => {
                 let inner_block = inner.to_ast(ctxt);
                 if inner_block.stmts.last().is_some_and(|s| {
@@ -4209,6 +4403,7 @@ impl ToAst for DerivedLogic<GTExpr> {
             | DerivedLogic::Let(.., inner)
             | DerivedLogic::MapOf(_, inner)
             | DerivedLogic::WrapSome(inner)
+            | DerivedLogic::WrapBox(inner)
             | DerivedLogic::VariantOf(_, inner)
             | DerivedLogic::UnitVariantOf(_, inner) => inner.depends_on_input(),
             DerivedLogic::Dynamic(dynamic, inner) => {
@@ -4885,19 +5080,24 @@ impl<'a> Elaborator<'a> {
                     // its own not-yet-elaborated level) resolves to this placeholder instead of
                     // re-entering this same call and recursing without bound.
                     //
-                    // Unlike the analogous fix in `TypeChecker::infer_var_format_level`, the
-                    // placeholder's *content* is never actually consulted by anything that cares:
-                    // `GTCompiler::compile_gt_format` discards a `FormatCall` node's `t_inner`
-                    // whenever `decoder_map` already has an entry for that level, and a level's
-                    // entry is always inserted into `decoder_map` at the point its `FormatCall`
-                    // node is *discovered*, before its body is ever walked (body-walking is
-                    // deferred via `compile_queue`) - so by the time a self-reference nested in
-                    // that body is reached, the real entry is already present and this
-                    // placeholder is never read. `Format::from`'s reverse conversion likewise
-                    // discards `t_inner` entirely when reconstructing `Format::ItemVar`. This
-                    // insertion also performs no index/`UVar`-style allocation of its own, so it
-                    // cannot desynchronize the lockstep invariant with `TypeChecker`.
-                    let placeholder = Rc::new(TypedFormat::Fail);
+                    // `GTCompiler::compile_gt_format` never trusts this placeholder's *content*:
+                    // it discards a `FormatCall` node's `t_inner` whenever `decoder_map` already
+                    // has an entry for that level, and a level's entry is always inserted into
+                    // `decoder_map` at the point its `FormatCall` node is *discovered*, before its
+                    // body is ever walked (body-walking is deferred via `compile_queue`) - so by
+                    // the time a self-reference nested in that body is reached, the real entry is
+                    // already present and this placeholder is never read there. `Format::from`'s
+                    // reverse conversion likewise discards `t_inner` entirely when reconstructing
+                    // `Format::ItemVar`. This insertion also performs no index/`UVar`-style
+                    // allocation of its own, so it cannot desynchronize the lockstep invariant
+                    // with `TypeChecker`.
+                    //
+                    // `TypedFormat::match_bounds`/`lookahead_bounds`, unlike the two consumers
+                    // above, *do* walk straight into `t_inner` on an arbitrary, possibly-nested
+                    // `FormatCall` - so they specifically must use this single, canonical
+                    // `TypedFormat::recursion_placeholder()` value (rather than an unmarked, fresh
+                    // `Rc::new(TypedFormat::Fail)`) to stay recognizable via `Rc::ptr_eq` later.
+                    let placeholder = TypedFormat::recursion_placeholder();
                     self.t_formats.insert(*level, placeholder);
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
@@ -4909,6 +5109,9 @@ impl<'a> Elaborator<'a> {
                 self.codegen.name_gen.ctxt.escape();
                 TypedFormat::FormatCall(gt, *level, t_args, t_views, t_inner)
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::ForEach(expr, lbl, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
@@ -6068,6 +6271,7 @@ mod __impls {
                     RustExpr::Control(Box::new(RustControl::translate(*ctrl)))
                 }
                 GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
+                GenExpr::WrapBox(expr) => RustExpr::from(*expr).wrap_box(),
                 GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
                 GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
                 GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
@@ -6132,7 +6336,8 @@ mod __impls {
                 GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
                 GenExpr::ResultOk(.., expr)
                 | GenExpr::ResultErr(expr)
-                | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
+                | GenExpr::WrapSome(expr)
+                | GenExpr::WrapBox(expr) => expr.is_short_circuiting(),
                 GenExpr::BlockScope(block) => block.is_short_circuiting(),
                 GenExpr::Try(..) => true,
                 GenExpr::CallThunk(..) => false,
@@ -6207,6 +6412,52 @@ mod tests {
         }
     }
 
+    /// Phase 4's codegen-path counterpart to `lib.rs`'s
+    /// `define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes`: the same
+    /// record-shaped mutual recursion, but run through the real production codegen path
+    /// (`generate_code`/`GTCompiler`) rather than the interpreter, since Phase 4's "Finding B"
+    /// (see `experiments/doodle-rec/PLAN.md`) found the identically-shaped `LetFormat`/`MonadSeq`
+    /// bug in `codegen::typed_decoder::GTCompiler::compile_gt_format` compiled `pong`'s reference
+    /// back to `ping` into a dead, always-failing decoder rather than reusing `ping`'s real one.
+    #[test]
+    fn recursive_format_through_record_field_generates_no_dead_decoder() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let ping_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'X'))),
+            Format::Variant(
+                Label::Borrowed("ToPong"),
+                Box::new(record([
+                    ("tag", is_byte(b'p')),
+                    ("next", Format::RecVar(1)),
+                ])),
+            ),
+        ]);
+        let pong_body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Stop"), Box::new(is_byte(b'Y'))),
+            Format::Variant(
+                Label::Borrowed("ToPing"),
+                Box::new(record([
+                    ("tag", is_byte(b'q')),
+                    ("next", Format::RecVar(0)),
+                ])),
+            ),
+        ]);
+        let refs = module.define_format_rec_batch(vec![
+            ("test.ping_rec_cg", ping_body),
+            ("test.pong_rec_cg", pong_body),
+        ]);
+        let ping_ref = refs[0];
+
+        let src = produce_string_gencode(&module, &ping_ref.call());
+        assert!(
+            !src.contains("FailToken"),
+            "generated decoder for a self-referential record field must not contain a dead \
+             always-failing decoder:\n{src}"
+        );
+    }
+
     #[test]
     fn test_headcount_simple() {
         let formats = vec![
@@ -6216,6 +6467,360 @@ mod tests {
             ("test.any_byte", Format::Byte(ByteSet::full())),
         ];
         run_headcount(&formats);
+    }
+
+    #[test]
+    fn phase3_final_check_peano_and_ping_pong() {
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+        let top = frefs[0].call();
+        let src = produce_string_gencode(&module, &top);
+        assert!(src.contains("Box<peano>"), "source was:\n{src}");
+
+        let ping = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Done"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("More"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'A'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let pong = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
+        let mut module2 = FormatModule::new();
+        let frefs2 = module2.define_format_rec_batch(vec![
+            (Label::Borrowed("ping"), ping),
+            (Label::Borrowed("pong"), pong),
+        ]);
+        let top2 = frefs2[0].call();
+        let src2 = produce_string_gencode(&module2, &top2);
+        assert!(src2.contains("Box<ping>"), "source was:\n{src2}");
+    }
+
+    /// All direct child [`TypedFormat`]s of `tf`, for a generic (variant-agnostic) traversal.
+    fn typed_format_children(tf: &GTFormat) -> Vec<&GTFormat> {
+        use TypedFormat::*;
+        match tf {
+            FormatCall(_, _, _, _, def) => vec![def.as_ref()],
+            ForEach(_, _, _, f) => vec![f.as_ref()],
+            Fail | EndOfInput | Align(_) | Byte(_) | Pos(_) | SkipRemainder | WithView(..) => {
+                vec![]
+            }
+            Variant(_, _, f) => vec![f.as_ref()],
+            Union(_, fs) | UnionNondet(_, fs) | Tuple(_, fs) | Sequence(_, fs) => {
+                fs.iter().collect()
+            }
+            Repeat(_, f) | Repeat1(_, f) => vec![f.as_ref()],
+            RepeatCount(_, _, f) => vec![f.as_ref()],
+            RepeatBetween(_, _, _, f) => vec![f.as_ref()],
+            RepeatUntilLast(_, _, f) | RepeatUntilSeq(_, _, f) => vec![f.as_ref()],
+            Maybe(_, _, f) => vec![f.as_ref()],
+            Peek(_, f) | PeekNot(_, f) => vec![f.as_ref()],
+            Slice(_, _, f) => vec![f.as_ref()],
+            Bits(_, f) => vec![f.as_ref()],
+            WithRelativeOffset(_, _, _, f) => vec![f.as_ref()],
+            Map(_, f, _) => vec![f.as_ref()],
+            Where(_, f, _) => vec![f.as_ref()],
+            Compute(_, _) => vec![],
+            Let(_, _, _, f) => vec![f.as_ref()],
+            Match(_, _, branches) => branches.iter().map(|(_, f)| f).collect(),
+            Dynamic(_, _, _, f) => vec![f.as_ref()],
+            Apply(_, _, _) => vec![],
+            DecodeBytes(_, _, f) => vec![f.as_ref()],
+            ParseFromView(_, _, f) => vec![f.as_ref()],
+            LetFormat(_, f0, _, f1) => vec![f0.as_ref(), f1.as_ref()],
+            MonadSeq(_, f0, f1) => vec![f0.as_ref(), f1.as_ref()],
+            Hint(_, _, f) => vec![f.as_ref()],
+            AccumUntil(_, _, _, _, _, f) => vec![f.as_ref()],
+            LiftedOption(_, f) => f.as_deref().into_iter().collect(),
+            LetView(_, _, f) => vec![f.as_ref()],
+            Phantom(_, f) => vec![f.as_ref()],
+            #[cfg(feature = "format_enforce")]
+            Enforce(_, f) => vec![f.as_ref()],
+            Permit(_, f, _) => vec![f.as_ref()],
+        }
+    }
+
+    /// Recursively checks that [`TypedFormat::is_nonproductive`] agrees with the
+    /// outcome of calling [`Format::is_nonproductive`] on `Format::from(tf.clone())`,
+    /// on every distinct (structurally unique) `TypedFormat` node reachable from `tf`.
+    ///
+    /// `seen` is used to dedup nodes that are reached more than once (e.g. Rc-shared
+    /// `def` of multiple FormatCalls pointing to the same level) so each unique format
+    /// is only tested once.
+    fn check_is_nonproductive_agrees(
+        tf: &GTFormat,
+        module: &FormatModule,
+        seen: &mut std::collections::HashSet<GTFormat>,
+    ) {
+        if !seen.insert(tf.clone()) {
+            return;
+        }
+        let erased: Format = tf.clone().into();
+        assert_eq!(
+            tf.is_nonproductive(),
+            erased.is_nonproductive(module),
+            "TypedFormat::is_nonproductive disagreed with erase-then-Format::is_nonproductive for {tf:?}"
+        );
+        for child in typed_format_children(tf) {
+            check_is_nonproductive_agrees(child, module, seen);
+        }
+    }
+
+    /// Builds a JSON-like, 4-member mutually-recursive format (value/member/array/object -
+    /// deliberately a bit more elaborate than `doodle-rec`'s own `json_lite` sandbox format, though
+    /// still far short of full JSON: no escapes, no floats/negatives, unquoted-alpha-only keys),
+    /// elaborates it exactly as the real `Generator::compile` pipeline does, and checks that
+    /// `TypedFormat::is_nonproductive` agrees with the clone-erase-`Format::is_nonproductive` path
+    /// at every distinct node of the elaborated tree - including, critically, nested `FormatCall`
+    /// occurrences reached while their own level was still open during elaboration (whose `def` is
+    /// only the elaborator's placeholder `TypedFormat::Fail`, per its own doc comment in
+    /// `Elaborator::elaborate_format`'s `Format::ItemVar` arm - see `src/codegen/mod.rs`).
+    #[test]
+    fn is_nonproductive_agrees() {
+        use crate::helper::{alts, byte_seq, is_byte, optional, record, repeat, repeat1, tuple};
+
+        fn digit() -> Format {
+            Format::Byte(ByteSet::from(b'0'..=b'9'))
+        }
+        fn alpha() -> Format {
+            Format::Byte(ByteSet::from(b'a'..=b'z').union(&ByteSet::from(b'A'..=b'Z')))
+        }
+        fn string_lit() -> Format {
+            tuple([is_byte(b'"'), repeat(alpha()), is_byte(b'"')])
+        }
+
+        // Batch layout: 0 = value, 1 = member, 2 = array, 3 = object
+        let value = alts([
+            ("Null", byte_seq(b"null")),
+            ("True", byte_seq(b"true")),
+            ("False", byte_seq(b"false")),
+            ("Number", repeat1(digit())),
+            ("String", string_lit()),
+            ("Array", Format::RecVar(2)),
+            ("Object", Format::RecVar(3)),
+        ]);
+        let member = record([
+            ("key", string_lit()),
+            ("colon", is_byte(b':')),
+            ("value", Format::RecVar(0)),
+        ]);
+        let array = tuple([
+            is_byte(b'['),
+            optional(tuple([
+                Format::RecVar(0),
+                repeat(tuple([is_byte(b','), Format::RecVar(0)])),
+            ])),
+            is_byte(b']'),
+        ]);
+        let object = tuple([
+            is_byte(b'{'),
+            optional(tuple([
+                Format::RecVar(1),
+                repeat(tuple([is_byte(b','), Format::RecVar(1)])),
+            ])),
+            is_byte(b'}'),
+        ]);
+
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("json.value"), value),
+            (Label::Borrowed("json.member"), member),
+            (Label::Borrowed("json.array"), array),
+            (Label::Borrowed("json.object"), object),
+        ]);
+        let top = refs[0].call();
+
+        let tc = TypeChecker::infer_module(&module, &top).unwrap();
+        let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+        let (top_typed, extra_typed) = elaborator.elaborate_module(&module, &top);
+
+        let mut seen = std::collections::HashSet::new();
+        check_is_nonproductive_agrees(&top_typed, &module, &mut seen);
+        for extra in &extra_typed {
+            check_is_nonproductive_agrees(extra, &module, &mut seen);
+        }
+        assert!(
+            seen.len() > 10,
+            "expected to have walked a nontrivial number of distinct TypedFormat nodes, only saw {}",
+            seen.len()
+        );
+    }
+
+    /// Generates small, non-recursive `Format` trees biased toward the variants
+    /// `is_nonproductive_agrees` above doesn't exercise (that test's JSON-like format never
+    /// constructs `Peek`/`PeekNot`/`Slice`/`RepeatCount`/`RepeatBetween`/`Match`/`UnionNondet`/
+    /// `Map`/`Where`/`WithRelativeOffset`) - a fresh, arm-by-arm check on the mechanical port of
+    /// `TypedFormat::match_bounds_recursive`/`lookahead_bounds_recursive`, independent of the
+    /// recursion/placeholder concern the other test targets. Still not exhaustive: `Let`, `Dynamic`,
+    /// `Apply`, `DecodeBytes`, `ParseFromView`, `AccumUntil`, `ForEach`, `LetView`, `WithView`,
+    /// `Phantom`, `Permit`, `Bits` are left uncovered (each needs either dynamic-format registration
+    /// or view machinery to construct validly, and are lower-value here since they're rare in real
+    /// `doodle-formats` definitions).
+    fn arb_gap_filling_format() -> impl Strategy<Value = Format> {
+        use crate::helper::{
+            f_id, fmt_match, map, record, repeat_between, repeat_count, repeat1, slice,
+            union_nondet, where_lambda, with_relative_offset,
+        };
+
+        let leaf = prop_oneof![
+            Just(Format::Byte(ByteSet::full())),
+            Just(Format::EndOfInput),
+            Just(Format::Fail),
+            Just(Format::Align(4)),
+            Just(Format::Compute(Box::new(Expr::U8(0)))),
+        ];
+
+        leaf.prop_recursive(3, 12, 2, |inner| {
+            prop_oneof![
+                inner.clone().prop_map(|f| Format::Peek(Box::new(f))),
+                inner.clone().prop_map(|f| Format::PeekNot(Box::new(f))),
+                inner.clone().prop_map(repeat1),
+                inner.clone().prop_map(|f| repeat_count(Expr::U8(2), f)),
+                inner
+                    .clone()
+                    .prop_map(|f| repeat_between(Expr::U8(0), Expr::U8(2), f)),
+                inner.clone().prop_map(|f| slice(Expr::U8(1), f)),
+                inner.clone().prop_map(|f| map(f, f_id())),
+                inner
+                    .clone()
+                    .prop_map(|f| where_lambda(f, "x", Expr::Bool(true))),
+                inner
+                    .clone()
+                    .prop_map(|f| fmt_match(Expr::U8(0), [(Pattern::Wildcard, f)])),
+                inner
+                    .clone()
+                    .prop_map(|f| with_relative_offset(None, Expr::U8(0), f)),
+                inner.clone().prop_map(|f| record([("x", f)])),
+                proptest::collection::vec(inner.clone(), 1..3)
+                    .prop_map(|fs| union_nondet::<&str>(fs)),
+            ]
+        })
+    }
+
+    proptest! {
+        /// Property-test counterpart to `is_nonproductive_agrees`: over many small, arbitrary,
+        /// non-recursive `Format` trees drawn from `arb_gap_filling_format`, checks the same
+        /// `TypedFormat::is_nonproductive`-agrees-with-erasure property at every distinct node.
+        /// A generated tree that fails to typecheck is discarded (not a property violation - just
+        /// an input `arb_gap_filling_format` shouldn't have produced, e.g. from an unforeseen
+        /// interaction between two combined combinators); genuine mismatches still panic through
+        /// `check_is_nonproductive_agrees`'s `assert_eq!` and fail the test normally.
+        #[test]
+        fn is_nonproductive_agrees_over_arbitrary_formats(f in arb_gap_filling_format()) {
+            let module = FormatModule::new();
+            let Ok(tc) = TypeChecker::infer_module(&module, &f) else {
+                return Ok(());
+            };
+            let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+            let (top_typed, extra_typed) = elaborator.elaborate_module(&module, &f);
+
+            let mut seen = std::collections::HashSet::new();
+            check_is_nonproductive_agrees(&top_typed, &module, &mut seen);
+            for extra in &extra_typed {
+                check_is_nonproductive_agrees(extra, &module, &mut seen);
+            }
+        }
+    }
+
+    /// Regenerates `tests/recursion/mod.rs` (Phase 5's capstone fixture, see
+    /// `experiments/doodle-rec/PLAN.md` and `doc/RECURSION.md`) from the real production codegen
+    /// path, for provenance: that file should always be exactly what the last run of this test
+    /// produced, never hand-edited. `peano` and `ping` are the same Union-based shapes as
+    /// `phase3_final_check_peano_and_ping_pong` above, but `pong` is a named `Format::record`
+    /// here, not a raw `Tuple` - a raw-`Tuple` `pong` hits Finding A's still-open recompute
+    /// inconsistency (`Decoder_pong`'s own return-type signature disagreeing with `ping::More`'s
+    /// field type on whether `pong`'s back-reference to `ping` needs `Box`ing) the moment the
+    /// generated source is actually compiled, which `phase3_final_check_peano_and_ping_pong`
+    /// itself never does (string-level check only). Both batches are registered in one shared
+    /// `FormatModule`, with a synthetic `Tuple` of both entry points as the `generate_code` top
+    /// format - never actually decoded as such by `tests/recursion/codegen_tests.rs` (which calls
+    /// `Decoder_peano`/`Decoder_ping` directly), only used to make both batches reachable from one
+    /// codegen invocation so the fixture is one coherent, consistently-numbered artifact rather
+    /// than two separately-generated snippets pasted together.
+    ///
+    /// After changing the format definitions below, run:
+    /// ```sh
+    /// cargo test --lib -p doodle codegen::tests::regenerate_recursion_fixture -- --ignored
+    /// ```
+    /// then re-run `cargo test --test recursion` to confirm the frozen decoders still behave as
+    /// `codegen_tests.rs` expects.
+    #[test]
+    #[ignore = "regenerates tests/recursion/mod.rs from the real codegen path; run explicitly after changing the format definitions in this test"]
+    fn regenerate_recursion_fixture() {
+        let peano = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Z"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
+        ]);
+        let ping = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Done"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("More"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'A'])),
+                    Format::RecVar(1),
+                ])),
+            ),
+        ]);
+        let pong = record([
+            ("tag", Format::Byte(ByteSet::from([b'B']))),
+            ("next", Format::RecVar(0)),
+        ]);
+
+        let mut module = FormatModule::new();
+        let peano_refs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+        let pingpong_refs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("ping"), ping),
+            (Label::Borrowed("pong"), pong),
+        ]);
+        let top = Format::Tuple(vec![peano_refs[0].call(), pingpong_refs[0].call()]);
+
+        let src = produce_string_gencode(&module, &top);
+        let dest = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/recursion/mod.rs");
+        std::fs::write(dest, src).expect("failed to regenerate tests/recursion/mod.rs");
+    }
+
+    #[test]
+    #[should_panic(expected = "not yet supported")]
+    fn phase3_final_check_pure_tuple_cycle_rejects_cleanly() {
+        let pair_a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
+        let pair_b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
+        let mut module = FormatModule::new();
+        let frefs = module.define_format_rec_batch(vec![
+            (Label::Borrowed("pair_a"), pair_a),
+            (Label::Borrowed("pair_b"), pair_b),
+        ]);
+        let top = frefs[0].call();
+        let _src = produce_string_gencode(&module, &top);
     }
 
     #[test]
@@ -6664,6 +7269,7 @@ mod tests {
         println!("{}", output);
     }
 
+    /// Watermark heuristic designed to check that generated-code looks 'sensible'
     fn is_valid_output(output: &str) -> bool {
         // FIXME - write a more sophisticated check
         output.len() > 0
