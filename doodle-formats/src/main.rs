@@ -68,6 +68,7 @@ enum Command {
 }
 
 const SELECTORS: &[(&[&str], FormatSelector)] = &[
+    (&["bson"], FormatSelector::Bson),
     (&["deflate"], FormatSelector::Deflate),
     (&["zlib"], FormatSelector::Zlib),
     (&["tiff"], FormatSelector::Tiff),
@@ -96,6 +97,7 @@ const SELECTORS: &[(&[&str], FormatSelector)] = &[
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum FormatSelector {
+    Bson,
     Deflate,
     Elf,
     Gif,
@@ -199,6 +201,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         return Err(anyhow!("Unknown format specifier `{normalized}`").into());
                     };
                     match selected {
+                        FormatSelector::Bson => format::bson::main(&mut module).call(),
                         FormatSelector::Deflate => format::deflate::main(&mut module).call(),
                         FormatSelector::Zlib => {
                             let deflate = format::deflate::main(&mut module);
