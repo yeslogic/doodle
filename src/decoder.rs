@@ -750,12 +750,14 @@ impl<'a> Compiler<'a> {
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
                     let field_next = match fields.as_slice() {
-                        // Only wrap non-empty field-suffixes in `Next::Sequence`
-                        remaining if !remaining.is_empty() => {
-                            // REVIEW - do we properly guard against `remaining` being a non-productive format?
+                        // Special-case empty field-suffixes to avoid extraneous `Next::Sequence`
+                        [] => next.clone(),
+                        #[cfg(any())]
+                        [last] if last.is_nonproductive(self.module) => next.clone(),
+                        remaining => {
+                            // REVIEW - do we properly guard against `remaining` consisting of only non-productive formats?
                             Rc::new(Next::Sequence(MaybeTyped::Untyped(remaining), next.clone()))
                         }
-                        _ => next.clone(),
                     };
                     let df = self.compile_format(f, field_next)?;
                     decs.push(df);
@@ -767,12 +769,14 @@ impl<'a> Compiler<'a> {
                 let mut fields = formats.iter();
                 while let Some(f) = fields.next() {
                     let field_next = match fields.as_slice() {
-                        // Only wrap non-empty field-suffixes in `Next::Sequence`
-                        remaining if !remaining.is_empty() => {
-                            // REVIEW - do we properly guard against `remaining` being a non-productive format?
+                        // Special-case empty field-suffixes to avoid extraneous `Next::Sequence`
+                        [] => next.clone(),
+                        #[cfg(any())]
+                        [last] if last.is_nonproductive(self.module) => next.clone(),
+                        remaining => {
+                            // REVIEW - do we properly guard against `remaining` consisting of only non-productive formats?
                             Rc::new(Next::Sequence(MaybeTyped::Untyped(remaining), next.clone()))
                         }
-                        _ => next.clone(),
                     };
                     let df = self.compile_format(f, field_next)?;
                     decs.push(df);

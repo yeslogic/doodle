@@ -594,7 +594,7 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
         self.lt_params.push(lt.into())
     }
 
-    #[expect(dead_code)]
+    #[allow(dead_code)]
     pub fn push_type(&mut self, ty: impl Into<Ty>) {
         self.ty_params.push(ty.into())
     }

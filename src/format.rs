@@ -298,16 +298,12 @@ impl Format {
         open: &mut HashSet<usize>,
     ) -> RecursiveBounds {
         match self {
-            Format::ItemVar(level, _args, _views) => {
-                let level = *level;
-                if !open.insert(level) {
-                    return RecursiveBounds::unresolved();
-                }
-                let b = module
-                    .get_format(level)
-                    .match_bounds_recursive(module, open);
-                open.remove(&level);
-                b
+            &Format::ItemVar(level, ..) => {
+                crate::recursion::guarded_bounds(level, open, move |open| {
+                    module
+                        .get_format(level)
+                        .match_bounds_recursive(module, open)
+                })
             }
             Format::RecVar(_) => unreachable!(
                 "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
@@ -410,16 +406,12 @@ impl Format {
         open: &mut HashSet<usize>,
     ) -> RecursiveBounds {
         match self {
-            Format::ItemVar(level, _args, _views) => {
-                let level = *level;
-                if !open.insert(level) {
-                    return RecursiveBounds::unresolved();
-                }
-                let b = module
-                    .get_format(level)
-                    .lookahead_bounds_recursive(module, open);
-                open.remove(&level);
-                b
+            &Format::ItemVar(level, ..) => {
+                crate::recursion::guarded_bounds(level, open, move |open| {
+                    module
+                        .get_format(level)
+                        .lookahead_bounds_recursive(module, open)
+                })
             }
             Format::RecVar(_) => unreachable!(
                 "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
@@ -788,26 +780,24 @@ impl Format {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helper::is_bytes;
+    use crate::helper::*;
 
-    /// `match_bounds` on a recursive `Union` must not understate the minimum by treating the
-    /// still-open self-reference as contributing `0` bytes: `Long` here is a 10-byte exit branch,
-    /// while `Rec`'s own non-recursive prefix (`'x'`) is only 1 byte - if the recursive tail were
-    /// naively assumed to contribute `0`, the overall minimum would wrongly come out as `1`
-    /// (`min(10, 1 + 0)`) instead of the true `10` (`min(10, 1 + Rec's-own-true-minimum)`, which a
-    /// well-formed recursive format can never make lower than its own exit branch's minimum).
+    /// Tests that `match_bounds` correctly estimates the minimum bytes consumed when processing
+    /// a recursive `Union`.
+    ///
+    /// Test-case is a recursive union whose recursive branch has a 1-byte prefix and whose
+    /// non-recursive branch consists of a simple byte-sequence of length 10.
+    /// If the value of `match_bounds` called on this format is `Bounds::at_least(10)`,
+    /// then the test passes. Otherwise, it fails.
+    ///
+    /// The most likely cause of potential failure would be the recursive self-call in
+    /// the 1-byte-prefix branch returning `Bounds::any()`.
     #[test]
     fn match_bounds_recursive_union_excludes_open_branch_from_minimum() {
         let mut module = FormatModule::new();
-        let body = Format::Union(vec![
-            Format::Variant(Label::Borrowed("Long"), Box::new(is_bytes(b"AAAAAAAAAA"))),
-            Format::Variant(
-                Label::Borrowed("Rec"),
-                Box::new(Format::Tuple(vec![
-                    Format::Byte(ByteSet::from([b'x'])),
-                    Format::RecVar(0),
-                ])),
-            ),
+        let body = alts([
+            ("Long", byte_seq(&[b'A'; 10])),
+            ("Rec", tuple([is_byte(b'x'), Format::RecVar(0)])),
         ]);
         let refs = module.define_format_rec_batch(vec![("test.rec", body)]);
         let bounds = refs[0].call().match_bounds(&module);
@@ -820,6 +810,35 @@ mod tests {
             bounds.max(),
             None,
             "the recursive branch keeps the format's maximum genuinely unbounded"
+        );
+    }
+
+    /// Tests that `match_bounds` finds the path with the fewest-bytes to report as minimum,
+    /// even when that path happens to follow one or more mutually-recursive layers.
+    #[test]
+    fn match_bounds_mutual_recursion_picks_shortest_path() {
+        let mut module = FormatModule::new();
+        let refs = {
+            let a0 = alts([
+                ("Longer", byte_seq(&[b'A'; 10])),
+                ("Rec", tuple([is_byte(b'x'), Format::RecVar(1)])),
+            ]);
+            let b1 = alts([
+                ("Shorter", byte_seq(&[b'B'; 7])),
+                ("Rec", tuple([is_byte(b'y'), Format::RecVar(0)])),
+            ]);
+            module.define_format_rec_batch(vec![("test.a", a0), ("test.b", b1)])
+        };
+        let bounds = refs[0].call().match_bounds(&module);
+        assert_eq!(
+            bounds.min(),
+            8,
+            "mutual-recursion incorrectly discounted shorter recursive path in favor of non-recursive path when comuting match_bounds"
+        );
+        assert_eq!(
+            bounds.max(),
+            None,
+            "mutual recursion should always report unbounded maximum"
         );
     }
 }
