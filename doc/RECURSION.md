@@ -213,25 +213,93 @@ either an unbounded, ever-growing `compile_queue` (interpreter path) or a `next`
 (codegen path: `TypedDecoder::Fail`, surfacing as generated Rust like
 `fn Decoder3(...) { return Err(ParseError::FailToken(...)); }`).
 
-Two constructs needed this fix, both in the same shape (skip the wrap when it would add nothing,
-use `next` directly):
+Two constructs needed this fix, both settled into one pair of smart constructors —
+`Next::cat`/`Next::sequence` (`src/lib.rs`, right after the `Next` enum) — skip the wrap when it
+would add nothing, use `next` directly otherwise, and are used identically by both
+`decoder::Compiler::compile_format` (interpreter) and `GTCompiler::compile_gt_format` (codegen):
 
-- **`Tuple`/`Sequence`'s trailing field** — every field but the last was wrapped in
+- **`Tuple`/`Sequence`'s trailing field-suffix** — every field but the last was wrapped in
   `Next::Sequence(remaining, next)`; the *last* field was too, with `remaining` empty, which is
-  semantically a no-op but structurally a new wrapper layer on every visit. Fixed by using `next`
-  directly when no fields remain.
+  semantically a no-op but structurally a new wrapper layer on every visit. `Next::sequence`'s check
+  is `remaining.iter().all(is_nonproductive)`, vacuously true for `remaining == []` (the originally
+  fixed case falls out for free) — and it generalizes past that: a trailing suffix of *several*
+  nonproductive fields, not just one, now also correctly collapses. (An earlier, narrower attempt at
+  this generalization special-cased only a single trailing field, `[last]` — genuinely incomplete,
+  since two or more nonproductive trailing fields still fell through to the general wrap; `.all(...)`
+  subsumes that cleanly instead of needing a length-1 special case.)
 - **`LetFormat`/`MonadSeq`'s first component** — wrapped in `Next::Cat(second, next)`
   unconditionally, even when `second` can only ever match zero bytes (the common case: a record's
   closing `Compute(Record(...))` step, from `Format::record`'s desugaring to nested `LetFormat`s).
-  Fixed by checking `second.match_bounds(module).as_exact() == Some(0)` (delegating to the existing
-  `Bounds`/`match_bounds` machinery, which already treats `Compute` as exact-zero and `Hint` as
-  transparent) and using `next` directly in that case.
+  `Next::cat`'s check is simply `is_nonproductive(second)`.
+
+Both smart constructors dispatch on `MaybeTyped::Untyped`/`Typed` to reach the right
+`is_nonproductive`: `Format::is_nonproductive(module)` (`src/format.rs`, module-based, unconditionally
+safe) for the interpreter path, or `TypedFormat::is_nonproductive()` (`src/codegen/typed_format.rs`,
+module-free) for the codegen path — see the next subsection for why the latter needed its own fix
+before this was safe to call on an arbitrary subtree.
 
 Both fixes are also observable for *non*-recursive formats (more `decoder_map` sharing = fewer,
 differently-numbered generated decoder functions) — this is a genuine, if minor, pre-existing codegen
-inefficiency the fix incidentally also cleans up, not a sign the fix is too broad. See
+inefficiency the fix incidentally also cleans up, not a sign the fix is too broad; confirmed
+byte-identical (fresh `cargo cg` vs. the checked-in `generated/gencode.rs`) after generalizing to the
+full-slice check, since no currently-registered format happens to have a multi-field
+all-nonproductive trailing suffix for the generalization to actually change anything for. See
 `experiments/doodle-rec/PLAN.md`'s disclaimer for how this was reconciled with that document's own
 (now-revised) byte-identical-codegen expectation.
+
+#### `TypedFormat`'s own cycle-safe bounds computation
+
+**Where**: `TypedFormat::match_bounds`/`lookahead_bounds`/`is_nonproductive` and
+`TypedFormat::recursion_placeholder`/`is_recursion_placeholder` (`src/codegen/typed_format.rs`);
+`RecursiveBounds`/`guarded_bounds`/`OpenSet` (`src/recursion.rs`, factored out so `Format`'s own
+`match_bounds_recursive`/`lookahead_bounds_recursive` in `src/format.rs` and `TypedFormat`'s share one
+implementation).
+
+`Next::cat`/`Next::sequence` need to ask "is this `TypedFormat` guaranteed zero-width?" without a
+`&FormatModule` in hand — the whole reason a `TypedFormat`-native `is_nonproductive` exists at all is
+that `TypedFormat::FormatCall` stores its callee's already-*resolved* body inline, so in principle no
+module lookup should be needed. Two distinct hazards had to be closed before that was actually safe:
+
+- **Live re-entry within one traversal.** A naive `match_bounds`/`lookahead_bounds` walk that
+  recurses straight into a `FormatCall`'s `def` has no protection against a self-reference reached
+  while that same level is still being walked by *this call* — unlike `Format::ItemVar`, which
+  re-resolves via `module.get_format(level)` on every visit and was already guarded by the `open`-set
+  in `Format::match_bounds_recursive`. Fixed by porting the identical `open: &mut OpenSet` /
+  `RecursiveBounds` pattern onto `TypedFormat` (via the shared `guarded_bounds` helper): re-entering
+  an already-open level reports `RecursiveBounds::unresolved()` instead of recursing into `def`.
+- **A stale placeholder from a *different*, already-finished traversal — the sharper of the two, and
+  not covered by the fix above.** `Elaborator::elaborate_format`'s `Format::ItemVar` arm
+  (`src/codegen/mod.rs`) reserves a placeholder `def` *before* recursing into a level's own body (see
+  [Mental model](#mental-model) above), so any self-reference reached while that level is still open
+  gets that placeholder baked into its `FormatCall::def` *permanently* — `def` is never patched once
+  the real body becomes available; only the level's own top-level entry in `Elaborator`'s `t_formats`
+  cache is updated. `GTCompiler::compile_gt_format`'s own `FormatCall` arm never trusts this blindly:
+  it discards `def` whenever `decoder_map` already has an entry for the level (see above). But a
+  *fresh*, standalone `TypedFormat::match_bounds`/`lookahead_bounds` call — exactly what
+  `Next::cat`/`Next::sequence` need to make on an arbitrary subtree, possibly one nested several
+  `FormatCall`s deep — has no such protection: its `open`-set starts empty, so it happily recurses
+  into a placeholder `def` with no way of knowing it's stale, and silently reports a genuinely
+  recursive, byte-consuming reference as `TypedFormat::Fail`'s trivial `exact(0)` — a false positive,
+  the opposite of what `is_nonproductive`'s "false negatives only" contract promises. Confirmed with a
+  real regression test (`is_nonproductive_agrees`, see below) before being fixed.
+
+  Fixed by giving the elaborator's placeholder a recognizable identity: `TypedFormat::FormatCall`'s
+  `def` is now reserved from a single, canonical thread-local sentinel
+  (`TypedFormat::recursion_placeholder()` — `Rc::new(TypedFormat::Fail)` constructed once) rather than
+  a fresh `Rc::new(TypedFormat::Fail)` per level. `match_bounds_recursive`/`lookahead_bounds_recursive`'s
+  `FormatCall` arm checks `Self::is_recursion_placeholder(def)` (an `Rc::ptr_eq` comparison) *before*
+  trusting `def`'s content, reporting `RecursiveBounds::unresolved()` immediately on a match.
+  Deliberately identity-based, not structural (`*def == TypedFormat::Fail`): a level whose *real*,
+  fully-resolved body genuinely is just `Format::Fail` would false-positive under a structural check,
+  since `Fail`'s own bounds are legitimately `exact(0)` — only the elaborator's own sentinel `Rc`
+  should ever be treated as untrustworthy, not anything that merely looks like it.
+
+  With this in place, the open-set port above turns out to be a defensive backstop rather than the
+  load-bearing fix: every *genuine* self-reference within a level's own body is, by construction,
+  reached while that level is still open at elaboration time, so it always gets the sentinel — a live
+  re-entry past the sentinel check would require some other, currently-unknown route to a real `Rc`
+  cycle. Kept anyway, since it costs little and guards against future `TypedFormat` constructions this
+  reasoning doesn't anticipate.
 
 ## Patterns that work
 
@@ -299,8 +367,17 @@ inefficiency the fix incidentally also cleans up, not a sign the fix is too broa
   string-level check), `phase3_final_check_pure_tuple_cycle_rejects_cleanly` (the bare-`Tuple`
   anti-pattern, confirmed to panic with the expected message),
   `recursive_format_through_record_field_generates_no_dead_decoder` (the codegen-path counterpart to
-  the `LetFormat`/`MonadSeq` fix), and `regenerate_recursion_fixture` (an `#[ignore]`d generator for
-  the `tests/recursion/` fixture below — run it after changing that fixture's format definitions).
+  the `LetFormat`/`MonadSeq` fix), `regenerate_recursion_fixture` (an `#[ignore]`d generator for
+  the `tests/recursion/` fixture below — run it after changing that fixture's format definitions),
+  `is_nonproductive_agrees` (elaborates a JSON-like, 4-member mutually-recursive format and checks
+  `TypedFormat::is_nonproductive` agrees with the clone-erase-`Format::is_nonproductive` path at every
+  distinct node of the elaborated tree — the test that originally caught the stale-placeholder gap
+  described above), and `is_nonproductive_agrees_over_arbitrary_formats` (a `proptest` counterpart over
+  small, arbitrary *non-recursive* `Format` trees biased toward the variants the JSON-like fixture
+  doesn't reach — `Peek`/`PeekNot`/`Slice`/`RepeatCount`/`RepeatBetween`/`Match`/`UnionNondet`/`Map`/
+  `Where`/`WithRelativeOffset` — for arm-by-arm coverage of the `match_bounds_recursive`/
+  `lookahead_bounds_recursive` port independent of the recursion/placeholder concern the other test
+  targets).
 - `tests/recursion/` — a self-contained mini codegen fixture (matching the existing convention of
   `tests/runtime_repeat/`/`tests/permit_state_error/`, see root `CLAUDE.md`): real, frozen production
   codegen output for peano/ping-pong (`pong` built via `Format::record`, per the Finding A workaround

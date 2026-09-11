@@ -1614,6 +1614,46 @@ enum Next<'a> {
     PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
+impl<'a> Next<'a> {
+    /// Smart constructor for [`Next::Cat`]: when `content` is guaranteed to match zero bytes (e.g.
+    /// a trailing `Format::Compute`), wrapping it around `next` adds no real information but *does*
+    /// add a structurally distinct `Next` layer - which, for a self-referential reference compiled
+    /// under it, can miss `decoder_map`'s `(level, next)` cache and queue a doomed duplicate compile
+    /// (see `doc/RECURSION.md`'s mechanism 4). Skips the wrapper in that case and returns `next`
+    /// directly instead.
+    fn cat(module: &FormatModule, content: MTFormatRef<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        let nonproductive = match content {
+            MaybeTyped::Untyped(f) => f.is_nonproductive(module),
+            MaybeTyped::Typed(f) => f.is_nonproductive(),
+        };
+        if nonproductive {
+            next
+        } else {
+            Rc::new(Next::Cat(content, next))
+        }
+    }
+
+    /// Smart constructor for [`Next::Sequence`]: analogous to [`Self::cat`], but for a `Tuple`/
+    /// `Sequence`'s trailing field-suffix as a whole - skips the wrapper when every element of
+    /// `content` is nonproductive, which is vacuously true for an empty slice (the previously
+    /// special-cased `remaining == []` case falls out of this for free).
+    fn sequence(
+        module: &FormatModule,
+        content: MTFormatSlice<'a>,
+        next: Rc<Next<'a>>,
+    ) -> Rc<Next<'a>> {
+        let nonproductive = match content {
+            MaybeTyped::Untyped(fs) => fs.iter().all(|f| f.is_nonproductive(module)),
+            MaybeTyped::Typed(fs) => fs.iter().all(|f| f.is_nonproductive()),
+        };
+        if nonproductive {
+            next
+        } else {
+            Rc::new(Next::Sequence(content, next))
+        }
+    }
+}
+
 /// A single choice-point in a conceptual [MatchTree] structure.
 #[derive(Clone, Debug)]
 struct MatchTreeStep<'a> {
