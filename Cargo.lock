@@ -589,6 +589,7 @@ dependencies = [
  "cfg-if",
  "clap",
  "cons-rs",
+ "doodle-numexpr-macro",
  "expect-test",
  "intmap",
  "log",
@@ -613,10 +614,21 @@ dependencies = [
  "clap",
  "criterion 0.5.1",
  "doodle",
+ "doodle-numexpr-macro",
  "log",
  "serde",
  "serde_json",
  "stderrlog",
+]
+
+[[package]]
+name = "doodle-numexpr-macro"
+version = "0.1.0"
+dependencies = [
+ "doodle",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
