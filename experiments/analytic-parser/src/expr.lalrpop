@@ -1,6 +1,7 @@
 use std::str::FromStr;
+use std::borrow::Cow;
 use num_bigint::BigInt;
-use analytic_engine::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, Expr, NumRep, MachineRep};
+use doodle::numeric::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, CastOp, Expr, NumRep, MachineRep};
 
 grammar;
 
@@ -10,7 +11,7 @@ pub Tree: Expr = {
     #[precedence(level="1")]
     <op:Op0> <t:Tree> => Expr::UnaryOp(op, Box::new(t)),
     #[precedence(level="2")]
-    <t:Tree> "as" <mr:MRep> => Expr::Cast(mr, Box::new(t)),
+    <t:Tree> "as" <op:COp> => Expr::Cast(op, Box::new(t)),
     #[precedence(level="3")] #[assoc(side="left")]
     <l:Tree> <op:Op1> <r:Tree> => Expr::BinOp(op, Box::new(l), Box::new(r)),
     #[precedence(level="4")] #[assoc(side="left")]
@@ -19,12 +20,15 @@ pub Tree: Expr = {
 
 Term: Expr = {
     Const => Expr::Const(<>),
+    Var => Expr::NumVar(<>),
     "(" <Tree> ")",
 }
 
 OpCode0: BasicUnaryOp = {
     "~" => BasicUnaryOp::Negate,
     "abs" => BasicUnaryOp::AbsVal,
+    "succ" => BasicUnaryOp::IntSucc,
+    "pred" => BasicUnaryOp::IntPred,
 }
 
 OpCode1: BasicBinOp = {
@@ -53,9 +57,16 @@ Op2: BinOp = {
     OpCode2 => BinOp::new(<>, None),
 }
 
+Var: Cow<'static, str> = "'" <s:r"[_a-z][_a-zA-Z]*"> "'" => Cow::Owned(String::from(s));
+
 Const: TypedConst = {
     <n:Num> => TypedConst(n, NumRep::AUTO),
     <n:Num><r:Rep> => TypedConst(n, r),
+}
+
+COp: CastOp = {
+    MRep => CastOp::arith(<>),
+    "r#" <r:MRep> => CastOp::bitwise(r),
 }
 
 Rep: NumRep = {
