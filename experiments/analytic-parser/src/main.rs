@@ -1,4 +1,4 @@
-use analytic_engine::printer::print_conversion;
+use doodle::numeric::printer::print_conversion;
 use lalrpop_util::lalrpop_mod;
 use linefeed::{Interface, ReadResult};
 
