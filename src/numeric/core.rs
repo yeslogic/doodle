@@ -262,6 +262,43 @@ impl NumRep {
     pub const AUTO: NumRep = NumRep::Auto;
 }
 
+macro_rules! into_bounds {
+    ( $($t:ty),+ ) => {
+        $(
+            impl From<$t> for Bounds {
+                fn from(x: $t) -> Self {
+                    Bounds {
+                        min: BigInt::from(x),
+                        max: BigInt::from(x),
+                    }
+                }
+            }
+
+            impl From<std::ops::RangeInclusive<$t>> for Bounds {
+                fn from(x: std::ops::RangeInclusive<$t>) -> Self {
+                    let (min, max) = x.into_inner();
+                    Bounds {
+                        min: BigInt::from(min),
+                        max: BigInt::from(max),
+                    }
+                }
+            }
+
+            impl From<std::ops::RangeFrom<$t>> for Bounds {
+                fn from(x: std::ops::RangeFrom<$t>) -> Self {
+                    let min = x.start as usize;
+                    let max = <$t>::MAX;
+                    Bounds { min: BigInt::from(min), max: BigInt::from(max) }
+                }
+            }
+        )+
+    };
+}
+
+into_bounds! {
+    u8, u16, u32, u64, i8, i16, i32, i64
+}
+
 /// Representative min and max bounds for a numeric type
 ///
 /// Both ends are inclusive, and `min <= max`.

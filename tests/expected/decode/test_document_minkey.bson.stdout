@@ -1,0 +1,5 @@
+└── document <- bson.document :=
+    └── 0 :=
+        └── minkey :=
+            ├── key := `valid([((0 :~ (97 => 97)) => 'a')])
+            └── value := ()

@@ -1,4 +1,5 @@
 use doodle::{Format, FormatModule, FormatRef, helper::*};
+use doodle_numexpr_macro::numexpr;
 
 fn cstring(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let utf8_nz_total = pseudo_record(
@@ -92,8 +93,30 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
     )
 }
 
+fn document(module: &mut FormatModule, element: FormatRef) -> FormatRef {
+    module.define_format(
+        "bson.document",
+        chain(
+            // NOTE - guard against underflow (len < 4)
+            where_within_z(i32le(), 4i32..),
+            "len",
+            slice(
+                numeric(numexpr!("len" -u32 4)),
+                pseudo_record(
+                    [
+                        ("elements", repeat(element.call())),
+                        ("__null", is_byte(0x00)),
+                    ],
+                    compute(var("elements")),
+                ),
+            ),
+        ),
+    )
+}
+
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
     let element = element(module, cstring);
-    module.define_format("bson", alts([("element", element.call())]))
+    let document = document(module, element);
+    module.define_format("bson.main", record([("document", document.call())]))
 }

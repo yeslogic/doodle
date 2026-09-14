@@ -371,10 +371,7 @@ fn subtable_format13(module: &mut FormatModule, sequential_map_group: FormatRef)
 }
 
 fn subtable_format14(module: &mut FormatModule) -> FormatRef {
-    let unicode_range = record([
-        ("start_unicode_value", u24be()),
-        ("additional_count", u8()),
-    ]);
+    let unicode_range = record([("start_unicode_value", u24be()), ("additional_count", u8())]);
 
     let uvs_mapping = record([("unicode_value", u24be()), ("glyph_id", u16be())]);
 

@@ -11,7 +11,7 @@ use crate::{
     Pattern, RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
 };
 
-use crate::numeric::core::Expr as NumExpr;
+use crate::numeric::core::{Bounds as NumBounds, Expr as NumExpr};
 use crate::numeric::helper as num;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1101,11 +1101,22 @@ pub fn expect_between_u32(format: Format, lower: u32, upper: u32) -> Format {
 /// However, the complexity of the test will typically be higher for this helper than for [`where_between`];
 /// this is doubly true for closed ranges whose minimum is `0`, in which case [`where_between`] tests a single
 /// integer comparison.
+///
+/// # Notes
+///
+/// Only works for unsignd integer Formats; for signed-integer formats, use `where_within_z` instead.
 pub fn where_within<R>(format: Format, range: R) -> Format
 where
     R: Into<Bounds>,
 {
     where_lambda(format, "x", is_within(var("x"), range.into()))
+}
+
+pub fn where_within_z<R>(format: Format, range: R) -> Format
+where
+    R: Into<NumBounds>,
+{
+    where_lambda(format, "x", is_within_z(var("x"), range.into()))
 }
 
 /// Similar to [`where_within`], but with `Expect`-level severity instead of `Assert`.
@@ -1713,12 +1724,27 @@ pub fn seq_last_unchecked(seq: Expr) -> Expr {
 
 /// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
 ///
-/// If `x` is not an integral-typed value, will cause a runtime error when encountered by the interpreter or compiler.
+/// If `x` is not an unsiged integral-typed value, will cause a runtime error when encountered by the interpreter or compiler.
+///
+/// For signed integer types, use [`is_within_z`] instead.
 pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
     expr_match(
         x,
         [
             (Pattern::Int(bounds), Expr::Bool(true)),
+            (Pattern::Wildcard, Expr::Bool(false)),
+        ],
+    )
+}
+
+/// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
+///
+/// Generalizes [`is_within`] to support signed integer types as well.
+pub fn is_within_z(x: Expr, bounds: NumBounds) -> Expr {
+    expr_match(
+        x,
+        [
+            (Pattern::ZRange(bounds), Expr::Bool(true)),
             (Pattern::Wildcard, Expr::Bool(false)),
         ],
     )

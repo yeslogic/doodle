@@ -1,0 +1,9 @@
+└── document <- bson.document :=
+    ├── 0 :=
+    │   └── bool :=
+    │       ├── key := `valid([((0 :~ (116 => 116)) => 't')])
+    │       └── value := true
+    └── 1 :=
+        └── bool :=
+            ├── key := `valid([((0 :~ (102 => 102)) => 'f')])
+            └── value := false
