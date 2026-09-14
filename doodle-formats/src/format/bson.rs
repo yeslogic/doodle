@@ -17,7 +17,83 @@ fn cstring(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     )
 }
 
+/// Internal helper for BSON boolean values. A literal byte of `0` is mapped to `false` and a value
+/// of 1 (or greater) is mapped to `true`.
+///
+/// Per the specification, `0x01` is the only proper byte value for `true`; other non-zero values
+/// are still mapped to `true`, but a soft-validation using [Expect](doodle::validation::Severity::Expect)
+/// may result in a warning being logged while parsing.
+fn bool() -> Format {
+    map(
+        expect_between_u8(u8(), 0, 1),
+        lambda("b", is_nonzero_u8(var("b"))),
+    )
+}
+
+/// Internal helper for BSON object IDs
+fn objectid() -> Format {
+    record([
+        ("timestamp", u32be()),
+        ("randval", seq_repeat(5, Format::ANY_BYTE)),
+        ("counter", u24be()),
+    ])
+}
+
+fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
+    record_auto([
+        ("__tag", is_byte(tag as u8)),
+        ("key", cstring.call()),
+        ("value", content),
+    ])
+}
+
+const BSON_TAG_OBJECTID: i8 = 0x07;
+const BSON_TAG_BOOL: i8 = 0x08;
+const BSON_TAG_NULL: i8 = 0x0A;
+const BSON_TAG_INT32: i8 = 0x10;
+const BSON_TAG_MAXKEY: i8 = 0x7F;
+const BSON_TAG_MINKEY: i8 = -1;
+
+fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
+    let e_null = module.define_format(
+        "bson.element.null",
+        mk_element(BSON_TAG_NULL, cstring, Format::EMPTY),
+    );
+    let e_minkey = module.define_format(
+        "bson.element.minkey",
+        mk_element(BSON_TAG_MINKEY, cstring, Format::EMPTY),
+    );
+    let e_maxkey = module.define_format(
+        "bson.element.maxkey",
+        mk_element(BSON_TAG_MAXKEY, cstring, Format::EMPTY),
+    );
+    let e_bool = module.define_format(
+        "bson.element.bool",
+        mk_element(BSON_TAG_BOOL, cstring, bool()),
+    );
+    let e_int32 = module.define_format(
+        "bson.element.int32",
+        mk_element(BSON_TAG_INT32, cstring, i32le()),
+    );
+    let e_objectid = module.define_format(
+        "bson.element.objectid",
+        mk_element(BSON_TAG_OBJECTID, cstring, objectid()),
+    );
+    module.define_format(
+        "bson.element",
+        alts([
+            ("null", e_null.call()),
+            ("minkey", e_minkey.call()),
+            ("maxkey", e_maxkey.call()),
+            ("bool", e_bool.call()),
+            ("int32", e_int32.call()),
+            ("objectid", e_objectid.call()),
+        ]),
+    )
+}
+
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
-    module.define_format("bson", alts([("cstring", cstring.call())]))
+    let element = element(module, cstring);
+    module.define_format("bson", alts([("element", element.call())]))
 }
