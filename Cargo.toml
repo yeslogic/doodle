@@ -4,7 +4,6 @@ members = [
     "generated/",
     "doodle-formats/",
     "smallsorts",
-    "experiments/analytic-engine/",
     "experiments/analytic-parser",
 ]
 
