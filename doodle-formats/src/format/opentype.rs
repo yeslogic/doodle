@@ -290,15 +290,6 @@ mod util {
         module.define_format("opentype.types.f2dot14", fmt_variant("F2Dot14", u16be()))
     }
 
-    /// Helper function for parsing a big-endian u24 (3-byte) as a 32-bit Value
-    pub(crate) fn u24be() -> Format {
-        // REVIEW - should U24Be be a CommonOp?
-        map(
-            Format::Tuple(vec![compute(Expr::U8(0)), u8(), u8(), u8()]),
-            lambda("x", Expr::U32Be(Box::new(var("x")))),
-        )
-    }
-
     /// Helper-function that parses a big-endian 32-bit value meant to be interpreted as a `(u16, u16)` value-pair (e.g. major, minor version fields)
     pub(crate) fn version16_16() -> Format {
         u32be()

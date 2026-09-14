@@ -1878,7 +1878,7 @@ pub fn hint(hint: StyleHint, format: Format) -> Format {
 
 pub mod base {
     use super::*;
-    use crate::{CommonOp, numeric::MachineRep};
+    use crate::{CommonOp, Endian, numeric::MachineRep};
 
     macro_rules! endian {
         ( $( $fname:ident, $kind_endian:ident, $size:expr, $op:ident );* $(;)? ) => {
@@ -1944,11 +1944,23 @@ pub mod base {
         )
     }
 
+    // TODO - implement i16le
+
     /// Parses a big-endian u32 value and performs a bitwise cast to i32.
     pub fn i32be() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I32BE)),
             Box::new(map_numeric(u32be(), |v| {
+                num::cast_bitwise(MachineRep::I32, v)
+            })),
+        )
+    }
+
+    /// Parses a little-endian u32 value and performs a bitwise cast to i32
+    pub fn i32le() -> Format {
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I32Ext(Endian::Le))),
+            Box::new(map_numeric(u32le(), |v| {
                 num::cast_bitwise(MachineRep::I32, v)
             })),
         )
@@ -1963,8 +1975,24 @@ pub mod base {
             })),
         )
     }
+
+    // TODO - implement i64le
 }
-pub use base::{bit, i8, i16be, i32be, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};
+pub use base::{bit, i8, i16be, i32be, i32le, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};
+
+/// Parses a big-endian u24 (3-byte) value, mapped into the u32 value-type space.
+///
+/// # Notes
+///
+/// The resulting format is not wrapped in a [`Format::Hint`] indicating it is a CommonOp,
+/// so it may not be given the same special treatment as helpers for common-width integer parsing.
+pub fn u24be() -> Format {
+    // REVIEW - should U24Be be a CommonOp?
+    map(
+        Format::Tuple(vec![compute(Expr::U8(0)), u8(), u8(), u8()]),
+        lambda("x", Expr::U32Be(Box::new(var("x")))),
+    )
+}
 
 pub mod ascii {
     use super::{mk_ascii_string, *};

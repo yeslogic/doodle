@@ -372,11 +372,11 @@ fn subtable_format13(module: &mut FormatModule, sequential_map_group: FormatRef)
 
 fn subtable_format14(module: &mut FormatModule) -> FormatRef {
     let unicode_range = record([
-        ("start_unicode_value", util::u24be()),
+        ("start_unicode_value", u24be()),
         ("additional_count", u8()),
     ]);
 
-    let uvs_mapping = record([("unicode_value", util::u24be()), ("glyph_id", u16be())]);
+    let uvs_mapping = record([("unicode_value", u24be()), ("glyph_id", u16be())]);
 
     let default_uvs_table = record([
         ("num_unicode_value_ranges", u32be()),
@@ -398,7 +398,7 @@ fn subtable_format14(module: &mut FormatModule) -> FormatRef {
         "opentype.variation_selector",
         vec![TABLE_VIEW],
         record([
-            ("var_selector", util::u24be()),
+            ("var_selector", u24be()),
             (
                 "default_uvs_offset",
                 util::read_phantom_view_offset32(vvar("table_view"), default_uvs_table),
