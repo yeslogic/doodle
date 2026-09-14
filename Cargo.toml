@@ -5,6 +5,7 @@ members = [
     "doodle-formats/",
     "smallsorts",
     "experiments/analytic-parser",
+    "doodle-numexpr-macro",
 ]
 
 [package]
@@ -56,3 +57,4 @@ stderrlog = "0.6.0"
 num-bigint = "0.4"
 cfg-if = "1.0.4"
 range-set = "0.1.1"
+doodle-numexpr-macro = { path = "doodle-numexpr-macro", version = "0.1.0" }
