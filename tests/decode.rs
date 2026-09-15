@@ -310,6 +310,14 @@ mod bson {
     }
 
     #[test]
+    fn test_decode_document_double() {
+        let output = decode_bson("test_document_double.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_double.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
     fn test_decode_document_mixed() {
         let output = decode_bson("test_document_mixed.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_mixed.bson.stdout");
