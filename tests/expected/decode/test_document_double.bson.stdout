@@ -1,0 +1,5 @@
+└── document <- bson.document :=
+    └── 0 :=
+        └── double :=
+            ├── key := `valid([((0 :~ (100 => 100)) => 'd')])
+            └── value := { F64 := 63551 }
