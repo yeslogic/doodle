@@ -2,10 +2,5 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── string <- bson.element.string :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       └── 0 := 'k'
-                └── value <- bson.string :=
-                    └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                        ├── 0 := 'h'
-                        └── 1 := 'i'
+                ├── key <- bson.cstring := { valid := "k" }
+                └── value <- bson.string := { valid := "hi" }
