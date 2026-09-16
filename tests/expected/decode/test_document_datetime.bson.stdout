@@ -1,5 +1,14 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── datetime :=
-            ├── key := `valid([((0 :~ (99 => 99)) => 'c'), ((0 :~ (114 => 114)) => 'r'), ((0 :~ (101 => 101)) => 'e'), ((0 :~ (97 => 97)) => 'a'), ((0 :~ (116 => 116)) => 't'), ((0 :~ (101 => 101)) => 'e'), ((0 :~ (100 => 100)) => 'd')])
-            └── value := { DateTime := 1577836800000i64 }
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── datetime <- bson.element.datetime :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       ├── 0 := 'c'
+                │       ├── 1 := 'r'
+                │       ├── 2 := 'e'
+                │       ├── 3 := 'a'
+                │       ├── 4 := 't'
+                │       ├── 5 := 'e'
+                │       └── 6 := 'd'
+                └── value <- variant DateTime ReadI64Le := { DateTime := 1577836800000i64 }

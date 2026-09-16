@@ -1,1 +1,2 @@
-└── document <- bson.document := []
+└── document <- bson.document :=
+    └── elements <- repeat bson.element := []
