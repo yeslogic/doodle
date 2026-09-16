@@ -43,6 +43,13 @@ fn datetime() -> Format {
     fmt_variant("DateTime", i64le())
 }
 
+/// BSON `Timestamp`: a MongoDB-internal type distinct from UTC `datetime`, consisting of an
+/// `increment` ordinal and `seconds`-since-epoch, each a little-endian `u32`. `increment` (the
+/// least-significant 32 bits of the conceptual 64-bit value) precedes `seconds` in the byte stream.
+fn timestamp() -> Format {
+    record([("increment", u32le()), ("seconds", u32le())])
+}
+
 /// Internal helper for BSON object IDs
 fn objectid() -> Format {
     record([
@@ -66,6 +73,7 @@ const BSON_TAG_BOOL: i8 = 0x08;
 const BSON_TAG_DATETIME: i8 = 0x09;
 const BSON_TAG_NULL: i8 = 0x0A;
 const BSON_TAG_INT32: i8 = 0x10;
+const BSON_TAG_TIMESTAMP: i8 = 0x11;
 const BSON_TAG_INT64: i8 = 0x12;
 const BSON_TAG_MAXKEY: i8 = 0x7F;
 const BSON_TAG_MINKEY: i8 = -1;
@@ -95,6 +103,10 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
         "bson.element.int32",
         mk_element(BSON_TAG_INT32, cstring, i32le()),
     );
+    let e_timestamp = module.define_format(
+        "bson.element.timestamp",
+        mk_element(BSON_TAG_TIMESTAMP, cstring, timestamp()),
+    );
     let e_int64 = module.define_format(
         "bson.element.int64",
         mk_element(BSON_TAG_INT64, cstring, i64le()),
@@ -116,6 +128,7 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
             ("datetime", e_datetime.call()),
             ("null", e_null.call()),
             ("int32", e_int32.call()),
+            ("timestamp", e_timestamp.call()),
             ("int64", e_int64.call()),
             ("maxkey", e_maxkey.call()),
             ("minkey", e_minkey.call()),
