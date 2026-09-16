@@ -1,0 +1,7 @@
+└── document <- bson.document :=
+    └── 0 :=
+        └── timestamp :=
+            ├── key := `valid([((0 :~ (116 => 116)) => 't'), ((0 :~ (115 => 115)) => 's')])
+            └── value :=
+                ├── increment := 7
+                └── seconds := 1577836800
