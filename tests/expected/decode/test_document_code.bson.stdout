@@ -2,21 +2,5 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── code <- bson.element.code :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'f'
-                │       └── 1 := 'n'
-                └── value <- bson.string :=
-                    └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                        ├── 0 := 'f'
-                        ├── 1 := 'u'
-                        ├── 2 := 'n'
-                        ├── 3 := 'c'
-                        ├── 4 := 't'
-                        ├── 5 := 'i'
-                        ├── 6 := 'o'
-                        ├── 7 := 'n'
-                        ├── 8 := '('
-                        ├── 9 := ')'
-                        ~
-                        └── 23 := '}'
+                ├── key <- bson.cstring := { valid := "fn" }
+                └── value <- bson.string := { valid := "function() { return 1; }" }

@@ -2,87 +2,35 @@
     └── elements <- repeat bson.element :=
         ├── 0 <- bson.element :=
         │   └── null <- bson.element.null :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'n'
-        │       │       ├── 1 := 'u'
-        │       │       ├── 2 := 'l'
-        │       │       ├── 3 := 'l'
-        │       │       ├── 4 := 'v'
-        │       │       ├── 5 := 'a'
-        │       │       └── 6 := 'l'
+        │       ├── key <- bson.cstring := { valid := "nullval" }
         │       └── value <- ()
         ├── 1 <- bson.element :=
         │   └── minkey <- bson.element.minkey :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'm'
-        │       │       ├── 1 := 'i'
-        │       │       ├── 2 := 'n'
-        │       │       ├── 3 := 'v'
-        │       │       ├── 4 := 'a'
-        │       │       └── 5 := 'l'
+        │       ├── key <- bson.cstring := { valid := "minval" }
         │       └── value <- ()
         ├── 2 <- bson.element :=
         │   └── maxkey <- bson.element.maxkey :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'm'
-        │       │       ├── 1 := 'a'
-        │       │       ├── 2 := 'x'
-        │       │       ├── 3 := 'v'
-        │       │       ├── 4 := 'a'
-        │       │       └── 5 := 'l'
+        │       ├── key <- bson.cstring := { valid := "maxval" }
         │       └── value <- ()
         ├── 3 <- bson.element :=
         │   └── bool <- bson.element.bool :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'f'
-        │       │       ├── 1 := 'l'
-        │       │       ├── 2 := 'a'
-        │       │       ├── 3 := 'g'
-        │       │       ├── 4 := '_'
-        │       │       └── 5 := 't'
+        │       ├── key <- bson.cstring := { valid := "flag_t" }
         │       └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := true
         ├── 4 <- bson.element :=
         │   └── bool <- bson.element.bool :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'f'
-        │       │       ├── 1 := 'l'
-        │       │       ├── 2 := 'a'
-        │       │       ├── 3 := 'g'
-        │       │       ├── 4 := '_'
-        │       │       └── 5 := 'f'
+        │       ├── key <- bson.cstring := { valid := "flag_f" }
         │       └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := false
         ├── 5 <- bson.element :=
         │   └── int32 <- bson.element.int32 :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'c'
-        │       │       ├── 1 := 'o'
-        │       │       ├── 2 := 'u'
-        │       │       ├── 3 := 'n'
-        │       │       └── 4 := 't'
+        │       ├── key <- bson.cstring := { valid := "count" }
         │       └── value <- ReadI32Le := 42i32
         ├── 6 <- bson.element :=
         │   └── int32 <- bson.element.int32 :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'd'
-        │       │       ├── 1 := 'e'
-        │       │       ├── 2 := 'l'
-        │       │       ├── 3 := 't'
-        │       │       └── 4 := 'a'
+        │       ├── key <- bson.cstring := { valid := "delta" }
         │       └── value <- ReadI32Le := -7i32
         └── 7 <- bson.element :=
             └── objectid <- bson.element.objectid :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := '_'
-                │       ├── 1 := 'i'
-                │       └── 2 := 'd'
+                ├── key <- bson.cstring := { valid := "_id" }
                 └── value <- { ... } :=
                     ├── timestamp <- ReadU32Be := 1
                     ├── randval <- [ ... ] :=

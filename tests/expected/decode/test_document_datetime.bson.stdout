@@ -2,13 +2,5 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── datetime <- bson.element.datetime :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'c'
-                │       ├── 1 := 'r'
-                │       ├── 2 := 'e'
-                │       ├── 3 := 'a'
-                │       ├── 4 := 't'
-                │       ├── 5 := 'e'
-                │       └── 6 := 'd'
+                ├── key <- bson.cstring := { valid := "created" }
                 └── value <- variant DateTime ReadI64Le := { DateTime := 1577836800000i64 }
