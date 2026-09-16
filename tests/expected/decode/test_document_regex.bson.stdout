@@ -2,18 +2,7 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── regex <- bson.element.regex :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'r'
-                │       └── 1 := 'e'
+                ├── key <- bson.cstring := { valid := "re" }
                 └── value <- { ... } :=
-                    ├── pattern <- bson.cstring :=
-                    │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                    │       ├── 0 := '^'
-                    │       ├── 1 := 'a'
-                    │       ├── 2 := 'b'
-                    │       ├── 3 := 'c'
-                    │       └── 4 := '$'
-                    └── options <- bson.cstring :=
-                        └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                            └── 0 := 'i'
+                    ├── pattern <- bson.cstring := { valid := "^abc$" }
+                    └── options <- bson.cstring := { valid := "i" }

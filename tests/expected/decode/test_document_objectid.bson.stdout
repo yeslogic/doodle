@@ -2,11 +2,7 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── objectid <- bson.element.objectid :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := '_'
-                │       ├── 1 := 'i'
-                │       └── 2 := 'd'
+                ├── key <- bson.cstring := { valid := "_id" }
                 └── value <- { ... } :=
                     ├── timestamp <- ReadU32Be := 16909060
                     ├── randval <- [ ... ] :=

@@ -2,9 +2,5 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── int64 <- bson.element.int64 :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'b'
-                │       ├── 1 := 'i'
-                │       └── 2 := 'g'
+                ├── key <- bson.cstring := { valid := "big" }
                 └── value <- ReadI64Le := 1234567890123i64

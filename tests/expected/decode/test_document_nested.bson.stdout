@@ -2,25 +2,14 @@
     └── elements <- repeat bson.element :=
         ├── 0 <- bson.element :=
         │   └── int32 <- bson.element.int32 :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       └── 0 := 'a'
+        │       ├── key <- bson.cstring := { valid := "a" }
         │       └── value <- ReadI32Le := 1i32
         └── 1 <- bson.element :=
             └── document <- { ... } :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'n'
-                │       ├── 1 := 'e'
-                │       ├── 2 := 's'
-                │       ├── 3 := 't'
-                │       ├── 4 := 'e'
-                │       └── 5 := 'd'
+                ├── key <- bson.cstring := { valid := "nested" }
                 └── value <- bson.document :=
                     └── elements <- repeat bson.element :=
                         └── 0 <- bson.element :=
                             └── int32 <- bson.element.int32 :=
-                                ├── key <- bson.cstring :=
-                                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                                │       └── 0 := 'x'
+                                ├── key <- bson.cstring := { valid := "x" }
                                 └── value <- ReadI32Le := 42i32

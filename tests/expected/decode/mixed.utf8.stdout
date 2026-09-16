@@ -1,2 +1,1 @@
-└── data <- _ |...| _ :=
-    └── text <- text.string := "Rustacean🦀\n"
+└── data <- _ |...| _ := { text := "Rustacean🦀\n" }
