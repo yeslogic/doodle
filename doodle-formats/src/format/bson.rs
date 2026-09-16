@@ -1,18 +1,52 @@
 use doodle::{Format, FormatModule, FormatRef, helper::*};
 use doodle_numexpr_macro::numexpr;
 
-fn cstring(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
+/// Given a field-name holding a captured byte-sequence, attempts to decode it as non-empty-null
+/// UTF-8 text, falling back to the raw bytes on failure. Shared tail logic for [`cstring`] and
+/// [`string`], which differ only in how the byte-sequence itself is bounded (scan-to-null vs.
+/// length-prefixed slice).
+fn decode_utf8_nz_permit(bytes_field: &'static str, utf8_nz: FormatRef) -> Format {
     let utf8_nz_total = pseudo_record(
         [("text", utf8_nz.call()), ("__eof", Format::EndOfInput)],
         compute(var("text")),
     );
+    permit(
+        fmt_variant("valid", decode_bytes(var(bytes_field), utf8_nz_total)),
+        variant("invalid", var(bytes_field)),
+    )
+}
+
+fn cstring(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     module.define_format(
         "bson.cstring",
         pseudo_record(
             [("bytes", repeat(not_byte(0x00))), ("__null", is_byte(0x00))],
-            permit(
-                fmt_variant("valid", decode_bytes(var("bytes"), utf8_nz_total)),
-                variant("invalid", var("bytes")),
+            decode_utf8_nz_permit("bytes", utf8_nz),
+        ),
+    )
+}
+
+/// BSON `string`: a length-prefixed UTF-8 string. The leading `int32` (`len`) is the byte-count of
+/// the content *plus* the trailing null terminator, and is enforced as a hard boundary via `slice`
+/// (an out-of-range or too-short buffer is a decode error), but full consumption within that slice
+/// is *not* additionally asserted — an embedded `0x00` before the declared length silently truncates
+/// the captured text early rather than hard-failing, matching the lenient style established for
+/// `bool`.
+fn string(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
+    module.define_format(
+        "bson.string",
+        chain(
+            where_within_z(i32le(), 1i32..),
+            "len",
+            pseudo_record(
+                [
+                    (
+                        "bytes",
+                        slice(numeric(numexpr!("len" -u32 1)), repeat(not_byte(0x00))),
+                    ),
+                    ("__null", is_byte(0x00)),
+                ],
+                decode_utf8_nz_permit("bytes", utf8_nz),
             ),
         ),
     )
@@ -68,6 +102,7 @@ fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
 }
 
 const BSON_TAG_DOUBLE: i8 = 0x01;
+const BSON_TAG_STRING: i8 = 0x02;
 const BSON_TAG_OBJECTID: i8 = 0x07;
 const BSON_TAG_BOOL: i8 = 0x08;
 const BSON_TAG_DATETIME: i8 = 0x09;
@@ -78,10 +113,14 @@ const BSON_TAG_INT64: i8 = 0x12;
 const BSON_TAG_MAXKEY: i8 = 0x7F;
 const BSON_TAG_MINKEY: i8 = -1;
 
-fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
+fn element(module: &mut FormatModule, cstring: FormatRef, string: FormatRef) -> FormatRef {
     let e_double = module.define_format(
         "bson.element.double",
         mk_element(BSON_TAG_DOUBLE, cstring, double()),
+    );
+    let e_string = module.define_format(
+        "bson.element.string",
+        mk_element(BSON_TAG_STRING, cstring, string.call()),
     );
     let e_objectid = module.define_format(
         "bson.element.objectid",
@@ -123,6 +162,7 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
         "bson.element",
         alts([
             ("double", e_double.call()),
+            ("string", e_string.call()),
             ("objectid", e_objectid.call()),
             ("bool", e_bool.call()),
             ("datetime", e_datetime.call()),
@@ -159,7 +199,8 @@ fn document(module: &mut FormatModule, element: FormatRef) -> FormatRef {
 
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
-    let element = element(module, cstring);
+    let string = string(module, utf8_nz);
+    let element = element(module, cstring, string);
     let document = document(module, element);
     module.define_format("bson.main", record([("document", document.call())]))
 }
