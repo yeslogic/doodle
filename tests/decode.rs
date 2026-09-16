@@ -265,6 +265,23 @@ mod bson {
     }
 
     #[test]
+    fn test_decode_document_string() {
+        let output = decode_bson("test_document_string.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_string.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_string_embedded_null() {
+        let output = decode_bson("test_document_string_embedded_null.bson");
+        let expected = expect_test::expect_file!(
+            "expected/decode/test_document_string_embedded_null.bson.stdout"
+        );
+        check_output(output, expected)
+    }
+
+    #[test]
     fn test_decode_document_null() {
         let output = decode_bson("test_document_null.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_null.bson.stdout");
