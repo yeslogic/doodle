@@ -1,5 +1,10 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── int64 :=
-            ├── key := `valid([((0 :~ (98 => 98)) => 'b'), ((0 :~ (105 => 105)) => 'i'), ((0 :~ (103 => 103)) => 'g')])
-            └── value := 1234567890123i64
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── int64 <- bson.element.int64 :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       ├── 0 := 'b'
+                │       ├── 1 := 'i'
+                │       └── 2 := 'g'
+                └── value <- ReadI64Le := 1234567890123i64

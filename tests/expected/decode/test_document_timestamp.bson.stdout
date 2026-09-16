@@ -1,7 +1,11 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── timestamp :=
-            ├── key := `valid([((0 :~ (116 => 116)) => 't'), ((0 :~ (115 => 115)) => 's')])
-            └── value :=
-                ├── increment := 7
-                └── seconds := 1577836800
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── timestamp <- bson.element.timestamp :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       ├── 0 := 't'
+                │       └── 1 := 's'
+                └── value <- { ... } :=
+                    ├── increment <- ReadU32Le := 7
+                    └── seconds <- ReadU32Le := 1577836800

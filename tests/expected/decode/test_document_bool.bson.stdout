@@ -1,9 +1,14 @@
 └── document <- bson.document :=
-    ├── 0 :=
-    │   └── bool :=
-    │       ├── key := `valid([((0 :~ (116 => 116)) => 't')])
-    │       └── value := true
-    └── 1 :=
-        └── bool :=
-            ├── key := `valid([((0 :~ (102 => 102)) => 'f')])
-            └── value := false
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── bool <- bson.element.bool :=
+        │       ├── key <- bson.cstring :=
+        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+        │       │       └── 0 := 't'
+        │       └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := true
+        └── 1 <- bson.element :=
+            └── bool <- bson.element.bool :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       └── 0 := 'f'
+                └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := false

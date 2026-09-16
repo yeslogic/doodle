@@ -1,19 +1,32 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── dbpointer :=
-            ├── key := `valid([((0 :~ (114 => 114)) => 'r'), ((0 :~ (101 => 101)) => 'e'), ((0 :~ (102 => 102)) => 'f')])
-            └── value :=
-                ├── namespace := `valid([((0 :~ (100 => 100)) => 'd'), ((0 :~ (98 => 98)) => 'b'), ((0 :~ (46 => 46)) => '.'), ((0 :~ (99 => 99)) => 'c'), ((0 :~ (111 => 111)) => 'o'), ((0 :~ (108 => 108)) => 'l'), ((0 :~ (108 => 108)) => 'l')])
-                └── id :=
-                    ├── 0 := 0
-                    ├── 1 := 1
-                    ├── 2 := 2
-                    ├── 3 := 3
-                    ├── 4 := 4
-                    ├── 5 := 5
-                    ├── 6 := 6
-                    ├── 7 := 7
-                    ├── 8 := 8
-                    ├── 9 := 9
-                    ~
-                    └── 11 := 11
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── dbpointer <- bson.element.dbpointer :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       ├── 0 := 'r'
+                │       ├── 1 := 'e'
+                │       └── 2 := 'f'
+                └── value <- { ... } :=
+                    ├── namespace <- bson.string :=
+                    │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                    │       ├── 0 := 'd'
+                    │       ├── 1 := 'b'
+                    │       ├── 2 := '.'
+                    │       ├── 3 := 'c'
+                    │       ├── 4 := 'o'
+                    │       ├── 5 := 'l'
+                    │       └── 6 := 'l'
+                    └── id <- [ ... ] :=
+                        ├── 0 := 0
+                        ├── 1 := 1
+                        ├── 2 := 2
+                        ├── 3 := 3
+                        ├── 4 := 4
+                        ├── 5 := 5
+                        ├── 6 := 6
+                        ├── 7 := 7
+                        ├── 8 := 8
+                        ├── 9 := 9
+                        ~
+                        └── 11 := 11

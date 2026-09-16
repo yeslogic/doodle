@@ -1,9 +1,18 @@
 └── document <- bson.document :=
-    ├── 0 :=
-    │   └── int32 :=
-    │       ├── key := `valid([((0 :~ (112 => 112)) => 'p'), ((0 :~ (111 => 111)) => 'o'), ((0 :~ (115 => 115)) => 's')])
-    │       └── value := 12345i32
-    └── 1 :=
-        └── int32 :=
-            ├── key := `valid([((0 :~ (110 => 110)) => 'n'), ((0 :~ (101 => 101)) => 'e'), ((0 :~ (103 => 103)) => 'g')])
-            └── value := -12345i32
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring :=
+        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+        │       │       ├── 0 := 'p'
+        │       │       ├── 1 := 'o'
+        │       │       └── 2 := 's'
+        │       └── value <- ReadI32Le := 12345i32
+        └── 1 <- bson.element :=
+            └── int32 <- bson.element.int32 :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       ├── 0 := 'n'
+                │       ├── 1 := 'e'
+                │       └── 2 := 'g'
+                └── value <- ReadI32Le := -12345i32
