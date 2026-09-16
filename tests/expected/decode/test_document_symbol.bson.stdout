@@ -2,13 +2,5 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── symbol <- bson.element.symbol :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 's'
-                │       ├── 1 := 'y'
-                │       └── 2 := 'm'
-                └── value <- bson.string :=
-                    └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                        ├── 0 := 's'
-                        ├── 1 := 'y'
-                        └── 2 := 'm'
+                ├── key <- bson.cstring := { valid := "sym" }
+                └── value <- bson.string := { valid := "sym" }

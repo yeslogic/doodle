@@ -1839,6 +1839,11 @@ pub fn mk_ascii_string(x: Format) -> Format {
     Format::Hint(StyleHint::AsciiStr, Box::new(x))
 }
 
+/// Similar to [`mk_ascii_string`], but for UTF8-encoded Seq(Char).
+pub fn mk_utf8_string(x: Format) -> Format {
+    Format::Hint(StyleHint::UTF8Str, Box::new(x))
+}
+
 /// Helper for [`Format::LetView`]
 pub fn let_view<Name: IntoLabel>(name: Name, format: Format) -> Format {
     Format::LetView(name.into(), Box::new(format))

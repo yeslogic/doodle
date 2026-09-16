@@ -2,7 +2,5 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── double <- bson.element.double :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       └── 0 := 'd'
+                ├── key <- bson.cstring := { valid := "d" }
                 └── value <- variant F64 ReadU64Le := { F64 := 4609434218613702656 }

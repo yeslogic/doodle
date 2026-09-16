@@ -2,17 +2,9 @@
     └── elements <- repeat bson.element :=
         ├── 0 <- bson.element :=
         │   └── int32 <- bson.element.int32 :=
-        │       ├── key <- bson.cstring :=
-        │       │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-        │       │       ├── 0 := 'p'
-        │       │       ├── 1 := 'o'
-        │       │       └── 2 := 's'
+        │       ├── key <- bson.cstring := { valid := "pos" }
         │       └── value <- ReadI32Le := 12345i32
         └── 1 <- bson.element :=
             └── int32 <- bson.element.int32 :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'n'
-                │       ├── 1 := 'e'
-                │       └── 2 := 'g'
+                ├── key <- bson.cstring := { valid := "neg" }
                 └── value <- ReadI32Le := -12345i32

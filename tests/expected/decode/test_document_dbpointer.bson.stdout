@@ -2,21 +2,9 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── dbpointer <- bson.element.dbpointer :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 'r'
-                │       ├── 1 := 'e'
-                │       └── 2 := 'f'
+                ├── key <- bson.cstring := { valid := "ref" }
                 └── value <- { ... } :=
-                    ├── namespace <- bson.string :=
-                    │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                    │       ├── 0 := 'd'
-                    │       ├── 1 := 'b'
-                    │       ├── 2 := '.'
-                    │       ├── 3 := 'c'
-                    │       ├── 4 := 'o'
-                    │       ├── 5 := 'l'
-                    │       └── 6 := 'l'
+                    ├── namespace <- bson.string := { valid := "db.coll" }
                     └── id <- [ ... ] :=
                         ├── 0 := 0
                         ├── 1 := 1

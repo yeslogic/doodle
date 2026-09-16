@@ -4069,7 +4069,7 @@ where
                 match _hint {
                     // REVIEW - do we want to perform any local modifications?
                     StyleHint::Record { .. } => inner_block,
-                    StyleHint::AsciiStr | StyleHint::AsciiChar => inner_block,
+                    StyleHint::AsciiStr | StyleHint::AsciiChar | StyleHint::UTF8Str => inner_block,
                     StyleHint::Common(CommonOp::EndianParse(_kind_endian)) => {
                         // REVIEW - do we want to swap-in particular endian parses instead?
                         inner_block
@@ -5492,6 +5492,9 @@ impl<'a> Elaborator<'a> {
                     }
                     StyleHint::AsciiChar => {
                         // REVIEW - should we check for u8-like types?
+                    }
+                    StyleHint::UTF8Str => {
+                        // REVIEW - should we check for Seq(char)-like types?
                     }
                     StyleHint::Common(common_op) => match common_op {
                         CommonOp::EndianParse(base_kind) => {

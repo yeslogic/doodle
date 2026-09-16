@@ -868,6 +868,8 @@ pub enum StyleHint {
     },
     AsciiStr,
     AsciiChar,
+    // REVIEW - consider implementing Utf8Char
+    UTF8Str,
     Common(CommonOp),
 }
 

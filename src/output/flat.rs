@@ -359,6 +359,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Enforce(format) => self.write_flat(value, format),
             Format::Hint(StyleHint::AsciiStr, str_format) => self.write_flat(value, str_format),
             Format::Hint(StyleHint::AsciiChar, char_format) => self.write_flat(value, char_format),
+            Format::Hint(StyleHint::UTF8Str, str_format) => self.write_flat(value, str_format),
             Format::Hint(StyleHint::Common(..), inner) => self.write_flat(value, inner),
             // REVIEW - is this the most sensible implementation?
             Format::WithView(_ident, _vf) => Ok(()),

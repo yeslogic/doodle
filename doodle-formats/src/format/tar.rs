@@ -22,10 +22,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // CString values. All unused bytes following the terminal NUL must also be NUL
     let tar_asciiz = module.define_format(
         "tar.ascii-string",
-        record_auto([
+        mk_ascii_string(record_auto([
             ("string", mk_ascii_string(repeat(not_byte(0x00)))),
             ("__padding", repeat1(is_byte(0x00))),
-        ]),
+        ])),
     );
 
     const MAGIC: &[u8; 6] = b"ustar\x00";
@@ -100,18 +100,18 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // if any, after reaching the end of the first parse, are all NUL
     let tar_str_optz = module.define_format(
         "tar.ascii-string.opt0",
-        record_auto([
+        mk_ascii_string(record_auto([
             ("string", mk_ascii_string(repeat(not_byte(0x00)))),
             ("__padding", repeat(is_byte(0x00))),
-        ]),
+        ])),
     );
 
     let tar_str_optz_ne = module.define_format(
         "tar.ascii-string.opt0.nonempty",
-        record_auto([
+        mk_ascii_string(record_auto([
             ("string", mk_ascii_string(repeat1(not_byte(0x00)))),
             ("__padding", repeat(is_byte(0x00))),
-        ]),
+        ])),
     );
 
     let filename = slice(Expr::U16(100), tar_str_optz_ne.call());

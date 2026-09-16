@@ -11,7 +11,10 @@ fn decode_utf8_nz_permit(bytes_field: &'static str, utf8_nz: FormatRef) -> Forma
         compute(var("text")),
     );
     permit(
-        fmt_variant("valid", decode_bytes(var(bytes_field), utf8_nz_total)),
+        fmt_variant(
+            "valid",
+            mk_utf8_string(decode_bytes(var(bytes_field), utf8_nz_total)),
+        ),
         variant("invalid", var(bytes_field)),
     )
 }

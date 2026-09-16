@@ -2,10 +2,7 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── timestamp <- bson.element.timestamp :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       ├── 0 := 't'
-                │       └── 1 := 's'
+                ├── key <- bson.cstring := { valid := "ts" }
                 └── value <- { ... } :=
                     ├── increment <- ReadU32Le := 7
                     └── seconds <- ReadU32Le := 1577836800

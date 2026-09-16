@@ -2,9 +2,7 @@
     └── elements <- repeat bson.element :=
         └── 0 <- bson.element :=
             └── binary <- bson.element.binary :=
-                ├── key <- bson.cstring :=
-                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
-                │       └── 0 := 'b'
+                ├── key <- bson.cstring := { valid := "b" }
                 └── value <- { ... } :=
                     ├── subtype <- ReadU8 := 0
                     └── data <- match subtype { ... } :=
