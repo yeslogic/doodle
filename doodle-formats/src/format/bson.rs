@@ -1,4 +1,4 @@
-use doodle::{Format, FormatModule, FormatRef, helper::*};
+use doodle::{Format, FormatModule, FormatRef, Pattern, helper::*};
 use doodle_numexpr_macro::numexpr;
 
 /// Given a field-name holding a captured byte-sequence, attempts to decode it as non-empty-null
@@ -93,6 +93,55 @@ fn objectid() -> Format {
     ])
 }
 
+/// BSON `binary` (0x05). The leading `int32` gives the byte-length of the data that follows the
+/// subtype byte, guarded against underflow the same way as `document`'s own length field.
+///
+/// Subtype `0x02` ("Binary (Old)") is a legacy quirk: it carries an extra, redundant `int32` length
+/// field *inside* the data span. Both length fields are present on the wire, but only the inner one
+/// is used here to bound the actual data read, sidestepping a needless outer/inner consistency
+/// cross-check (and the underflow risk of deriving one from the other by subtraction).
+fn binary() -> Format {
+    record_auto([
+        ("_len", where_within_z(i32le(), 0i32..)),
+        ("subtype", u8()),
+        (
+            "data",
+            fmt_match(
+                var("subtype"),
+                [
+                    (
+                        Pattern::U8(0x02),
+                        chain(
+                            where_within_z(i32le(), 0i32..),
+                            "_inner_len",
+                            repeat_count(numeric(numexpr!("_inner_len" -u32 0)), Format::ANY_BYTE),
+                        ),
+                    ),
+                    (
+                        Pattern::Wildcard,
+                        repeat_count(numeric(numexpr!("_len" -u32 0)), Format::ANY_BYTE),
+                    ),
+                ],
+            ),
+        ),
+    ])
+}
+
+/// BSON `regex`: a `pattern` `cstring` followed by an `options` `cstring`.
+fn regex(cstring: FormatRef) -> Format {
+    record([("pattern", cstring.call()), ("options", cstring.call())])
+}
+
+/// BSON `DBPointer` (deprecated): a `namespace` `string` followed by 12 raw, opaque bytes. The spec
+/// text doesn't mandate `ObjectId`-shaped structure for those 12 bytes (even though in practice they
+/// reference one), so they're left undecomposed here rather than reusing [`objectid`].
+fn dbpointer(string: FormatRef) -> Format {
+    record([
+        ("namespace", string.call()),
+        ("id", seq_repeat(12, Format::ANY_BYTE)),
+    ])
+}
+
 fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
     record_auto([
         ("__tag", is_byte(tag as u8)),
@@ -103,10 +152,15 @@ fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
 
 const BSON_TAG_DOUBLE: i8 = 0x01;
 const BSON_TAG_STRING: i8 = 0x02;
+const BSON_TAG_BINARY: i8 = 0x05;
 const BSON_TAG_OBJECTID: i8 = 0x07;
 const BSON_TAG_BOOL: i8 = 0x08;
 const BSON_TAG_DATETIME: i8 = 0x09;
 const BSON_TAG_NULL: i8 = 0x0A;
+const BSON_TAG_REGEX: i8 = 0x0B;
+const BSON_TAG_DBPOINTER: i8 = 0x0C;
+const BSON_TAG_CODE: i8 = 0x0D;
+const BSON_TAG_SYMBOL: i8 = 0x0E;
 const BSON_TAG_INT32: i8 = 0x10;
 const BSON_TAG_TIMESTAMP: i8 = 0x11;
 const BSON_TAG_INT64: i8 = 0x12;
@@ -121,6 +175,10 @@ fn element(module: &mut FormatModule, cstring: FormatRef, string: FormatRef) -> 
     let e_string = module.define_format(
         "bson.element.string",
         mk_element(BSON_TAG_STRING, cstring, string.call()),
+    );
+    let e_binary = module.define_format(
+        "bson.element.binary",
+        mk_element(BSON_TAG_BINARY, cstring, binary()),
     );
     let e_objectid = module.define_format(
         "bson.element.objectid",
@@ -137,6 +195,22 @@ fn element(module: &mut FormatModule, cstring: FormatRef, string: FormatRef) -> 
     let e_null = module.define_format(
         "bson.element.null",
         mk_element(BSON_TAG_NULL, cstring, Format::EMPTY),
+    );
+    let e_regex = module.define_format(
+        "bson.element.regex",
+        mk_element(BSON_TAG_REGEX, cstring, regex(cstring)),
+    );
+    let e_dbpointer = module.define_format(
+        "bson.element.dbpointer",
+        mk_element(BSON_TAG_DBPOINTER, cstring, dbpointer(string)),
+    );
+    let e_code = module.define_format(
+        "bson.element.code",
+        mk_element(BSON_TAG_CODE, cstring, string.call()),
+    );
+    let e_symbol = module.define_format(
+        "bson.element.symbol",
+        mk_element(BSON_TAG_SYMBOL, cstring, string.call()),
     );
     let e_int32 = module.define_format(
         "bson.element.int32",
@@ -163,10 +237,15 @@ fn element(module: &mut FormatModule, cstring: FormatRef, string: FormatRef) -> 
         alts([
             ("double", e_double.call()),
             ("string", e_string.call()),
+            ("binary", e_binary.call()),
             ("objectid", e_objectid.call()),
             ("bool", e_bool.call()),
             ("datetime", e_datetime.call()),
             ("null", e_null.call()),
+            ("regex", e_regex.call()),
+            ("dbpointer", e_dbpointer.call()),
+            ("code", e_code.call()),
+            ("symbol", e_symbol.call()),
             ("int32", e_int32.call()),
             ("timestamp", e_timestamp.call()),
             ("int64", e_int64.call()),
