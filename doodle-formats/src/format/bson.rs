@@ -152,6 +152,7 @@ fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
 
 const BSON_TAG_DOUBLE: i8 = 0x01;
 const BSON_TAG_STRING: i8 = 0x02;
+const BSON_TAG_DOCUMENT: i8 = 0x03;
 const BSON_TAG_BINARY: i8 = 0x05;
 const BSON_TAG_OBJECTID: i8 = 0x07;
 const BSON_TAG_BOOL: i8 = 0x08;
@@ -167,7 +168,16 @@ const BSON_TAG_INT64: i8 = 0x12;
 const BSON_TAG_MAXKEY: i8 = 0x7F;
 const BSON_TAG_MINKEY: i8 = -1;
 
-fn element(module: &mut FormatModule, cstring: FormatRef, string: FormatRef) -> FormatRef {
+/// Factory function for the format of a single BSON `element`
+///
+/// Takes references to `cstring` and `string` formats, as well as the `Format::RecVar` corresponding
+/// to the `bson.document` format.
+fn element(
+    module: &mut FormatModule,
+    cstring: FormatRef,
+    string: FormatRef,
+    document: Format,
+) -> Format {
     let e_double = module.define_format(
         "bson.element.double",
         mk_element(BSON_TAG_DOUBLE, cstring, double()),
@@ -232,46 +242,39 @@ fn element(module: &mut FormatModule, cstring: FormatRef, string: FormatRef) -> 
         "bson.element.minkey",
         mk_element(BSON_TAG_MINKEY, cstring, Format::EMPTY),
     );
-    module.define_format(
-        "bson.element",
-        alts([
-            ("double", e_double.call()),
-            ("string", e_string.call()),
-            ("binary", e_binary.call()),
-            ("objectid", e_objectid.call()),
-            ("bool", e_bool.call()),
-            ("datetime", e_datetime.call()),
-            ("null", e_null.call()),
-            ("regex", e_regex.call()),
-            ("dbpointer", e_dbpointer.call()),
-            ("code", e_code.call()),
-            ("symbol", e_symbol.call()),
-            ("int32", e_int32.call()),
-            ("timestamp", e_timestamp.call()),
-            ("int64", e_int64.call()),
-            ("maxkey", e_maxkey.call()),
-            ("minkey", e_minkey.call()),
-        ]),
-    )
+    alts([
+        ("double", e_double.call()),
+        ("string", e_string.call()),
+        ("document", mk_element(BSON_TAG_DOCUMENT, cstring, document)),
+        ("binary", e_binary.call()),
+        ("objectid", e_objectid.call()),
+        ("bool", e_bool.call()),
+        ("datetime", e_datetime.call()),
+        ("null", e_null.call()),
+        ("regex", e_regex.call()),
+        ("dbpointer", e_dbpointer.call()),
+        ("code", e_code.call()),
+        ("symbol", e_symbol.call()),
+        ("int32", e_int32.call()),
+        ("timestamp", e_timestamp.call()),
+        ("int64", e_int64.call()),
+        ("maxkey", e_maxkey.call()),
+        ("minkey", e_minkey.call()),
+    ])
 }
 
-fn document(module: &mut FormatModule, element: FormatRef) -> FormatRef {
-    module.define_format(
-        "bson.document",
-        chain(
-            // NOTE - guard against underflow (len < 4)
-            where_within_z(i32le(), 4i32..),
-            "len",
-            slice(
-                numeric(numexpr!("len" -u32 4)),
-                pseudo_record(
-                    [
-                        ("elements", repeat(element.call())),
-                        ("__null", is_byte(0x00)),
-                    ],
-                    compute(var("elements")),
-                ),
-            ),
+/// Factory function for the format of a BSON `document`
+///
+/// Takes a direct format to use for `bson.element`, allowing `RecVar` to be used
+/// (where a FormatRef-typed argument is not currently sound for that purpose).
+fn document(element: Format) -> Format {
+    chain(
+        // NOTE - guard against underflow (len < 4)
+        where_within_z(i32le(), 4i32..),
+        "len",
+        slice(
+            numeric(numexpr!("len" -u32 4)),
+            record_auto([("elements", repeat(element)), ("__null", is_byte(0x00))]),
         ),
     )
 }
@@ -279,7 +282,16 @@ fn document(module: &mut FormatModule, element: FormatRef) -> FormatRef {
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
     let string = string(module, utf8_nz);
-    let element = element(module, cstring, string);
-    let document = document(module, element);
+    let document = {
+        let element0 = element(module, cstring, string, Format::RecVar(1));
+        let refs = module.define_format_rec_batch(vec![
+            ("bson.element", element0),
+            ("bson.document", document(Format::RecVar(0))),
+        ]);
+        match &refs[..] {
+            [_element, document] => *document,
+            _ => unreachable!(),
+        }
+    };
     module.define_format("bson.main", record([("document", document.call())]))
 }

@@ -1,11 +1,14 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── binary :=
-            ├── key := `valid([((0 :~ (98 => 98)) => 'b')])
-            └── value :=
-                ├── subtype := 0
-                └── data :=
-                    ├── 0 := 222
-                    ├── 1 := 173
-                    ├── 2 := 190
-                    └── 3 := 239
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── binary <- bson.element.binary :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       └── 0 := 'b'
+                └── value <- { ... } :=
+                    ├── subtype <- ReadU8 := 0
+                    └── data <- match subtype { ... } :=
+                        ├── 0 := 222
+                        ├── 1 := 173
+                        ├── 2 := 190
+                        └── 3 := 239

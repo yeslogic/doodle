@@ -1,7 +1,19 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── regex :=
-            ├── key := `valid([((0 :~ (114 => 114)) => 'r'), ((0 :~ (101 => 101)) => 'e')])
-            └── value :=
-                ├── pattern := `valid([((0 :~ (94 => 94)) => '^'), ((0 :~ (97 => 97)) => 'a'), ((0 :~ (98 => 98)) => 'b'), ((0 :~ (99 => 99)) => 'c'), ((0 :~ (36 => 36)) => '$')])
-                └── options := `valid([((0 :~ (105 => 105)) => 'i')])
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── regex <- bson.element.regex :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       ├── 0 := 'r'
+                │       └── 1 := 'e'
+                └── value <- { ... } :=
+                    ├── pattern <- bson.cstring :=
+                    │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                    │       ├── 0 := '^'
+                    │       ├── 1 := 'a'
+                    │       ├── 2 := 'b'
+                    │       ├── 3 := 'c'
+                    │       └── 4 := '$'
+                    └── options <- bson.cstring :=
+                        └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                            └── 0 := 'i'

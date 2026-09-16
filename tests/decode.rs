@@ -409,4 +409,20 @@ mod bson {
         let expected = expect_test::expect_file!("expected/decode/test_document_mixed.bson.stdout");
         check_output(output, expected)
     }
+
+    #[test]
+    fn test_decode_document_nested() {
+        let output = decode_bson("test_document_nested.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_nested.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_nested_deep() {
+        let output = decode_bson("test_document_nested_deep.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_nested_deep.bson.stdout");
+        check_output(output, expected)
+    }
 }
