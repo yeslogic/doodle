@@ -1,5 +1,8 @@
 └── document <- bson.document :=
-    └── 0 :=
-        └── double :=
-            ├── key := `valid([((0 :~ (100 => 100)) => 'd')])
-            └── value := { F64 := 4609434218613702656 }
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── double <- bson.element.double :=
+                ├── key <- bson.cstring :=
+                │   └── valid <- decode-bytes bytes (let-format text text.string.utf8.non-null (monad-seq end-of-input (compute text))) :=
+                │       └── 0 := 'd'
+                └── value <- variant F64 ReadU64Le := { F64 := 4609434218613702656 }
