@@ -37,6 +37,12 @@ fn double() -> Format {
     fmt_variant("F64", u64le())
 }
 
+/// BSON UTC datetime: a signed 64-bit integer of milliseconds since the Unix epoch, tagged
+/// distinctly from a plain `int64` since it carries different semantics despite the same bits.
+fn datetime() -> Format {
+    fmt_variant("DateTime", i64le())
+}
+
 /// Internal helper for BSON object IDs
 fn objectid() -> Format {
     record([
@@ -57,8 +63,10 @@ fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
 const BSON_TAG_DOUBLE: i8 = 0x01;
 const BSON_TAG_OBJECTID: i8 = 0x07;
 const BSON_TAG_BOOL: i8 = 0x08;
+const BSON_TAG_DATETIME: i8 = 0x09;
 const BSON_TAG_NULL: i8 = 0x0A;
 const BSON_TAG_INT32: i8 = 0x10;
+const BSON_TAG_INT64: i8 = 0x12;
 const BSON_TAG_MAXKEY: i8 = 0x7F;
 const BSON_TAG_MINKEY: i8 = -1;
 
@@ -75,6 +83,10 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
         "bson.element.bool",
         mk_element(BSON_TAG_BOOL, cstring, bool()),
     );
+    let e_datetime = module.define_format(
+        "bson.element.datetime",
+        mk_element(BSON_TAG_DATETIME, cstring, datetime()),
+    );
     let e_null = module.define_format(
         "bson.element.null",
         mk_element(BSON_TAG_NULL, cstring, Format::EMPTY),
@@ -82,6 +94,10 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
     let e_int32 = module.define_format(
         "bson.element.int32",
         mk_element(BSON_TAG_INT32, cstring, i32le()),
+    );
+    let e_int64 = module.define_format(
+        "bson.element.int64",
+        mk_element(BSON_TAG_INT64, cstring, i64le()),
     );
     let e_maxkey = module.define_format(
         "bson.element.maxkey",
@@ -97,8 +113,10 @@ fn element(module: &mut FormatModule, cstring: FormatRef) -> FormatRef {
             ("double", e_double.call()),
             ("objectid", e_objectid.call()),
             ("bool", e_bool.call()),
+            ("datetime", e_datetime.call()),
             ("null", e_null.call()),
             ("int32", e_int32.call()),
+            ("int64", e_int64.call()),
             ("maxkey", e_maxkey.call()),
             ("minkey", e_minkey.call()),
         ]),

@@ -2002,9 +2002,19 @@ pub mod base {
         )
     }
 
-    // TODO - implement i64le
+    /// Parses a little-endian u64 value and performs a bitwise cast to i64.
+    pub fn i64le() -> Format {
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I64Ext(Endian::Le))),
+            Box::new(map_numeric(u64le(), |v| {
+                num::cast_bitwise(MachineRep::I64, v)
+            })),
+        )
+    }
 }
-pub use base::{bit, i8, i16be, i32be, i32le, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};
+pub use base::{
+    bit, i8, i16be, i32be, i32le, i64be, i64le, u8, u16be, u16le, u32be, u32le, u64be, u64le,
+};
 
 /// Parses a big-endian u24 (3-byte) value, mapped into the u32 value-type space.
 ///
