@@ -34,7 +34,7 @@ fn bool() -> Format {
 /// Scaffolding for BSON double values
 fn double() -> Format {
     // NOTE - we have no support for non-integer numbers in any layer, so we parse a 64-bit int we can later convert
-    fmt_variant("F64", u64be())
+    fmt_variant("F64", u64le())
 }
 
 /// Internal helper for BSON object IDs
