@@ -342,6 +342,52 @@ mod bson {
     }
 
     #[test]
+    fn test_decode_document_binary() {
+        let output = decode_bson("test_document_binary.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_binary.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_binary_old() {
+        let output = decode_bson("test_document_binary_old.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_binary_old.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_regex() {
+        let output = decode_bson("test_document_regex.bson");
+        let expected = expect_test::expect_file!("expected/decode/test_document_regex.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_dbpointer() {
+        let output = decode_bson("test_document_dbpointer.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_dbpointer.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_code() {
+        let output = decode_bson("test_document_code.bson");
+        let expected = expect_test::expect_file!("expected/decode/test_document_code.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_symbol() {
+        let output = decode_bson("test_document_symbol.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_symbol.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
     fn test_decode_document_objectid() {
         let output = decode_bson("test_document_objectid.bson");
         let expected =
