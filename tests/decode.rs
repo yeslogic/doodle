@@ -432,4 +432,12 @@ mod bson {
         let expected = expect_test::expect_file!("expected/decode/test_document_array.bson.stdout");
         check_output(output, expected)
     }
+
+    #[test]
+    fn test_decode_document_code_w_scope() {
+        let output = decode_bson("test_document_code_w_scope.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_code_w_scope.bson.stdout");
+        check_output(output, expected)
+    }
 }
