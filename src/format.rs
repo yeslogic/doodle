@@ -938,7 +938,7 @@ impl Format {
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
-            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatBetween(.., format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format)
             | Format::ForEach(.., format) => format.is_utf8_char_format(module),

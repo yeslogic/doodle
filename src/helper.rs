@@ -2004,9 +2004,11 @@ pub mod base {
     pub fn i32le() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I32Ext(Endian::Le))),
-            Box::new(map_numeric(u32le(), |v| {
-                num::cast_bitwise(MachineRep::I32, v)
-            })),
+            Box::new(map_numeric(
+                u32le(),
+                "x",
+                num::cast_bitwise(MachineRep::I32, num::num_var("x")),
+            )),
         )
     }
 
@@ -2016,8 +2018,8 @@ pub mod base {
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I64BE)),
             Box::new(map_numeric(
                 u64be(),
-                "raw",
-                num::cast_bitwise(MachineRep::I64, num::num_var("raw")),
+                "x",
+                num::cast_bitwise(MachineRep::I64, num::num_var("x")),
             )),
         )
     }
@@ -2026,9 +2028,11 @@ pub mod base {
     pub fn i64le() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I64Ext(Endian::Le))),
-            Box::new(map_numeric(u64le(), |v| {
-                num::cast_bitwise(MachineRep::I64, v)
-            })),
+            Box::new(map_numeric(
+                u64le(),
+                "x",
+                num::cast_bitwise(MachineRep::I64, num::num_var("x")),
+            )),
         )
     }
 }
