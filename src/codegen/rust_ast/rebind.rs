@@ -464,6 +464,7 @@ impl Rebindable for CompType {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             CompType::Vec(t)
+            | CompType::RecBox(t)
             | CompType::RawSlice(t)
             | CompType::Option(t)
             | CompType::Result(t, ..)

@@ -1,0 +1,20 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── dbpointer <- bson.element.dbpointer :=
+                ├── key <- bson.cstring := { valid := "ref" }
+                └── value <- { ... } :=
+                    ├── namespace <- bson.string := { valid := "db.coll" }
+                    └── id <- [ ... ] :=
+                        ├── 0 := 0
+                        ├── 1 := 1
+                        ├── 2 := 2
+                        ├── 3 := 3
+                        ├── 4 := 4
+                        ├── 5 := 5
+                        ├── 6 := 6
+                        ├── 7 := 7
+                        ├── 8 := 8
+                        ├── 9 := 9
+                        ~
+                        └── 11 := 11

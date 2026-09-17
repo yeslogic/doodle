@@ -57,25 +57,6 @@ pub struct Flags {
     summarize_boolean_record_set_fields: bool,
 }
 
-// TODO - introduce StyleHints to replace these name-based checks
-#[inline]
-/// Specialization predicate for identifying ASCII-character formats based on their registered name
-fn name_is_ascii_char(name: &str) -> bool {
-    name.contains("ascii") && name.contains("char")
-}
-
-#[inline]
-/// Specialization predicate for identifying ASCII-string formats based on their registered name
-fn name_is_ascii_string(name: &str) -> bool {
-    name.contains("ascii") && name.contains("string")
-}
-
-#[inline]
-/// Specialization predicate for identifying UTF8-string formats based on their registered name
-fn name_is_utf8_string(name: &str) -> bool {
-    name.contains("utf8") && name.contains("string")
-}
-
 pub struct TreePrinter<'module> {
     gutter: Vec<Column>,
     preview_len: Option<usize>,
@@ -121,6 +102,9 @@ impl<'module> TreePrinter<'module> {
             Format::ItemVar(level, _args, _views) => {
                 self.is_implied_value_format(self.module.get_format(*level))
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::EndOfInput => true,
             Format::Phantom(_) => true,
             Format::Byte(bs) => bs.len() == 1,
@@ -131,6 +115,7 @@ impl<'module> TreePrinter<'module> {
             Format::Hint(StyleHint::Common(_), inner) => self.is_implied_value_format(inner),
             Format::Hint(StyleHint::AsciiChar, inner) => self.is_implied_value_format(inner),
             Format::Hint(StyleHint::AsciiStr, inner) => self.is_implied_value_format(inner),
+            Format::Hint(StyleHint::UTF8Str, inner) => self.is_implied_value_format(inner),
             Format::Hint(StyleHint::Record { old_style }, inner) => {
                 if *old_style {
                     self.is_implied_value_format_old_style_record(inner)
@@ -243,6 +228,9 @@ impl<'module> TreePrinter<'module> {
             if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
                 return true;
             }
+            if self.flags.pretty_utf8_strings && format.is_utf8_string_format(self.module) {
+                return true;
+            }
         }
         match value {
             Value::Char(_) => true,
@@ -310,6 +298,9 @@ impl<'module> TreePrinter<'module> {
     fn is_atomic_parsed_value(&self, value: &ParsedValue, format: Option<&Format>) -> bool {
         if let Some(format) = format {
             if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
+                return true;
+            }
+            if self.flags.pretty_utf8_strings && format.is_utf8_string_format(self.module) {
                 return true;
             }
         }
@@ -453,21 +444,11 @@ impl<'module> TreePrinter<'module> {
                 self.compile_parsed_value(value)
             }
             Format::ItemVar(level, _args, _views) => {
-                let fmt_name = self.module.get_name(*level);
-
-                if self.flags.pretty_utf8_strings && name_is_utf8_string(fmt_name) {
-                    Self::compile_parsed_string(value)
-                } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
-                    Self::compile_parsed_ascii_string(value)
-                } else if self.flags.pretty_ascii_strings && name_is_ascii_char(fmt_name) {
-                    frag.append(Fragment::Char('\''));
-                    frag.append(Self::compile_parsed_ascii_char(value));
-                    frag.append(Fragment::Char('\''));
-                    frag
-                } else {
-                    self.compile_decoded_parsedvalue(value, self.module.get_format(*level))
-                }
+                self.compile_decoded_parsedvalue(value, self.module.get_format(*level))
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Fail => panic!("uninhabited format (value={value:?}"),
             Format::EndOfInput | Format::SkipRemainder => self.compile_parsed_value(value),
             Format::Align(_) => self.compile_parsed_value(value),
@@ -620,6 +601,30 @@ impl<'module> TreePrinter<'module> {
             Format::Apply(_) => self.compile_parsed_value(value),
             Format::LetFormat(_f0, _name, f) => self.compile_decoded_parsedvalue(value, f),
             Format::MonadSeq(_f0, f) => self.compile_decoded_parsedvalue(value, f),
+            Format::Hint(StyleHint::AsciiStr, str_format) => {
+                if self.flags.pretty_ascii_strings {
+                    Self::compile_parsed_ascii_string(value)
+                } else {
+                    self.compile_decoded_parsedvalue(value, str_format)
+                }
+            }
+            Format::Hint(StyleHint::AsciiChar, char_format) => {
+                if self.flags.pretty_ascii_strings {
+                    frag.append(Fragment::Char('\''));
+                    frag.append(Self::compile_parsed_ascii_char(value));
+                    frag.append(Fragment::Char('\''));
+                    frag
+                } else {
+                    self.compile_decoded_parsedvalue(value, char_format)
+                }
+            }
+            Format::Hint(StyleHint::UTF8Str, str_format) => {
+                if self.flags.pretty_utf8_strings {
+                    Self::compile_parsed_string(value)
+                } else {
+                    self.compile_decoded_parsedvalue(value, str_format)
+                }
+            }
             Format::Hint(_hint, f) => self.compile_decoded_parsedvalue(value, f),
             Format::Permit(f, _e) => match value {
                 ParsedValue::Permit(res) => match res {
@@ -648,23 +653,11 @@ impl<'module> TreePrinter<'module> {
                 self.compile_value(value)
             }
             Format::ItemVar(level, _args, _views) => {
-                let fmt_name = self.module.get_name(*level);
-
-                // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
-                if self.flags.pretty_utf8_strings && fmt_name == "text.string.utf8" {
-                    Self::compile_string(value)
-                } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
-                    Self::compile_ascii_string(value)
-                } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
-                {
-                    frag.append(Fragment::Char('\''));
-                    frag.append(Self::compile_ascii_char(value));
-                    frag.append(Fragment::Char('\''));
-                    frag
-                } else {
-                    self.compile_decoded_value(value, self.module.get_format(*level))
-                }
+                self.compile_decoded_value(value, self.module.get_format(*level))
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::DecodeBytes(_bytes, f) => self.compile_decoded_value(value, f),
             Format::ParseFromView(_view, f) => self.compile_decoded_value(value, f),
             Format::Fail => panic!("uninhabited format (value={value}"),
@@ -737,6 +730,13 @@ impl<'module> TreePrinter<'module> {
                     Self::compile_ascii_char(value)
                 } else {
                     self.compile_decoded_value(value, char_format)
+                }
+            }
+            Format::Hint(StyleHint::UTF8Str, str_format) => {
+                if self.flags.pretty_utf8_strings {
+                    Self::compile_string(value)
+                } else {
+                    self.compile_decoded_value(value, str_format)
                 }
             }
             Format::Hint(StyleHint::Common(CommonOp::EndianParse(..)), inner) => {
@@ -2201,6 +2201,9 @@ impl<'module> TreePrinter<'module> {
     fn compile_format(&self, format: &Format, prec: Precedence) -> Fragment {
         match format {
             Format::Phantom(_f) => Fragment::string("phantom"),
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Variant(label, f) => cond_paren(
                 self.compile_nested_format(
                     "variant",
@@ -2504,6 +2507,11 @@ impl<'module> TreePrinter<'module> {
             ),
             Format::Hint(StyleHint::AsciiChar, char_format) => cond_paren(
                 self.compile_nested_format("ascii-char", None, char_format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
+            Format::Hint(StyleHint::UTF8Str, str_format) => cond_paren(
+                self.compile_nested_format("utf8-str", None, str_format, prec),
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),

@@ -354,7 +354,7 @@ mod paint_table {
     // Child paint references are 3-byte (Offset24) offsets per the COLRv1 spec.
     // `phantom_embed` is already `Format::Phantom(...)`, so it must NOT be passed through
     // `read_phantom_view_offset*` (which would add a second Phantom layer). Instead, the raw
-    // 24-bit offset is read as a plain `util::u24be()` field and the phantom is embedded
+    // 24-bit offset is read as a plain `u24be()` field and the phantom is embedded
     // directly as a sibling field for type-tracking purposes.
 
     /// Format 10: PaintGlyph
@@ -365,7 +365,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("glyph_id", u16be()),
         ])
@@ -379,7 +379,7 @@ mod paint_table {
             ("table_scope", reify_view(view.clone())),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             (
                 "transform",
@@ -399,7 +399,7 @@ mod paint_table {
             ("table_scope", reify_view(view.clone())),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             (
                 "transform",
@@ -416,7 +416,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("dx", i16be()),
             ("dy", i16be()),
@@ -430,7 +430,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("dx", i16be()),
             ("dy", i16be()),
@@ -446,7 +446,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale_x", f2dot14.call()),
             ("scale_y", f2dot14.call()),
@@ -460,7 +460,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale_x", f2dot14.call()),
             ("scale_y", f2dot14.call()),
@@ -479,7 +479,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale_x", f2dot14.call()),
             ("scale_y", f2dot14.call()),
@@ -499,7 +499,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale_x", f2dot14.call()),
             ("scale_y", f2dot14.call()),
@@ -516,7 +516,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale", f2dot14.call()),
         ])
@@ -533,7 +533,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale", f2dot14.call()),
             ("var_index_base", u32be()),
@@ -551,7 +551,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale", f2dot14.call()),
             ("center_x", i16be()),
@@ -570,7 +570,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("scale", f2dot14.call()),
             ("center_x", i16be()),
@@ -587,7 +587,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("angle", f2dot14.call()),
         ])
@@ -600,7 +600,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("angle", f2dot14.call()),
             ("var_index_base", u32be()),
@@ -618,7 +618,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("angle", f2dot14.call()),
             ("center_x", i16be()),
@@ -637,7 +637,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("angle", f2dot14.call()),
             ("center_x", i16be()),
@@ -654,7 +654,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("x_skew_angle", f2dot14.call()),
             ("y_skew_angle", f2dot14.call()),
@@ -668,7 +668,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("x_skew_angle", f2dot14.call()),
             ("y_skew_angle", f2dot14.call()),
@@ -687,7 +687,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("x_skew_angle", f2dot14.call()),
             ("y_skew_angle", f2dot14.call()),
@@ -707,7 +707,7 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
             ("x_skew_angle", f2dot14.call()),
             ("y_skew_angle", f2dot14.call()),
@@ -725,12 +725,12 @@ mod paint_table {
             ("table_scope", reify_view(view)),
             (
                 "source_paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed.clone())]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed.clone())]),
             ),
             ("composite_mode", u8()),
             (
                 "backdrop_paint",
-                record_auto([("offset", util::u24be()), ("#_data", phantom_embed)]),
+                record_auto([("offset", u24be()), ("#_data", phantom_embed)]),
             ),
         ])
     }

@@ -1,0 +1,10 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring := { valid := "pos" }
+        │       └── value <- ReadI32Le := 12345i32
+        └── 1 <- bson.element :=
+            └── int32 <- bson.element.int32 :=
+                ├── key <- bson.cstring := { valid := "neg" }
+                └── value <- ReadI32Le := -12345i32

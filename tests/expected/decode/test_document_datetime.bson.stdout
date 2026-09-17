@@ -1,0 +1,6 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── datetime <- bson.element.datetime :=
+                ├── key <- bson.cstring := { valid := "created" }
+                └── value <- variant DateTime ReadI64Le := { DateTime := 1577836800000i64 }

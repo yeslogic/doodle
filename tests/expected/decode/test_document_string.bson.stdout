@@ -1,0 +1,6 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── string <- bson.element.string :=
+                ├── key <- bson.cstring := { valid := "name" }
+                └── value <- bson.string := { valid := "hello" }

@@ -1,0 +1,15 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring := { valid := "a" }
+        │       └── value <- ReadI32Le := 1i32
+        └── 1 <- bson.element :=
+            └── document <- { ... } :=
+                ├── key <- bson.cstring := { valid := "nested" }
+                └── value <- bson.document :=
+                    └── elements <- repeat bson.element :=
+                        └── 0 <- bson.element :=
+                            └── int32 <- bson.element.int32 :=
+                                ├── key <- bson.cstring := { valid := "x" }
+                                └── value <- ReadI32Le := 42i32

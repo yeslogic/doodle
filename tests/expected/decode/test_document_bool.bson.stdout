@@ -1,0 +1,10 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── bool <- bson.element.bool :=
+        │       ├── key <- bson.cstring := { valid := "t" }
+        │       └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := true
+        └── 1 <- bson.element :=
+            └── bool <- bson.element.bool :=
+                ├── key <- bson.cstring := { valid := "f" }
+                └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := false

@@ -68,6 +68,7 @@ enum Command {
 }
 
 const SELECTORS: &[(&[&str], FormatSelector)] = &[
+    (&["bson"], FormatSelector::Bson),
     (&["deflate"], FormatSelector::Deflate),
     (&["zlib"], FormatSelector::Zlib),
     (&["tiff"], FormatSelector::Tiff),
@@ -96,6 +97,7 @@ const SELECTORS: &[(&[&str], FormatSelector)] = &[
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum FormatSelector {
+    Bson,
     Deflate,
     Elf,
     Gif,
@@ -199,6 +201,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         return Err(anyhow!("Unknown format specifier `{normalized}`").into());
                     };
                     match selected {
+                        FormatSelector::Bson => {
+                            let (_, utf8nz) = format::text::main(&mut module);
+                            format::bson::main(&mut module, utf8nz).call()
+                        }
                         FormatSelector::Deflate => format::deflate::main(&mut module).call(),
                         FormatSelector::Zlib => {
                             let deflate = format::deflate::main(&mut module);
@@ -400,6 +406,9 @@ mod census {
                 let format = module.get_format(*level);
                 crawl(format, module, pop);
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Fail => (),
             Format::EndOfInput => (),
             Format::Align(_) => (),

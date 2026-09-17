@@ -21,19 +21,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "analytic-engine"
-version = "0.1.0"
-dependencies = [
- "num-bigint",
- "num-traits",
- "proptest",
-]
-
-[[package]]
 name = "analytic-parser"
 version = "0.1.0"
 dependencies = [
- "analytic-engine",
+ "doodle",
  "lalrpop",
  "lalrpop-util 0.21.0",
  "linefeed",
@@ -598,6 +589,7 @@ dependencies = [
  "cfg-if",
  "clap",
  "cons-rs",
+ "doodle-numexpr-macro",
  "expect-test",
  "intmap",
  "log",
@@ -622,10 +614,33 @@ dependencies = [
  "clap",
  "criterion 0.5.1",
  "doodle",
+ "doodle-numexpr-macro",
  "log",
  "serde",
  "serde_json",
  "stderrlog",
+]
+
+[[package]]
+name = "doodle-numexpr-macro"
+version = "0.1.0"
+dependencies = [
+ "doodle",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "doodle-rec"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "doodle",
+ "linked_hash_set",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1119,6 +1134,21 @@ dependencies = [
  "dirs 1.0.5",
  "mortal",
  "winapi",
+]
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linked_hash_set"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "984fb35d06508d1e69fc91050cceba9c0b748f983e6739fa2c7a9237154c52c8"
+dependencies = [
+ "linked-hash-map",
 ]
 
 [[package]]

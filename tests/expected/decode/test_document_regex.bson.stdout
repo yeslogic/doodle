@@ -1,0 +1,8 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── regex <- bson.element.regex :=
+                ├── key <- bson.cstring := { valid := "re" }
+                └── value <- { ... } :=
+                    ├── pattern <- bson.cstring := { valid := "^abc$" }
+                    └── options <- bson.cstring := { valid := "i" }

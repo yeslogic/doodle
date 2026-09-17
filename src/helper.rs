@@ -11,7 +11,7 @@ use crate::{
     Pattern, RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
 };
 
-use crate::numeric::core::Expr as NumExpr;
+use crate::numeric::core::{Bounds as NumBounds, Expr as NumExpr};
 use crate::numeric::helper as num;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1101,11 +1101,22 @@ pub fn expect_between_u32(format: Format, lower: u32, upper: u32) -> Format {
 /// However, the complexity of the test will typically be higher for this helper than for [`where_between`];
 /// this is doubly true for closed ranges whose minimum is `0`, in which case [`where_between`] tests a single
 /// integer comparison.
+///
+/// # Notes
+///
+/// Only works for unsignd integer Formats; for signed-integer formats, use `where_within_z` instead.
 pub fn where_within<R>(format: Format, range: R) -> Format
 where
     R: Into<Bounds>,
 {
     where_lambda(format, "x", is_within(var("x"), range.into()))
+}
+
+pub fn where_within_z<R>(format: Format, range: R) -> Format
+where
+    R: Into<NumBounds>,
+{
+    where_lambda(format, "x", is_within_z(var("x"), range.into()))
 }
 
 /// Similar to [`where_within`], but with `Expect`-level severity instead of `Assert`.
@@ -1713,12 +1724,27 @@ pub fn seq_last_unchecked(seq: Expr) -> Expr {
 
 /// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
 ///
-/// If `x` is not an integral-typed value, will cause a runtime error when encountered by the interpreter or compiler.
+/// If `x` is not an unsiged integral-typed value, will cause a runtime error when encountered by the interpreter or compiler.
+///
+/// For signed integer types, use [`is_within_z`] instead.
 pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
     expr_match(
         x,
         [
             (Pattern::Int(bounds), Expr::Bool(true)),
+            (Pattern::Wildcard, Expr::Bool(false)),
+        ],
+    )
+}
+
+/// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
+///
+/// Generalizes [`is_within`] to support signed integer types as well.
+pub fn is_within_z(x: Expr, bounds: NumBounds) -> Expr {
+    expr_match(
+        x,
+        [
+            (Pattern::ZRange(bounds), Expr::Bool(true)),
             (Pattern::Wildcard, Expr::Bool(false)),
         ],
     )
@@ -1813,6 +1839,11 @@ pub fn mk_ascii_string(x: Format) -> Format {
     Format::Hint(StyleHint::AsciiStr, Box::new(x))
 }
 
+/// Similar to [`mk_ascii_string`], but for UTF8-encoded Seq(Char).
+pub fn mk_utf8_string(x: Format) -> Format {
+    Format::Hint(StyleHint::UTF8Str, Box::new(x))
+}
+
 /// Helper for [`Format::LetView`]
 pub fn let_view<Name: IntoLabel>(name: Name, format: Format) -> Format {
     Format::LetView(name.into(), Box::new(format))
@@ -1878,7 +1909,7 @@ pub fn hint(hint: StyleHint, format: Format) -> Format {
 
 pub mod base {
     use super::*;
-    use crate::{CommonOp, numeric::MachineRep};
+    use crate::{CommonOp, Endian, numeric::MachineRep};
 
     macro_rules! endian {
         ( $( $fname:ident, $kind_endian:ident, $size:expr, $op:ident );* $(;)? ) => {
@@ -1944,11 +1975,23 @@ pub mod base {
         )
     }
 
+    // TODO - implement i16le
+
     /// Parses a big-endian u32 value and performs a bitwise cast to i32.
     pub fn i32be() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I32BE)),
             Box::new(map_numeric(u32be(), |v| {
+                num::cast_bitwise(MachineRep::I32, v)
+            })),
+        )
+    }
+
+    /// Parses a little-endian u32 value and performs a bitwise cast to i32
+    pub fn i32le() -> Format {
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I32Ext(Endian::Le))),
+            Box::new(map_numeric(u32le(), |v| {
                 num::cast_bitwise(MachineRep::I32, v)
             })),
         )
@@ -1963,8 +2006,34 @@ pub mod base {
             })),
         )
     }
+
+    /// Parses a little-endian u64 value and performs a bitwise cast to i64.
+    pub fn i64le() -> Format {
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::I64Ext(Endian::Le))),
+            Box::new(map_numeric(u64le(), |v| {
+                num::cast_bitwise(MachineRep::I64, v)
+            })),
+        )
+    }
 }
-pub use base::{bit, i8, i16be, i32be, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};
+pub use base::{
+    bit, i8, i16be, i32be, i32le, i64be, i64le, u8, u16be, u16le, u32be, u32le, u64be, u64le,
+};
+
+/// Parses a big-endian u24 (3-byte) value, mapped into the u32 value-type space.
+///
+/// # Notes
+///
+/// The resulting format is not wrapped in a [`Format::Hint`] indicating it is a CommonOp,
+/// so it may not be given the same special treatment as helpers for common-width integer parsing.
+pub fn u24be() -> Format {
+    // REVIEW - should U24Be be a CommonOp?
+    map(
+        Format::Tuple(vec![compute(Expr::U8(0)), u8(), u8(), u8()]),
+        lambda("x", Expr::U32Be(Box::new(var("x")))),
+    )
+}
 
 pub mod ascii {
     use super::{mk_ascii_string, *};

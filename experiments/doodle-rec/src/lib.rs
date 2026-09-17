@@ -1,0 +1,1007 @@
+pub mod codegen;
+pub mod decoder;
+pub mod elaborate;
+pub(crate) mod matchtree;
+pub mod typecheck;
+pub use matchtree::determinations;
+pub mod helper;
+pub(crate) use matchtree::{MatchTree, Next};
+pub mod output;
+
+use anyhow::{Result as AResult, anyhow};
+use doodle::{bounds::Bounds, byte_set::ByteSet};
+use std::{
+    borrow::Cow,
+    cell::OnceCell,
+    collections::{BTreeMap, HashSet},
+    ops::{Add as _, RangeInclusive},
+    rc::Rc,
+};
+
+pub type Label = Cow<'static, str>;
+
+/// Global index into the total set of formats within a Module
+pub type FormatId = usize;
+
+/// Local index into a Batch of formats (e.g. 0 would be 'self' in a singleton-batch)
+pub type RecId = usize;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum RecurseCtx<'a> {
+    #[default]
+    NonRec,
+    Recurse {
+        entry_id: RecId,
+        span: Span<usize>,
+        batch: &'a [FormatDecl],
+    },
+}
+
+impl<'a> RecurseCtx<'a> {
+    pub const fn is_recursive(&self) -> bool {
+        matches!(self, RecurseCtx::Recurse { .. })
+    }
+
+    pub const fn as_span(&self) -> Option<Span<usize>> {
+        match self {
+            RecurseCtx::NonRec => None,
+            RecurseCtx::Recurse { span, .. } => Some(*span),
+        }
+    }
+
+    /// Returns `(new_ctx, is_auto)`
+    pub fn enter(&self, ix: RecId) -> Self {
+        match self {
+            RecurseCtx::NonRec => panic!("cannot recurse into non-recursive context"),
+            RecurseCtx::Recurse { batch, span, .. } => {
+                assert!(ix < batch.len(), "batch index out of range");
+                RecurseCtx::Recurse {
+                    entry_id: ix,
+                    span: *span,
+                    batch,
+                }
+            }
+        }
+    }
+
+    pub fn convert_rec_var(&self, ix: RecId) -> Option<FormatId> {
+        self.as_span().map(|span| span.index(ix))
+    }
+
+    /// Returns the global format-level of the closest entry-point
+    pub fn get_level(&self) -> Option<usize> {
+        match self {
+            RecurseCtx::NonRec => None,
+            RecurseCtx::Recurse { span, entry_id, .. } => Some(span.index(*entry_id)),
+        }
+    }
+
+    pub fn get_format(&self) -> Option<&'a Format> {
+        match self {
+            RecurseCtx::NonRec => None,
+            RecurseCtx::Recurse {
+                batch, entry_id, ..
+            } => Some(&batch[*entry_id].format),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FormatRef(FormatId);
+
+impl FormatRef {
+    pub const fn get_level(self) -> usize {
+        self.0
+    }
+
+    pub fn call(self) -> Format {
+        Format::ItemVar(self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Span<Idx> {
+    pub start: Idx,
+    pub end: Idx,
+}
+
+impl<Idx> Span<Idx> {
+    pub const fn new(start: Idx, end: Idx) -> Self {
+        Self { start, end }
+    }
+}
+
+impl Span<usize> {
+    pub fn index(self, ix: usize) -> usize {
+        assert!(self.start + ix <= self.end);
+        self.start + ix
+    }
+}
+
+impl<Idx: Copy> From<RangeInclusive<Idx>> for Span<Idx> {
+    fn from(value: RangeInclusive<Idx>) -> Self {
+        Self {
+            start: *value.start(),
+            end: *value.end(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FormatDecl {
+    format: Format,
+    pub fmt_id: FormatId,
+    f_type: Rc<OnceCell<FormatType>>,
+    batch: Option<Span<FormatId>>,
+}
+
+// `f_type` is a lazily-populated type-inference cache, not part of a FormatDecl's logical
+// identity - it's also an `Rc<OnceCell<_>>`, which doesn't implement `PartialEq`/`Hash` at all
+// (correctly so: a `OnceCell`'s value can be set after the FormatDecl has already been hashed
+// into a `HashSet`/`HashMap`, which would corrupt those structures' invariants if the cache
+// state affected the hash). Compare/hash everything else instead.
+impl PartialEq for FormatDecl {
+    fn eq(&self, other: &Self) -> bool {
+        self.format == other.format && self.fmt_id == other.fmt_id && self.batch == other.batch
+    }
+}
+
+impl Eq for FormatDecl {}
+
+impl std::hash::Hash for FormatDecl {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.format.hash(state);
+        self.fmt_id.hash(state);
+        self.batch.hash(state);
+    }
+}
+
+impl FormatDecl {
+    pub fn solve_type(&self, module: &FormatModule) -> AResult<&FormatType> {
+        let mut visited = HashSet::new();
+        self.solve_type_with(module, &mut visited)
+    }
+
+    pub(crate) fn solve_type_with(
+        &self,
+        module: &FormatModule,
+        visited: &mut HashSet<FormatId>,
+    ) -> AResult<&FormatType> {
+        match self.f_type.get() {
+            None => {
+                visited.insert(self.fmt_id);
+                let f_type = self.format.infer_type(visited, module, self.batch)?;
+                // Once cached, this level is no longer "in progress" - a *different*, later
+                // reference to it (e.g. an unrelated sibling Union branch) should see its real,
+                // now-resolved type via the OnceCell above, not a stale FormatType::Ref cycle
+                // placeholder left over from this now-completed computation.
+                visited.remove(&self.fmt_id);
+                let Ok(_) = self.f_type.set(f_type) else {
+                    unreachable!("synchronous TOCTOU!?")
+                };
+                Ok(self.f_type.get().unwrap())
+            }
+            Some(f_type) => Ok(f_type),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BaseType {
+    Bool,
+    U8,
+    U16,
+    U32,
+    U64,
+    Char,
+}
+
+impl BaseType {
+    pub fn is_numeric(&self) -> bool {
+        matches!(
+            self,
+            BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FormatType {
+    Any,
+    Void,
+    Base(BaseType),
+    Ref(FormatId),
+    Shape(TypeShape),
+}
+
+impl FormatType {
+    pub const UNIT: FormatType = FormatType::Shape(TypeShape::Tuple(Vec::new()));
+
+    pub fn is_numeric(&self) -> bool {
+        match self {
+            FormatType::Base(base) => base.is_numeric(),
+            _ => false,
+        }
+    }
+
+    fn unify(&self, other: &FormatType) -> AResult<FormatType> {
+        match (self, other) {
+            (FormatType::Any, _) => Ok(other.clone()),
+            (_, FormatType::Any) => Ok(self.clone()),
+            (FormatType::Ref(id0), FormatType::Ref(id1)) if id0 == id1 => Ok(FormatType::Ref(*id0)),
+            // A Ref is a placeholder for a level whose type is still being computed - unifying
+            // it against anything else (a concrete type, or a *different* still-open Ref) can't
+            // fail here for the same reason `Any` can't: there isn't enough information yet to
+            // contradict `other`. This is a pragmatic simplification, not full equi-recursive
+            // unification: it doesn't verify that the referenced level's *eventual* type is
+            // actually compatible with `other`, including when `other` itself contains a
+            // reference back to this same level, or is itself a *different* still-open cycle
+            // (e.g. two sibling `Tuple`/`Seq`/`Union` positions independently reaching two
+            // distinct open ancestors, only reachable via 3-or-more-level mutual recursion -
+            // confirmed empirically reachable through ordinary `declare_rec_formats` use, not
+            // just hypothetical). Originally the distinct-Ref case was a hard `Err` here, on the
+            // reasoning that there's no principled way to pick a winner between two still-open
+            // cycles - but that's exactly as true of a Ref-vs-concrete-type unification too, and
+            // this file already accepts that imprecision there; singling out distinct-Ref as a
+            // harder error than the rest of this already-permissive design was an unjustified
+            // asymmetry, not a meaningfully stronger guarantee - downstream consumers (e.g.
+            // `codegen.rs`) never inspect a `Ref`'s own further structure beyond `Box`-wrapping
+            // it, so which of the two ambiguous placeholders gets returned here doesn't change
+            // what they do with it. `experiments/doodle-rec/src/typecheck.rs`'s UVar/occurs-check
+            // engine is the sound alternative for callers that need this resolved precisely - two
+            // distinct open `UVar`s there just get merged like anything else via ordinary
+            // union-find aliasing, with the occurs-check (not a special case here) providing the
+            // real soundness guarantee.
+            (FormatType::Ref(_), _) => Ok(other.clone()),
+            (_, FormatType::Ref(_)) => Ok(self.clone()),
+            (FormatType::Void, _) | (_, FormatType::Void) => Ok(FormatType::Void),
+            (FormatType::Base(b1), FormatType::Base(b2)) if b1 == b2 => Ok(FormatType::Base(*b1)),
+            (FormatType::Shape(s1), FormatType::Shape(s2)) => {
+                let s = s1.unify(s2)?;
+                Ok(FormatType::Shape(s))
+            }
+            _ => Err(anyhow!(
+                "cannot unify incompatible types: {self:?}, {other:?}"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeShape {
+    Tuple(Vec<FormatType>),
+    Seq(Box<FormatType>),
+    Option(Box<FormatType>),
+    Union(BTreeMap<Label, FormatType>),
+}
+
+impl TypeShape {
+    fn unify(&self, other: &Self) -> AResult<TypeShape> {
+        match (self, other) {
+            (TypeShape::Tuple(t1), TypeShape::Tuple(t2)) => {
+                if t1.len() != t2.len() {
+                    return Err(anyhow!(
+                        "cannot unify tuples of different arity: {t1:?}, {t2:?}"
+                    ));
+                }
+                let mut unified = Vec::with_capacity(t1.len());
+                for (t1, t2) in t1.iter().zip(t2.iter()) {
+                    unified.push(t1.unify(t2)?);
+                }
+                Ok(TypeShape::Tuple(unified))
+            }
+            (TypeShape::Seq(t1), TypeShape::Seq(t2)) => Ok(TypeShape::Seq(Box::new(t1.unify(t2)?))),
+            (TypeShape::Option(t1), TypeShape::Option(t2)) => {
+                Ok(TypeShape::Option(Box::new(t1.unify(t2)?)))
+            }
+            (TypeShape::Union(bs1), TypeShape::Union(bs2)) => {
+                let mut bs = BTreeMap::new();
+
+                let keys1 = bs1.keys().collect::<HashSet<_>>();
+                let keys2 = bs2.keys().collect::<HashSet<_>>();
+
+                let all_keys = HashSet::union(&keys1, &keys2).cloned();
+
+                for key in all_keys.into_iter() {
+                    match (bs1.get(key), bs2.get(key)) {
+                        (Some(t1), Some(t2)) => {
+                            let t = t1.unify(t2)?;
+                            bs.insert(key.clone(), t);
+                        }
+                        (Some(t), None) | (None, Some(t)) => {
+                            bs.insert(key.clone(), t.clone());
+                        }
+                        (None, None) => unreachable!("key must appear in at least one operand"),
+                    }
+                }
+                Ok(TypeShape::Union(bs))
+            }
+            _ => Err(anyhow!("cannot unify shapes: {self:?}, {other:?}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Format {
+    // References to other formats
+    ItemVar(FormatId),
+    RecVar(RecId),
+
+    // Basic Primitives
+    FailWith(Label),
+    EndOfInput,
+    Byte(ByteSet),
+    Compute(Box<Expr>),
+
+    // Union-Based
+    Variant(Label, Box<Format>),
+    Union(Vec<Format>),
+    /// Like [`Format::Union`], but the branches are not required to be mutually exclusive - tried
+    /// in order via backtracking rather than disambiguated ahead of time via `MatchTree`. The
+    /// fallback for a `Union` shape `MatchTree` genuinely cannot decide (a real, reachable ceiling
+    /// - bounded lookahead is fundamentally insufficient when branches share an unboundedly long
+    /// recursive common prefix, not just an implementation gap).
+    UnionNondet(Vec<Format>),
+
+    // Sequential
+    Repeat(Box<Format>),
+    /// Repeats a format an exact number of times. Since `Expr` has no `Var`, `count` is
+    /// necessarily a compile-time-constant expression today; kept `Box<Expr>` (rather than a bare
+    /// `usize`) to mirror `doodle::Format::RepeatCount`'s shape, so no signature change is needed
+    /// once `Expr::Var` lands.
+    RepeatCount(Box<Expr>, Box<Format>),
+    /// Repeats a format at least `min` and at most `max` times (both compile-time-constant, same
+    /// caveat as [`Format::RepeatCount`]).
+    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
+    Seq(Vec<Format>),
+
+    // Higher-Order
+    Tuple(Vec<Format>),
+    Maybe(Box<Expr>, Box<Format>),
+
+    /// Parses a format without advancing the stream position afterwards.
+    Peek(Box<Format>),
+    /// Attempts to parse a format and fails if it succeeds; yields unit on success (non-match).
+    PeekNot(Box<Format>),
+
+    /// Restricts a format to a sub-stream of exactly `count` bytes (compile-time-constant, same
+    /// `Expr`-has-no-`Var` caveat as [`Format::RepeatCount`]), skipping any leftover bytes in the
+    /// sub-stream once the inner format has matched.
+    Slice(Box<Expr>, Box<Format>),
+    /// Matches a format at an absolute byte offset (`base + offset`, both compile-time-constant)
+    /// relative to the start of the buffer, without advancing the outer stream position.
+    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Format>),
+}
+
+impl Format {
+    pub const EMPTY: Self = Format::Tuple(vec![]);
+
+    pub(crate) fn infer_type<'ctx>(
+        &'ctx self,
+        visited: &mut HashSet<FormatId>,
+        module: &'ctx FormatModule,
+        batch: Option<Span<FormatId>>,
+    ) -> AResult<FormatType> {
+        match self {
+            Format::ItemVar(level) => {
+                if visited.contains(level) {
+                    Ok(FormatType::Ref(*level))
+                } else {
+                    let decl = &module.decls[*level];
+                    Ok(decl.solve_type_with(module, visited)?.clone())
+                }
+            }
+            Format::RecVar(batch_ix) => match batch {
+                None => Err(anyhow!("Recursion without a batch")),
+                Some(range) => {
+                    let level = range.start + batch_ix;
+                    if level > range.end {
+                        return Err(anyhow!("batch index out of range"));
+                    }
+                    if visited.contains(&level) {
+                        Ok(FormatType::Ref(level))
+                    } else {
+                        let decl = &module.decls[level];
+                        Ok(decl.solve_type_with(module, visited)?.clone())
+                    }
+                }
+            },
+            Format::FailWith(_msg) => Ok(FormatType::Void),
+            Format::EndOfInput => Ok(FormatType::UNIT),
+            Format::Byte(bs) if bs.is_empty() => Ok(FormatType::Void),
+            Format::Byte(_) => Ok(FormatType::Base(BaseType::U8)),
+            Format::Compute(expr) => expr.as_ref().infer_type(),
+            Format::Variant(label, inner) => {
+                let inner_type = inner.infer_type(visited, module, batch)?;
+                Ok(FormatType::Shape(TypeShape::Union(BTreeMap::from([(
+                    label.clone(),
+                    inner_type,
+                )]))))
+            }
+            Format::Union(branches) | Format::UnionNondet(branches) => {
+                let mut t = FormatType::Any;
+                for f in branches {
+                    t = t.unify(&f.infer_type(visited, module, batch)?)?;
+                }
+                Ok(t)
+            }
+            Format::Repeat(inner) => {
+                let t = inner.infer_type(visited, module, batch)?;
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(t))))
+            }
+            Format::Seq(elts) => {
+                let mut elem_type = FormatType::Any;
+                for elt in elts {
+                    elem_type = elem_type.unify(&elt.infer_type(visited, module, batch)?)?;
+                }
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(elem_type))))
+            }
+            Format::Tuple(elts) => {
+                let mut types = Vec::with_capacity(elts.len());
+                for elt in elts {
+                    types.push(elt.infer_type(visited, module, batch)?);
+                }
+                Ok(FormatType::Shape(TypeShape::Tuple(types)))
+            }
+            Format::Maybe(expr, format) => match expr.infer_type()? {
+                FormatType::Base(BaseType::Bool) => {
+                    let t = format.infer_type(visited, module, batch)?;
+                    Ok(FormatType::Shape(TypeShape::Option(Box::new(t))))
+                }
+                other => Err(anyhow!(
+                    "maybe expression type was inferred to be non-bool: {other:?}"
+                )),
+            },
+            Format::RepeatCount(count, inner) => {
+                if !count.infer_type()?.is_numeric() {
+                    return Err(anyhow!("RepeatCount count expression must be numeric"));
+                }
+                let t = inner.infer_type(visited, module, batch)?;
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(t))))
+            }
+            Format::RepeatBetween(min, max, inner) => {
+                if !min.infer_type()?.is_numeric() || !max.infer_type()?.is_numeric() {
+                    return Err(anyhow!("RepeatBetween min/max expressions must be numeric"));
+                }
+                let t = inner.infer_type(visited, module, batch)?;
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(t))))
+            }
+            Format::Peek(inner) => inner.infer_type(visited, module, batch),
+            Format::Slice(count, inner) => {
+                if !count.infer_type()?.is_numeric() {
+                    return Err(anyhow!("Slice count expression must be numeric"));
+                }
+                inner.infer_type(visited, module, batch)
+            }
+            Format::WithRelativeOffset(base, offset, inner) => {
+                if !base.infer_type()?.is_numeric() || !offset.infer_type()?.is_numeric() {
+                    return Err(anyhow!(
+                        "WithRelativeOffset base/offset expressions must be numeric"
+                    ));
+                }
+                inner.infer_type(visited, module, batch)
+            }
+            Format::PeekNot(_inner) => Ok(FormatType::UNIT),
+        }
+    }
+
+    fn depends_on_next<'a>(&self, module: &'a FormatModule, ctx: RecurseCtx<'a>) -> bool {
+        let mut visited = determinations::Traversal::new_unscoped();
+        self.depends_on_next_with(module, ctx, &mut visited)
+    }
+
+    /// `visited` guards against infinite recursion for a self-/mutually-recursive `RecVar`: a
+    /// level already being analyzed further out on the current path contributes `false` here
+    /// rather than being re-expanded. This can't under-report a `Union`'s own depends_on_next,
+    /// since `union_depends_on_next`'s `MatchTree::build` fallback remains the authority there;
+    /// for `Tuple`/`Seq` it's sound because a recursive format's AST is fixed and self-similar,
+    /// so one level of re-entry before stopping already reaches everything a further unrolling
+    /// would (deeper unrollings only re-encounter the same structure).
+    fn depends_on_next_with<'a>(
+        &self,
+        module: &'a FormatModule,
+        ctx: RecurseCtx<'a>,
+        visited: &mut determinations::Traversal,
+    ) -> bool {
+        match self {
+            Format::ItemVar(level) => {
+                let ctx = module.get_ctx(*level);
+                // Level-crossing reference to a different, independently-declared format: not
+                // part of this cycle, so it gets its own fresh traversal (matching
+                // solve_determinations's ItemVar convention).
+                let mut visited = determinations::Traversal::new_unscoped();
+                module
+                    .get_format(*level)
+                    .depends_on_next_with(module, ctx, &mut visited)
+            }
+            Format::FailWith(..) => false,
+            Format::EndOfInput => false,
+            Format::Byte(..) => false,
+            Format::Compute(..) => false,
+            Format::RecVar(rec_ix) => {
+                let level = ctx.convert_rec_var(*rec_ix).unwrap_or_else(|| {
+                    unreachable!("depends_on_next: {ctx:?} has no recursive variable ~{rec_ix}")
+                });
+                match visited.insert(level) {
+                    determinations::Entry::Novel => {
+                        let new_ctx = ctx.enter(*rec_ix);
+                        let result = new_ctx
+                            .get_format()
+                            .unwrap()
+                            .depends_on_next_with(module, new_ctx, visited);
+                        visited.escape();
+                        result
+                    }
+                    // Already being analyzed further out on this path (guarded or not doesn't
+                    // matter here, unlike left-recursion checking): whatever this occurrence
+                    // would contribute is already accounted for by that in-progress computation.
+                    _ => false,
+                }
+            }
+            Format::Variant(_, f) => f.depends_on_next_with(module, ctx, visited),
+            Format::Union(branches) => {
+                Format::union_depends_on_next(branches, module, ctx, visited)
+            }
+            // Unlike `Union`, `UnionNondet` never goes through `MatchTree` at compile time (it
+            // always compiles to a backtracking `Decoder::Parallel`/`Format::UnionNondet` arm
+            // regardless of whether a `MatchTree` could disambiguate it) - so `union_depends_on_next`'s
+            // `MatchTree::build(...).is_none()` fallback doesn't apply here: that fallback exists
+            // to catch "no branch itself needs `next`, but disambiguating between them still
+            // requires looking into it", which is only a concern for a construct that actually
+            // attempts `MatchTree`-based disambiguation in the first place.
+            Format::UnionNondet(branches) => branches
+                .iter()
+                .any(|f| f.depends_on_next_with(module, ctx, visited)),
+            Format::Repeat(..) | Format::RepeatCount(..) | Format::RepeatBetween(..) => true,
+            Format::Seq(formats) | Format::Tuple(formats) => formats
+                .iter()
+                .any(|f| f.depends_on_next_with(module, ctx, visited)),
+            Format::Maybe(..) => true,
+            // Peek/PeekNot always compile their inner format against a fresh `Next::Empty`
+            // continuation (see `MatchTreeStep::from_format`'s Peek/PeekNot arms) - the peek
+            // target never sees, and so can never depend on, the enclosing `next`. Peek/PeekNot
+            // themselves don't consume input either, so there's nothing here for `next` to affect.
+            Format::Peek(..) | Format::PeekNot(..) => false,
+            // Slice and WithRelativeOffset both compile their inner format against a fresh
+            // Next::Empty too (bounded sub-stream / absolute jump, neither continues into
+            // whatever comes after in the *outer* stream), same reasoning as Peek/PeekNot.
+            Format::Slice(..) | Format::WithRelativeOffset(..) => false,
+        }
+    }
+
+    fn union_depends_on_next<'a>(
+        branches: &'a [Format],
+        module: &'a FormatModule,
+        ctx: RecurseCtx<'a>,
+        visited: &mut determinations::Traversal,
+    ) -> bool {
+        let mut fs = Vec::with_capacity(branches.len());
+        for f in branches {
+            if f.depends_on_next_with(module, ctx, visited) {
+                return true;
+            }
+            fs.push(f.clone());
+        }
+        MatchTree::build(module, &fs, Rc::new(Next::Empty), ctx).is_none()
+    }
+
+    fn is_nullable(&self, module: &FormatModule) -> bool {
+        self.match_bounds(module).min() == 0
+    }
+
+    fn match_bounds(&self, module: &FormatModule) -> Bounds {
+        match self {
+            Format::ItemVar(level) => module.get_format(*level).match_bounds(module),
+            Format::FailWith(..) | Format::EndOfInput | Format::Compute(..) => Bounds::exact(0),
+            Format::Byte(_) => Bounds::exact(1),
+            Format::Variant(_, f) => f.match_bounds(module),
+            Format::Union(branches) | Format::UnionNondet(branches) => branches
+                .iter()
+                .map(|f| f.match_bounds(module))
+                .reduce(Bounds::union)
+                .unwrap(),
+            Format::Tuple(fields) | Format::Seq(fields) => fields
+                .iter()
+                .map(|f| f.match_bounds(module))
+                .reduce(Bounds::add)
+                .unwrap_or(Bounds::exact(0)),
+            Format::Repeat(_) => Bounds::any(),
+            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.match_bounds(module)),
+            Format::RecVar(..) => {
+                // REVIEW - we cannot get better than this without a complex model, and certainly not without adding more parameters
+                Bounds::any()
+            }
+            Format::RepeatCount(count, f) => {
+                let n = count.eval_usize();
+                Self::repeat_bounds(f.match_bounds(module), n, n)
+            }
+            Format::RepeatBetween(min, max, f) => {
+                Self::repeat_bounds(f.match_bounds(module), min.eval_usize(), max.eval_usize())
+            }
+            Format::Peek(_) | Format::PeekNot(_) => Bounds::exact(0),
+            Format::Slice(count, _) => Bounds::exact(count.eval_usize()),
+            Format::WithRelativeOffset(..) => Bounds::exact(0),
+        }
+    }
+
+    /// Scales `inner` (the bounds of a single repetition) by a `[count_min, count_max]` repeat
+    /// count, both of which are already-concrete `usize`s (see [`Format::RepeatCount`]/
+    /// [`Format::RepeatBetween`] - `Expr` has no `Var` yet, so any repeat count is necessarily
+    /// compile-time-constant).
+    fn repeat_bounds(inner: Bounds, count_min: usize, count_max: usize) -> Bounds {
+        let min = inner.min() * count_min;
+        let max = if count_max == 0 {
+            Some(0)
+        } else {
+            inner.max().map(|m| m * count_max)
+        };
+        match max {
+            Some(max) => Bounds::new(min, max),
+            None => Bounds::at_least(min),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr {
+    // Primitive Values
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    Bool(bool),
+
+    // Primitive Value Casts
+    AsChar(Box<Expr>),
+    AsU8(Box<Expr>),
+    AsU16(Box<Expr>),
+    AsU32(Box<Expr>),
+    AsU64(Box<Expr>),
+
+    // Higher-Order Exprs
+    Seq(Vec<Expr>),
+    Tuple(Vec<Expr>),
+    LiftOption(Option<Box<Expr>>),
+    Variant(Label, Box<Expr>),
+
+    // Operational
+    IntRel(IntRel, Box<Expr>, Box<Expr>),
+    Arith(Arith, Box<Expr>, Box<Expr>),
+    Unary(Unary, Box<Expr>),
+}
+
+impl Expr {
+    pub(crate) fn infer_type(&self) -> AResult<FormatType> {
+        match self {
+            Expr::U8(_) => Ok(FormatType::Base(BaseType::U8)),
+            Expr::U16(_) => Ok(FormatType::Base(BaseType::U16)),
+            Expr::U32(_) => Ok(FormatType::Base(BaseType::U32)),
+            Expr::U64(_) => Ok(FormatType::Base(BaseType::U64)),
+            Expr::Bool(_) => Ok(FormatType::Base(BaseType::Bool)),
+            Expr::AsChar(expr) => {
+                let expr_type = expr.infer_type()?;
+                if expr_type.is_numeric() {
+                    Ok(FormatType::Base(BaseType::Char))
+                } else {
+                    Err(anyhow!("invalid char type conversion from {expr_type:?}"))
+                }
+            }
+            Expr::AsU8(expr) => {
+                let expr_type = expr.infer_type()?;
+                if expr_type.is_numeric() {
+                    Ok(FormatType::Base(BaseType::U8))
+                } else {
+                    Err(anyhow!("invalid u8 type conversion from {expr_type:?}"))
+                }
+            }
+            Expr::AsU16(expr) => {
+                let expr_type = expr.infer_type()?;
+                if expr_type.is_numeric() {
+                    Ok(FormatType::Base(BaseType::U16))
+                } else {
+                    Err(anyhow!("invalid u16 type conversion from {expr_type:?}"))
+                }
+            }
+            Expr::AsU32(expr) => {
+                let expr_type = expr.infer_type()?;
+                if expr_type.is_numeric() {
+                    Ok(FormatType::Base(BaseType::U32))
+                } else {
+                    Err(anyhow!("invalid u32 type conversion from {expr_type:?}"))
+                }
+            }
+            Expr::AsU64(expr) => {
+                let expr_type = expr.infer_type()?;
+                if expr_type.is_numeric() {
+                    Ok(FormatType::Base(BaseType::U64))
+                } else {
+                    Err(anyhow!("invalid u64 type conversion from {expr_type:?}"))
+                }
+            }
+            Expr::Seq(exprs) => {
+                let mut elem_type = FormatType::Any;
+                for expr in exprs {
+                    elem_type = expr.infer_type()?.unify(&elem_type)?;
+                }
+                Ok(FormatType::Shape(TypeShape::Seq(Box::new(elem_type))))
+            }
+            Expr::Tuple(exprs) => {
+                let mut elem_types = Vec::with_capacity(exprs.len());
+                for expr in exprs {
+                    elem_types.push(expr.infer_type()?);
+                }
+                Ok(FormatType::Shape(TypeShape::Tuple(elem_types)))
+            }
+            Expr::LiftOption(None) => Ok(FormatType::Shape(TypeShape::Option(Box::new(
+                FormatType::Any,
+            )))),
+            Expr::LiftOption(Some(expr)) => {
+                let expr_type = expr.infer_type()?;
+                Ok(FormatType::Shape(TypeShape::Option(Box::new(expr_type))))
+            }
+            Expr::Variant(lab, expr) => {
+                let expr_type = expr.infer_type()?;
+                Ok(FormatType::Shape(TypeShape::Union(BTreeMap::from([(
+                    lab.clone(),
+                    expr_type,
+                )]))))
+            }
+            Expr::IntRel(_rel, lhs, rhs) => {
+                let lhs_type = lhs.infer_type()?;
+                let rhs_type = rhs.infer_type()?;
+                match (lhs_type, rhs_type) {
+                    (FormatType::Base(b1), FormatType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
+                        Ok(FormatType::Base(BaseType::Bool))
+                    }
+                    (lhs_type, rhs_type) => Err(anyhow!(
+                        "invalid integer relation between {lhs_type:?} and {rhs_type:?}"
+                    )),
+                }
+            }
+            Expr::Arith(_arith, lhs, rhs) => {
+                let lhs_type = lhs.infer_type()?;
+                let rhs_type = rhs.infer_type()?;
+                match (lhs_type, rhs_type) {
+                    (FormatType::Base(b1), FormatType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
+                        Ok(FormatType::Base(b1))
+                    }
+                    (lhs_type, rhs_type) => Err(anyhow!(
+                        "invalid arithmetic operation between {lhs_type:?} and {rhs_type:?}"
+                    )),
+                }
+            }
+            Expr::Unary(Unary::BoolNot, expr) => {
+                let expr_type = expr.infer_type()?;
+                if matches!(expr_type, FormatType::Base(BaseType::Bool)) {
+                    Ok(FormatType::Base(BaseType::Bool))
+                } else {
+                    Err(anyhow!("invalid bool-not on {expr_type:?}"))
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IntRel {
+    Eq,
+    Neq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Arith {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Shl,
+    Shr,
+    BitOr,
+    BitAnd,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Unary {
+    BoolNot,
+}
+
+#[derive(Debug)]
+pub struct FormatModule {
+    names: Vec<Label>,
+    decls: Vec<FormatDecl>,
+}
+
+impl FormatModule {
+    pub fn new() -> Self {
+        Self {
+            names: Vec::new(),
+            decls: Vec::new(),
+        }
+    }
+
+    pub fn get_ctx<'a>(&'a self, level: usize) -> RecurseCtx<'a> {
+        let decl = &self.decls[level];
+        match decl.batch {
+            None => RecurseCtx::NonRec,
+            Some(span) => RecurseCtx::Recurse {
+                span,
+                entry_id: decl.fmt_id,
+                batch: &self.decls[span.start..=span.end],
+            },
+        }
+    }
+
+    pub fn declare_rec_formats(&mut self, formats: Vec<(Label, Format)>) -> Vec<FormatRef> {
+        let fmt_id = self.decls.len();
+        let batch_size = formats.len();
+        let batch_id = Span::from(fmt_id..=fmt_id + batch_size - 1);
+        for (ix, (name, format)) in formats.into_iter().enumerate() {
+            let decl = FormatDecl {
+                format,
+                fmt_id: fmt_id + ix,
+                f_type: Rc::new(OnceCell::new()),
+                batch: Some(batch_id.clone()),
+            };
+            self.names.push(name);
+            self.decls.push(decl);
+        }
+        let mut accum = Vec::with_capacity(batch_size);
+        for ix in batch_id.start..=batch_id.end {
+            let decl = &self.decls[ix];
+            match decl.solve_type_with(self, &mut HashSet::new()) {
+                Ok(_) => {
+                    accum.push(FormatRef(ix));
+                }
+                Err(e) => {
+                    panic!(
+                        "Failed to solve type for {name}: {e}",
+                        name = &self.names[ix]
+                    );
+                }
+            }
+            if let Err(e) = decl.determinations(self) {
+                panic!("Grammar error in {name}: {e}", name = &self.names[ix]);
+            }
+        }
+        accum
+    }
+
+    pub fn declare_format(&mut self, name: Label, format: Format) -> FormatRef {
+        let fmt_id = self.decls.len();
+        let f_type = Rc::new(OnceCell::new());
+        let decl = FormatDecl {
+            format,
+            fmt_id,
+            f_type,
+            batch: None,
+        };
+        if let Err(e) = decl.solve_type(&self) {
+            panic!("Failed to solve type for {name}: {e}");
+        }
+        // `determinations` looks itself up via `module.decls[fmt_id]` (needed to build a
+        // RecurseCtx for the format), so `decl` must already be pushed before calling it -
+        // unlike `solve_type`, which only ever looks up *other*, already-declared items.
+        self.names.push(name);
+        self.decls.push(decl);
+        if let Err(e) = self.decls[fmt_id].determinations(self) {
+            panic!("Grammar error in {name}: {e}", name = &self.names[fmt_id]);
+        }
+        FormatRef(fmt_id)
+    }
+
+    pub fn get_format_type(&self, level: usize) -> &FormatType {
+        &self.decls[level].solve_type(self).unwrap()
+    }
+
+    pub fn get_format(&self, level: usize) -> &Format {
+        &self.decls[level].format
+    }
+
+    pub fn get_decl(&self, level: usize) -> &FormatDecl {
+        &self.decls[level]
+    }
+
+    pub(crate) fn get_batch(&self, level: usize) -> Option<Span<FormatId>> {
+        self.decls[level].batch
+    }
+
+    pub(crate) fn get_name(&self, level: usize) -> &Label {
+        &self.names[level]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_type_inference() -> AResult<()> {
+        let mut module = FormatModule::new();
+        let expr = Expr::IntRel(
+            IntRel::Eq,
+            Box::new(Expr::Arith(
+                Arith::Add,
+                Box::new(Expr::U8(1)),
+                Box::new(Expr::U8(1)),
+            )),
+            Box::new(Expr::U8(2)),
+        );
+        let f = Format::Compute(Box::new(expr));
+        let fref = module.declare_format(Label::Borrowed("static_math"), f);
+        assert!(matches!(
+            module.get_format_type(fref.get_level()),
+            FormatType::Base(BaseType::Bool)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn cons_list_any_byte() -> AResult<()> {
+        let mut module = FormatModule::new();
+        let format0 = Format::Union(vec![
+            Format::Variant(
+                Label::Borrowed("Cons"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::full()),
+                    Format::RecVar(0),
+                ])),
+            ),
+            Format::Variant(Label::Borrowed("Nil"), Box::new(Format::Tuple(vec![]))),
+        ]);
+        let fref = module.declare_rec_formats(vec![(Label::Borrowed("list_any_byte"), format0)])[0];
+        let expected = FormatType::Shape(TypeShape::Union(BTreeMap::from([
+            (
+                Label::Borrowed("Cons"),
+                FormatType::Shape(TypeShape::Tuple(vec![
+                    FormatType::Base(BaseType::U8),
+                    FormatType::Ref(0),
+                ])),
+            ),
+            (Label::Borrowed("Nil"), FormatType::UNIT),
+        ])));
+        let actual = module.get_format_type(fref.get_level());
+        match actual.unify(&expected) {
+            Ok(FormatType::Shape(TypeShape::Union(bs))) => assert_eq!(bs.len(), 2),
+            Err(e) => panic!("unification failed: {e}"),
+            other => panic!("unexpected type: {other:?}"),
+        }
+        eprintln!("cons_list_any_byte :: {actual:?}");
+        Ok(())
+    }
+
+    /// Regression test for the original punch list's `FormatType::unify` `(Ref, Ref)` leftover:
+    /// a 3-level mutual recursion (`a` -> `b` -> `c`) where `c`'s body is
+    /// `Seq([RecVar(0)/*->a*/, RecVar(1)/*->b*/])` - by the time `c` is reached (nested inside
+    /// resolving `a`, which nests into `b`), both `a` and `b` are still open/mid-computation, so
+    /// `c`'s two `Seq` elements resolve to `FormatType::Ref(a)` and `FormatType::Ref(b)`
+    /// respectively - two *different* still-open cycles combined via the same `elem_type.unify`
+    /// call. Confirmed (before this fix) to panic `declare_rec_formats` outright via this exact
+    /// grammar, not just hypothetically - `declare_rec_formats`'s own eager per-member type-check
+    /// runs before any other consumer (including `typecheck.rs`'s newer, actually-sound engine)
+    /// ever gets a `FormatModule` handle to work with, so this was a hard gate blocking the
+    /// pattern entirely, not merely an imprecise-but-usable result.
+    #[test]
+    fn distinct_open_refs_unify_permissively_instead_of_erroring() {
+        let a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
+        let b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(2)]);
+        let c = Format::Seq(vec![Format::RecVar(0), Format::RecVar(1)]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("a"), a),
+            (Label::Borrowed("b"), b),
+            (Label::Borrowed("c"), c),
+        ]);
+        // Reaching this line at all (declare_rec_formats didn't panic) is the actual assertion -
+        // confirm the resulting type is at least some Ref, for a concrete sanity check.
+        let actual = module.get_format_type(frefs[2].get_level());
+        assert!(
+            matches!(actual, FormatType::Shape(TypeShape::Seq(elem)) if matches!(**elem, FormatType::Ref(_))),
+            "expected c's element type to resolve to some Ref placeholder: {actual:?}"
+        );
+    }
+}

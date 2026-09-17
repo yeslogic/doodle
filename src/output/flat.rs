@@ -122,6 +122,9 @@ fn check_covered(
                 path.pop();
             }
         }
+        Format::RecVar(_) => unreachable!(
+            "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+        ),
         Format::Phantom(inner) => {
             check_covered(module, path, inner)?;
         }
@@ -231,6 +234,9 @@ impl<'module, W: io::Write> Context<'module, W> {
                     self.write_flat(value, self.module.get_format(*level))
                 }
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Phantom(..) => Ok(()),
             Format::Fail => Ok(()),
             Format::EndOfInput => Ok(()),
@@ -353,6 +359,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Enforce(format) => self.write_flat(value, format),
             Format::Hint(StyleHint::AsciiStr, str_format) => self.write_flat(value, str_format),
             Format::Hint(StyleHint::AsciiChar, char_format) => self.write_flat(value, char_format),
+            Format::Hint(StyleHint::UTF8Str, str_format) => self.write_flat(value, str_format),
             Format::Hint(StyleHint::Common(..), inner) => self.write_flat(value, inner),
             // REVIEW - is this the most sensible implementation?
             Format::WithView(_ident, _vf) => Ok(()),
