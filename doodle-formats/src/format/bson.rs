@@ -190,18 +190,15 @@ const BSON_TAG_MINKEY: i8 = -1;
 
 /// Factory function for the format of a single BSON `element`
 ///
-/// Takes references to `cstring` and `string` formats, as well as the `Format::RecVar`s
-/// corresponding to the `bson.document` and `bson.array` formats. `document_scope` is a second,
-/// independent instance of the same `bson.document` `RecVar` as `document` - needed because a
-/// `Format` value (unlike a `FormatRef`) can only be consumed once, and `code_w_scope`'s embedded
-/// scope is a second, distinct use-site of the same recursive document slot.
+/// Takes references to `cstring`/`string`/`document`/`array`, the latter two being the recursive
+/// `bson.document`/`bson.array` batch members. `document` is called twice (once for the plain
+/// `document` arm, once for `code_w_scope`'s embedded scope) since `FormatRef` is `Copy`.
 fn element(
     module: &mut FormatModule,
     cstring: FormatRef,
     string: FormatRef,
-    document: Format,
-    array: Format,
-    document_scope: Format,
+    document: FormatRef,
+    array: FormatRef,
 ) -> Format {
     let e_double = module.define_format(
         "bson.element.double",
@@ -270,8 +267,11 @@ fn element(
     alts([
         ("double", e_double.call()),
         ("string", e_string.call()),
-        ("document", mk_element(BSON_TAG_DOCUMENT, cstring, document)),
-        ("array", mk_element(BSON_TAG_ARRAY, cstring, array)),
+        (
+            "document",
+            mk_element(BSON_TAG_DOCUMENT, cstring, document.call()),
+        ),
+        ("array", mk_element(BSON_TAG_ARRAY, cstring, array.call())),
         ("binary", e_binary.call()),
         ("objectid", e_objectid.call()),
         ("bool", e_bool.call()),
@@ -286,7 +286,7 @@ fn element(
             mk_element(
                 BSON_TAG_CODE_W_SCOPE,
                 cstring,
-                code_w_scope(string, document_scope),
+                code_w_scope(string, document.call()),
             ),
         ),
         ("int32", e_int32.call()),
@@ -299,16 +299,18 @@ fn element(
 
 /// Factory function for the format of a BSON `document`
 ///
-/// Takes a direct format to use for `bson.element`, allowing `RecVar` to be used
-/// (where a FormatRef-typed argument is not currently sound for that purpose).
-fn document(element: Format) -> Format {
+/// Takes the `FormatRef` to use for `bson.element` (the recursive batch member repeated here).
+fn document(element: FormatRef) -> Format {
     chain(
         // NOTE - guard against underflow (len < 4)
         where_within_z(i32le(), 4i32..),
         "len",
         slice(
             numeric(numexpr!("len" -u32 4)),
-            record_auto([("elements", repeat(element)), ("__null", is_byte(0x00))]),
+            record_auto([
+                ("elements", repeat(element.call())),
+                ("__null", is_byte(0x00)),
+            ]),
         ),
     )
 }
@@ -318,33 +320,24 @@ fn document(element: Format) -> Format {
 /// Per the BSON spec, `array` is grammatically identical to [`document`] (`int32 len` + `e_list` +
 /// null terminator) — the convention that keys are stringified indices is not enforced on the wire.
 /// This delegates to `document`'s builder directly rather than duplicating its body, while still
-/// getting its own module registration (`bson.array`) and `RecVar` slot so it's distinguishable from
+/// getting its own module registration (`bson.array`) and batch slot so it's distinguishable from
 /// an embedded document at the tree-output/codegen level.
-fn array(element: Format) -> Format {
+fn array(element: FormatRef) -> Format {
     document(element)
 }
 
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
     let string = string(module, utf8_nz);
-    let document = {
-        let element0 = element(
-            module,
-            cstring,
-            string,
-            Format::RecVar(1),
-            Format::RecVar(2),
-            Format::RecVar(1),
-        );
-        let refs = module.define_format_rec_batch(vec![
-            ("bson.element", element0),
-            ("bson.document", document(Format::RecVar(0))),
-            ("bson.array", array(Format::RecVar(0))),
-        ]);
-        match &refs[..] {
-            [_element, document, _array] => *document,
-            _ => unreachable!(),
-        }
-    };
+    let [_element, document, _array] = module.define_format_recursive(
+        ["bson.element", "bson.document", "bson.array"],
+        [
+            Box::new(move |module: &mut FormatModule, refs: &[FormatRef; 3]| {
+                element(module, cstring, string, refs[1], refs[2])
+            }),
+            Box::new(|_module: &mut FormatModule, refs: &[FormatRef; 3]| document(refs[0])),
+            Box::new(|_module: &mut FormatModule, refs: &[FormatRef; 3]| array(refs[0])),
+        ],
+    );
     module.define_format("bson.main", record([("document", document.call())]))
 }
