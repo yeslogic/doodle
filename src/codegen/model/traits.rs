@@ -237,13 +237,12 @@ pub mod object_api {
 
 pub mod smallsorts {
     use super::*;
-    use crate::codegen::typed_format::{GenType, TypedFormat};
+    use crate::codegen::typed_format::{GenType, LevelCell};
     use crate::codegen::util::{BTree, StableMap};
     use crate::fixed::{self, SpineElem};
     use crate::{FormatModule, FormatRef};
     use intmap::IntMap;
     use std::collections::BTreeSet;
-    use std::rc::Rc;
 
     /// Context needed to generate a `ReadUnchecked` impl for a struct that originated from a
     /// `FixedReadKind::FixedFormat`-kinded `ReadArray` element.
@@ -265,7 +264,7 @@ pub mod smallsorts {
     pub(crate) struct FixedFormatInfo<'a> {
         pub module: &'a FormatModule,
         pub targets: &'a IntMap<usize, FormatRef>,
-        pub t_formats: &'a StableMap<usize, Rc<TypedFormat<GenType>>, BTree>,
+        pub t_formats: &'a StableMap<usize, LevelCell<GenType>, BTree>,
         pub defined_types: &'a [RustTypeDecl],
     }
 
@@ -289,7 +288,7 @@ pub mod smallsorts {
             &self,
             fref: FormatRef,
         ) -> Option<(usize, Label, Option<Box<UseParams>>)> {
-            let t_inner = self.t_formats.get(&fref.get_level())?;
+            let t_inner = self.t_formats.get(&fref.get_level())?.borrow();
             let gt = t_inner.get_type()?;
             let (ix, name, params) = gt.try_as_adhoc()?;
             Some((ix, name.clone(), params))
@@ -314,7 +313,7 @@ pub mod smallsorts {
         /// Given a `FormatRef` pointing to a proposed fixed-size type, extract the type it associates to,
         /// whether an adhoc LocalType or a primitive MarkerType
         fn to_marker_or_adhoc(&self, fref: FormatRef) -> Option<SpineType> {
-            let t_inner = self.t_formats.get(&fref.get_level())?;
+            let t_inner = self.t_formats.get(&fref.get_level())?.borrow();
             if let Some(hint) = t_inner.get_hint() {
                 match hint {
                     &crate::StyleHint::Common(crate::CommonOp::EndianParse(k)) => {

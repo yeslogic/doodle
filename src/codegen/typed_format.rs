@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -217,6 +218,18 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
     }
 }
 
+/// Shared, backpatchable slot for a recursive level's elaborated body.
+///
+/// Every `FormatCall` occurrence for a given level - regardless of whether it was elaborated
+/// before or after that level's own body finished (see `Elaborator::elaborate_format`'s
+/// `Format::ItemVar` arm) - holds a `clone()` of the *same* cell, so that once the level's real
+/// body is known, backfilling it once (`*cell.borrow_mut() = real_body`) is instantly visible to
+/// every occurrence, including ones frozen mid-elaboration on [`TypedFormat::recursion_placeholder`].
+/// Without this sharing, an occurrence discovered while its own level was still "open" (e.g. a
+/// second, sibling recursive definition reached from within another's still-elaborating body) would
+/// keep the placeholder forever, even though it denotes an ordinary, resolvable reference.
+pub(crate) type LevelCell<TypeRep> = Rc<RefCell<Rc<TypedFormat<TypeRep>>>>;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedFormat<TypeRep> {
     FormatCall(
@@ -224,7 +237,7 @@ pub enum TypedFormat<TypeRep> {
         usize,
         Vec<(Label, TypedExpr<TypeRep>)>,
         Vec<(Label, TypedViewExpr<TypeRep>)>,
-        Rc<TypedFormat<TypeRep>>,
+        LevelCell<TypeRep>,
     ),
     ForEach(
         TypeRep,
@@ -339,14 +352,31 @@ impl TypedFormat<GenType> {
         RECURSION_PLACEHOLDER.with(|p| p.clone())
     }
 
-    /// True if `def` is [`Self::recursion_placeholder`]'s sentinel - i.e. `def` was reserved before
-    /// its level's own body had been elaborated, and is not a genuine, resolvable body. Consulted by
-    /// [`Self::match_bounds_recursive`]/[`Self::lookahead_bounds_recursive`] so a placeholder-tainted
-    /// `FormatCall` reports [`RecursiveBounds::unresolved`] instead of trusting `def`'s content
-    /// (which would otherwise silently under-report a genuinely recursive, byte-consuming reference
-    /// as `Fail`'s trivial `exact(0)`).
-    fn is_recursion_placeholder(def: &Rc<TypedFormat<GenType>>) -> bool {
-        RECURSION_PLACEHOLDER.with(|p| Rc::ptr_eq(p, def))
+    /// True if `def`'s *current* content is still [`Self::recursion_placeholder`]'s sentinel - i.e.
+    /// the cell hasn't yet been backfilled with its level's real body (see [`LevelCell`]). Consulted
+    /// by [`Self::match_bounds_recursive`]/[`Self::lookahead_bounds_recursive`] so a still-open
+    /// `FormatCall` reports [`RecursiveBounds::unresolved`] instead of trusting `Fail`'s trivial
+    /// `exact(0)`.
+    fn is_recursion_placeholder(def: &LevelCell<GenType>) -> bool {
+        RECURSION_PLACEHOLDER.with(|p| Rc::ptr_eq(p, &def.borrow()))
+    }
+
+    /// Borrows a [`LevelCell`]'s current content for the full lifetime of the cell reference itself,
+    /// bypassing `RefCell`'s runtime borrow tracking.
+    ///
+    /// # Safety (well, soundness - this fn takes no unsafe preconditions from its caller)
+    ///
+    /// Every `LevelCell` is written to exactly once, by `Elaborator::elaborate_format`'s
+    /// `Format::ItemVar` arm (`*cell.borrow_mut() = ...`), and only *during* elaboration
+    /// (`Elaborator::elaborate_module`). `GTCompiler::compile_program` - the sole caller of this,
+    /// via `compile_gt_format`'s `FormatCall` case - only ever runs after `elaborate_module` has
+    /// already returned, at which point no `LevelCell` is ever mutated again. Treating the content
+    /// as valid for the reference's own lifetime is therefore sound in practice, even though the
+    /// borrow-checker can't verify it through `RefCell`'s ordinary (runtime-scoped) `Ref` API -
+    /// which is also why this can't just be `std::cell::Ref::leak` (stable Rust doesn't expose it).
+    pub(crate) fn leak_level_cell(cell: &LevelCell<GenType>) -> &TypedFormat<GenType> {
+        let ptr: *mut Rc<TypedFormat<GenType>> = cell.as_ptr();
+        unsafe { &**ptr }
     }
 
     /// One-to-one analogue for [`Format::lookahead_bounds`] that can be called referentially
@@ -377,7 +407,7 @@ impl TypedFormat<GenType> {
                     return RecursiveBounds::unresolved();
                 }
                 guarded_bounds(*level, open, move |open| {
-                    def.lookahead_bounds_recursive(open)
+                    def.borrow().lookahead_bounds_recursive(open)
                 })
             }
 
@@ -500,7 +530,9 @@ impl TypedFormat<GenType> {
                 if Self::is_recursion_placeholder(def) {
                     return RecursiveBounds::unresolved();
                 }
-                guarded_bounds(*level, open, move |open| def.match_bounds_recursive(open))
+                guarded_bounds(*level, open, move |open| {
+                    def.borrow().match_bounds_recursive(open)
+                })
             }
 
             TypedFormat::DecodeBytes(_, _, _)
