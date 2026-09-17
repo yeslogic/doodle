@@ -156,6 +156,7 @@ fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
 const BSON_TAG_DOUBLE: i8 = 0x01;
 const BSON_TAG_STRING: i8 = 0x02;
 const BSON_TAG_DOCUMENT: i8 = 0x03;
+const BSON_TAG_ARRAY: i8 = 0x04;
 const BSON_TAG_BINARY: i8 = 0x05;
 const BSON_TAG_OBJECTID: i8 = 0x07;
 const BSON_TAG_BOOL: i8 = 0x08;
@@ -173,13 +174,14 @@ const BSON_TAG_MINKEY: i8 = -1;
 
 /// Factory function for the format of a single BSON `element`
 ///
-/// Takes references to `cstring` and `string` formats, as well as the `Format::RecVar` corresponding
-/// to the `bson.document` format.
+/// Takes references to `cstring` and `string` formats, as well as the `Format::RecVar`s
+/// corresponding to the `bson.document` and `bson.array` formats.
 fn element(
     module: &mut FormatModule,
     cstring: FormatRef,
     string: FormatRef,
     document: Format,
+    array: Format,
 ) -> Format {
     let e_double = module.define_format(
         "bson.element.double",
@@ -249,6 +251,7 @@ fn element(
         ("double", e_double.call()),
         ("string", e_string.call()),
         ("document", mk_element(BSON_TAG_DOCUMENT, cstring, document)),
+        ("array", mk_element(BSON_TAG_ARRAY, cstring, array)),
         ("binary", e_binary.call()),
         ("objectid", e_objectid.call()),
         ("bool", e_bool.call()),
@@ -282,17 +285,35 @@ fn document(element: Format) -> Format {
     )
 }
 
+/// Factory function for the format of a BSON `array`.
+///
+/// Per the BSON spec, `array` is grammatically identical to [`document`] (`int32 len` + `e_list` +
+/// null terminator) — the convention that keys are stringified indices is not enforced on the wire.
+/// This delegates to `document`'s builder directly rather than duplicating its body, while still
+/// getting its own module registration (`bson.array`) and `RecVar` slot so it's distinguishable from
+/// an embedded document at the tree-output/codegen level.
+fn array(element: Format) -> Format {
+    document(element)
+}
+
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
     let string = string(module, utf8_nz);
     let document = {
-        let element0 = element(module, cstring, string, Format::RecVar(1));
+        let element0 = element(
+            module,
+            cstring,
+            string,
+            Format::RecVar(1),
+            Format::RecVar(2),
+        );
         let refs = module.define_format_rec_batch(vec![
             ("bson.element", element0),
             ("bson.document", document(Format::RecVar(0))),
+            ("bson.array", array(Format::RecVar(0))),
         ]);
         match &refs[..] {
-            [_element, document] => *document,
+            [_element, document, _array] => *document,
             _ => unreachable!(),
         }
     };
