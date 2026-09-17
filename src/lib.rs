@@ -1114,38 +1114,106 @@ impl FormatModule {
         &mut self,
         formats: Vec<(L, Format)>,
     ) -> Vec<FormatRef> {
-        let start = self.names.len();
         let n = formats.len();
-
-        // Reserve every level in the batch before any body is installed, so that a RecVar-derived
-        // ItemVar reference to any batch member (including itself) resolves to a real (if still
-        // type-provisional) slot rather than indexing out of bounds.
         let mut names = Vec::with_capacity(n);
         let mut bodies = Vec::with_capacity(n);
         for (name, format) in formats {
             names.push(name.into());
             bodies.push(format);
         }
-        for name in &names {
-            self.names.push(name.clone());
+
+        let start = self.reserve_batch_levels(names);
+        for (ix, format) in bodies.into_iter().enumerate() {
+            self.formats[start + ix] = format.substitute_rec_var(start);
+        }
+        self.infer_batch_types(start, n);
+
+        (start..start + n).map(FormatRef).collect()
+    }
+
+    /// Registers a batch of mutually-referencing formats built directly from [`FormatRef`]s rather
+    /// than batch-relative [`Format::RecVar`] indices.
+    ///
+    /// Reserves all `N` levels up front, exactly like [`Self::define_format_rec_batch`], but hands
+    /// each member-builder the resulting `[FormatRef; N]` immediately rather than requiring the
+    /// caller to pre-build a whole `Format` tree using raw `RecVar` indices. Since [`FormatRef`] is
+    /// `Copy` (unlike [`Format`]), a builder can call `.call()`/`.call_args()`/etc. on any of `refs`
+    /// as many times as it needs, without having to thread a fresh `Format::RecVar(i)`-valued
+    /// parameter through its own signature for each additional use site of the same recursive
+    /// reference - the exact friction that motivated this constructor (see `doc/RECURSION.md`'s
+    /// "mental model" section for the underlying `ItemVar`/level model this still builds on).
+    ///
+    /// Each builder also receives `&mut FormatModule`, so it may register its own auxiliary,
+    /// non-recursive sub-formats along the way, exactly as it could when called ahead of a plain
+    /// [`Self::define_format_rec_batch`] (e.g. a batch member that itself dispatches on a tagged
+    /// union of many sub-formats, each worth naming independently).
+    ///
+    /// Builders are invoked in `formats` order, and the same order-dependent type-inference
+    /// behavior documented on [`Self::define_format_rec_batch`] applies here too: a member
+    /// referencing an *earlier* sibling sees that sibling's real, already-solved type, while one
+    /// referencing itself or a *later* sibling sees the still-provisional placeholder.
+    ///
+    /// This is presently a thin, additive convenience layer over the same underlying level/`ItemVar`
+    /// machinery `define_format_rec_batch` uses (a builder's returned `Format` never contains a
+    /// `RecVar` to begin with, so no substitution pass is needed) - it does not remove or replace
+    /// `Format::RecVar`/`define_format_rec_batch`, which remain the lower-level, `Vec`-based entry
+    /// point.
+    ///
+    /// Builders are boxed (`Box<dyn FnOnce(..) -> Format>`) rather than a single generic `F`,
+    /// because distinct batch members typically close over distinct free variables (e.g. one member
+    /// needing a couple of sibling `FormatRef`s a neighboring member doesn't) - which makes them
+    /// distinct concrete closure types that a single monomorphic `[F; N]` could not hold together.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any constructed format fails to type-check.
+    pub fn define_format_recursive<L: IntoLabel, const N: usize>(
+        &mut self,
+        names: [L; N],
+        formats: [Box<dyn FnOnce(&mut FormatModule, &[FormatRef; N]) -> Format>; N],
+    ) -> [FormatRef; N] {
+        let start = self.reserve_batch_levels(names.into_iter().map(Into::into));
+        let refs: [FormatRef; N] = std::array::from_fn(|ix| FormatRef(start + ix));
+
+        for (ix, build) in formats.into_iter().enumerate() {
+            let body = build(self, &refs);
+            self.formats[start + ix] = body;
+        }
+        self.infer_batch_types(start, N);
+
+        refs
+    }
+
+    /// Reserves `names.len()` contiguous levels, starting at the module's current length, each with
+    /// a placeholder (`Format::EMPTY`/`ValueType::Any`) body - so that a self- or forward-reference
+    /// to any reserved level (including one still awaiting its real body) resolves to a real, if
+    /// still type-provisional, slot rather than indexing out of bounds. Shared by
+    /// [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`]; returns the starting
+    /// level.
+    fn reserve_batch_levels(&mut self, names: impl IntoIterator<Item = Label>) -> usize {
+        let start = self.names.len();
+        for name in names {
+            self.names.push(name);
             self.args.push(Vec::new());
             self.views.push(Vec::new());
             self.formats.push(Format::EMPTY);
             self.format_types.push(ValueType::Any);
         }
-        for (ix, format) in bodies.into_iter().enumerate() {
-            self.formats[start + ix] = format.substitute_rec_var(start);
-        }
+        start
+    }
 
-        // `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
-        // level's body - it just reads `format_types[level]` directly (see that method) - so,
-        // unlike an eager equirecursive inference engine, no occurs-tracking is needed here: a
-        // still-provisional sibling (including self) is read as-is (currently `ValueType::Any`,
-        // which `ValueType::unify` always accepts unconditionally) and treated as an
-        // already-terminating leaf. Processing members in `formats`-order means a member
-        // referencing an *earlier* sibling sees that sibling's real, already-solved type, while
-        // one referencing a *later* sibling (or itself) sees the placeholder - an accepted,
-        // order-dependent imprecision, not a soundness gap for this module's own purposes.
+    /// Solves and installs the real type for each of `n` levels starting at `start`, in ascending
+    /// order. `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
+    /// level's body - it just reads `format_types[level]` directly - so, unlike an eager
+    /// equirecursive inference engine, no occurs-tracking is needed here: a still-provisional
+    /// sibling (including self) is read as-is (currently `ValueType::Any`, which `ValueType::unify`
+    /// always accepts unconditionally) and treated as an already-terminating leaf. Processing in
+    /// ascending order means a member referencing an *earlier* sibling sees that sibling's real,
+    /// already-solved type, while one referencing a *later* sibling (or itself) sees the
+    /// placeholder - an accepted, order-dependent imprecision, not a soundness gap for this module's
+    /// own purposes. Shared by [`Self::define_format_rec_batch`] and
+    /// [`Self::define_format_recursive`].
+    fn infer_batch_types(&mut self, start: usize, n: usize) {
         for ix in start..start + n {
             let scope = TypeScope::new();
             let format_type = match self.infer_format_type(&scope, &self.formats[ix]) {
@@ -1154,8 +1222,6 @@ impl FormatModule {
             };
             self.format_types[ix] = format_type;
         }
-
-        (start..start + n).map(FormatRef).collect()
     }
 
     pub fn get_name(&self, level: usize) -> &str {
