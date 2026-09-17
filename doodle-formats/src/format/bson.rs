@@ -145,6 +145,21 @@ fn dbpointer(string: FormatRef) -> Format {
     ])
 }
 
+/// BSON `code_w_scope` (0x0F, deprecated): JS `code` paired with a `scope` document giving bindings
+/// for variables referenced in the code. The leading `int32` is the total byte length of the whole
+/// value (itself, `code`, and `scope` combined), guarded against underflow the same way as
+/// `document`'s own length field.
+fn code_w_scope(string: FormatRef, document: Format) -> Format {
+    chain(
+        where_within_z(i32le(), 4i32..),
+        "len",
+        slice(
+            numeric(numexpr!("len" -u32 4)),
+            record([("code", string.call()), ("scope", document)]),
+        ),
+    )
+}
+
 fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
     record_auto([
         ("__tag", is_byte(tag as u8)),
@@ -166,6 +181,7 @@ const BSON_TAG_REGEX: i8 = 0x0B;
 const BSON_TAG_DBPOINTER: i8 = 0x0C;
 const BSON_TAG_CODE: i8 = 0x0D;
 const BSON_TAG_SYMBOL: i8 = 0x0E;
+const BSON_TAG_CODE_W_SCOPE: i8 = 0x0F;
 const BSON_TAG_INT32: i8 = 0x10;
 const BSON_TAG_TIMESTAMP: i8 = 0x11;
 const BSON_TAG_INT64: i8 = 0x12;
@@ -175,13 +191,17 @@ const BSON_TAG_MINKEY: i8 = -1;
 /// Factory function for the format of a single BSON `element`
 ///
 /// Takes references to `cstring` and `string` formats, as well as the `Format::RecVar`s
-/// corresponding to the `bson.document` and `bson.array` formats.
+/// corresponding to the `bson.document` and `bson.array` formats. `document_scope` is a second,
+/// independent instance of the same `bson.document` `RecVar` as `document` - needed because a
+/// `Format` value (unlike a `FormatRef`) can only be consumed once, and `code_w_scope`'s embedded
+/// scope is a second, distinct use-site of the same recursive document slot.
 fn element(
     module: &mut FormatModule,
     cstring: FormatRef,
     string: FormatRef,
     document: Format,
     array: Format,
+    document_scope: Format,
 ) -> Format {
     let e_double = module.define_format(
         "bson.element.double",
@@ -261,6 +281,14 @@ fn element(
         ("dbpointer", e_dbpointer.call()),
         ("code", e_code.call()),
         ("symbol", e_symbol.call()),
+        (
+            "code_w_scope",
+            mk_element(
+                BSON_TAG_CODE_W_SCOPE,
+                cstring,
+                code_w_scope(string, document_scope),
+            ),
+        ),
         ("int32", e_int32.call()),
         ("timestamp", e_timestamp.call()),
         ("int64", e_int64.call()),
@@ -306,6 +334,7 @@ pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
             string,
             Format::RecVar(1),
             Format::RecVar(2),
+            Format::RecVar(1),
         );
         let refs = module.define_format_rec_batch(vec![
             ("bson.element", element0),
