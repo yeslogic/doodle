@@ -273,10 +273,16 @@ mod util {
         use doodle::numeric::BasicUnaryOp;
         if_then_else(
             is_positive,
-            map_numeric(u8(), |v| num::cast(MachineRep::I16, v)),
-            map_numeric(u8(), |v| {
-                num::unary_with_rep(BasicUnaryOp::Negate, Some(MachineRep::I16), v)
-            }),
+            map_numeric(u8(), "raw", num::cast(MachineRep::I16, num::num_var("raw"))),
+            map_numeric(
+                u8(),
+                "raw",
+                num::unary_with_rep(
+                    BasicUnaryOp::Negate,
+                    Some(MachineRep::I16),
+                    num::num_var("raw"),
+                ),
+            ),
         )
     }
 
