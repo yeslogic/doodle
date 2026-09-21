@@ -1,8 +1,8 @@
 [alias]
 cw = "check --workspace"
 cg = "run --bin doodle -- format --output rust --dest generated/gencode.rs"
-coverage = "tarpaulin --workspace --exclude smallsorts analytic-parser analytic-engine --out lcov --engine llvm"
-testall = "test --workspace --exclude smallsorts --exclude analytic-engine --exclude analytic-parser"
+coverage = "tarpaulin --workspace --exclude smallsorts analytic-parser --out lcov --engine llvm"
+testall = "test --workspace --exclude smallsorts --exclude analytic-parser"
 
 [profile.profiling]
 inherits = "release"

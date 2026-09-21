@@ -1930,7 +1930,11 @@ pub mod base {
     pub fn i8() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I8)),
-            Box::new(map_numeric(u8(), |v| num::cast_bitwise(MachineRep::I8, v))),
+            Box::new(map_numeric(
+                u8(),
+                "raw",
+                num::cast_bitwise(MachineRep::I8, num::num_var("raw")),
+            )),
         )
     }
 
@@ -1938,9 +1942,11 @@ pub mod base {
     pub fn i16be() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I16BE)),
-            Box::new(map_numeric(u16be(), |v| {
-                num::cast_bitwise(MachineRep::I16, v)
-            })),
+            Box::new(map_numeric(
+                u16be(),
+                "raw",
+                num::cast_bitwise(MachineRep::I16, num::num_var("raw")),
+            )),
         )
     }
 
@@ -1948,9 +1954,11 @@ pub mod base {
     pub fn i32be() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I32BE)),
-            Box::new(map_numeric(u32be(), |v| {
-                num::cast_bitwise(MachineRep::I32, v)
-            })),
+            Box::new(map_numeric(
+                u32be(),
+                "raw",
+                num::cast_bitwise(MachineRep::I32, num::num_var("raw")),
+            )),
         )
     }
 
@@ -1958,9 +1966,11 @@ pub mod base {
     pub fn i64be() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::I64BE)),
-            Box::new(map_numeric(u64be(), |v| {
-                num::cast_bitwise(MachineRep::I64, v)
-            })),
+            Box::new(map_numeric(
+                u64be(),
+                "raw",
+                num::cast_bitwise(MachineRep::I64, num::num_var("raw")),
+            )),
         )
     }
 }
@@ -2156,15 +2166,9 @@ pub fn numeric(n_expr: NumExpr) -> Expr {
     Expr::Numeric(Box::new(n_expr))
 }
 
-/// Helper function for parsing a numeric expression and leaving it as a numeric value, without any additional transformation.
-pub fn mk_numeric(f: Format) -> Format {
-    map_numeric(f, |x| x)
-}
-
-/// Helper function for parsing a numeric expression and applying a NumExpr transformation to the resulting value.
-pub fn map_numeric(f: Format, map_fn: impl FnOnce(NumExpr) -> NumExpr) -> Format {
-    const IDENT: &str = "raw";
-    chain(f, IDENT, compute(numeric(map_fn(num::num_var(IDENT)))))
+/// Helper function for parsing an integer value using a given Format, and compuing a derived expression based on it.
+pub fn map_numeric(f: Format, ident: &'static str, mapped: NumExpr) -> Format {
+    chain(f, ident, compute_numeric(mapped))
 }
 
 /// Polymorphic (auto-rep) zero-value within the embedded `numeric` model.
