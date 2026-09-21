@@ -446,7 +446,7 @@ pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>)
 /// If the branches in question are all `Format::Variant`, use [`alts_nondet`] instead.
 ///
 /// If the given branches can be deterministically distinguished within a fixed finite lookahead, use [`union`] instead.
-pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = Format>) -> Format {
+pub fn union_nondet(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::UnionNondet(Vec::from_iter(branches))
 }
 
