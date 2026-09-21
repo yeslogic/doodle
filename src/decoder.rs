@@ -17,6 +17,8 @@ use crate::{
 };
 use crate::{FixedReadKind, try_with};
 
+#[cfg(test)]
+mod eval_parity_tests;
 pub mod seq_kind;
 use seq_kind::sub_range;
 pub use seq_kind::{SeqKind, ValueSeq};
