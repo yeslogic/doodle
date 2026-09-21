@@ -136,7 +136,7 @@ pub(crate) mod with_err {
         ///
         /// If `f` returns `Ok(other)`, this function returns `other` with any errors from `self` appended.
         /// Otherwise, returns the same `Err` that `f` returned.
-        pub fn join<U, E1>(self, mut f: impl FnMut(T) -> EResult<U, E0, E1>) -> EResult<U, E0, E1> {
+        pub fn join<U, E1>(self, f: impl FnOnce(T) -> EResult<U, E0, E1>) -> EResult<U, E0, E1> {
             let mut this_errs = self.errs;
             let mut ret = f(self.value)?;
             ret.errs.append(&mut this_errs);
@@ -217,24 +217,25 @@ pub(crate) mod with_err {
 
     pub type EResult<T, E0, E1 = E0> = Result<WithErr<T, E0>, E1>;
 
-    /// Given `val: Result<WithErr<T, E0>, E0>`, returns `v` if `val` is `Ok(v)`, and for `Err(e)`, returns `WithErr::with_err(default(), e)`.
-    pub fn downgrade_error_with<T, E0>(
+    /// Downgrades an error in `val` to a logged warning by substituting `default`, which is itself fallible:
+    /// if `default` fails, its error is propagated instead.
+    pub fn try_downgrade_error_with<T, E0, E1>(
         val: EResult<T, E0>,
-        default: impl FnOnce() -> T,
-    ) -> WithErr<T, E0>
+        default: impl FnOnce() -> Result<T, E1>,
+    ) -> Result<WithErr<T, E0>, E1>
     where
         E0: std::fmt::Display,
     {
         match val {
-            Ok(v) => v,
+            Ok(v) => Ok(v),
             Err(e) => {
                 log::error!("downgraded error: {e}");
-                WithErr::with_err(default(), e)
+                Ok(WithErr::with_err(default()?, e))
             }
         }
     }
 }
-pub(crate) use with_err::{EResult, WithErr, downgrade_error_with};
+pub(crate) use with_err::{EResult, WithErr, try_downgrade_error_with};
 
 pub trait ErrTrace {
     fn with_trace<T>(self, trace: T) -> Self
@@ -286,9 +287,21 @@ mod tests {
 
     #[test]
     fn test_downgrade_error() {
-        let x = downgrade_error_with::<&'static str, &'static str>(Err("error"), || "default");
+        let x = try_downgrade_error_with::<&'static str, &'static str, ()>(Err("error"), || {
+            Ok("default")
+        })
+        .unwrap();
         assert!(x.has_errs());
         assert!(x.iter_errs().next().is_some_and(|e| *e == "error"));
         assert_eq!(x.into_inner(), "default");
+    }
+
+    #[test]
+    fn test_downgrade_error_default_fails() {
+        let res = try_downgrade_error_with::<&'static str, &'static str, &'static str>(
+            Err("error"),
+            || Err("default failed"),
+        );
+        assert_eq!(res.err(), Some("default failed"));
     }
 }

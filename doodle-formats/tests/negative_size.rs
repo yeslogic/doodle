@@ -42,9 +42,9 @@ fn test_native() {
     let prog = Compiler::compile_program(&module, &native.call()).expect("compilation failed");
     let ctxt_ok = ReadCtxt::new(&ok);
     let ctxt_err = ReadCtxt::new(&err);
-    let (res, _) = prog.run(ctxt_ok).expect("decoding failed on ok-buf"); // should succeed
+    let (res, _) = prog.run(ctxt_ok).expect("decoding failed on ok-buf");
     check_res_ok(res);
-    let (res, _) = prog.run(ctxt_err).expect("decoding failed on err-buf"); // should succeed
+    let (res, _) = prog.run(ctxt_err).expect("decoding failed on err-buf");
     check_res_err(res);
 }
 
@@ -81,9 +81,9 @@ fn test_numeric() {
     let prog = Compiler::compile_program(&module, &numeric.call()).expect("compilation failed");
     let ctxt_ok = ReadCtxt::new(&ok);
     let ctxt_err = ReadCtxt::new(&err);
-    let (res, _) = prog.run(ctxt_ok).expect("decoding failed on ok-buf"); // should succeed
+    let (res, _) = prog.run(ctxt_ok).expect("decoding failed on ok-buf");
     check_res_ok(res);
-    let (res, _) = prog.run(ctxt_err).expect("decoding failed on err-buf"); // will fail
+    let (res, _) = prog.run(ctxt_err).expect("decoding failed on err-buf");
     check_res_err(res);
 }
 
@@ -112,7 +112,7 @@ fn check_res_err(res: Value) {
         panic!("expected Variant");
     };
     assert_eq!(label, "small");
-    let Value::U32(n) = *inner else {
+    let Value::U32(n) = inner.extract_mapped_value().into_inner() else {
         panic!("expected U32");
     };
     assert_eq!(n, 3);
