@@ -1,5 +1,5 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::{ArithError, Scope, ScopeEntry, Value};
+use crate::decoder::{ArithError, Scope, ScopeEntry, SeqBoundsError, Value};
 use crate::loc_decoder::{LocScope, ParsedValue};
 use crate::numeric::core::EvalError as NumExprError;
 use crate::read::{BufferKind, ReadCtxt};
@@ -32,6 +32,8 @@ pub enum EvalError {
     IntCast(std::num::TryFromIntError),
     /// A [`TypedConst`](crate::numeric::core::TypedConst) could not be converted to a native integer type.
     NumericConvert(anyhow::Error),
+    /// A `SeqIx`/`SubSeq`/`SubSeqInflate` index or start-offset was out of bounds.
+    SeqBounds(SeqBoundsError),
 }
 
 impl std::fmt::Display for EvalError {
@@ -41,6 +43,7 @@ impl std::fmt::Display for EvalError {
             Self::Numeric(err) => write!(f, "numeric expression evaluation failed: {err}"),
             Self::IntCast(err) => write!(f, "integer conversion failed: {err}"),
             Self::NumericConvert(err) => write!(f, "numeric conversion failed: {err}"),
+            Self::SeqBounds(err) => err.fmt(f),
         }
     }
 }
@@ -52,6 +55,7 @@ impl std::error::Error for EvalError {
             Self::Numeric(err) => Some(err),
             Self::IntCast(err) => Some(err),
             Self::NumericConvert(err) => Some(err.as_ref()),
+            Self::SeqBounds(err) => Some(err),
         }
     }
 }
@@ -101,6 +105,12 @@ impl From<std::num::TryFromIntError> for EvalError {
 impl From<anyhow::Error> for EvalError {
     fn from(err: anyhow::Error) -> Self {
         Self::NumericConvert(err)
+    }
+}
+
+impl From<SeqBoundsError> for EvalError {
+    fn from(err: SeqBoundsError) -> Self {
+        Self::SeqBounds(err)
     }
 }
 

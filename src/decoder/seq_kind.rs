@@ -53,8 +53,12 @@ pub(crate) fn sub_range(
     start: usize,
     len: usize,
 ) -> std::ops::Range<usize> {
+    // NOTE - `start + len == range.len()` is the valid full-range case (e.g. `start=0,
+    // len=range.len()`), so this must be `<=`, not `<`. Callers are expected to have already
+    // checked bounds (see `eval::check_sub_range`), so this is a last-line invariant check, not
+    // the primary bounds-checking mechanism.
     assert!(
-        start + len < range.len(),
+        start + len <= range.len(),
         "sub_range invalid: start={start} len={len} range={range:?}"
     );
     range.start + start..range.start + start + len
