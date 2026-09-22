@@ -1,6 +1,7 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::{Scope, ScopeEntry, Value};
+use crate::decoder::{ArithError, Scope, ScopeEntry, SeqBoundsError, Value};
 use crate::loc_decoder::{LocScope, ParsedValue};
+use crate::numeric::core::EvalError as NumExprError;
 use crate::read::{BufferKind, ReadCtxt};
 use crate::{Expr, Label, Pattern};
 
@@ -16,6 +17,119 @@ impl std::fmt::Display for UnknownVarError {
 }
 
 impl std::error::Error for UnknownVarError {}
+
+/// Error produced while evaluating an [`Expr`] to a [`Value`] (see `Expr::eval`).
+///
+/// Only covers failures that can be caused by the data being decoded; violations of invariants
+/// that the type-checker is responsible for (e.g. applying `AsChar` to a `Seq`) remain panics.
+#[derive(Debug)]
+pub enum EvalError {
+    /// Checked integer arithmetic underflowed, overflowed, or divided by zero.
+    Arith(ArithError),
+    /// Evaluation of an embedded [`NumExpr`](crate::numeric::core::NumExpr) failed.
+    Numeric(NumExprError),
+    /// A fixed-width integer conversion (e.g. a narrowing `AsU8`) was out of range.
+    IntCast(std::num::TryFromIntError),
+    /// A [`TypedConst`](crate::numeric::core::TypedConst) could not be converted to a native integer type.
+    NumericConvert(anyhow::Error),
+    /// A `SeqIx`/`SubSeq`/`SubSeqInflate` index or start-offset was out of bounds.
+    SeqBounds(SeqBoundsError),
+    /// An `Expr::Match`'s scrutinee matched none of its branch patterns ("non-exhaustive"), or an
+    /// `Expr::Destructure`'s scrutinee did not match its single pattern ("refuted"). Mirrors
+    /// `DecodeErrorKind::RefutedPatternMatch`, the analogous error for `Decoder::Match`.
+    RefutedPattern {
+        /// The pattern(s) that the value was matched against (all branches, for `Match`; the
+        /// single pattern, for `Destructure`).
+        cases: Vec<Pattern>,
+        /// The value that failed to match any of `cases`.
+        value: Box<Value>,
+    },
+}
+
+impl std::fmt::Display for EvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Arith(err) => err.fmt(f),
+            Self::Numeric(err) => write!(f, "numeric expression evaluation failed: {err}"),
+            Self::IntCast(err) => write!(f, "integer conversion failed: {err}"),
+            Self::NumericConvert(err) => write!(f, "numeric conversion failed: {err}"),
+            Self::SeqBounds(err) => err.fmt(f),
+            Self::RefutedPattern { cases, value } => {
+                write!(
+                    f,
+                    "value `{value:?}` failed to match any of the provided patterns: {cases:?}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for EvalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Arith(err) => Some(err),
+            Self::Numeric(err) => Some(err),
+            Self::IntCast(err) => Some(err),
+            Self::NumericConvert(err) => Some(err.as_ref()),
+            Self::SeqBounds(err) => Some(err),
+            Self::RefutedPattern { .. } => None,
+        }
+    }
+}
+
+/// Extension for attaching decode-context to an [`EvalError`] as it crosses into the decoder,
+/// so that an otherwise narrow failure (e.g. a bare `TryFromIntError`) records which `Decoder`
+/// and which `Expr` it originated from.
+pub(crate) trait EvalResultExt<T> {
+    /// Converts the error into a [`DecodeError`], pushing the value produced by `ctx` onto its trace.
+    ///
+    /// `ctx` is only evaluated if `self` is an `Err`.
+    fn trace_eval<V, C>(self, ctx: impl FnOnce() -> C) -> Result<T, DecodeError<V>>
+    where
+        V: Clone + std::fmt::Debug,
+        C: std::fmt::Debug + Send + Sync + 'static;
+}
+
+impl<T> EvalResultExt<T> for Result<T, EvalError> {
+    fn trace_eval<V, C>(self, ctx: impl FnOnce() -> C) -> Result<T, DecodeError<V>>
+    where
+        V: Clone + std::fmt::Debug,
+        C: std::fmt::Debug + Send + Sync + 'static,
+    {
+        use crate::util::ErrTrace as _;
+        self.map_err(|err| DecodeError::<V>::from(err).with_trace(ctx()))
+    }
+}
+
+impl From<ArithError> for EvalError {
+    fn from(err: ArithError) -> Self {
+        Self::Arith(err)
+    }
+}
+
+impl From<NumExprError> for EvalError {
+    fn from(err: NumExprError) -> Self {
+        Self::Numeric(err)
+    }
+}
+
+impl From<std::num::TryFromIntError> for EvalError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::IntCast(err)
+    }
+}
+
+impl From<anyhow::Error> for EvalError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::NumericConvert(err)
+    }
+}
+
+impl From<SeqBoundsError> for EvalError {
+    fn from(err: SeqBoundsError) -> Self {
+        Self::SeqBounds(err)
+    }
+}
 
 #[derive(Debug)]
 pub struct DecodeError<V: Clone = Value> {
@@ -100,6 +214,16 @@ pub enum BufferLimitError {
         /// The length of the buffer we were seeking within (i.e. one more than the last legal offset)
         buffer_len: usize,
     },
+    /// A `Format::WithRelativeOffset`'s `base + offset` computation overflowed `usize`, rather
+    /// than merely landing past the end of the buffer (see `SeekPastEnd` for that case).
+    OffsetOverflow {
+        /// What kind of buffer the offset was being computed relative to
+        buffer_kind: BufferKind,
+        /// The base address the offset was added to
+        base: usize,
+        /// The (relative) offset that, added to `base`, overflowed `usize`
+        offset: usize,
+    },
 }
 
 impl std::fmt::Display for BufferLimitError {
@@ -133,6 +257,16 @@ impl std::fmt::Display for BufferLimitError {
                     f,
                     "attempted to read byte at offset {offset} in {buffer_kind}, but encountered {terminus}",
                     terminus = buffer_kind.terminus()
+                )
+            }
+            Self::OffsetOverflow {
+                buffer_kind,
+                base,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "relative offset computation {base} + {offset} overflowed while seeking in {buffer_kind}"
                 )
             }
         }
@@ -188,6 +322,8 @@ pub enum DecodeErrorKind<V: Clone = Value> {
         /// The value that failed to match any of the provided patterns
         value: Box<V>,
     },
+    /// Evaluation of an [`Expr`] failed (see [`EvalError`]).
+    Eval(EvalError),
 }
 
 impl BufferLimitError {
@@ -269,6 +405,7 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeErrorKind<V> {
                     "value `{value:?}` failed to match any of the provided patterns: {cases:?}"
                 )
             }
+            Self::Eval(err) => err.fmt(f),
         }
     }
 }
@@ -277,8 +414,21 @@ impl<V: std::fmt::Debug + Clone> std::error::Error for DecodeErrorKind<V> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::BufferLimit(err) => Some(err),
+            Self::Eval(err) => Some(err),
             _ => None,
         }
+    }
+}
+
+impl<V: Clone> From<EvalError> for DecodeErrorKind<V> {
+    fn from(err: EvalError) -> Self {
+        Self::Eval(err)
+    }
+}
+
+impl<V: Clone + std::fmt::Debug> From<EvalError> for DecodeError<V> {
+    fn from(err: EvalError) -> Self {
+        DecodeErrorKind::from(err).into()
     }
 }
 
@@ -378,6 +528,16 @@ impl BufferKind {
             buffer_kind: self,
             seek_offset,
             buffer_len,
+        }
+    }
+
+    /// Constructs a DecodeError that indicates that a `base + offset` relative-offset
+    /// computation overflowed `usize`, rather than merely landing past the end of the buffer.
+    pub fn offset_overflow(self, base: usize, offset: usize) -> BufferLimitError {
+        BufferLimitError::OffsetOverflow {
+            buffer_kind: self,
+            base,
+            offset,
         }
     }
 

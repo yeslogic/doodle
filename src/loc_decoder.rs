@@ -8,16 +8,14 @@ use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
-    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, SpineDecoder, Value, ValueSeq,
-    cow_map, cow_remap, extract_pair,
-    search::{find_index_by_key_sorted, find_index_by_key_unsorted},
-    seq_kind::sub_range,
+    Compiler, Decoder, Program, ReadArrayKind, SeqKind, SpineDecoder, Value, ValueSeq,
+    value::Coerced,
 };
-use crate::error::{DecodeError, DecodeErrorKind, UnknownVarError};
+use crate::error::{DecodeError, DecodeErrorKind, EvalError, EvalResultExt as _};
 use crate::read::{BufferKind, ReadCtxt};
 use crate::try_with;
 use crate::util::ErrTrace as _;
-use crate::util::downgrade_error_with;
+use crate::util::try_downgrade_error_with;
 use crate::util::{EResult, WithErr};
 use crate::validation::Condition;
 use crate::{BaseKind, DynFormat, Endian, Expr, Format, Label, Pattern, ViewExpr};
@@ -371,7 +369,7 @@ impl ParsedValue {
     pub fn matches_inner(&self, scope: &mut LocMultiScope<'_>, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::Binding(name) => {
-                scope.push(name.clone(), self.clone());
+                scope.push_owned(name.clone(), self.clone());
                 true
             }
             Pattern::Wildcard => true,
@@ -468,9 +466,14 @@ impl ParsedValue {
         }
     }
 
-    fn tuple_proj(&self, index: usize) -> &Self {
-        match self.coerce_mapped_value() {
+    /// Internal helper for [`super::decoder::eval::EvalValue::tuple_proj_raw`]. Mirrors
+    /// [`Value::_tuple_proj`](super::decoder::value::Value), including its special-case pass-through
+    /// for `Permit(Err(None))`; unlike the old `tuple_proj`, assumes `self` is already
+    /// `coerce_mapped_value`-coerced (callers coerce first, same as `Value::_tuple_proj`).
+    fn tuple_proj_raw(&self, index: usize) -> &Self {
+        match self {
             ParsedValue::Tuple(Parsed { inner, .. }) => &inner[index],
+            ParsedValue::Permit(Err(None)) => self,
             _ => panic!("expected tuple"),
         }
     }
@@ -489,6 +492,19 @@ impl ParsedValue {
             ParsedValue::Mapped(_orig, v) => v.coerce_mapped_value(),
             ParsedValue::Branch(_n, v) => v.coerce_mapped_value(),
             ParsedValue::Permit(Ok(v)) => v.coerce_mapped_value(),
+            v => v,
+        }
+    }
+
+    /// Higher-level version of [`Self::coerce_mapped_value`] that also unwraps any
+    /// `ParsedValue::Permit(Err(_))` for pattern-matching purposes. Mirrors
+    /// [`Value::coerce_nominal_value`](super::decoder::value::Value::coerce_nominal_value).
+    pub(crate) fn coerce_nominal_value(&self) -> &Self {
+        match self {
+            ParsedValue::Permit(Ok(v)) => v.coerce_nominal_value(),
+            ParsedValue::Permit(Err(Some(v))) => v.coerce_nominal_value(),
+            ParsedValue::Mapped(_orig, v) => v.coerce_nominal_value(),
+            ParsedValue::Branch(_n, v) => v.coerce_nominal_value(),
             v => v,
         }
     }
@@ -584,504 +600,91 @@ impl ParsedValue {
 
     fn matches<'a>(&self, scope: &'a LocScope<'a>, pattern: &Pattern) -> Option<LocMultiScope<'a>> {
         let mut pattern_scope = LocMultiScope::new(scope);
-        self.coerce_mapped_value()
+        self.coerce_nominal_value()
             .matches_inner(&mut pattern_scope, pattern)
             .then_some(pattern_scope)
     }
 }
 
+impl crate::decoder::eval::EvalValue for ParsedValue {
+    fn from_evaluated(v: Value) -> Self {
+        ParsedValue::from_evaluated(v)
+    }
+
+    fn from_evaluated_seq(vs: Vec<Self>) -> Self {
+        ParsedValue::from_evaluated_seq(vs)
+    }
+
+    fn clone_into_value(&self) -> Value {
+        self.clone_into_value()
+    }
+
+    fn coerce_mapped_value(&self) -> Coerced<&Self> {
+        // `ParsedValue::coerce_mapped_value` (unlike `Value`'s) never unwraps a
+        // `Permit(Err(Some(_)))`, so it never has a real fallback to report - always `pure`.
+        Coerced::pure(self.coerce_mapped_value())
+    }
+
+    fn extract_mapped_value(self) -> Value {
+        match self {
+            ParsedValue::Mapped(_orig, v) => (*v).extract_mapped_value(),
+            ParsedValue::Branch(_n, v) => (*v).extract_mapped_value(),
+            ParsedValue::Permit(Ok(v)) => (*v).extract_mapped_value(),
+            v => v.clone_into_value(),
+        }
+    }
+
+    fn tuple_proj_raw(&self, index: usize) -> &Self {
+        self.tuple_proj_raw(index)
+    }
+
+    fn record_proj_raw(&self, label: &str) -> &Self {
+        self.record_proj(label)
+    }
+
+    fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
+        self.get_sequence()
+    }
+
+    fn collect_fields(fields: Vec<(Label, Self)>) -> Self {
+        ParsedValue::collect_fields(fields)
+    }
+
+    fn lift_option(opt: Option<Self>) -> Self {
+        match opt {
+            Some(v) => ParsedValue::Option(Some(Box::new(v))),
+            // No real value to preserve location for either way.
+            None => ParsedValue::from_evaluated(Value::Option(None)),
+        }
+    }
+
+    fn matches<'a>(
+        &'a self,
+        scope: &'a LocScope<'a>,
+        pattern: &Pattern,
+    ) -> Option<LocMultiScope<'a>> {
+        self.matches(scope, pattern)
+    }
+}
+
 impl Expr {
-    pub fn eval_with_loc<'a>(&'a self, scope: &'a LocScope<'a>) -> Cow<'a, ParsedValue> {
-        match self {
-            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name).unwrap()),
-            Expr::Bool(b) => Cow::Owned(ParsedValue::from_evaluated(Value::Bool(*b))),
-            Expr::U8(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U8(*i))),
-            Expr::U16(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U16(*i))),
-            Expr::U32(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U32(*i))),
-            Expr::U64(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U64(*i))),
-            Expr::Numeric(n) => {
-                let num_val = n.eval(scope);
-                match num_val {
-                    Ok(v) => Cow::Owned(ParsedValue::from_evaluated(Value::from(v))),
-                    Err(e) => panic!(
-                        "Expr::eval_with_loc(Numeric({n:?})) failed during NumExpr evaluation: {e}"
-                    ),
-                }
-            }
-            Expr::Tuple(exprs) => Cow::Owned(ParsedValue::from_evaluated(Value::Tuple(
-                exprs
-                    .iter()
-                    .map(|expr| expr.eval_value_with_loc(scope))
-                    .collect(),
-            ))),
-            Expr::TupleProj(head, index) => cow_map(head.eval_with_loc(scope), |v| {
-                v.coerce_mapped_value().tuple_proj(*index)
-            }),
-            Expr::Record(fields) => Cow::Owned(ParsedValue::collect_fields(
-                fields
-                    .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval_with_loc(scope).into_owned()))
-                    .collect(),
-            )),
-            Expr::RecordProj(head, label) => cow_map(head.eval_with_loc(scope), |v| {
-                v.coerce_mapped_value().record_proj(label.as_ref())
-            }),
-            Expr::Variant(label, expr) => Cow::Owned(ParsedValue::from_evaluated(Value::variant(
-                label.clone(),
-                expr.eval_value_with_loc(scope),
-            ))),
-            Expr::Seq(exprs) => Cow::Owned(ParsedValue::from_evaluated(Value::Seq(
-                exprs
-                    .iter()
-                    .map(|expr| expr.eval_value_with_loc(scope))
-                    .collect(),
-            ))),
-            Expr::Match(head, branches) => {
-                let head = head.eval_with_loc(scope);
-                for (pattern, expr) in branches {
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let value = expr.eval_value_with_loc(&LocScope::Multi(&pattern_scope));
-                        return Cow::Owned(ParsedValue::from_evaluated(value));
-                    }
-                }
-                panic!("non-exhaustive patterns");
-            }
-            Expr::Destructure(head, pattern, expr) => {
-                let head = head.eval_with_loc(scope);
-                if let Some(pattern_scope) = head.matches(scope, pattern) {
-                    let value = expr.eval_value_with_loc(&LocScope::Multi(&pattern_scope));
-                    return Cow::Owned(ParsedValue::from_evaluated(value));
-                }
-                panic!("refuted pattern: {head:?} does not match {pattern:?}")
-            }
-            Expr::Lambda(_, _) => panic!("cannot eval lambda"),
-
-            Expr::IntRel(rel, x, y) => Cow::Owned(ParsedValue::from_evaluated({
-                let left = x.eval_value_with_loc(scope);
-                let right = y.eval_value_with_loc(scope);
-                Value::int_rel(*rel, left, right)
-            })),
-            Expr::Arith(op, x, y) => Cow::Owned(ParsedValue::from_evaluated({
-                let left = x.eval_value_with_loc(scope);
-                let right = y.eval_value_with_loc(scope);
-                Value::arith(*op, left, right)
-            })),
-            Expr::Unary(op, x) => Cow::Owned(ParsedValue::from_evaluated({
-                let value = x.eval_value_with_loc(scope);
-                Value::unary(*op, value)
-            })),
-
-            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
-            Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(x),
-                    Value::U16(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
-                        panic!("cannot perform AsU8 cast on u16 {x}: {err}")
-                    })),
-                    Value::U32(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
-                        panic!("cannot perform AsU8 cast on u32 {x}: {err}")
-                    })),
-                    Value::U64(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
-                        panic!("cannot perform AsU8 cast on u64 {x}: {err}")
-                    })),
-                    Value::Usize(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
-                        panic!("cannot perform AsU8 cast on usize {x}: {err}")
-                    })),
-                    x => panic!("cannot convert {x:?} to U8"),
-                },
-            )),
-            Expr::AsU16(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U16(u16::from(x)),
-                    Value::U16(x) => Value::U16(x),
-                    Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
-                    Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
-                    Value::Usize(x) => Value::U16(u16::try_from(x).unwrap()),
-                    x => panic!("cannot convert {x:?} to U16"),
-                },
-            )),
-            Expr::AsU32(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U32(u32::from(x)),
-                    Value::U16(x) => Value::U32(u32::from(x)),
-                    Value::U32(x) => Value::U32(x),
-                    Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
-                    Value::Usize(x) => Value::U32(u32::try_from(x).unwrap()),
-                    x => panic!("cannot convert {x:?} to U32"),
-                },
-            )),
-            Expr::AsU64(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U64(u64::from(x)),
-                    Value::U16(x) => Value::U64(u64::from(x)),
-                    Value::U32(x) => Value::U64(u64::from(x)),
-                    Value::U64(x) => Value::U64(x),
-                    Value::Usize(x) => Value::U64(u64::try_from(x).unwrap()),
-                    x => panic!("cannot convert {x:?} to U64"),
-                },
-            )),
-
-            Expr::U16Be(bytes) => {
-                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [Value::U8(hi), Value::U8(lo)] => Cow::Owned(ParsedValue::from_evaluated(
-                        Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    )),
-                    _ => panic!("U16Be: expected (U8, U8)"),
-                }
-            }
-            Expr::U16Le(bytes) => {
-                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [Value::U8(lo), Value::U8(hi)] => Cow::Owned(ParsedValue::from_evaluated(
-                        Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    )),
-                    _ => panic!("U16Le: expected (U8, U8)"),
-                }
-            }
-            Expr::U32Be(bytes) => {
-                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_be_bytes(
-                            [*a, *b, *c, *d],
-                        ))))
-                    }
-                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
-                }
-            }
-            Expr::U32Le(bytes) => {
-                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_le_bytes(
-                            [*a, *b, *c, *d],
-                        ))))
-                    }
-                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
-                }
-            }
-            Expr::U64Be(bytes) => {
-                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [
-                        Value::U8(a),
-                        Value::U8(b),
-                        Value::U8(c),
-                        Value::U8(d),
-                        Value::U8(e),
-                        Value::U8(f),
-                        Value::U8(g),
-                        Value::U8(h),
-                    ] => Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes(
-                        [*a, *b, *c, *d, *e, *f, *g, *h],
-                    )))),
-                    _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
-                }
-            }
-            Expr::U64Le(bytes) => {
-                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [
-                        Value::U8(a),
-                        Value::U8(b),
-                        Value::U8(c),
-                        Value::U8(d),
-                        Value::U8(e),
-                        Value::U8(f),
-                        Value::U8(g),
-                        Value::U8(h),
-                    ] => Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes(
-                        [*a, *b, *c, *d, *e, *f, *g, *h],
-                    )))),
-                    _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
-                }
-            }
-            Expr::AsChar(bytes) => Cow::Owned(ParsedValue::from_evaluated(
-                match bytes.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::Char(char::from(x)),
-                    Value::U16(x) => {
-                        Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER))
-                    }
-                    Value::U32(x) => {
-                        Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
-                    }
-                    Value::U64(x) => Value::Char(
-                        char::from_u32(u32::try_from(x).unwrap())
-                            .unwrap_or(char::REPLACEMENT_CHARACTER),
-                    ),
-                    _ => panic!("AsChar: expected U8, U16, U32, or U64"),
-                },
-            )),
-            Expr::SeqLength(seq) => match seq
-                .eval_with_loc(scope)
-                .coerce_mapped_value()
-                .get_sequence()
-            {
-                Some(values) => {
-                    let len = values.len();
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U32(len as u32)))
-                }
-                _ => panic!("SeqLength: expected Seq (or EnumFromTo)"),
-            },
-            Expr::SeqIx(seq, index) => cow_remap(seq.eval_with_loc(scope), |v| {
-                match v.coerce_mapped_value().get_sequence() {
-                    Some(values) => {
-                        let index = index.eval_value_with_loc(scope).unwrap_usize();
-                        match values {
-                            ValueSeq::ValueSeq(values) => Cow::Borrowed(&values[index]),
-                            ValueSeq::IntRange(mut range) => {
-                                Cow::Owned(ParsedValue::from_evaluated(Value::Usize(
-                                    range.nth(index).unwrap(),
-                                )))
-                            }
-                        }
-                    }
-                    _ => panic!("SeqIx: expected Seq (or EnumFromTo)"),
-                }
-            }),
-            Expr::SubSeq(seq, start, length) => {
-                match seq
-                    .eval_with_loc(scope)
-                    .coerce_mapped_value()
-                    .get_sequence()
-                {
-                    Some(values) => {
-                        let start = start.eval_value_with_loc(scope).unwrap_usize();
-                        let length = length.eval_value_with_loc(scope).unwrap_usize();
-                        match values {
-                            ValueSeq::ValueSeq(values) => Cow::Owned(
-                                ParsedValue::from_evaluated_seq(values.sub_seq(start, length)),
-                            ),
-                            ValueSeq::IntRange(range) => Cow::Owned(ParsedValue::from_evaluated(
-                                Value::EnumFromTo(sub_range(range, start, length)),
-                            )),
-                        }
-                    }
-                    _ => panic!("SubSeq: expected Seq"),
-                }
-            }
-            Expr::SubSeqInflate(seq, start, length) => {
-                match seq
-                    .eval_with_loc(scope)
-                    .coerce_mapped_value()
-                    .get_sequence()
-                {
-                    Some(values) => {
-                        let start = start.eval_value_with_loc(scope).unwrap_usize();
-                        let length = length.eval_value_with_loc(scope).unwrap_usize();
-                        let mut vs = Vec::new();
-                        match values {
-                            ValueSeq::ValueSeq(vs0) => {
-                                for i in 0..length {
-                                    if i + start < vs0.len() {
-                                        vs.push(vs0[i + start].clone());
-                                    } else {
-                                        vs.push(vs[i + start - vs0.len()].clone());
-                                    }
-                                }
-                            }
-                            ValueSeq::IntRange(range) => {
-                                // REVIEW - double-check this logic
-                                let len = range.len();
-                                let mut iter = range.skip(start);
-                                for i in 0..length {
-                                    if let Some(val) = iter.next() {
-                                        vs.push(val.into());
-                                    } else {
-                                        vs.push(vs[i + start - len].clone());
-                                    }
-                                }
-                            }
-                        }
-                        Cow::Owned(ParsedValue::from_evaluated_seq(vs))
-                    }
-                    _ => panic!("SubSeqInflate: expected Seq"),
-                }
-            }
-            Expr::Append(seq0, seq1) => {
-                let tmp0 = seq0.eval_with_loc(scope);
-                let val0 = tmp0.coerce_mapped_value();
-                match val0.get_sequence() {
-                    Some(val_seq0) => {
-                        let tmp1 = seq1.eval_with_loc(scope);
-                        let val1 = tmp1.coerce_mapped_value();
-                        match val1.get_sequence() {
-                            Some(val_seq1) => {
-                                if val_seq0.is_empty() {
-                                    return Cow::Owned(val1.clone());
-                                } else if val_seq1.is_empty() {
-                                    return Cow::Owned(val0.clone());
-                                }
-                                Cow::Owned(ParsedValue::Seq(Parsed {
-                                    loc: ParseLoc::Synthesized,
-                                    inner: val_seq0.append(val_seq1),
-                                }))
-                            }
-                            _ => unreachable!("Append: expected Seq in (lhs)"),
-                        }
-                    }
-                    _ => unreachable!("Append: expected Seq in (lhs)"),
-                }
-            }
-            Expr::FlatMap(expr, seq) => {
-                match seq
-                    .eval_with_loc(scope)
-                    .coerce_mapped_value()
-                    .get_sequence()
-                {
-                    Some(values) => {
-                        let mut vs: Vec<Value> = Vec::new();
-                        for v in values {
-                            if let Value::Seq(vn) = expr.eval_lambda_with_loc(scope, &v) {
-                                vs.extend(vn);
-                            } else {
-                                panic!("FlatMap: expected Seq");
-                            }
-                        }
-                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
-                    }
-                    _ => panic!("FlatMap: expected Seq"),
-                }
-            }
-            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq
-                .eval_with_loc(scope)
-                .coerce_mapped_value()
-                .get_sequence()
-            {
-                Some(values) => {
-                    let mut accum = accum.eval_value_with_loc(scope);
-                    let mut vs = Vec::new();
-                    for v in values {
-                        let ret = expr.eval_lambda_with_loc(
-                            scope,
-                            &ParsedValue::from_evaluated(Value::Tuple(vec![
-                                accum,
-                                v.clone_into_value(),
-                            ])),
-                        );
-                        accum = match extract_pair(ret.unwrap_tuple()) {
-                            (accum, Value::Seq(vn)) => {
-                                vs.extend(vn);
-                                accum
-                            }
-                            other => panic!("FlatMapAccum: bad lambda output type {other:?}"),
-                        };
-                    }
-                    Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
-                }
-                None => panic!("FlatMapAccum: expected Seq"),
-            },
-            Expr::LeftFold(expr, accum, _accum_type, seq) => match seq
-                .eval_with_loc(scope)
-                .coerce_mapped_value()
-                .get_sequence()
-            {
-                Some(values) => {
-                    let mut accum = accum.eval_value_with_loc(scope);
-                    for v in values {
-                        let new_accum = expr.eval_lambda_with_loc(
-                            scope,
-                            &ParsedValue::from_evaluated(Value::Tuple(vec![
-                                accum,
-                                v.clone_into_value(),
-                            ])),
-                        );
-                        accum = new_accum;
-                    }
-                    Cow::Owned(ParsedValue::from_evaluated(accum))
-                }
-                None => panic!("LeftFold: expected Seq"),
-            },
-            Expr::FindByKey(is_sorted, f_get_key, query_key, seq) => {
-                match seq
-                    .eval_with_loc(scope)
-                    .coerce_mapped_value()
-                    .get_sequence()
-                {
-                    Some(ValueSeq::ValueSeq(values)) => {
-                        let eval =
-                            |lambda: &Expr, v: &ParsedValue| lambda.eval_lambda_with_loc(scope, v);
-                        let query = query_key.eval_value_with_loc(scope);
-                        if *is_sorted {
-                            match find_index_by_key_sorted(f_get_key, &query, values, eval) {
-                                Some(ix) => Cow::Owned(ParsedValue::Option(Some(Box::new(
-                                    values[ix].clone(),
-                                )))),
-                                None => {
-                                    Cow::Owned(ParsedValue::from_evaluated(Value::Option(None)))
-                                }
-                            }
-                        } else {
-                            match find_index_by_key_unsorted(f_get_key, &query, values, eval) {
-                                Some(ix) => Cow::Owned(ParsedValue::Option(Some(Box::new(
-                                    values[ix].clone(),
-                                )))),
-                                None => {
-                                    Cow::Owned(ParsedValue::from_evaluated(Value::Option(None)))
-                                }
-                            }
-                        }
-                    }
-                    Some(ValueSeq::IntRange(_)) => {
-                        unimplemented!("FindByKey: unimplemented on IntRange")
-                    }
-                    None => panic!("FindByKey: expected Seq"),
-                }
-            }
-            Expr::FlatMapList(expr, _ret_type, seq) => match seq.eval_value_with_loc(scope) {
-                Value::Seq(values) => {
-                    let mut vs = Vec::new();
-                    for v in values {
-                        let arg = Value::Tuple(vec![Value::Seq(vs.into()), v]);
-                        // TODO can we avoid cloning arg here?
-                        if let Value::Seq(vn) = expr
-                            .eval_lambda_with_loc(scope, &ParsedValue::from_evaluated(arg.clone()))
-                        {
-                            vs = match arg {
-                                Value::Tuple(mut args) => match args.remove(0) {
-                                    Value::Seq(vs) => vs.into_vec(),
-                                    _ => unreachable!(),
-                                },
-                                _ => unreachable!(),
-                            };
-                            vs.extend(vn);
-                        } else {
-                            panic!("FlatMapList: expected Seq");
-                        }
-                    }
-                    Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
-                }
-                _ => panic!("FlatMapList: expected Seq"),
-            },
-            Expr::Dup(count, expr) => {
-                let count = count.eval_value_with_loc(scope).unwrap_usize();
-                let v = expr.eval_value_with_loc(scope);
-                Cow::Owned(ParsedValue::from_evaluated(Value::Seq(SeqKind::Dup(
-                    count,
-                    Box::new(v),
-                ))))
-            }
-            Expr::EnumFromTo(start, stop) => {
-                let start = start.eval_value_with_loc(scope).unwrap_usize();
-                let stop = stop.eval_value_with_loc(scope).unwrap_usize();
-                Cow::Owned(ParsedValue::from_evaluated(Value::EnumFromTo(start..stop)))
-            }
-            Expr::LiftOption(opt) => Cow::Owned(ParsedValue::from_evaluated(Value::Option(
-                opt.as_ref()
-                    .map(|expr| Box::new(expr.eval_value_with_loc(scope))),
-            ))),
-        }
+    pub fn eval_with_loc<'a>(
+        &'a self,
+        scope: &'a LocScope<'a>,
+    ) -> Result<Cow<'a, ParsedValue>, EvalError> {
+        self.eval_generic(scope)
     }
 
-    pub fn eval_value_with_loc<'a>(&self, scope: &'a LocScope<'a>) -> Value {
-        self.eval_with_loc(scope)
-            .coerce_mapped_value()
-            .clone_into_value()
+    pub fn eval_value_with_loc<'a>(&self, scope: &'a LocScope<'a>) -> Result<Value, EvalError> {
+        self.eval_value_generic(scope)
     }
 
-    fn eval_lambda_with_loc<'a>(&self, scope: &'a LocScope<'a>, arg: &ParsedValue) -> Value {
-        match self {
-            Expr::Lambda(name, expr) => {
-                let child_scope = LocSingleScope::new(scope, name, arg);
-                expr.eval_value_with_loc(&LocScope::Single(child_scope))
-            }
-            _ => panic!("expected Lambda"),
-        }
+    fn eval_lambda_with_loc<'a>(
+        &self,
+        scope: &'a LocScope<'a>,
+        arg: &'a ParsedValue,
+    ) -> Result<Value, EvalError> {
+        self.eval_lambda_generic(scope, arg)
     }
 }
 
@@ -1097,241 +700,12 @@ impl Program {
     }
 }
 
-pub type LocScopeEntry = ScopeEntry<ParsedValue>;
-
-pub enum LocScope<'a> {
-    Empty,
-    Multi(&'a LocMultiScope<'a>),
-    Single(LocSingleScope<'a>),
-    Decoder(LocDecoderScope<'a>),
-    View(LocViewScope<'a>),
-}
-
-#[derive(Clone, Debug)]
-enum ViewOrParsedValue<'a> {
-    View(View<'a>),
-    ParsedValue(ParsedValue),
-}
-
-impl<'a> ViewOrParsedValue<'a> {
-    fn try_as_value(&self) -> Option<&ParsedValue> {
-        match self {
-            ViewOrParsedValue::ParsedValue(v) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-pub struct LocMultiScope<'a> {
-    parent: &'a LocScope<'a>,
-    entries: Vec<(Label, ViewOrParsedValue<'a>)>,
-}
-
-pub struct LocSingleScope<'a> {
-    parent: &'a LocScope<'a>,
-    name: &'a str,
-    value: &'a ParsedValue,
-}
-
-pub struct LocDecoderScope<'a> {
-    parent: &'a LocScope<'a>,
-    name: &'a str,
-    decoder: Decoder,
-}
-
-pub struct LocViewScope<'a> {
-    parent: &'a LocScope<'a>,
-    name: &'a str,
-    view: View<'a>,
-}
-
-impl<'a> LocScope<'a> {
-    pub(crate) fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
-        match self {
-            LocScope::Empty => Err(UnknownVarError(Label::Owned(name.to_string()))),
-            LocScope::Multi(multi) => multi.get_value_by_name(name),
-            LocScope::Single(single) => single.get_value_by_name(name),
-            LocScope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
-            LocScope::View(view) => view.parent.get_value_by_name(name),
-        }
-    }
-
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        match self {
-            LocScope::Empty => panic!("decoder not found: {name}"),
-            LocScope::Multi(multi) => multi.parent.get_decoder_by_name(name),
-            LocScope::Single(single) => single.parent.get_decoder_by_name(name),
-            LocScope::Decoder(decoder) => decoder.get_decoder_by_name(name),
-            LocScope::View(view) => view.parent.get_decoder_by_name(name),
-        }
-    }
-
-    fn get_view_by_name(&self, name: &str) -> View<'a> {
-        match self {
-            LocScope::Empty => panic!("view not found: {name}"),
-            LocScope::Multi(multi) => multi.get_view_by_name(name),
-            LocScope::Single(single) => single.parent.get_view_by_name(name),
-            LocScope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
-            LocScope::View(view) => view.get_view_by_name(name),
-        }
-    }
-
-    pub fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        match self {
-            LocScope::Empty => {}
-            LocScope::Multi(multi) => multi.get_bindings(bindings),
-            LocScope::Single(single) => single.get_bindings(bindings),
-            LocScope::Decoder(decoder) => decoder.get_bindings(bindings),
-            LocScope::View(view) => view.get_bindings(bindings),
-        }
-    }
-}
-
-impl<'a> LocMultiScope<'a> {
-    fn new(parent: &'a LocScope<'a>) -> LocMultiScope<'a> {
-        let entries = Vec::new();
-        LocMultiScope { parent, entries }
-    }
-
-    pub fn with_capacity(parent: &'a LocScope<'a>, capacity: usize) -> LocMultiScope<'a> {
-        let entries = Vec::with_capacity(capacity);
-        LocMultiScope { parent, entries }
-    }
-
-    pub fn push(&mut self, name: impl Into<Label>, v: ParsedValue) {
-        self.entries
-            .push((name.into(), ViewOrParsedValue::ParsedValue(v)))
-    }
-
-    pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
-        self.entries
-            .push((name.into(), ViewOrParsedValue::View(view)))
-    }
-
-    fn get_view_by_name(&self, name: &str) -> View<'a> {
-        for (n, vv) in self.entries.iter().rev() {
-            if n == name {
-                if let ViewOrParsedValue::View(view) = vv {
-                    return *view;
-                } else {
-                    log::warn!(
-                        "LocMultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
-                    );
-                    continue;
-                }
-            }
-        }
-        self.parent.get_view_by_name(name)
-    }
-
-    fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
-        for (n, vv) in self.entries.iter().rev() {
-            if n == name {
-                if let Some(v) = vv.try_as_value() {
-                    return Ok(v);
-                } else {
-                    log::warn!(
-                        "LocMultiScope::get_value_by_name: query for `{name}` encountered a view-binding before any value-bindings, skipping..."
-                    );
-                    continue;
-                }
-            }
-        }
-        self.parent.get_value_by_name(name)
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        for (name, vv) in self.entries.iter().rev() {
-            match vv {
-                ViewOrParsedValue::View(view) => {
-                    bindings.push((name.clone(), LocScopeEntry::View(view.offset)))
-                }
-                ViewOrParsedValue::ParsedValue(value) => {
-                    bindings.push((name.clone(), LocScopeEntry::Value(value.clone())))
-                }
-            }
-        }
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> LocSingleScope<'a> {
-    pub fn new(
-        parent: &'a LocScope<'a>,
-        name: &'a str,
-        value: &'a ParsedValue,
-    ) -> LocSingleScope<'a> {
-        LocSingleScope {
-            parent,
-            name,
-            value,
-        }
-    }
-
-    fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
-        if self.name == name {
-            Ok(self.value)
-        } else {
-            self.parent.get_value_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            LocScopeEntry::Value(self.value.clone()),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> LocDecoderScope<'a> {
-    fn new(parent: &'a LocScope<'a>, name: &'a str, decoder: Decoder) -> LocDecoderScope<'a> {
-        LocDecoderScope {
-            parent,
-            name,
-            decoder,
-        }
-    }
-
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        if self.name == name {
-            &self.decoder
-        } else {
-            self.parent.get_decoder_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            LocScopeEntry::Decoder(self.decoder.clone()),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> LocViewScope<'a> {
-    fn new(parent: &'a LocScope<'a>, name: &'a str, view: View<'a>) -> Self {
-        LocViewScope { parent, name, view }
-    }
-
-    fn get_view_by_name(&self, name: &str) -> View<'a> {
-        if self.name == name {
-            self.view
-        } else {
-            self.parent.get_view_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            LocScopeEntry::View(self.view.offset),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
+// `LocScope`/`LocMultiScope`/`LocSingleScope`/`LocDecoderScope`/`LocViewScope`/`LocScopeEntry`
+// are generic over the leaf value representation and defined once, alongside their `Scope`
+// counterparts, as `GScope<'a, V>` and friends in `crate::scope`.
+pub use crate::scope::{
+    LocDecoderScope, LocMultiScope, LocScope, LocScopeEntry, LocSingleScope, LocViewScope,
+};
 
 impl Decoder {
     pub fn parse_with_loc<'input>(
@@ -1345,8 +719,8 @@ impl Decoder {
             Decoder::Call(n, es, vs) => {
                 let mut new_scope = LocMultiScope::with_capacity(&LocScope::Empty, es.len());
                 for (name, e) in es {
-                    let v = e.eval_with_loc(scope).as_ref().clone();
-                    new_scope.push(name.clone(), v);
+                    let v = e.eval_with_loc(scope).trace_eval(|| ("Call(e)", format!("{e:?}")))?.as_ref().clone();
+                    new_scope.push_owned(name.clone(), v);
                 }
                 for (name, vv) in vs {
                     let v = Self::eval_view_expr_with_loc(scope, vv)?;
@@ -1501,7 +875,7 @@ impl Decoder {
             }
             Decoder::DecodeBytes(bytes, a) => {
                 let bytes = {
-                    let raw = bytes.eval_value_with_loc(scope);
+                    let raw = bytes.eval_value_with_loc(scope).trace_eval(|| ("DecodeBytes(bytes)", format!("{bytes:?}")))?;
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
                     seq_vals
                         .into_iter()
@@ -1538,7 +912,7 @@ impl Decoder {
                 })
             }
             Decoder::ForEach(expr, lbl, a) => {
-                let val = expr.eval_with_loc(scope);
+                let val = expr.eval_with_loc(scope).trace_eval(|| ("ForEach(expr)", format!("{expr:?}")))?;
                 let seq = val.get_sequence().expect("bad type for ForEach input");
                 Ok(WithErr::fold(
                     (Vec::with_capacity(seq.len()), input),
@@ -1558,7 +932,7 @@ impl Decoder {
                 }))
             }
             Decoder::RepeatCount(expr, a) => {
-                let count = expr.eval_value_with_loc(scope).unwrap_usize();
+                let count = expr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatCount(expr)", format!("{expr:?}")))?;
                 Ok(WithErr::fold(
                     (Vec::with_capacity(count), input),
                     0..count,
@@ -1577,8 +951,8 @@ impl Decoder {
                 }))
             }
             Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
-                let min = min.eval_value_with_loc(scope).unwrap_usize();
-                let max = max.eval_value_with_loc(scope).unwrap_usize();
+                let min = min.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatBetween(min)", format!("{min:?}")))?;
+                let max = max.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatBetween(max)", format!("{max:?}")))?;
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
                     let v = &res.as_ref().0;
@@ -1611,7 +985,7 @@ impl Decoder {
                 }))
             }
             Decoder::Maybe(expr, a) => {
-                let is_present = expr.eval_value_with_loc(scope).unwrap_bool();
+                let is_present = expr.eval_value_with_loc(scope).trace_eval(|| ("Maybe(expr)", format!("{expr:?}")))?.unwrap_bool();
                 if is_present {
                     Ok(try_with!(a.parse_with_loc(program, scope, input) => "Maybe")
                         .map(|(val, input)| (ParsedValue::Option(Some(Box::new(val))), input))
@@ -1625,12 +999,12 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
-                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("RepeatUntilLast", v.len()))
-                            .map(move |(va, next_input)| {
-                                let done = expr.eval_lambda_with_loc(scope, &va).unwrap_bool();
+                        try_with!(a.parse_with_loc(program, scope, input) => ("RepeatUntilLast", v.len()))
+                            .join(move |(va, next_input)| {
+                                let done = expr.eval_lambda_with_loc(scope, &va).trace_eval(|| ("RepeatUntilLast(expr)", format!("{expr:?}")))?.unwrap_bool();
                                 v.push(va);
-                                (v, next_input, done)
-                            }))
+                                Ok(WithErr::new((v, next_input, done)))
+                            })
                     })?;
                     let done = res.as_ref().2;
                     if done {
@@ -1647,18 +1021,17 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
-                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
-                            .map(|(va, next_input)| {
+                        try_with!(a.parse_with_loc(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
+                            .join(|(va, next_input)| {
                                 v.push(va);
                                 let vs = ParsedValue::from_evaluated_seq(v);
-                                let done = expr.eval_lambda_with_loc(scope, &vs).unwrap_bool();
+                                let done = expr.eval_lambda_with_loc(scope, &vs).trace_eval(|| ("RepeatUntilSeq(expr)", format!("{expr:?}")))?.unwrap_bool();
                                 v = match vs {
                                     ParsedValue::Seq(v) => v.inner.into_vec(),
                                     _ => unreachable!(),
                                 };
-                                (v, next_input, done)
-                            }),
-                        )
+                                Ok(WithErr::new((v, next_input, done)))
+                            })
                     })?;
                     break_if_done!(res => (v, input));
                 }
@@ -1667,7 +1040,7 @@ impl Decoder {
                     .map(|(v, input, _)| (ParsedValue::new_seq(v, start_offset, total_len), input)))
             }
             Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
-                let accum = init.eval_value_with_loc(scope);
+                let accum = init.eval_value_with_loc(scope).trace_eval(|| ("AccumUntil(init)", format!("{init:?}")))?;
                 let mut res = WithErr::new((Vec::new(), accum, input, false));
                 loop {
                     res = res.join(|(mut v, accum, input, _done)| {
@@ -1680,22 +1053,22 @@ impl Decoder {
                             )
                             .clone_into_value(),
                         ]));
-                        let is_done = f_done.eval_lambda_with_loc(scope, &done_arg).unwrap_bool();
+                        let is_done = f_done.eval_lambda_with_loc(scope, &done_arg).trace_eval(|| ("AccumUntil(f_done)", format!("{f_done:?}")))?.unwrap_bool();
                         if is_done {
                             return Ok(WithErr::new((v, accum, input, true)));
                         }
-                        Ok(try_with!(a.parse_with_loc(program, scope, input) => ("AccumUntil", v.len()))
-                            .map(
+                        try_with!(a.parse_with_loc(program, scope, input) => ("AccumUntil", v.len()))
+                            .join(
                             |(next_elem, next_input)| {
                                 v.push(next_elem.clone());
                                 let update_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
                                     accum.clone(),
                                     next_elem.clone_into_value(),
                                 ]));
-                                let next_accum = f_update.eval_lambda_with_loc(scope, &update_arg);
-                                (v, next_accum, next_input, false)
+                                let next_accum = f_update.eval_lambda_with_loc(scope, &update_arg).trace_eval(|| ("AccumUntil(f_update)", format!("{f_update:?}")))?;
+                                Ok(WithErr::new((v, next_accum, next_input, false)))
                             },
-                        ))
+                        )
                     })?;
                     break_if_done!(res => (v, accum, input));
                 }
@@ -1726,7 +1099,7 @@ impl Decoder {
                 }
             }
             Decoder::Slice(expr, a) => {
-                let size = expr.eval_value_with_loc(scope).unwrap_usize();
+                let size = expr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("Slice(expr)", format!("{expr:?}")))?;
                 let (slice, input) = input
                     .split_at(size)
                     .ok_or(input.kind.overrun(size, input.offset).with_trace(("Slice(create)", format!("{:?}->{size}", expr))))?;
@@ -1752,29 +1125,35 @@ impl Decoder {
                     })
             }
             Decoder::WithRelativeOffset(base_addr, expr, a) => {
-                let base_addr = base_addr.eval_value_with_loc(scope).unwrap_usize();
-                let offset = expr.eval_value_with_loc(scope).unwrap_usize();
-                let abs_offset = base_addr + offset;
+                let base_addr = base_addr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("WithRelativeOffset(base_addr)", format!("{base_addr:?}")))?;
+                let offset = expr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("WithRelativeOffset(expr)", format!("{expr:?}")))?;
+                // See the equivalent `Decoder::parse` arm (decoder.rs): `checked_add` avoids a
+                // debug-build panic / release-build silent wraparound on overflow.
+                let abs_offset = base_addr.checked_add(offset).ok_or_else(|| {
+                    input
+                        .kind
+                        .offset_overflow(base_addr, offset)
+                        .with_trace("WithRelativeOffset(seek)")
+                })?;
                 let seek_input = input
                     .seek_to(abs_offset)
                     .ok_or(input.kind.bad_seek(abs_offset, input.input.len()).with_trace("WithRelativeOffset(seek)"))?;
                 Ok(try_with!(a.parse_with_loc(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
                     .map(|(v, _)| (v, input)))
             }
-            Decoder::Map(d, expr) => Ok(
+            Decoder::Map(d, expr) => {
                 try_with!(d.parse_with_loc(program, scope, input) => ("Map(parse)", format!("{d:?}")))
-                    .map(|(orig, input)| {
-                        let v = expr.eval_lambda_with_loc(scope, &orig);
+                    .join(|(orig, input)| {
+                        let v = expr.eval_lambda_with_loc(scope, &orig).trace_eval(|| ("Map(expr)", format!("{expr:?}")))?;
                         let image = ParsedValue::inherit(&orig, v);
-                        (ParsedValue::Mapped(Box::new(orig), Box::new(image)), input)
-                    },
-                ),
-            ),
+                        Ok(WithErr::new((ParsedValue::Mapped(Box::new(orig), Box::new(image)), input)))
+                    })
+            }
             Decoder::Where(d, cond) => {
                 try_with!(d.parse_with_loc(program, scope, input) => ("Where(parse)", format!("{d:?}")))
                     .join(|(v, input)| {
                         let Condition { expr, severity } = cond;
-                        match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
+                        match expr.eval_lambda_with_loc(scope, &v).trace_eval(|| ("Where(expr)", format!("{expr:?}")))?.unwrap_bool() {
                             true => Ok(WithErr::new((v, input))),
                             false => {
                                 let err = DecodeErrorKind::loc_bad_where(
@@ -1792,11 +1171,11 @@ impl Decoder {
                     })
             }
             Decoder::Compute(expr) => {
-                let v = expr.eval_with_loc(scope);
+                let v = expr.eval_with_loc(scope).trace_eval(|| ("Compute(expr)", format!("{expr:?}")))?;
                 Ok(WithErr::new((v.as_ref().clone(), input)))
             }
             Decoder::Let(name, expr, d) => {
-                let v = expr.eval_with_loc(scope).as_ref().clone();
+                let v = expr.eval_with_loc(scope).trace_eval(|| ("Let(expr)", format!("{expr:?}")))?.as_ref().clone();
                 let let_scope = LocSingleScope::new(scope, name, &v);
                 Ok(
                     try_with!(d.parse_with_loc(program, &LocScope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),
@@ -1811,7 +1190,7 @@ impl Decoder {
                 )
             }
             Decoder::Match(head, branches) => {
-                let head = head.eval_with_loc(scope);
+                let head = head.eval_with_loc(scope).trace_eval(|| ("Match(head)", format!("{head:?}")))?;
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         return Ok(
@@ -1830,12 +1209,12 @@ impl Decoder {
                 }))
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
-                let lengths_val = lengths_expr.eval_with_loc(scope);
+                let lengths_val = lengths_expr.eval_with_loc(scope).trace_eval(|| ("Dynamic(lengths_expr)", format!("{lengths_expr:?}")))?;
                 let lengths = value_to_vec_usize(lengths_val.as_ref());
                 let lengths = match opt_values_expr {
                     None => lengths,
                     Some(e) => {
-                        let values = value_to_vec_usize(e.eval_with_loc(scope).as_ref());
+                        let values = value_to_vec_usize(e.eval_with_loc(scope).trace_eval(|| ("Dynamic(e)", format!("{e:?}")))?.as_ref());
                         let mut new_lengths = [0].repeat(values.len());
                         for i in 0..lengths.len() {
                             new_lengths[values[i]] = lengths[i];
@@ -1864,7 +1243,7 @@ impl Decoder {
                 .parse_with_loc(program, scope, input) => ("LiftedOption(parse)", format!("{dec:?}")))
                 .map(|(v, input)| (ParsedValue::Option(Some(Box::new(v))), input))),
             Decoder::CaptureBytes(v_expr, len) => {
-                let len = len.eval_value_with_loc(scope).unwrap_usize();
+                let len = len.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("CaptureBytes(len)", format!("{len:?}")))?;
 
                 let view_window = Self::eval_view_expr_with_loc(scope, v_expr)?;
                 // accumulate `len` bytes into a Vec<ParsedValue>
@@ -1896,7 +1275,7 @@ impl Decoder {
                 )))
             }
             Decoder::ReadArray(v_expr, len, kind) => {
-                let len = len.eval_value_with_loc(scope).unwrap_usize();
+                let len = len.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("ReadArray(len)", format!("{len:?}")))?;
                 let view_window = Self::eval_view_expr_with_loc(scope, v_expr)?;
 
                 let folded = WithErr::fold(
@@ -1919,19 +1298,20 @@ impl Decoder {
                 });
                 Ok(WithErr::new((v, input)))
             }
-            Decoder::Permit(inner, dft) => Ok(downgrade_error_with(
+            Decoder::Permit(inner, dft) => Ok(try_downgrade_error_with(
                 inner
                     .parse_with_loc(program, scope, input)
                     .map(|ok| ok.map(|(v, input)| (ParsedValue::Permit(Ok(Box::new(v))), input))),
                 || {
-                    (
+                    Ok::<_, EvalError>((
                         ParsedValue::Permit(Err(Some(Box::new(
-                            dft.eval_with_loc(scope).into_owned(),
+                            dft.eval_with_loc(scope)?.into_owned(),
                         )))),
                         input,
-                    )
+                    ))
                 },
-            )),
+            )
+            .trace_eval(|| ("Permit(default)", format!("{dft:?}")))?),
             #[cfg(feature = "format_enforce")]
             Decoder::Enforce(inner) => {
                 let res = inner.parse_with_loc(program, scope, input)?;
@@ -1957,7 +1337,7 @@ impl Decoder {
                 Ok(view)
             }
             ViewExpr::Offset(base, offset) => {
-                let offset = offset.eval_value_with_loc(scope).unwrap_usize();
+                let offset = offset.eval_value_with_loc(scope)?.try_as_usize()?;
                 let base_view = Self::eval_view_expr_with_loc(scope, base)?;
                 let Some((_, mut view_window)) = base_view.split_at(offset) else {
                     return Err(base_view.kind.overrun(offset, base_view.offset).into());

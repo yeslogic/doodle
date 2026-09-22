@@ -97,6 +97,7 @@ impl<'a> ReadCtxt<'a> {
     pub fn remaining(&self) -> &'a [u8] {
         &self.input[self.offset..]
     }
+
     /// Creates a new `ReadCtxt` with the same `input` as the current `ReadCtxt`, but with an `offset` of `n`.
     ///
     /// The new `ReadCtxt` is only created if `n` is a valid offset into the `input` slice.

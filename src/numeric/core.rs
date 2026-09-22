@@ -471,6 +471,25 @@ impl TypedConst {
         }
     }
 
+    /// Attempts a purely value-based conversion of `self`'s value to a native integer type `U`,
+    /// succeeding exactly when the value fits within `U`'s range - completely irrespective of
+    /// `self`'s declared `NumRep`. Generalizes [`Self::as_usize`] to an arbitrary target width.
+    ///
+    /// Unlike [`Self::get_as_unsized`], the `NumRep` does not need to equal (or be compatible
+    /// with) the representation implied by `U` - e.g. a `NumRep::Concrete(MachineRep::U32)`-tagged
+    /// constant whose value happens to be `0` is still `as_native::<u8>()`-able, mirroring how a
+    /// native-grammar `AsU8(Expr::U32(0))` already succeeds regardless of the source width.
+    pub fn as_native<U>(&self) -> Result<U, anyhow::Error>
+    where
+        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
+    {
+        (&self.0).try_into().map_err(|e| {
+            anyhow!(
+                "TypedConst::as_native: unable to convert typed-const {self:?} to target width: {e}"
+            )
+        })
+    }
+
     pub fn get_as_unsized<U>(&self) -> Result<U, anyhow::Error>
     where
         U: num_traits::PrimInt + num_traits::Unsigned,
@@ -1053,6 +1072,8 @@ impl From<CoerceValueError> for EvalError {
     }
 }
 
+/// Error returned when a variable identifier used within [`Expr::NumVar`] is scope-bound
+/// to a `Value` that is not numeric.
 #[derive(Debug)]
 pub struct CoerceValueError {
     bad_value: crate::decoder::Value,
@@ -1067,6 +1088,8 @@ impl std::fmt::Display for CoerceValueError {
         )
     }
 }
+
+impl std::error::Error for CoerceValueError {}
 
 impl<'a> TryFrom<&'a crate::decoder::Value> for StrictValue {
     type Error = CoerceValueError;
@@ -1149,7 +1172,17 @@ impl std::fmt::Display for EvalError {
     }
 }
 
-impl std::error::Error for EvalError {}
+impl std::error::Error for EvalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            EvalError::UnknownVar(err) => Some(err),
+            EvalError::BadVariable(err) => Some(err),
+            EvalError::DivideByZero
+            | EvalError::RemainderNonPositive
+            | EvalError::Ambiguous(..) => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Strict<T> {
@@ -1331,7 +1364,7 @@ pub fn bitwise_cast(num: BigInt, rep_in: NumRep, rep_out: MachineRep) -> BigInt 
 }
 
 impl Expr {
-    /// Like `eval`, except that the representability of every individual sub-term is also checked,
+    /// Like [`Expr::eval`], except that the representability of every individual sub-term is also checked,
     /// and if any term is unrepresentable, the validity flag of the return-value will be `false`.
     pub fn eval_strict<'a, S, V>(&self, scope: &'a S) -> Result<Strict<Value>, EvalError>
     where
@@ -1441,6 +1474,12 @@ impl Expr {
         }
     }
 
+    /// Attempts to evaluate `self` in a given scope, returning `Err` when:
+    /// - A referenced variable is not found in-scope
+    /// - Division by zero is attempted
+    /// - Remainder with a non-positive divisor is attempted
+    /// - A binary operation with ambiguous output representation is attempted (i.e. terms have different non-auto reps and operator itself isn't rep-tagged)
+    /// - Conversion from [`doodle::Value`](crate::decoder::value::Value) to [`numeric::Value`](Value) fails (i.e. a NumVar is scoped to a non-numeric value)
     pub fn eval<'a, S, V>(&self, scope: &'a S) -> Result<Value, EvalError>
     where
         S: 'a + EvalScope<'a, Output = &'a V, Error = UnknownVarError>,
@@ -1475,9 +1514,7 @@ impl Expr {
                         } else {
                             return Err(EvalError::RemainderNonPositive);
                         }
-                    } // (_, Value::Opt(..), _) | (_, _, Value::Opt(..)) => {
-                      //     return Err(EvalError::ArithOrCastOption)
-                      // }
+                    }
                 };
                 let rep_out = match out_rep {
                     Some(rep) => NumRep::Concrete(rep),
