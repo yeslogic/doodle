@@ -2,6 +2,49 @@ use std::{borrow::Cow, fmt::Debug, ops::Index};
 
 use serde::Serialize;
 
+use crate::error::EvalError;
+
+/// The `Expr` variant that failed in a [`SeqBoundsError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeqBoundsOp {
+    SeqIx,
+    SubSeq,
+    SubSeqInflate,
+}
+
+impl std::fmt::Display for SeqBoundsOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SeqBoundsOp::SeqIx => write!(f, "SeqIx"),
+            SeqBoundsOp::SubSeq => write!(f, "SubSeq"),
+            SeqBoundsOp::SubSeqInflate => write!(f, "SubSeqInflate"),
+        }
+    }
+}
+
+/// Error produced when `SeqIx`/`SubSeq`/`SubSeqInflate` indexes or slices past the end of a
+/// sequence (or `EnumFromTo` range).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SeqBoundsError {
+    pub op: SeqBoundsOp,
+    /// The (0-based) index, or sub-range start offset, that was out of bounds.
+    pub index: usize,
+    /// The length of the sequence (or range) that `index` was checked against.
+    pub len: usize,
+}
+
+impl std::fmt::Display for SeqBoundsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: index {} out of bounds for sequence of length {}",
+            self.op, self.index, self.len
+        )
+    }
+}
+
+impl std::error::Error for SeqBoundsError {}
+
 /// Represents a sequence of values, which is either explicitly constructed
 /// or yielded through an array-generator term (i.e. [`crate::Expr::Dup`]).
 #[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
@@ -46,8 +89,42 @@ impl<'a, V: Clone> ValueSeq<'a, V> {
             _ => unreachable!(),
         }
     }
+
+    /// Checks that `index` is in-bounds for `self` (used by `SeqIx`, and by `SubSeqInflate` to
+    /// check its back-reference `start` — but not its `length`, which may legitimately
+    /// self-reference past `self.len()` once `start` itself is valid).
+    pub(crate) fn check_index(&self, op: SeqBoundsOp, index: usize) -> Result<(), EvalError> {
+        let len = self.len();
+        if index < len {
+            Ok(())
+        } else {
+            Err(SeqBoundsError { op, index, len }.into())
+        }
+    }
+
+    /// Checks that the sub-range `start..start + length` fits within `self` (used by `SubSeq`,
+    /// which — unlike `SubSeqInflate` — takes a plain contiguous slice).
+    pub(crate) fn check_sub_range(
+        &self,
+        op: SeqBoundsOp,
+        start: usize,
+        length: usize,
+    ) -> Result<(), EvalError> {
+        let len = self.len();
+        match start.checked_add(length) {
+            Some(end) if end <= len => Ok(()),
+            _ => Err(SeqBoundsError {
+                op,
+                index: start,
+                len,
+            }
+            .into()),
+        }
+    }
 }
 
+/// Performs a virtual 'slice' operation on a [`Range<usize>`](std::ops::Range) as if it were an array/slice holding those values,
+/// mirroring the intended behavior of [`Expr::SubSeq`] when applied to a sequence-value backed by `ValueSeq::IntRange`.
 pub(crate) fn sub_range(
     range: std::ops::Range<usize>,
     start: usize,

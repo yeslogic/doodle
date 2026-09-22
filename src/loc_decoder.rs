@@ -9,6 +9,7 @@ use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
     Compiler, Decoder, Program, ReadArrayKind, SeqKind, SpineDecoder, Value, ValueSeq,
+    value::Coerced,
 };
 use crate::error::{DecodeError, DecodeErrorKind, EvalError, EvalResultExt as _};
 use crate::read::{BufferKind, ReadCtxt};
@@ -618,8 +619,19 @@ impl crate::decoder::eval::EvalValue for ParsedValue {
         self.clone_into_value()
     }
 
-    fn coerce_mapped_value(&self) -> &Self {
-        self.coerce_mapped_value()
+    fn coerce_mapped_value(&self) -> Coerced<&Self> {
+        // `ParsedValue::coerce_mapped_value` (unlike `Value`'s) never unwraps a
+        // `Permit(Err(Some(_)))`, so it never has a real fallback to report - always `pure`.
+        Coerced::pure(self.coerce_mapped_value())
+    }
+
+    fn extract_mapped_value(self) -> Value {
+        match self {
+            ParsedValue::Mapped(_orig, v) => (*v).extract_mapped_value(),
+            ParsedValue::Branch(_n, v) => (*v).extract_mapped_value(),
+            ParsedValue::Permit(Ok(v)) => (*v).extract_mapped_value(),
+            v => v.clone_into_value(),
+        }
     }
 
     fn tuple_proj_raw(&self, index: usize) -> &Self {
@@ -1109,7 +1121,12 @@ impl Decoder {
                 let offset = expr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("WithRelativeOffset(expr)", format!("{expr:?}")))?;
                 // See the equivalent `Decoder::parse` arm (decoder.rs): `checked_add` avoids a
                 // debug-build panic / release-build silent wraparound on overflow.
-                let abs_offset = base_addr.checked_add(offset).unwrap_or(usize::MAX);
+                let abs_offset = base_addr.checked_add(offset).ok_or_else(|| {
+                    input
+                        .kind
+                        .offset_overflow(base_addr, offset)
+                        .with_trace("WithRelativeOffset(seek)")
+                })?;
                 let seek_input = input
                     .seek_to(abs_offset)
                     .ok_or(input.kind.bad_seek(abs_offset, input.input.len()).with_trace("WithRelativeOffset(seek)"))?;
