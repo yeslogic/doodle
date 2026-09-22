@@ -156,24 +156,6 @@ impl<T> Coerced<T> {
     }
 }
 
-impl<'a> Coerced<&'a Value> {
-    /// Performs tuple-projection on the underlying `Value` of a `Coerced<&'_ Value>`, preserving
-    /// the fallback-tracking bit.
-    pub(crate) fn tuple_proj(self, index: usize) -> Self {
-        self.map(|v| v._tuple_proj(index))
-    }
-
-    /// Performs record-projection on the underlying `Value` of a `Coerced<&'_ Value>`, preserving
-    /// the fallback-tracking bit.
-    pub(crate) fn record_proj(self, label: &str) -> Self {
-        self.map(|v| v._record_proj(label))
-    }
-
-    pub(crate) fn cloned(self) -> Value {
-        self.value.clone()
-    }
-}
-
 impl<T> std::ops::Deref for Coerced<T> {
     type Target = T;
 
@@ -470,6 +452,47 @@ impl Value {
 
     pub(crate) fn is_boolean(&self) -> bool {
         matches!(self.coerce_nominal_value(), Value::Bool(_))
+    }
+}
+
+impl super::eval::EvalValue for Value {
+    fn from_evaluated(v: Value) -> Self {
+        v
+    }
+
+    fn from_evaluated_seq(vs: Vec<Self>) -> Self {
+        Value::Seq(SeqKind::Strict(vs))
+    }
+
+    fn clone_into_value(&self) -> Value {
+        self.clone()
+    }
+
+    fn coerce_mapped_value(&self) -> &Self {
+        // Calls the inherent `Value::coerce_mapped_value` above (inherent methods take priority
+        // over trait methods in resolution), discarding its `Coerced` fallback-tracking bit: every
+        // `Expr::eval` call site already discarded it immediately after use.
+        self.coerce_mapped_value().into_inner()
+    }
+
+    fn tuple_proj_raw(&self, index: usize) -> &Self {
+        self._tuple_proj(index)
+    }
+
+    fn record_proj_raw(&self, label: &str) -> &Self {
+        self._record_proj(label)
+    }
+
+    fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
+        self.get_sequence()
+    }
+
+    fn collect_fields(fields: Vec<(Label, Self)>) -> Self {
+        Value::record(fields)
+    }
+
+    fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
+        self.matches(scope, pattern)
     }
 }
 

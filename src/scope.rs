@@ -25,17 +25,8 @@ pub trait EvalScope<'a> {
     fn lookup_var(&'a self, name: &str) -> Result<Self::Output, Self::Error>;
 }
 
-impl<'a> EvalScope<'a> for Scope<'a> {
-    type Output = &'a Value;
-    type Error = UnknownVarError;
-
-    fn lookup_var(&'a self, name: &str) -> Result<Self::Output, Self::Error> {
-        self.get_value_by_name(name)
-    }
-}
-
-impl<'a> EvalScope<'a> for LocScope<'a> {
-    type Output = &'a ParsedValue;
+impl<'a, V: Clone> EvalScope<'a> for GScope<'a, V> {
+    type Output = &'a V;
     type Error = UnknownVarError;
 
     fn lookup_var(&'a self, name: &str) -> Result<Self::Output, Self::Error> {

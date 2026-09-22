@@ -5,8 +5,10 @@
 //! unifying them: each [`Case`] is run through both, and the observable outcomes (result `Value`, error
 //! message, or "panicked") are compared.
 //!
-//! Known, not-yet-fixed divergences are recorded as [`Expect::Diverges`]. Such a case *fails* once the
-//! evaluators start to agree, at which point it should be switched to [`Expect::Parity`].
+//! Known, not-yet-fixed divergences are recorded as [`Expect::Diverges`] (none at present, now that
+//! `Expr::eval`/`Expr::eval_with_loc` both delegate to the shared `Expr::eval_generic`). Such a case
+//! *fails* once the evaluators start to agree, at which point it should be switched to
+//! [`Expect::Parity`].
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
@@ -70,6 +72,10 @@ fn eval_loc(expr: &Expr, vars: &[(&'static str, Value)]) -> Outcome {
 
 enum Expect {
     Parity,
+    /// Currently unused (no known divergences), but kept available: a future change that
+    /// reintroduces a divergence should be caught here and documented via [`diverges`]/
+    /// [`diverges_with`] rather than silently breaking [`Expect::Parity`] cases.
+    #[allow(dead_code)]
     Diverges(&'static str),
 }
 
@@ -123,10 +129,12 @@ fn parity_with(name: &'static str, expr: Expr, vars: Vec<(&'static str, Value)>)
     }
 }
 
+#[allow(dead_code)]
 fn diverges(name: &'static str, why: &'static str, expr: Expr) -> Case {
     diverges_with(name, why, expr, Vec::new())
 }
 
+#[allow(dead_code)]
 fn diverges_with(
     name: &'static str,
     why: &'static str,
@@ -406,15 +414,16 @@ fn cases() -> Vec<Case> {
         ),
     ));
 
-    // -- known divergences (fill in from observed results)
+    // -- formerly-divergent cases: both evaluators now share `Expr::eval_generic` (Stage 3 of the
+    // eval-unification project), so these are unconditional parity cases rather than a live
+    // divergence list. Kept as named regression cases for the specific behaviors each one pins
+    // down (see the eval-unification plan memory for the resolution each one records).
     cases.push(parity(
         "as_char_usize",
         Expr::AsChar(b(Expr::SeqIx(b(range(2, 7)), b(Expr::U32(0))))),
     ));
-
-    cases.push(diverges(
+    cases.push(parity(
         "flat_map_accum_range",
-        "main `FlatMapAccum` requires `Value::Seq`, loc accepts any sequence (incl. `EnumFromTo`)",
         Expr::FlatMapAccum(
             b(accum_pass_through()),
             b(Expr::U8(0)),
@@ -422,23 +431,23 @@ fn cases() -> Vec<Case> {
             b(range(0, 3)),
         ),
     ));
-    cases.push(diverges(
+    cases.push(parity(
         "left_fold_range",
-        "main `LeftFold` requires `Value::Seq`, loc accepts any sequence (incl. `EnumFromTo`)",
         Expr::LeftFold(b(fold_last()), b(Expr::U8(0)), hint(), b(range(0, 3))),
     ));
-    cases.push(diverges_with(
+    cases.push(parity_with(
         "match_permit_err_some",
-        "main `Match` coerces via `coerce_nominal_value` (unwraps `Permit(Err(Some))`), loc via `coerce_mapped_value` (does not)",
         Expr::Match(
             b(var("p")),
-            vec![(Pattern::U8(1), Expr::U8(10)), (Pattern::Wildcard, Expr::U8(20))],
+            vec![
+                (Pattern::U8(1), Expr::U8(10)),
+                (Pattern::Wildcard, Expr::U8(20)),
+            ],
         ),
         vec![("p", Value::Permit(Err(Some(Box::new(Value::U8(1))))))],
     ));
-    cases.push(diverges(
+    cases.push(parity(
         "flat_map_returns_range",
-        "loc `FlatMap` has no `EnumFromTo` arm for the lambda result",
         Expr::FlatMap(b(lam("x", range(0, 2))), b(seq_u8(&[1, 2]))),
     ));
 
