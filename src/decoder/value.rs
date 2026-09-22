@@ -765,35 +765,35 @@ impl Value {
             (Value::Usize(l), Value::Usize(r)) => Ok(Value::Bool(__rel(rel, l, r))),
             (Value::Numeric(l), Value::Numeric(r)) => Ok(Value::Bool(TypedConst::rel(rel, &l, &r))),
             (Value::Numeric(ref num), Value::U8(r)) => {
-                let l = num.get_as_unsized::<u8>()?;
+                let l = num.as_native::<u8>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::U8(l), Value::Numeric(ref num)) => {
-                let r = num.get_as_unsized::<u8>()?;
+                let r = num.as_native::<u8>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::Numeric(ref num), Value::U16(r)) => {
-                let l = num.get_as_unsized::<u16>()?;
+                let l = num.as_native::<u16>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::U16(l), Value::Numeric(ref num)) => {
-                let r = num.get_as_unsized::<u16>()?;
+                let r = num.as_native::<u16>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::Numeric(ref num), Value::U32(r)) => {
-                let l = num.get_as_unsized::<u32>()?;
+                let l = num.as_native::<u32>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::U32(l), Value::Numeric(ref num)) => {
-                let r = num.get_as_unsized::<u32>()?;
+                let r = num.as_native::<u32>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::Numeric(ref num), Value::U64(r)) => {
-                let l = num.get_as_unsized::<u64>()?;
+                let l = num.as_native::<u64>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (Value::U64(l), Value::Numeric(ref num)) => {
-                let r = num.get_as_unsized::<u64>()?;
+                let r = num.as_native::<u64>()?;
                 Ok(Value::Bool(__rel(rel, l, r)))
             }
             (left, right) => {
@@ -1048,18 +1048,23 @@ mod tests {
     // ---- error cases ----
 
     #[test]
-    fn numeric_with_mismatched_concrete_rep_errs() {
+    fn numeric_with_mismatched_concrete_rep_still_compares_by_value() {
+        // Declared as U16-rep, but the raw value 5 fits fine in a u8: `int_rel` is purely
+        // value-based (like `as_native`) and ignores the declared `NumRep` entirely. Regression
+        // test: this used to error, back when the (now-removed) `get_as_unsized` required the
+        // declared rep to match the native operand's width.
         let left = numeric(5u8, NumRep::Concrete(MachineRep::U16));
         let right = Value::U8(5);
-        assert!(matches!(
-            Value::int_rel(IntRel::Eq, left, right),
-            Err(EvalError::NumericConvert(_))
-        ));
+        assert_eq!(
+            Value::int_rel(IntRel::Eq, left, right).unwrap(),
+            Value::Bool(true)
+        );
     }
 
     #[test]
-    fn numeric_with_unrepresentable_concrete_rep_errs() {
-        // 300 does not fit in u8, despite being tagged with `NumRep::U8`
+    fn numeric_out_of_range_for_native_width_errs() {
+        // 300 does not fit in u8 - a pure value/range failure, irrespective of the (irrelevant)
+        // declared rep.
         let left = numeric(300i32, NumRep::Concrete(MachineRep::U8));
         let right = Value::U8(5);
         assert!(matches!(
