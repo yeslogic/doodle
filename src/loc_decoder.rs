@@ -12,6 +12,7 @@ use crate::decoder::{
     cow_map, cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
+    sub_seq_inflate,
 };
 use crate::error::{DecodeError, DecodeErrorKind, EvalError, EvalResultExt as _, UnknownVarError};
 use crate::read::{BufferKind, ReadCtxt};
@@ -670,132 +671,63 @@ impl Expr {
                 Value::unary(*op, value)?
             })),
 
-            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
             Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope)? {
-                    Value::U8(x) => Value::U8(x),
-                    Value::U16(x) => Value::U8(u8::try_from(x)?),
-                    Value::U32(x) => Value::U8(u8::try_from(x)?),
-                    Value::U64(x) => Value::U8(u8::try_from(x)?),
-                    Value::Usize(x) => Value::U8(u8::try_from(x)?),
-                    x => panic!("cannot convert {x:?} to U8"),
-                },
+                x.eval_value_with_loc(scope)?.cast_to_u8()?,
             )),
             Expr::AsU16(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope)? {
-                    Value::U8(x) => Value::U16(u16::from(x)),
-                    Value::U16(x) => Value::U16(x),
-                    Value::U32(x) => Value::U16(u16::try_from(x)?),
-                    Value::U64(x) => Value::U16(u16::try_from(x)?),
-                    Value::Usize(x) => Value::U16(u16::try_from(x)?),
-                    x => panic!("cannot convert {x:?} to U16"),
-                },
+                x.eval_value_with_loc(scope)?.cast_to_u16()?,
             )),
             Expr::AsU32(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope)? {
-                    Value::U8(x) => Value::U32(u32::from(x)),
-                    Value::U16(x) => Value::U32(u32::from(x)),
-                    Value::U32(x) => Value::U32(x),
-                    Value::U64(x) => Value::U32(u32::try_from(x)?),
-                    Value::Usize(x) => Value::U32(u32::try_from(x)?),
-                    x => panic!("cannot convert {x:?} to U32"),
-                },
+                x.eval_value_with_loc(scope)?.cast_to_u32()?,
             )),
             Expr::AsU64(x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope)? {
-                    Value::U8(x) => Value::U64(u64::from(x)),
-                    Value::U16(x) => Value::U64(u64::from(x)),
-                    Value::U32(x) => Value::U64(u64::from(x)),
-                    Value::U64(x) => Value::U64(x),
-                    Value::Usize(x) => Value::U64(u64::try_from(x)?),
-                    x => panic!("cannot convert {x:?} to U64"),
-                },
+                x.eval_value_with_loc(scope)?.cast_to_u64()?,
             )),
 
             Expr::U16Be(bytes) => {
-                match bytes.eval_value_with_loc(scope)?.unwrap_tuple().as_slice() {
-                    [Value::U8(hi), Value::U8(lo)] => Cow::Owned(ParsedValue::from_evaluated(
-                        Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    )),
-                    _ => panic!("U16Be: expected (U8, U8)"),
-                }
+                Cow::Owned(ParsedValue::from_evaluated(Value::U16(u16::from_be_bytes(
+                    bytes
+                        .eval_value_with_loc(scope)?
+                        .unwrap_byte_array::<2>("U16Be"),
+                ))))
             }
             Expr::U16Le(bytes) => {
-                match bytes.eval_value_with_loc(scope)?.unwrap_tuple().as_slice() {
-                    [Value::U8(lo), Value::U8(hi)] => Cow::Owned(ParsedValue::from_evaluated(
-                        Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    )),
-                    _ => panic!("U16Le: expected (U8, U8)"),
-                }
+                Cow::Owned(ParsedValue::from_evaluated(Value::U16(u16::from_le_bytes(
+                    bytes
+                        .eval_value_with_loc(scope)?
+                        .unwrap_byte_array::<2>("U16Le"),
+                ))))
             }
             Expr::U32Be(bytes) => {
-                match bytes.eval_value_with_loc(scope)?.unwrap_tuple().as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_be_bytes(
-                            [*a, *b, *c, *d],
-                        ))))
-                    }
-                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
-                }
+                Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_be_bytes(
+                    bytes
+                        .eval_value_with_loc(scope)?
+                        .unwrap_byte_array::<4>("U32Be"),
+                ))))
             }
             Expr::U32Le(bytes) => {
-                match bytes.eval_value_with_loc(scope)?.unwrap_tuple().as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_le_bytes(
-                            [*a, *b, *c, *d],
-                        ))))
-                    }
-                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
-                }
+                Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_le_bytes(
+                    bytes
+                        .eval_value_with_loc(scope)?
+                        .unwrap_byte_array::<4>("U32Le"),
+                ))))
             }
             Expr::U64Be(bytes) => {
-                match bytes.eval_value_with_loc(scope)?.unwrap_tuple().as_slice() {
-                    [
-                        Value::U8(a),
-                        Value::U8(b),
-                        Value::U8(c),
-                        Value::U8(d),
-                        Value::U8(e),
-                        Value::U8(f),
-                        Value::U8(g),
-                        Value::U8(h),
-                    ] => Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes(
-                        [*a, *b, *c, *d, *e, *f, *g, *h],
-                    )))),
-                    _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
-                }
+                Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes(
+                    bytes
+                        .eval_value_with_loc(scope)?
+                        .unwrap_byte_array::<8>("U64Be"),
+                ))))
             }
             Expr::U64Le(bytes) => {
-                match bytes.eval_value_with_loc(scope)?.unwrap_tuple().as_slice() {
-                    [
-                        Value::U8(a),
-                        Value::U8(b),
-                        Value::U8(c),
-                        Value::U8(d),
-                        Value::U8(e),
-                        Value::U8(f),
-                        Value::U8(g),
-                        Value::U8(h),
-                    ] => Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes(
-                        [*a, *b, *c, *d, *e, *f, *g, *h],
-                    )))),
-                    _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
-                }
+                Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes(
+                    bytes
+                        .eval_value_with_loc(scope)?
+                        .unwrap_byte_array::<8>("U64Le"),
+                ))))
             }
-            Expr::AsChar(bytes) => Cow::Owned(ParsedValue::from_evaluated(
-                match bytes.eval_value_with_loc(scope)? {
-                    Value::U8(x) => Value::Char(char::from(x)),
-                    Value::U16(x) => {
-                        Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER))
-                    }
-                    Value::U32(x) => {
-                        Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
-                    }
-                    Value::U64(x) => Value::Char(
-                        char::from_u32(u32::try_from(x)?).unwrap_or(char::REPLACEMENT_CHARACTER),
-                    ),
-                    _ => panic!("AsChar: expected U8, U16, U32, or U64"),
-                },
+            Expr::AsChar(x) => Cow::Owned(ParsedValue::from_evaluated(
+                x.eval_value_with_loc(scope)?.cast_to_char()?,
             )),
             Expr::SeqLength(seq) => match seq
                 .eval_with_loc(scope)?
@@ -854,31 +786,9 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value_with_loc(scope)?.try_as_usize()?;
                         let length = length.eval_value_with_loc(scope)?.try_as_usize()?;
-                        let mut vs = Vec::new();
-                        match values {
-                            ValueSeq::ValueSeq(vs0) => {
-                                for i in 0..length {
-                                    if i + start < vs0.len() {
-                                        vs.push(vs0[i + start].clone());
-                                    } else {
-                                        vs.push(vs[i + start - vs0.len()].clone());
-                                    }
-                                }
-                            }
-                            ValueSeq::IntRange(range) => {
-                                // REVIEW - double-check this logic
-                                let len = range.len();
-                                let mut iter = range.skip(start);
-                                for i in 0..length {
-                                    if let Some(val) = iter.next() {
-                                        vs.push(val.into());
-                                    } else {
-                                        vs.push(vs[i + start - len].clone());
-                                    }
-                                }
-                            }
-                        }
-                        Cow::Owned(ParsedValue::from_evaluated_seq(vs))
+                        Cow::Owned(ParsedValue::from_evaluated_seq(sub_seq_inflate(
+                            values, start, length,
+                        )))
                     }
                     _ => panic!("SubSeqInflate: expected Seq"),
                 }

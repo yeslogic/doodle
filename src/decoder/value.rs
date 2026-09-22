@@ -519,6 +519,98 @@ impl Value {
         }
     }
 
+    /// Converts any fixed-width integer `Value` to a `U8`, returning `Err` if the value does not fit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not an integer, as this is an invariant enforced by the type-checker.
+    pub(crate) fn cast_to_u8(self) -> Result<Value, EvalError> {
+        Ok(Value::U8(match self {
+            Value::U8(x) => x,
+            Value::U16(x) => u8::try_from(x)?,
+            Value::U32(x) => u8::try_from(x)?,
+            Value::U64(x) => u8::try_from(x)?,
+            Value::Usize(x) => u8::try_from(x)?,
+            x => panic!("cannot convert {x:?} to U8"),
+        }))
+    }
+
+    /// As [`Self::cast_to_u8`], but to `U16`.
+    pub(crate) fn cast_to_u16(self) -> Result<Value, EvalError> {
+        Ok(Value::U16(match self {
+            Value::U8(x) => u16::from(x),
+            Value::U16(x) => x,
+            Value::U32(x) => u16::try_from(x)?,
+            Value::U64(x) => u16::try_from(x)?,
+            Value::Usize(x) => u16::try_from(x)?,
+            x => panic!("cannot convert {x:?} to U16"),
+        }))
+    }
+
+    /// As [`Self::cast_to_u8`], but to `U32`.
+    pub(crate) fn cast_to_u32(self) -> Result<Value, EvalError> {
+        Ok(Value::U32(match self {
+            Value::U8(x) => u32::from(x),
+            Value::U16(x) => u32::from(x),
+            Value::U32(x) => x,
+            Value::U64(x) => u32::try_from(x)?,
+            Value::Usize(x) => u32::try_from(x)?,
+            x => panic!("cannot convert {x:?} to U32"),
+        }))
+    }
+
+    /// As [`Self::cast_to_u8`], but to `U64`.
+    pub(crate) fn cast_to_u64(self) -> Result<Value, EvalError> {
+        Ok(Value::U64(match self {
+            Value::U8(x) => u64::from(x),
+            Value::U16(x) => u64::from(x),
+            Value::U32(x) => u64::from(x),
+            Value::U64(x) => x,
+            Value::Usize(x) => u64::try_from(x)?,
+            x => panic!("cannot convert {x:?} to U64"),
+        }))
+    }
+
+    /// Converts any fixed-width integer `Value` to a `Char`, substituting `char::REPLACEMENT_CHARACTER` for
+    /// any value that is not a Unicode scalar value. Returns `Err` only if the value does not fit in a `u32`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not an integer, as this is an invariant enforced by the type-checker.
+    pub(crate) fn cast_to_char(self) -> Result<Value, EvalError> {
+        let code_point = match self {
+            Value::U8(x) => u32::from(x),
+            Value::U16(x) => u32::from(x),
+            Value::U32(x) => x,
+            Value::U64(x) => u32::try_from(x)?,
+            Value::Usize(x) => u32::try_from(x)?,
+            _ => panic!("AsChar: expected U8, U16, U32, U64, or Usize"),
+        };
+        Ok(Value::Char(
+            char::from_u32(code_point).unwrap_or(char::REPLACEMENT_CHARACTER),
+        ))
+    }
+
+    /// Unwraps a `Value::Tuple` of exactly `N` `Value::U8`s into an array of bytes.
+    ///
+    /// `ctx` names the calling operation, for the panic message.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not a tuple of `N` `U8`s, as this is an invariant enforced by the type-checker.
+    pub(crate) fn unwrap_byte_array<const N: usize>(self, ctx: &str) -> [u8; N] {
+        match <[Value; N]>::try_from(self.unwrap_tuple()) {
+            Ok(values) => values.map(|v| match v {
+                Value::U8(b) => b,
+                other => panic!("{ctx}: expected a tuple of {N} U8s, found element {other:?}"),
+            }),
+            Err(values) => panic!(
+                "{ctx}: expected a tuple of {N} U8s, found {} elements",
+                values.len()
+            ),
+        }
+    }
+
     pub(crate) fn unwrap_tuple(self) -> Vec<Value> {
         match self {
             Value::Tuple(values) => values,

@@ -407,11 +407,11 @@ fn cases() -> Vec<Case> {
     ));
 
     // -- known divergences (fill in from observed results)
-    cases.push(diverges(
+    cases.push(parity(
         "as_char_usize",
-        "loc `AsChar` has no `Usize` arm",
         Expr::AsChar(b(Expr::SeqIx(b(range(2, 7)), b(Expr::U32(0))))),
     ));
+
     cases.push(diverges(
         "flat_map_accum_range",
         "main `FlatMapAccum` requires `Value::Seq`, loc accepts any sequence (incl. `EnumFromTo`)",
