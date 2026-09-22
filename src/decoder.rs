@@ -74,7 +74,27 @@ pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
     values: ValueSeq<'_, V>,
     start: usize,
     length: usize,
-) -> Vec<V> {
+) -> Result<Vec<V>, SeqBoundsError> {
+    let len = values.len();
+    if start >= len {
+        if length == 0 {
+            // `start` is never dereferenced when `length == 0` (the loops below don't run), so
+            // this isn't a hard error - but it's still a suspicious `Expr` to have produced, so
+            // flag it in debug builds without changing behavior.
+            #[cfg(debug_assertions)]
+            log::error!(
+                "SubSeqInflate: start={start} is out of bounds for source length {len}, \
+                 but length=0 means it will not be dereferenced; permitting, but this is \
+                 likely a bug in the calling Expr"
+            );
+        } else {
+            return Err(SeqBoundsError {
+                op: SeqBoundsOp::SubSeqInflate,
+                index: start,
+                len,
+            });
+        }
+    }
     let mut vs = Vec::new();
     match values {
         ValueSeq::ValueSeq(vs0) => {
@@ -99,7 +119,7 @@ pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
             }
         }
     }
-    vs
+    Ok(vs)
 }
 
 pub mod value;

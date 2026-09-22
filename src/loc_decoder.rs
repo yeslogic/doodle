@@ -650,6 +650,14 @@ impl crate::decoder::eval::EvalValue for ParsedValue {
         ParsedValue::collect_fields(fields)
     }
 
+    fn lift_option(opt: Option<Self>) -> Self {
+        match opt {
+            Some(v) => ParsedValue::Option(Some(Box::new(v))),
+            // No real value to preserve location for either way.
+            None => ParsedValue::from_evaluated(Value::Option(None)),
+        }
+    }
+
     fn matches<'a>(
         &'a self,
         scope: &'a LocScope<'a>,
