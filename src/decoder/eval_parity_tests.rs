@@ -287,6 +287,29 @@ fn cases() -> Vec<Case> {
             "sub_seq_inflate_range",
             Expr::SubSeqInflate(b(range(0, 3)), b(Expr::U32(1)), b(Expr::U32(6))),
         ),
+        // Regression cases for Group 5 (sequence-bounds panic -> EvalError conversion).
+        parity(
+            "sub_seq_range_full",
+            // start=0, length=3 exactly spans a 3-element range: the boundary case a previous
+            // off-by-one in `sub_range`'s bounds check used to reject.
+            Expr::SubSeq(b(range(0, 3)), b(Expr::U32(0)), b(Expr::U32(3))),
+        ),
+        parity(
+            "sub_seq_inflate_start_oob",
+            // start=5 is past the end of a 3-element source with nothing yet accumulated to
+            // self-reference: used to index an empty Vec and panic.
+            Expr::SubSeqInflate(b(seq_u8(&[1, 2, 3])), b(Expr::U32(5)), b(Expr::U32(2))),
+        ),
+        parity(
+            "sub_seq_inflate_range_start_oob",
+            Expr::SubSeqInflate(b(range(0, 3)), b(Expr::U32(5)), b(Expr::U32(2))),
+        ),
+        parity(
+            "sub_seq_inflate_start_oob_zero_length",
+            // start is out of bounds, but length=0 means it's never dereferenced, so this should
+            // still succeed (an empty Seq), not error.
+            Expr::SubSeqInflate(b(seq_u8(&[1, 2, 3])), b(Expr::U32(5)), b(Expr::U32(0))),
+        ),
         parity("append", Expr::Append(b(seq_u8(&[1])), b(seq_u8(&[2, 3])))),
         parity(
             "append_lhs_empty",

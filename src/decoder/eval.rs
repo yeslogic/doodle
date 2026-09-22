@@ -17,8 +17,38 @@ use crate::scope::{GMultiScope, GScope, GSingleScope};
 use crate::{Expr, Label, Pattern};
 
 use super::seq_kind::{ValueSeq, sub_range};
-use super::value::Value;
+use super::value::{SeqBoundsError, SeqBoundsOp, Value};
 use super::{SeqKind, cow_map, cow_remap, extract_pair, search, sub_seq_inflate};
+
+/// Checks that `index` is in-bounds for a sequence of length `len` (used by `SeqIx`, and by
+/// `SubSeqInflate` to check its back-reference `start` — but not its `length`, which may
+/// legitimately self-reference past `len` once `start` itself is valid).
+fn check_index(op: SeqBoundsOp, len: usize, index: usize) -> Result<(), EvalError> {
+    if index < len {
+        Ok(())
+    } else {
+        Err(SeqBoundsError { op, index, len }.into())
+    }
+}
+
+/// Checks that the sub-range `start..start + length` fits within a sequence of length `len`
+/// (used by `SubSeq`, which — unlike `SubSeqInflate` — takes a plain contiguous slice).
+fn check_sub_range(
+    op: SeqBoundsOp,
+    len: usize,
+    start: usize,
+    length: usize,
+) -> Result<(), EvalError> {
+    match start.checked_add(length) {
+        Some(end) if end <= len => Ok(()),
+        _ => Err(SeqBoundsError {
+            op,
+            index: start,
+            len,
+        }
+        .into()),
+    }
+}
 
 /// The operations `Expr::eval_generic` needs from a leaf value representation. Implemented by
 /// [`Value`] (identity/no-op wrapping) and by [`crate::loc_decoder::ParsedValue`] (which also
@@ -201,16 +231,20 @@ impl Expr {
             }
             Expr::SeqIx(seq, index) => {
                 let index = index.eval_value_generic(scope)?.try_as_usize()?;
-                cow_remap(seq.eval_generic(scope)?, |v| {
-                    match v.coerce_mapped_value().get_sequence() {
-                        Some(values) => match values {
-                            ValueSeq::ValueSeq(values) => Cow::Borrowed(&values[index]),
-                            ValueSeq::IntRange(mut range) => {
-                                Cow::Owned(V::from(range.nth(index).unwrap()))
-                            }
-                        },
-                        _ => panic!("SeqIx: expected Seq (or EnumFromTo)"),
-                    }
+                let head = seq.eval_generic(scope)?;
+                let len = match head.coerce_mapped_value().get_sequence() {
+                    Some(values) => values.len(),
+                    _ => panic!("SeqIx: expected Seq (or EnumFromTo)"),
+                };
+                check_index(SeqBoundsOp::SeqIx, len, index)?;
+                cow_remap(head, |v| match v.coerce_mapped_value().get_sequence() {
+                    Some(values) => match values {
+                        ValueSeq::ValueSeq(values) => Cow::Borrowed(&values[index]),
+                        ValueSeq::IntRange(mut range) => {
+                            Cow::Owned(V::from(range.nth(index).unwrap()))
+                        }
+                    },
+                    _ => unreachable!("bounds already checked above"),
                 })
             }
             Expr::SubSeq(seq, start, length) => {
@@ -223,6 +257,7 @@ impl Expr {
                         ValueSeq::ValueSeq(values) => {
                             let start = start.eval_value_generic(scope)?.try_as_usize()?;
                             let length = length.eval_value_generic(scope)?.try_as_usize()?;
+                            check_sub_range(SeqBoundsOp::SubSeq, values.len(), start, length)?;
                             Cow::Owned(V::from_evaluated_seq(
                                 values.sub_seq(start, length).into_vec(),
                             ))
@@ -230,6 +265,7 @@ impl Expr {
                         ValueSeq::IntRange(range) => {
                             let start = start.eval_value_generic(scope)?.try_as_usize()?;
                             let length = length.eval_value_generic(scope)?.try_as_usize()?;
+                            check_sub_range(SeqBoundsOp::SubSeq, range.len(), start, length)?;
                             Cow::Owned(V::from_evaluated(Value::EnumFromTo(sub_range(
                                 range, start, length,
                             ))))
@@ -247,6 +283,12 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value_generic(scope)?.try_as_usize()?;
                         let length = length.eval_value_generic(scope)?.try_as_usize()?;
+                        // `length == 0` never dereferences `start`, so it needs no bound (matches
+                        // `SubSeq`'s `start..start` being valid for any `start <= len`, including
+                        // `start > len` here since nothing is ever read at `start`).
+                        if length > 0 {
+                            check_index(SeqBoundsOp::SubSeqInflate, values.len(), start)?;
+                        }
                         Cow::Owned(V::from_evaluated_seq(sub_seq_inflate(
                             values, start, length,
                         )))
@@ -469,5 +511,93 @@ impl Expr {
         StrictValue: for<'x> TryFrom<&'x V, Error = CoerceValueError>,
     {
         self.eval_lambda_generic(scope, &V::from_evaluated(arg.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decoder::Scope;
+
+    fn eval_ok(expr: &Expr) -> Value {
+        expr.eval_value_generic(&Scope::Empty).unwrap()
+    }
+
+    fn eval_err(expr: &Expr) -> EvalError {
+        expr.eval_value_generic(&Scope::Empty).unwrap_err()
+    }
+
+    fn b(e: Expr) -> Box<Expr> {
+        Box::new(e)
+    }
+
+    fn seq_u8(items: &[u8]) -> Expr {
+        Expr::Seq(items.iter().copied().map(Expr::U8).collect())
+    }
+
+    fn range(start: u32, stop: u32) -> Expr {
+        Expr::EnumFromTo(b(Expr::U32(start)), b(Expr::U32(stop)))
+    }
+
+    /// Direct (non-differential) correctness checks for Group 5's sequence-bounds fixes: these
+    /// assert the actual `Ok`/`Err` outcome, not just that the two evaluators agree with each
+    /// other (see `eval_parity_tests.rs` for that).
+    #[test]
+    fn seq_ix_out_of_bounds_errors() {
+        let expr = Expr::SeqIx(b(seq_u8(&[1, 2, 3])), b(Expr::U32(3)));
+        assert!(matches!(
+            eval_err(&expr),
+            EvalError::SeqBounds(SeqBoundsError {
+                op: SeqBoundsOp::SeqIx,
+                index: 3,
+                len: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn sub_seq_full_range_of_enum_from_to_succeeds() {
+        // Regression test for an off-by-one in `sub_range`'s bounds check that used to reject
+        // `start + length == range.len()`, the valid full-range case.
+        let expr = Expr::SubSeq(b(range(0, 3)), b(Expr::U32(0)), b(Expr::U32(3)));
+        assert_eq!(eval_ok(&expr), Value::EnumFromTo(0..3));
+    }
+
+    #[test]
+    fn sub_seq_inflate_start_out_of_bounds_errors() {
+        // start=5 is past the end of a 3-element source with nothing yet accumulated to
+        // self-reference: this used to index an empty Vec and panic.
+        let expr = Expr::SubSeqInflate(b(seq_u8(&[1, 2, 3])), b(Expr::U32(5)), b(Expr::U32(2)));
+        assert!(matches!(
+            eval_err(&expr),
+            EvalError::SeqBounds(SeqBoundsError {
+                op: SeqBoundsOp::SubSeqInflate,
+                index: 5,
+                len: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn sub_seq_inflate_start_out_of_bounds_with_zero_length_succeeds() {
+        // start is out of bounds, but length=0 means it's never dereferenced.
+        let expr = Expr::SubSeqInflate(b(seq_u8(&[1, 2, 3])), b(Expr::U32(5)), b(Expr::U32(0)));
+        assert_eq!(eval_ok(&expr), Value::Seq(SeqKind::Strict(vec![])));
+    }
+
+    #[test]
+    fn sub_seq_inflate_wraps_correctly() {
+        let expr = Expr::SubSeqInflate(b(seq_u8(&[1, 2, 3])), b(Expr::U32(1)), b(Expr::U32(6)));
+        assert_eq!(
+            eval_ok(&expr),
+            Value::Seq(SeqKind::Strict(vec![
+                Value::U8(2),
+                Value::U8(3),
+                Value::U8(2),
+                Value::U8(3),
+                Value::U8(2),
+                Value::U8(3),
+            ]))
+        );
     }
 }

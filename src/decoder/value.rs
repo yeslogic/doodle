@@ -689,6 +689,47 @@ impl std::fmt::Display for ArithError {
 
 impl std::error::Error for ArithError {}
 
+/// The `Expr` variant that failed in a [`SeqBoundsError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeqBoundsOp {
+    SeqIx,
+    SubSeq,
+    SubSeqInflate,
+}
+
+impl std::fmt::Display for SeqBoundsOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SeqBoundsOp::SeqIx => write!(f, "SeqIx"),
+            SeqBoundsOp::SubSeq => write!(f, "SubSeq"),
+            SeqBoundsOp::SubSeqInflate => write!(f, "SubSeqInflate"),
+        }
+    }
+}
+
+/// Error produced when `SeqIx`/`SubSeq`/`SubSeqInflate` indexes or slices past the end of a
+/// sequence (or `EnumFromTo` range).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SeqBoundsError {
+    pub op: SeqBoundsOp,
+    /// The (0-based) index, or sub-range start offset, that was out of bounds.
+    pub index: usize,
+    /// The length of the sequence (or range) that `index` was checked against.
+    pub len: usize,
+}
+
+impl std::fmt::Display for SeqBoundsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: index {} out of bounds for sequence of length {}",
+            self.op, self.index, self.len
+        )
+    }
+}
+
+impl std::error::Error for SeqBoundsError {}
+
 fn __arith<T>(arith: Arith, left: T, right: T) -> Result<T, ArithError>
 where
     T: num_traits::CheckedAdd,
