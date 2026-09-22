@@ -7,6 +7,7 @@ use crate::error::EvalError;
 use crate::numeric::core::{TypedConst, Value as NumValue};
 use crate::{Arith, IntRel, IntoLabel, Label, Pattern, UnaryOp};
 
+use super::eval::EvalValue;
 use super::{
     MultiScope, Scope,
     seq_kind::{SeqKind, ValueSeq},
@@ -455,7 +456,7 @@ impl Value {
     }
 }
 
-impl super::eval::EvalValue for Value {
+impl EvalValue for Value {
     fn from_evaluated(v: Value) -> Self {
         v
     }
@@ -468,11 +469,15 @@ impl super::eval::EvalValue for Value {
         self.clone()
     }
 
-    fn coerce_mapped_value(&self) -> &Self {
+    fn coerce_mapped_value(&self) -> Coerced<&Self> {
         // Calls the inherent `Value::coerce_mapped_value` above (inherent methods take priority
-        // over trait methods in resolution), discarding its `Coerced` fallback-tracking bit: every
-        // `Expr::eval` call site already discarded it immediately after use.
-        self.coerce_mapped_value().into_inner()
+        // over trait methods in resolution), which already returns `Coerced<&Self>`.
+        self.coerce_mapped_value()
+    }
+
+    fn extract_mapped_value(self) -> Value {
+        // Likewise calls the inherent `Value::extract_mapped_value` (owned, no-clone unwrap).
+        self.extract_mapped_value().into_inner()
     }
 
     fn tuple_proj_raw(&self, index: usize) -> &Self {
@@ -688,47 +693,6 @@ impl std::fmt::Display for ArithError {
 }
 
 impl std::error::Error for ArithError {}
-
-/// The `Expr` variant that failed in a [`SeqBoundsError`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SeqBoundsOp {
-    SeqIx,
-    SubSeq,
-    SubSeqInflate,
-}
-
-impl std::fmt::Display for SeqBoundsOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SeqBoundsOp::SeqIx => write!(f, "SeqIx"),
-            SeqBoundsOp::SubSeq => write!(f, "SubSeq"),
-            SeqBoundsOp::SubSeqInflate => write!(f, "SubSeqInflate"),
-        }
-    }
-}
-
-/// Error produced when `SeqIx`/`SubSeq`/`SubSeqInflate` indexes or slices past the end of a
-/// sequence (or `EnumFromTo` range).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SeqBoundsError {
-    pub op: SeqBoundsOp,
-    /// The (0-based) index, or sub-range start offset, that was out of bounds.
-    pub index: usize,
-    /// The length of the sequence (or range) that `index` was checked against.
-    pub len: usize,
-}
-
-impl std::fmt::Display for SeqBoundsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}: index {} out of bounds for sequence of length {}",
-            self.op, self.index, self.len
-        )
-    }
-}
-
-impl std::error::Error for SeqBoundsError {}
 
 fn __arith<T>(arith: Arith, left: T, right: T) -> Result<T, ArithError>
 where

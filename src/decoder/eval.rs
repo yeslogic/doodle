@@ -16,43 +16,19 @@ use crate::numeric::core::{CoerceValueError, StrictValue};
 use crate::scope::{GMultiScope, GScope, GSingleScope};
 use crate::{Expr, Label, Pattern};
 
-use super::seq_kind::{ValueSeq, sub_range};
-use super::value::{SeqBoundsError, SeqBoundsOp, Value};
+use super::seq_kind::{SeqBoundsOp, ValueSeq, sub_range};
+use super::value::{Coerced, Value};
 use super::{SeqKind, cow_map, cow_remap, extract_pair, search, sub_seq_inflate};
-
-/// Checks that `index` is in-bounds for a sequence of length `len` (used by `SeqIx`, and by
-/// `SubSeqInflate` to check its back-reference `start` — but not its `length`, which may
-/// legitimately self-reference past `len` once `start` itself is valid).
-fn check_index(op: SeqBoundsOp, len: usize, index: usize) -> Result<(), EvalError> {
-    if index < len {
-        Ok(())
-    } else {
-        Err(SeqBoundsError { op, index, len }.into())
-    }
-}
-
-/// Checks that the sub-range `start..start + length` fits within a sequence of length `len`
-/// (used by `SubSeq`, which — unlike `SubSeqInflate` — takes a plain contiguous slice).
-fn check_sub_range(
-    op: SeqBoundsOp,
-    len: usize,
-    start: usize,
-    length: usize,
-) -> Result<(), EvalError> {
-    match start.checked_add(length) {
-        Some(end) if end <= len => Ok(()),
-        _ => Err(SeqBoundsError {
-            op,
-            index: start,
-            len,
-        }
-        .into()),
-    }
-}
 
 /// The operations `Expr::eval_generic` needs from a leaf value representation. Implemented by
 /// [`Value`] (identity/no-op wrapping) and by [`crate::loc_decoder::ParsedValue`] (which also
 /// threads parse-location info through).
+///
+/// NOTE - `Expr::Numeric` also needs `StrictValue: TryFrom<&Self>` (via `NumExpr::eval`'s own
+/// `EvalScope`-based bound). It is *not* a supertrait bound here: moving it onto the trait itself
+/// broke inference at call sites (the HRTB `for<'x>` combined with the `Error = CoerceValueError`
+/// associated-type-equality bound doesn't elaborate cleanly through a supertrait in current
+/// rustc), so it's repeated as a `where` clause on every function below that needs it instead.
 pub(crate) trait EvalValue: Sized + Clone + std::fmt::Debug + From<usize> + 'static {
     /// Wraps a fully-evaluated, plain [`Value`] as `Self`.
     fn from_evaluated(v: Value) -> Self;
@@ -64,8 +40,18 @@ pub(crate) trait EvalValue: Sized + Clone + std::fmt::Debug + From<usize> + 'sta
     /// Converts (cloning as needed) to a plain [`Value`], discarding any location info.
     fn clone_into_value(&self) -> Value;
 
-    /// Looks through `Mapped`/`Branch`/`Permit(Ok)`/`Permit(Err(Some))` wrappers.
-    fn coerce_mapped_value(&self) -> &Self;
+    /// Looks through `Mapped`/`Branch`/`Permit(Ok)`/`Permit(Err(Some))` wrappers, tracking
+    /// whether a `Permit`-fallback value was found along the way (see [`Coerced`]).
+    ///
+    /// `ParsedValue`'s coercion never actually unwraps a `Permit(Err(Some))` (unlike `Value`'s),
+    /// so its `Coerced` is always `is_fallback() == false` — that's an existing, separate
+    /// asymmetry between the two, not something this trait method papers over.
+    fn coerce_mapped_value(&self) -> Coerced<&Self>;
+
+    /// Like [`Self::coerce_mapped_value`], but consumes `self` and converts straight to a plain
+    /// [`Value`], letting each implementation avoid a redundant clone when it already owns the
+    /// value (see `Value`'s impl, which is a no-op unwrap with no clone at all).
+    fn extract_mapped_value(self) -> Value;
 
     /// Panics if `self` (after coercion) is not a tuple of at least `index + 1` elements.
     fn tuple_proj_raw(&self, index: usize) -> &Self;
@@ -110,7 +96,9 @@ impl Expr {
                     .collect::<Result<_, EvalError>>()?,
             ))),
             Expr::TupleProj(head, index) => cow_map(head.eval_generic(scope)?, |v| {
-                v.coerce_mapped_value().tuple_proj_raw(*index)
+                v.coerce_mapped_value()
+                    .map(|v| v.tuple_proj_raw(*index))
+                    .into_inner()
             }),
             Expr::Record(fields) => {
                 let fields = fields
@@ -122,7 +110,9 @@ impl Expr {
                 Cow::Owned(V::collect_fields(fields))
             }
             Expr::RecordProj(head, label) => cow_map(head.eval_generic(scope)?, |v| {
-                v.coerce_mapped_value().record_proj_raw(label.as_ref())
+                v.coerce_mapped_value()
+                    .map(|v| v.record_proj_raw(label.as_ref()))
+                    .into_inner()
             }),
             Expr::Variant(label, expr) => Cow::Owned(V::from_evaluated(Value::variant(
                 label.clone(),
@@ -232,11 +222,10 @@ impl Expr {
             Expr::SeqIx(seq, index) => {
                 let index = index.eval_value_generic(scope)?.try_as_usize()?;
                 let head = seq.eval_generic(scope)?;
-                let len = match head.coerce_mapped_value().get_sequence() {
-                    Some(values) => values.len(),
+                match head.coerce_mapped_value().get_sequence() {
+                    Some(values) => values.check_index(SeqBoundsOp::SeqIx, index)?,
                     _ => panic!("SeqIx: expected Seq (or EnumFromTo)"),
-                };
-                check_index(SeqBoundsOp::SeqIx, len, index)?;
+                }
                 cow_remap(head, |v| match v.coerce_mapped_value().get_sequence() {
                     Some(values) => match values {
                         ValueSeq::ValueSeq(values) => Cow::Borrowed(&values[index]),
@@ -253,24 +242,19 @@ impl Expr {
                     .coerce_mapped_value()
                     .get_sequence()
                 {
-                    Some(values) => match values {
-                        ValueSeq::ValueSeq(values) => {
-                            let start = start.eval_value_generic(scope)?.try_as_usize()?;
-                            let length = length.eval_value_generic(scope)?.try_as_usize()?;
-                            check_sub_range(SeqBoundsOp::SubSeq, values.len(), start, length)?;
-                            Cow::Owned(V::from_evaluated_seq(
+                    Some(values) => {
+                        let start = start.eval_value_generic(scope)?.try_as_usize()?;
+                        let length = length.eval_value_generic(scope)?.try_as_usize()?;
+                        values.check_sub_range(SeqBoundsOp::SubSeq, start, length)?;
+                        match values {
+                            ValueSeq::ValueSeq(values) => Cow::Owned(V::from_evaluated_seq(
                                 values.sub_seq(start, length).into_vec(),
-                            ))
+                            )),
+                            ValueSeq::IntRange(range) => Cow::Owned(V::from_evaluated(
+                                Value::EnumFromTo(sub_range(range, start, length)),
+                            )),
                         }
-                        ValueSeq::IntRange(range) => {
-                            let start = start.eval_value_generic(scope)?.try_as_usize()?;
-                            let length = length.eval_value_generic(scope)?.try_as_usize()?;
-                            check_sub_range(SeqBoundsOp::SubSeq, range.len(), start, length)?;
-                            Cow::Owned(V::from_evaluated(Value::EnumFromTo(sub_range(
-                                range, start, length,
-                            ))))
-                        }
-                    },
+                    }
                     _ => panic!("SubSeq: expected Seq"),
                 }
             }
@@ -287,7 +271,7 @@ impl Expr {
                         // `SubSeq`'s `start..start` being valid for any `start <= len`, including
                         // `start > len` here since nothing is ever read at `start`).
                         if length > 0 {
-                            check_index(SeqBoundsOp::SubSeqInflate, values.len(), start)?;
+                            values.check_index(SeqBoundsOp::SubSeqInflate, start)?;
                         }
                         Cow::Owned(V::from_evaluated_seq(sub_seq_inflate(
                             values, start, length,
@@ -299,26 +283,24 @@ impl Expr {
             Expr::Append(seq0, seq1) => {
                 let tmp0 = seq0.eval_generic(scope)?;
                 let val0 = tmp0.coerce_mapped_value();
-                match val0.get_sequence() {
-                    Some(val_seq0) => {
-                        let tmp1 = seq1.eval_generic(scope)?;
-                        let val1 = tmp1.coerce_mapped_value();
-                        match val1.get_sequence() {
-                            Some(val_seq1) => {
-                                if val_seq0.is_empty() {
-                                    return Ok(Cow::Owned(val1.clone()));
-                                } else if val_seq1.is_empty() {
-                                    return Ok(Cow::Owned(val0.clone()));
-                                }
-                                Cow::Owned(V::from_evaluated_seq(
-                                    val_seq0.append(val_seq1).into_vec(),
-                                ))
-                            }
-                            _ => unreachable!("Append: expected Seq in (rhs)"),
-                        }
-                    }
-                    _ => unreachable!("Append: expected Seq in (lhs)"),
+
+                let Some(val_seq0) = val0.get_sequence() else {
+                    unreachable!("Append: expected Seq in (lhs)")
+                };
+
+                let tmp1 = seq1.eval_generic(scope)?;
+                let val1 = tmp1.coerce_mapped_value();
+
+                let Some(val_seq1) = val1.get_sequence() else {
+                    unreachable!("Append: expected Seq in (rhs)")
+                };
+
+                if val_seq0.is_empty() {
+                    return Ok(Cow::Owned(val1.into_inner().clone()));
+                } else if val_seq1.is_empty() {
+                    return Ok(Cow::Owned(val0.into_inner().clone()));
                 }
+                Cow::Owned(V::from_evaluated_seq(val_seq0.append(val_seq1).into_vec()))
             }
             Expr::FlatMap(expr, seq) => {
                 match seq
@@ -477,10 +459,14 @@ impl Expr {
     where
         StrictValue: for<'x> TryFrom<&'x V, Error = CoerceValueError>,
     {
-        Ok(self
-            .eval_generic(scope)?
-            .coerce_mapped_value()
-            .clone_into_value())
+        Ok(match self.eval_generic(scope)? {
+            // Already owned: let the impl avoid a redundant clone (see `extract_mapped_value`'s
+            // doc comment — for `Value` this is a no-op unwrap, no clone at all).
+            Cow::Owned(v) => v.extract_mapped_value(),
+            // Only borrowed: coercing still only walks references, but converting to a plain
+            // `Value` necessarily clones at the leaf either way.
+            Cow::Borrowed(v) => v.coerce_mapped_value().into_inner().clone_into_value(),
+        })
     }
 
     pub(crate) fn eval_lambda_generic<'a, V: EvalValue>(
@@ -517,7 +503,7 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoder::Scope;
+    use crate::decoder::{Scope, SeqBoundsError};
 
     fn eval_ok(expr: &Expr) -> Value {
         expr.eval_value_generic(&Scope::Empty).unwrap()
