@@ -61,7 +61,7 @@ fn eval_loc(expr: &Expr, vars: &[(&'static str, Value)]) -> Outcome {
         let root = LocScope::Empty;
         let mut multi = LocMultiScope::with_capacity(&root, vars.len());
         for (name, value) in vars {
-            multi.push(*name, ParsedValue::from_evaluated(value.clone()));
+            multi.push_owned(*name, ParsedValue::from_evaluated(value.clone()));
         }
         let scope = LocScope::Multi(&multi);
         expr.eval_value_with_loc(&scope)
