@@ -471,6 +471,25 @@ impl TypedConst {
         }
     }
 
+    /// Attempts a purely value-based conversion of `self`'s value to a native integer type `U`,
+    /// succeeding exactly when the value fits within `U`'s range - completely irrespective of
+    /// `self`'s declared `NumRep`. Generalizes [`Self::as_usize`] to an arbitrary target width.
+    ///
+    /// Unlike [`Self::get_as_unsized`], the `NumRep` does not need to equal (or be compatible
+    /// with) the representation implied by `U` - e.g. a `NumRep::Concrete(MachineRep::U32)`-tagged
+    /// constant whose value happens to be `0` is still `as_native::<u8>()`-able, mirroring how a
+    /// native-grammar `AsU8(Expr::U32(0))` already succeeds regardless of the source width.
+    pub fn as_native<U>(&self) -> Result<U, anyhow::Error>
+    where
+        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
+    {
+        (&self.0).try_into().map_err(|e| {
+            anyhow!(
+                "TypedConst::as_native: unable to convert typed-const {self:?} to target width: {e}"
+            )
+        })
+    }
+
     pub fn get_as_unsized<U>(&self) -> Result<U, anyhow::Error>
     where
         U: num_traits::PrimInt + num_traits::Unsigned,

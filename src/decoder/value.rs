@@ -551,7 +551,9 @@ impl Value {
         }
     }
 
-    /// Converts any fixed-width integer `Value` to a `U8`, returning `Err` if the value does not fit.
+    /// Converts any fixed-width integer `Value` (including `Numeric`) to a `U8`, returning `Err`
+    /// if the value does not fit. A `Numeric` operand converts purely by value, irrespective of
+    /// its declared `NumRep` (see [`crate::numeric::core::TypedConst::as_native`]).
     ///
     /// # Panics
     ///
@@ -563,6 +565,7 @@ impl Value {
             Value::U32(x) => u8::try_from(x)?,
             Value::U64(x) => u8::try_from(x)?,
             Value::Usize(x) => u8::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u8>()?,
             x => panic!("cannot convert {x:?} to U8"),
         }))
     }
@@ -575,6 +578,7 @@ impl Value {
             Value::U32(x) => u16::try_from(x)?,
             Value::U64(x) => u16::try_from(x)?,
             Value::Usize(x) => u16::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u16>()?,
             x => panic!("cannot convert {x:?} to U16"),
         }))
     }
@@ -587,6 +591,7 @@ impl Value {
             Value::U32(x) => x,
             Value::U64(x) => u32::try_from(x)?,
             Value::Usize(x) => u32::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u32>()?,
             x => panic!("cannot convert {x:?} to U32"),
         }))
     }
@@ -599,12 +604,15 @@ impl Value {
             Value::U32(x) => u64::from(x),
             Value::U64(x) => x,
             Value::Usize(x) => u64::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u64>()?,
             x => panic!("cannot convert {x:?} to U64"),
         }))
     }
 
-    /// Converts any fixed-width integer `Value` to a `Char`, substituting `char::REPLACEMENT_CHARACTER` for
-    /// any value that is not a Unicode scalar value. Returns `Err` only if the value does not fit in a `u32`.
+    /// Converts any fixed-width integer `Value` (including `Numeric`) to a `Char`, substituting
+    /// `char::REPLACEMENT_CHARACTER` for any value that is not a Unicode scalar value. Returns
+    /// `Err` only if the value does not fit in a `u32`. As with the other `cast_to_*` methods, a
+    /// `Numeric` operand converts purely by value, irrespective of its declared `NumRep`.
     ///
     /// # Panics
     ///
@@ -616,7 +624,8 @@ impl Value {
             Value::U32(x) => x,
             Value::U64(x) => u32::try_from(x)?,
             Value::Usize(x) => u32::try_from(x)?,
-            _ => panic!("AsChar: expected U8, U16, U32, U64, or Usize"),
+            Value::Numeric(n) => n.as_native::<u32>()?,
+            _ => panic!("AsChar: expected U8, U16, U32, U64, Usize, or Numeric"),
         };
         Ok(Value::Char(
             char::from_u32(code_point).unwrap_or(char::REPLACEMENT_CHARACTER),
@@ -1074,5 +1083,52 @@ mod tests {
     #[should_panic(expected = "cannot apply int-rel")]
     fn fully_unsupported_combination_panics() {
         int_rel_ok(IntRel::Eq, Value::Bool(true), Value::U8(1));
+    }
+
+    // ---- As*-cast support for Numeric (TypedConst) operands ----
+
+    #[test]
+    fn numeric_as_u8_ignores_declared_rep() {
+        // Declared as U32-rep, but the value 0 fits fine in every native width - mirrors how
+        // AsU8(Expr::U32(0)) already succeeds for native-grammar values regardless of source
+        // width; the As*-casts are purely value-based, unlike int_rel's rep-aware coercion.
+        let v = numeric(0u32, NumRep::Concrete(MachineRep::U32));
+        assert_eq!(v.cast_to_u8().unwrap(), Value::U8(0));
+    }
+
+    #[test]
+    fn numeric_as_u8_out_of_range_errs() {
+        let v = numeric(300i32, NumRep::Concrete(MachineRep::U8));
+        assert!(matches!(v.cast_to_u8(), Err(EvalError::NumericConvert(_))));
+    }
+
+    #[test]
+    fn numeric_auto_as_u32_widens() {
+        let v = numeric_auto(9u8);
+        assert_eq!(v.cast_to_u32().unwrap(), Value::U32(9));
+    }
+
+    #[test]
+    fn numeric_as_char_valid_codepoint() {
+        let v = numeric_auto(65u8); // 'A'
+        assert_eq!(v.cast_to_char().unwrap(), Value::Char('A'));
+    }
+
+    #[test]
+    fn numeric_as_char_invalid_surrogate_uses_replacement() {
+        let v = numeric_auto(0xD800u32);
+        assert_eq!(
+            v.cast_to_char().unwrap(),
+            Value::Char(char::REPLACEMENT_CHARACTER)
+        );
+    }
+
+    #[test]
+    fn numeric_as_char_out_of_u32_range_errs() {
+        let v = numeric(u64::MAX, NumRep::Concrete(MachineRep::U64));
+        assert!(matches!(
+            v.cast_to_char(),
+            Err(EvalError::NumericConvert(_))
+        ));
     }
 }
