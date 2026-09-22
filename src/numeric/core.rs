@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::{borrow::Cow, cmp::Ordering};
 
 use anyhow::{Result as AResult, anyhow};
@@ -475,10 +474,13 @@ impl TypedConst {
     /// succeeding exactly when the value fits within `U`'s range - completely irrespective of
     /// `self`'s declared `NumRep`. Generalizes [`Self::as_usize`] to an arbitrary target width.
     ///
-    /// Unlike [`Self::get_as_unsized`], the `NumRep` does not need to equal (or be compatible
-    /// with) the representation implied by `U` - e.g. a `NumRep::Concrete(MachineRep::U32)`-tagged
-    /// constant whose value happens to be `0` is still `as_native::<u8>()`-able, mirroring how a
-    /// native-grammar `AsU8(Expr::U32(0))` already succeeds regardless of the source width.
+    /// Used both by the `AsU8`/`AsU16`/`AsU32`/`AsU64` casts and by `Value::int_rel`'s
+    /// `Numeric`-vs-native-integer arms: numeric equality/ordering and native-cast conversions are
+    /// value-only questions (a `NumRep::Concrete(MachineRep::U32)`-tagged constant with value `0`
+    /// compares/casts exactly as `Value::U32(0)` would), in contrast to *pattern*-matching
+    /// (`Pattern::U8`/`matches_u8`/etc.), which does care whether a value's declared type is
+    /// nominally compatible - that's a different question (`v` conceptually *is* a `U8`) from
+    /// value equality/ordering or reinterpretation (`v`'s numeric value fits/compares as a `U8`).
     pub fn as_native<U>(&self) -> Result<U, anyhow::Error>
     where
         for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
@@ -488,42 +490,6 @@ impl TypedConst {
                 "TypedConst::as_native: unable to convert typed-const {self:?} to target width: {e}"
             )
         })
-    }
-
-    pub fn get_as_unsized<U>(&self) -> Result<U, anyhow::Error>
-    where
-        U: num_traits::PrimInt + num_traits::Unsigned,
-        PhantomData<U>: Into<NumRep>,
-        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
-    {
-        let _proxy: PhantomData<U> = PhantomData;
-        let tgt = _proxy.into();
-        match self.1 {
-            n if n == tgt => {
-                if self.is_representable() {
-                    self.get_unsigned_unchecked::<U>().inspect_err(|e| {
-                        log::error!(
-                            "TypedConst::get_as_unsized: `{self:?}` supposedly representable (as {n:?}), but conversion failed: {e}"
-                        );
-                    })
-                } else {
-                    Err(anyhow!(
-                        "TypedConst::get_as_unsized: `{self:?}` not representable (as {n:?})"
-                    ))
-                }
-            }
-            NumRep::Auto => self.get_unsigned_unchecked::<U>(),
-            other => Err(anyhow!(
-                "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
-            )),
-        }
-    }
-
-    fn get_unsigned_unchecked<U>(&self) -> Result<U, anyhow::Error>
-    where
-        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
-    {
-        Ok((&self.0).try_into()?)
     }
 
     /// Attempts to coerce the value of `self` to a `u8`, checking that it is both representable,
