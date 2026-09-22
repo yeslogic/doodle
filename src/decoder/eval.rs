@@ -137,7 +137,10 @@ impl Expr {
                         return Ok(Cow::Owned(V::from_evaluated(value)));
                     }
                 }
-                panic!("non-exhaustive patterns");
+                return Err(EvalError::RefutedPattern {
+                    cases: branches.iter().map(|(p, _)| p.clone()).collect(),
+                    value: Box::new(head.clone_into_value()),
+                });
             }
             Expr::Destructure(head, pattern, expr) => {
                 let head = head.eval_generic(scope)?;
@@ -145,7 +148,10 @@ impl Expr {
                     let value = expr.eval_value_generic(&GScope::Multi(&pattern_scope))?;
                     return Ok(Cow::Owned(V::from_evaluated(value)));
                 } else {
-                    panic!("refuted pattern: {head:?} does not match {pattern:?}");
+                    return Err(EvalError::RefutedPattern {
+                        cases: vec![pattern.clone()],
+                        value: Box::new(head.clone_into_value()),
+                    });
                 }
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
@@ -582,6 +588,29 @@ mod tests {
         // start is out of bounds, but length=0 means it's never dereferenced.
         let expr = Expr::SubSeqInflate(b(seq_u8(&[1, 2, 3])), b(Expr::U32(5)), b(Expr::U32(0)));
         assert_eq!(eval_ok(&expr), Value::Seq(SeqKind::Strict(vec![])));
+    }
+
+    /// Regression test for Group 6 (refuted-pattern panic -> `EvalError` conversion): an
+    /// `Expr::Match` whose scrutinee matches none of the branch patterns.
+    #[test]
+    fn match_non_exhaustive_errors() {
+        let expr = Expr::Match(b(Expr::U8(5)), vec![(Pattern::U8(1), Expr::U8(10))]);
+        assert!(matches!(
+            eval_err(&expr),
+            EvalError::RefutedPattern { cases, value }
+                if cases == vec![Pattern::U8(1)] && *value == Value::U8(5)
+        ));
+    }
+
+    /// As above, but for `Expr::Destructure`'s single-pattern refutation.
+    #[test]
+    fn destructure_refuted_errors() {
+        let expr = Expr::Destructure(b(Expr::U8(1)), Pattern::U8(2), b(Expr::U8(0)));
+        assert!(matches!(
+            eval_err(&expr),
+            EvalError::RefutedPattern { cases, value }
+                if cases == vec![Pattern::U8(2)] && *value == Value::U8(1)
+        ));
     }
 
     #[test]
