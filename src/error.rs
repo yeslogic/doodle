@@ -34,6 +34,16 @@ pub enum EvalError {
     NumericConvert(anyhow::Error),
     /// A `SeqIx`/`SubSeq`/`SubSeqInflate` index or start-offset was out of bounds.
     SeqBounds(SeqBoundsError),
+    /// An `Expr::Match`'s scrutinee matched none of its branch patterns ("non-exhaustive"), or an
+    /// `Expr::Destructure`'s scrutinee did not match its single pattern ("refuted"). Mirrors
+    /// `DecodeErrorKind::RefutedPatternMatch`, the analogous error for `Decoder::Match`.
+    RefutedPattern {
+        /// The pattern(s) that the value was matched against (all branches, for `Match`; the
+        /// single pattern, for `Destructure`).
+        cases: Vec<Pattern>,
+        /// The value that failed to match any of `cases`.
+        value: Box<Value>,
+    },
 }
 
 impl std::fmt::Display for EvalError {
@@ -44,6 +54,12 @@ impl std::fmt::Display for EvalError {
             Self::IntCast(err) => write!(f, "integer conversion failed: {err}"),
             Self::NumericConvert(err) => write!(f, "numeric conversion failed: {err}"),
             Self::SeqBounds(err) => err.fmt(f),
+            Self::RefutedPattern { cases, value } => {
+                write!(
+                    f,
+                    "value `{value:?}` failed to match any of the provided patterns: {cases:?}"
+                )
+            }
         }
     }
 }
@@ -56,6 +72,7 @@ impl std::error::Error for EvalError {
             Self::IntCast(err) => Some(err),
             Self::NumericConvert(err) => Some(err.as_ref()),
             Self::SeqBounds(err) => Some(err),
+            Self::RefutedPattern { .. } => None,
         }
     }
 }
