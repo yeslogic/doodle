@@ -11,9 +11,11 @@
 //! [`Expect::Parity`].
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::rc::Rc;
 
 use super::{MultiScope, Scope, SeqKind, Value};
 use crate::loc_decoder::{LocMultiScope, LocScope, ParsedValue};
+use crate::numeric::core::{MachineRep, NumRep, TypedConst};
 use crate::{Arith, Expr, IntRel, Label, Pattern, TypeHint, ValueType};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -169,6 +171,20 @@ fn range(start: u32, stop: u32) -> Expr {
     Expr::EnumFromTo(b(Expr::U32(start)), b(Expr::U32(stop)))
 }
 
+fn numeric<N>(n: N, rep: NumRep) -> Value
+where
+    num_bigint::BigInt: From<N>,
+{
+    Value::Numeric(Rc::new(TypedConst::new(n, rep)))
+}
+
+fn numeric_auto<N>(n: N) -> Value
+where
+    num_bigint::BigInt: From<N>,
+{
+    Value::Numeric(Rc::new(TypedConst::new_auto(n)))
+}
+
 fn cases() -> Vec<Case> {
     let mut cases = vec![
         // -- literals and structural constructors
@@ -239,6 +255,34 @@ fn cases() -> Vec<Case> {
         parity(
             "as_u8_from_usize",
             Expr::AsU8(b(Expr::SeqLength(b(seq_u8(&[1, 2]))))),
+        ),
+        // Regression cases for the Numeric-As*-cast support: As*-casts on a `Value::Numeric` are
+        // purely value-based (ignoring the numeric's declared `NumRep`), unlike `IntRel`'s
+        // rep-aware coercion.
+        parity_with(
+            "as_u8_numeric_ignores_declared_rep",
+            Expr::AsU8(b(var("n"))),
+            vec![("n", numeric(0u32, NumRep::Concrete(MachineRep::U32)))],
+        ),
+        parity_with(
+            "as_u8_numeric_out_of_range",
+            Expr::AsU8(b(var("n"))),
+            vec![("n", numeric(300i32, NumRep::Concrete(MachineRep::U8)))],
+        ),
+        parity_with(
+            "as_u32_numeric_auto_widens",
+            Expr::AsU32(b(var("n"))),
+            vec![("n", numeric_auto(9u8))],
+        ),
+        parity_with(
+            "as_char_numeric_valid",
+            Expr::AsChar(b(var("n"))),
+            vec![("n", numeric_auto(65u8))],
+        ),
+        parity_with(
+            "as_char_numeric_invalid_surrogate",
+            Expr::AsChar(b(var("n"))),
+            vec![("n", numeric_auto(0xD800u32))],
         ),
         parity("as_char_u8", Expr::AsChar(b(Expr::U8(65)))),
         parity("as_char_u32_invalid", Expr::AsChar(b(Expr::U32(0xD800)))),
