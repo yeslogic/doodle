@@ -63,6 +63,11 @@ pub(crate) trait EvalValue: Sized + Clone + std::fmt::Debug + From<usize> + 'sta
 
     fn collect_fields(fields: Vec<(Label, Self)>) -> Self;
 
+    /// Wraps `opt` as an Option-typed `Self`, preserving `opt`'s own structure/location when
+    /// `Some` rather than downgrading it to a plain `Value` first (used by `FindByKey`, so the
+    /// matched element keeps its real parse-location instead of a synthesized one).
+    fn lift_option(opt: Option<Self>) -> Self;
+
     /// Attempts to match `self` against `pattern`, coercing through `Mapped`/`Branch`/
     /// `Permit`-wrappers transparently first (see `Value::coerce_nominal_value`), returning the
     /// bindings introduced by the match on success.
@@ -245,14 +250,20 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value_generic(scope)?.try_as_usize()?;
                         let length = length.eval_value_generic(scope)?.try_as_usize()?;
-                        values.check_sub_range(SeqBoundsOp::SubSeq, start, length)?;
                         match values {
                             ValueSeq::ValueSeq(values) => Cow::Owned(V::from_evaluated_seq(
-                                values.sub_seq(start, length).into_vec(),
+                                values
+                                    .sub_seq(SeqBoundsOp::SubSeq, start, length)?
+                                    .into_vec(),
                             )),
-                            ValueSeq::IntRange(range) => Cow::Owned(V::from_evaluated(
-                                Value::EnumFromTo(sub_range(range, start, length)),
-                            )),
+                            ValueSeq::IntRange(range) => {
+                                Cow::Owned(V::from_evaluated(Value::EnumFromTo(sub_range(
+                                    SeqBoundsOp::SubSeq,
+                                    range,
+                                    start,
+                                    length,
+                                )?)))
+                            }
                         }
                     }
                     _ => panic!("SubSeq: expected Seq"),
@@ -267,15 +278,9 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value_generic(scope)?.try_as_usize()?;
                         let length = length.eval_value_generic(scope)?.try_as_usize()?;
-                        // `length == 0` never dereferences `start`, so it needs no bound (matches
-                        // `SubSeq`'s `start..start` being valid for any `start <= len`, including
-                        // `start > len` here since nothing is ever read at `start`).
-                        if length > 0 {
-                            values.check_index(SeqBoundsOp::SubSeqInflate, start)?;
-                        }
                         Cow::Owned(V::from_evaluated_seq(sub_seq_inflate(
                             values, start, length,
-                        )))
+                        )?))
                     }
                     _ => panic!("SubSeqInflate: expected Seq"),
                 }
@@ -375,36 +380,40 @@ impl Expr {
                 }
             }
             Expr::FindByKey(is_sorted, f_get_key, query_key, seq) => {
-                match seq.eval_value_generic(scope)? {
-                    Value::Seq(values) => {
+                match seq
+                    .eval_generic(scope)?
+                    .coerce_mapped_value()
+                    .get_sequence()
+                {
+                    Some(ValueSeq::ValueSeq(values)) => {
                         let query = query_key.eval_value_generic(scope)?;
                         // `search` is shared with `decoder`/`loc_decoder` and expects an infallible evaluator, so
                         // the first error is stashed here (the sentinel `query` key makes the search terminate
                         // immediately)
                         let eval_err = std::cell::Cell::new(None);
-                        let eval = |lambda: &Expr, arg: &Value| match lambda
-                            .eval_lambda_value_generic(scope, arg)
-                        {
-                            Ok(key) => key,
-                            Err(err) => {
-                                eval_err.set(Some(err));
-                                query.clone()
-                            }
-                        };
+                        let eval =
+                            |lambda: &Expr, arg: &V| match lambda.eval_lambda_generic(scope, arg) {
+                                Ok(key) => key,
+                                Err(err) => {
+                                    eval_err.set(Some(err));
+                                    query.clone()
+                                }
+                            };
                         let found = if *is_sorted {
-                            search::find_index_by_key_sorted(f_get_key, &query, &values, eval)
+                            search::find_index_by_key_sorted(f_get_key, &query, values, eval)
                         } else {
-                            search::find_index_by_key_unsorted(f_get_key, &query, &values, eval)
+                            search::find_index_by_key_unsorted(f_get_key, &query, values, eval)
                         };
                         if let Some(err) = eval_err.take() {
                             return Err(err);
                         }
-                        match found {
-                            Some(ix) => Cow::Owned(V::from_evaluated(Value::Option(Some(
-                                Box::new(values[ix].clone()),
-                            )))),
-                            None => Cow::Owned(V::from_evaluated(Value::Option(None))),
-                        }
+                        // Preserves the matched element's own location/structure (via
+                        // `lift_option`) rather than discarding it by routing through a plain
+                        // `Value::Option`.
+                        Cow::Owned(V::lift_option(found.map(|ix| values[ix].clone())))
+                    }
+                    Some(ValueSeq::IntRange(_)) => {
+                        unimplemented!("FindByKey: unimplemented on IntRange")
                     }
                     _ => panic!("FindByKey: expected Seq"),
                 }
@@ -413,9 +422,18 @@ impl Expr {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
-                        let arg = Value::Tuple(vec![Value::Seq(SeqKind::Strict(vs)), v]);
-                        if let Value::Seq(vn) = expr.eval_lambda_value_generic(scope, &arg)? {
-                            vs = match arg {
+                        // Builds `arg` by moving (not cloning) `vs`/`v` into it, then reclaims
+                        // `vs` afterward via `extract_mapped_value` (also a move, not a clone) -
+                        // `eval_lambda_generic` only *borrows* `arg`, so it's still intact and
+                        // owned once the call returns. Using `eval_lambda_value_generic` here
+                        // instead would clone the *entire* accumulator (`vs`) on every iteration
+                        // (it was embedded inside `arg`), turning this from O(n) into O(n²).
+                        let arg = V::from_evaluated(Value::Tuple(vec![
+                            Value::Seq(SeqKind::Strict(vs)),
+                            v,
+                        ]));
+                        if let Value::Seq(vn) = expr.eval_lambda_generic(scope, &arg)? {
+                            vs = match arg.extract_mapped_value() {
                                 Value::Tuple(mut args) => match args.remove(0) {
                                     Value::Seq(vs) => vs.into_vec(),
                                     _ => unreachable!(),
@@ -485,19 +503,6 @@ impl Expr {
             _ => panic!("expected Lambda"),
         }
     }
-
-    /// Like [`Self::eval_lambda_generic`], but for an argument that is already a plain [`Value`]
-    /// (used by `FindByKey`, which downgrades its sequence to `Value` up front).
-    fn eval_lambda_value_generic<'a, V: EvalValue>(
-        &self,
-        scope: &'a GScope<'a, V>,
-        arg: &Value,
-    ) -> Result<Value, EvalError>
-    where
-        StrictValue: for<'x> TryFrom<&'x V, Error = CoerceValueError>,
-    {
-        self.eval_lambda_generic(scope, &V::from_evaluated(arg.clone()))
-    }
 }
 
 #[cfg(test)]
@@ -511,6 +516,14 @@ mod tests {
 
     fn eval_err(expr: &Expr) -> EvalError {
         expr.eval_value_generic(&Scope::Empty).unwrap_err()
+    }
+
+    fn var(name: &'static str) -> Expr {
+        Expr::Var(Label::from(name))
+    }
+
+    fn lam(name: &'static str, body: Expr) -> Expr {
+        Expr::Lambda(Label::from(name), Box::new(body))
     }
 
     fn b(e: Expr) -> Box<Expr> {
@@ -584,6 +597,41 @@ mod tests {
                 Value::U8(2),
                 Value::U8(3),
             ]))
+        );
+    }
+
+    /// Regression test for the `FindByKey` rework (items 5/9): the matched element's *real*
+    /// parse-location should survive, not get flattened to `Value` and re-synthesized.
+    #[test]
+    fn find_by_key_preserves_loc_for_parsed_value() {
+        use crate::loc_decoder::{LocMultiScope, LocScope, ParseLoc, Parsed, ParsedValue};
+
+        let elems = vec![
+            ParsedValue::new_flat(Value::U8(1), 0, 1),
+            ParsedValue::new_flat(Value::U8(2), 1, 1),
+            ParsedValue::new_flat(Value::U8(3), 2, 1),
+        ];
+        let seq_value = ParsedValue::Seq(Parsed {
+            loc: ParseLoc::Synthesized,
+            inner: SeqKind::Strict(elems),
+        });
+
+        let root = LocScope::Empty;
+        let mut multi = LocMultiScope::with_capacity(&root, 1);
+        multi.push("seq", &seq_value);
+        let scope = LocScope::Multi(&multi);
+
+        let expr = Expr::FindByKey(true, b(lam("x", var("x"))), b(Expr::U8(2)), b(var("seq")));
+        let result = expr.eval_generic(&scope).unwrap().into_owned();
+        let ParsedValue::Option(Some(matched)) = result else {
+            panic!("expected Option(Some(_)), got {result:?}");
+        };
+        assert_eq!(
+            matched.get_loc(),
+            ParseLoc::InBuffer {
+                offset: 1,
+                length: 1
+            }
         );
     }
 }

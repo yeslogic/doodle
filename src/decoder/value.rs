@@ -496,6 +496,10 @@ impl EvalValue for Value {
         Value::record(fields)
     }
 
+    fn lift_option(opt: Option<Self>) -> Self {
+        Value::Option(opt.map(Box::new))
+    }
+
     fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
         self.matches(scope, pattern)
     }
