@@ -197,6 +197,16 @@ pub enum BufferLimitError {
         /// The length of the buffer we were seeking within (i.e. one more than the last legal offset)
         buffer_len: usize,
     },
+    /// A `Format::WithRelativeOffset`'s `base + offset` computation overflowed `usize`, rather
+    /// than merely landing past the end of the buffer (see `SeekPastEnd` for that case).
+    OffsetOverflow {
+        /// What kind of buffer the offset was being computed relative to
+        buffer_kind: BufferKind,
+        /// The base address the offset was added to
+        base: usize,
+        /// The (relative) offset that, added to `base`, overflowed `usize`
+        offset: usize,
+    },
 }
 
 impl std::fmt::Display for BufferLimitError {
@@ -230,6 +240,16 @@ impl std::fmt::Display for BufferLimitError {
                     f,
                     "attempted to read byte at offset {offset} in {buffer_kind}, but encountered {terminus}",
                     terminus = buffer_kind.terminus()
+                )
+            }
+            Self::OffsetOverflow {
+                buffer_kind,
+                base,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "relative offset computation {base} + {offset} overflowed while seeking in {buffer_kind}"
                 )
             }
         }
@@ -491,6 +511,16 @@ impl BufferKind {
             buffer_kind: self,
             seek_offset,
             buffer_len,
+        }
+    }
+
+    /// Constructs a DecodeError that indicates that a `base + offset` relative-offset
+    /// computation overflowed `usize`, rather than merely landing past the end of the buffer.
+    pub fn offset_overflow(self, base: usize, offset: usize) -> BufferLimitError {
+        BufferLimitError::OffsetOverflow {
+            buffer_kind: self,
+            base,
+            offset,
         }
     }
 
