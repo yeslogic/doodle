@@ -8,13 +8,13 @@ use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
-    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, SpineDecoder, Value, ValueSeq,
-    cow_map, cow_remap, extract_pair,
+    Compiler, Decoder, Program, ReadArrayKind, SeqKind, SpineDecoder, Value, ValueSeq, cow_map,
+    cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
     sub_seq_inflate,
 };
-use crate::error::{DecodeError, DecodeErrorKind, EvalError, EvalResultExt as _, UnknownVarError};
+use crate::error::{DecodeError, DecodeErrorKind, EvalError, EvalResultExt as _};
 use crate::read::{BufferKind, ReadCtxt};
 use crate::try_with;
 use crate::util::ErrTrace as _;
@@ -372,7 +372,7 @@ impl ParsedValue {
     pub fn matches_inner(&self, scope: &mut LocMultiScope<'_>, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::Binding(name) => {
-                scope.push(name.clone(), self.clone());
+                scope.push_owned(name.clone(), self.clone());
                 true
             }
             Pattern::Wildcard => true,
@@ -1009,241 +1009,12 @@ impl Program {
     }
 }
 
-pub type LocScopeEntry = ScopeEntry<ParsedValue>;
-
-pub enum LocScope<'a> {
-    Empty,
-    Multi(&'a LocMultiScope<'a>),
-    Single(LocSingleScope<'a>),
-    Decoder(LocDecoderScope<'a>),
-    View(LocViewScope<'a>),
-}
-
-#[derive(Clone, Debug)]
-enum ViewOrParsedValue<'a> {
-    View(View<'a>),
-    ParsedValue(ParsedValue),
-}
-
-impl<'a> ViewOrParsedValue<'a> {
-    fn try_as_value(&self) -> Option<&ParsedValue> {
-        match self {
-            ViewOrParsedValue::ParsedValue(v) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-pub struct LocMultiScope<'a> {
-    parent: &'a LocScope<'a>,
-    entries: Vec<(Label, ViewOrParsedValue<'a>)>,
-}
-
-pub struct LocSingleScope<'a> {
-    parent: &'a LocScope<'a>,
-    name: &'a str,
-    value: &'a ParsedValue,
-}
-
-pub struct LocDecoderScope<'a> {
-    parent: &'a LocScope<'a>,
-    name: &'a str,
-    decoder: Decoder,
-}
-
-pub struct LocViewScope<'a> {
-    parent: &'a LocScope<'a>,
-    name: &'a str,
-    view: View<'a>,
-}
-
-impl<'a> LocScope<'a> {
-    pub(crate) fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
-        match self {
-            LocScope::Empty => Err(UnknownVarError(Label::Owned(name.to_string()))),
-            LocScope::Multi(multi) => multi.get_value_by_name(name),
-            LocScope::Single(single) => single.get_value_by_name(name),
-            LocScope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
-            LocScope::View(view) => view.parent.get_value_by_name(name),
-        }
-    }
-
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        match self {
-            LocScope::Empty => panic!("decoder not found: {name}"),
-            LocScope::Multi(multi) => multi.parent.get_decoder_by_name(name),
-            LocScope::Single(single) => single.parent.get_decoder_by_name(name),
-            LocScope::Decoder(decoder) => decoder.get_decoder_by_name(name),
-            LocScope::View(view) => view.parent.get_decoder_by_name(name),
-        }
-    }
-
-    fn get_view_by_name(&self, name: &str) -> View<'a> {
-        match self {
-            LocScope::Empty => panic!("view not found: {name}"),
-            LocScope::Multi(multi) => multi.get_view_by_name(name),
-            LocScope::Single(single) => single.parent.get_view_by_name(name),
-            LocScope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
-            LocScope::View(view) => view.get_view_by_name(name),
-        }
-    }
-
-    pub fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        match self {
-            LocScope::Empty => {}
-            LocScope::Multi(multi) => multi.get_bindings(bindings),
-            LocScope::Single(single) => single.get_bindings(bindings),
-            LocScope::Decoder(decoder) => decoder.get_bindings(bindings),
-            LocScope::View(view) => view.get_bindings(bindings),
-        }
-    }
-}
-
-impl<'a> LocMultiScope<'a> {
-    fn new(parent: &'a LocScope<'a>) -> LocMultiScope<'a> {
-        let entries = Vec::new();
-        LocMultiScope { parent, entries }
-    }
-
-    pub fn with_capacity(parent: &'a LocScope<'a>, capacity: usize) -> LocMultiScope<'a> {
-        let entries = Vec::with_capacity(capacity);
-        LocMultiScope { parent, entries }
-    }
-
-    pub fn push(&mut self, name: impl Into<Label>, v: ParsedValue) {
-        self.entries
-            .push((name.into(), ViewOrParsedValue::ParsedValue(v)))
-    }
-
-    pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
-        self.entries
-            .push((name.into(), ViewOrParsedValue::View(view)))
-    }
-
-    fn get_view_by_name(&self, name: &str) -> View<'a> {
-        for (n, vv) in self.entries.iter().rev() {
-            if n == name {
-                if let ViewOrParsedValue::View(view) = vv {
-                    return *view;
-                } else {
-                    log::warn!(
-                        "LocMultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
-                    );
-                    continue;
-                }
-            }
-        }
-        self.parent.get_view_by_name(name)
-    }
-
-    fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
-        for (n, vv) in self.entries.iter().rev() {
-            if n == name {
-                if let Some(v) = vv.try_as_value() {
-                    return Ok(v);
-                } else {
-                    log::warn!(
-                        "LocMultiScope::get_value_by_name: query for `{name}` encountered a view-binding before any value-bindings, skipping..."
-                    );
-                    continue;
-                }
-            }
-        }
-        self.parent.get_value_by_name(name)
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        for (name, vv) in self.entries.iter().rev() {
-            match vv {
-                ViewOrParsedValue::View(view) => {
-                    bindings.push((name.clone(), LocScopeEntry::View(view.offset)))
-                }
-                ViewOrParsedValue::ParsedValue(value) => {
-                    bindings.push((name.clone(), LocScopeEntry::Value(value.clone())))
-                }
-            }
-        }
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> LocSingleScope<'a> {
-    pub fn new(
-        parent: &'a LocScope<'a>,
-        name: &'a str,
-        value: &'a ParsedValue,
-    ) -> LocSingleScope<'a> {
-        LocSingleScope {
-            parent,
-            name,
-            value,
-        }
-    }
-
-    fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
-        if self.name == name {
-            Ok(self.value)
-        } else {
-            self.parent.get_value_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            LocScopeEntry::Value(self.value.clone()),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> LocDecoderScope<'a> {
-    fn new(parent: &'a LocScope<'a>, name: &'a str, decoder: Decoder) -> LocDecoderScope<'a> {
-        LocDecoderScope {
-            parent,
-            name,
-            decoder,
-        }
-    }
-
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        if self.name == name {
-            &self.decoder
-        } else {
-            self.parent.get_decoder_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            LocScopeEntry::Decoder(self.decoder.clone()),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> LocViewScope<'a> {
-    fn new(parent: &'a LocScope<'a>, name: &'a str, view: View<'a>) -> Self {
-        LocViewScope { parent, name, view }
-    }
-
-    fn get_view_by_name(&self, name: &str) -> View<'a> {
-        if self.name == name {
-            self.view
-        } else {
-            self.parent.get_view_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            LocScopeEntry::View(self.view.offset),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
+// `LocScope`/`LocMultiScope`/`LocSingleScope`/`LocDecoderScope`/`LocViewScope`/`LocScopeEntry`
+// are generic over the leaf value representation and defined once, alongside their `Scope`
+// counterparts, as `GScope<'a, V>` and friends in `crate::scope`.
+pub use crate::scope::{
+    LocDecoderScope, LocMultiScope, LocScope, LocScopeEntry, LocSingleScope, LocViewScope,
+};
 
 impl Decoder {
     pub fn parse_with_loc<'input>(
@@ -1258,7 +1029,7 @@ impl Decoder {
                 let mut new_scope = LocMultiScope::with_capacity(&LocScope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_with_loc(scope).trace_eval(|| ("Call(e)", format!("{e:?}")))?.as_ref().clone();
-                    new_scope.push(name.clone(), v);
+                    new_scope.push_owned(name.clone(), v);
                 }
                 for (name, vv) in vs {
                     let v = Self::eval_view_expr_with_loc(scope, vv)?;
