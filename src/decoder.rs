@@ -104,7 +104,7 @@ pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
 
 pub mod value;
 pub use crate::error::EvalError;
-pub use value::{ArithError, ArithOp, Value};
+pub use value::{ArithError, ArithOp, SeqBoundsError, SeqBoundsOp, Value};
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
 pub type EDecodeResult<T> = EResult<T, DecodeError>;
@@ -1065,7 +1065,10 @@ impl Decoder {
                     .eval_value(scope)
                     .and_then(|v| v.try_as_usize())
                     .trace_eval(|| ("WithRelativeOffset(expr)", format!("{expr:?}")))?;
-                let abs_offset = base + offset;
+                // `checked_add` rather than `+`: an unchecked add here would panic on overflow in
+                // debug builds and silently wrap in release builds, potentially seeking to a
+                // small, wrapped-around (and spuriously valid-looking) offset instead of failing.
+                let abs_offset = base.checked_add(offset).unwrap_or(usize::MAX);
                 let seek_input = input.seek_to(abs_offset).ok_or(
                     input
                         .kind

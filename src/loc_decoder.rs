@@ -1107,7 +1107,9 @@ impl Decoder {
             Decoder::WithRelativeOffset(base_addr, expr, a) => {
                 let base_addr = base_addr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("WithRelativeOffset(base_addr)", format!("{base_addr:?}")))?;
                 let offset = expr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("WithRelativeOffset(expr)", format!("{expr:?}")))?;
-                let abs_offset = base_addr + offset;
+                // See the equivalent `Decoder::parse` arm (decoder.rs): `checked_add` avoids a
+                // debug-build panic / release-build silent wraparound on overflow.
+                let abs_offset = base_addr.checked_add(offset).unwrap_or(usize::MAX);
                 let seek_input = input
                     .seek_to(abs_offset)
                     .ok_or(input.kind.bad_seek(abs_offset, input.input.len()).with_trace("WithRelativeOffset(seek)"))?;
