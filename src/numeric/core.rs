@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::{borrow::Cow, cmp::Ordering};
 
 use anyhow::{Result as AResult, anyhow};
@@ -490,6 +491,59 @@ impl TypedConst {
                 "TypedConst::as_native: unable to convert typed-const {self:?} to target width: {e}"
             )
         })
+    }
+
+    /// Attempts to coerce `self` to a native unsigned integer type `U`, requiring that `self`'s
+    /// declared `NumRep` is either `NumRep::Auto` or exactly the `NumRep` corresponding to `U`
+    /// (unlike [`Self::as_native`], which is purely value-based and ignores the declared `NumRep`
+    /// entirely).
+    ///
+    /// Use this (rep-checking) rather than [`Self::as_native`] (value-only) whenever the calling
+    /// operation already has a type-equality invariant it needs `self` to hold to - e.g.
+    /// `Expr::Arith`/`Expr::Unary` unify a `Numeric` operand's declared `NumRep` with its sibling's
+    /// concrete width during type-checking (per `impl From<NumRep> for ValueType`), so for a sound
+    /// tree "does this value legitimately inhabit the type it claims" is the right question, not
+    /// "does the magnitude opportunistically fit". This matters because the numeric model does not
+    /// eagerly check overflow/underflow: a `BinOp`/`UnaryOp` evaluation can silently produce a
+    /// `TypedConst` tagged e.g. `Concrete(U32)` whose actual raw value is out of range, and
+    /// [`Self::is_representable`] (checked here) is what catches that. By contrast, `AsU8`-style
+    /// casts and `int_rel`'s `Numeric`-vs-native arms have no such invariant to hold to (their
+    /// operations don't themselves constrain both operands to share a type), so they use
+    /// [`Self::as_native`] instead.
+    pub fn get_as_unsized<U>(&self) -> Result<U, anyhow::Error>
+    where
+        U: num_traits::PrimInt + num_traits::Unsigned,
+        PhantomData<U>: Into<NumRep>,
+        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
+    {
+        let _proxy: PhantomData<U> = PhantomData;
+        let tgt = _proxy.into();
+        match self.1 {
+            n if n == tgt => {
+                if self.is_representable() {
+                    self.get_unsigned_unchecked::<U>().inspect_err(|e| {
+                        log::error!(
+                            "TypedConst::get_as_unsized: `{self:?}` supposedly representable (as {n:?}), but conversion failed: {e}"
+                        );
+                    })
+                } else {
+                    Err(anyhow!(
+                        "TypedConst::get_as_unsized: `{self:?}` not representable (as {n:?})"
+                    ))
+                }
+            }
+            NumRep::Auto => self.get_unsigned_unchecked::<U>(),
+            other => Err(anyhow!(
+                "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
+            )),
+        }
+    }
+
+    fn get_unsigned_unchecked<U>(&self) -> Result<U, anyhow::Error>
+    where
+        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
+    {
+        Ok((&self.0).try_into()?)
     }
 
     /// Attempts to coerce the value of `self` to a `u8`, checking that it is both representable,
