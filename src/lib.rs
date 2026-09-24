@@ -4,6 +4,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::iter::repeat_n;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 
 use anyhow::{Result as AResult, anyhow};
@@ -2283,17 +2284,16 @@ impl<'a> MatchTreeStep<'a> {
     /// Constructs a [MatchTreeStep] that matches the various possible align-offset versions of `next`, for small enough `n`,
     /// and otherwise fudges the return value with a universal-acceptance.
     ///
-    /// NOTE - currently 'small enough' just means that `n` is 0 (and illegal) or `1` (and irrefutable as an alignment modulus).
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `n` happens to be `0`, as it is impossible to align modulo `0`.
-    fn from_align(module: &'a FormatModule, next: Rc<Next<'a>>, n: usize) -> MatchTreeStep<'a> {
-        match n {
-            // FIXME - we might want to construct an auto-rejecting tree here, but this is perhaps less murky in terms of expected behavior
-            0 => unreachable!("alignment modulus 0 has no valid possible interpretation"),
+    /// NOTE - currently 'small enough' just means that `n` is `1` (irrefutable as an alignment modulus). `n == 0` has no
+    /// valid interpretation, but is unrepresentable (`n: NonZeroUsize`) rather than an illegal value to check for here.
+    fn from_align(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        n: NonZeroUsize,
+    ) -> MatchTreeStep<'a> {
+        match n.get() {
             1 => Self::from_next(module, next), // guaranteed to already be in alignment
-            2.. => {
+            _ => {
                 // FIXME - this is still hackish but it is at least somewhat better than before
                 // TODO - consider handling very small cases like 2..=4, with bespoke tree-unions over each potential distance from `next` we might skip over
                 Self::accept()

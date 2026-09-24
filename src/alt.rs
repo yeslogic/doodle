@@ -4,6 +4,7 @@ pub mod prelude;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashSet},
+    num::NonZeroUsize,
     rc::Rc,
 };
 
@@ -36,7 +37,7 @@ pub enum GroundFormat {
     /// Matches if the end of the input has been reached
     EndOfInput,
     /// Skips bytes if necessary to align the current offset to a multiple of N
-    Align(usize),
+    Align(NonZeroUsize),
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Apply a dynamic format from a named variable in the scope

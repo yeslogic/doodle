@@ -1250,7 +1250,7 @@ pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
 /// Given an alignment `align` and a Format `f`, constructs a parse that seeks to the nearest offset
 /// that is byte-aligned to a width of `align`, and then parses `f` and yields its result.
 pub fn align_then(align: usize, f: Format) -> Format {
-    monad_seq(Format::Align(align), f)
+    monad_seq(Format::align(align), f)
 }
 
 /// Helper for constructing `Format::Align` that aligns to the size (in bytes) of the parametric type `T`.
@@ -1260,10 +1260,10 @@ pub fn align_then(align: usize, f: Format) -> Format {
 /// ```
 /// use doodle::helper::align_to_size;
 /// use doodle::Format;
-/// assert!(matches!(align_to_size::<u32>(), Format::Align(4)));
+/// assert_eq!(align_to_size::<u32>(), Format::align(4));
 /// ```
 pub fn align_to_size<T>() -> Format {
-    Format::Align(std::mem::size_of::<T>())
+    Format::align(std::mem::size_of::<T>())
 }
 
 /// Given a format `f` and an alignment `align`, constructs a parse that first parses `f` and then
