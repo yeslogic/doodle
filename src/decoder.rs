@@ -67,14 +67,16 @@ pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
 ///
 /// Shared by the `Value` and `ParsedValue` evaluators.
 ///
-/// # Panics
-///
-/// Panics if a back-reference falls outside the output built so far (e.g. `start > values.len()`).
+/// `length` is typically derived from parsed data (unlike `start`, which is bounds-checked against
+/// the source sequence up front, `length` has no natural upper bound - the output buffer is grown
+/// to fit it). The output `Vec` is allocated via `try_reserve_exact` rather than the infallible
+/// allocation APIs, so a `length` large enough to exhaust available memory surfaces as
+/// `EvalError::Alloc` instead of aborting the process.
 pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
     values: ValueSeq<'_, V>,
     start: usize,
     length: usize,
-) -> Result<Vec<V>, SeqBoundsError> {
+) -> Result<Vec<V>, EvalError> {
     let len = values.len();
     if start >= len {
         if length == 0 {
@@ -92,10 +94,12 @@ pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
                 op: SeqBoundsOp::SubSeqInflate,
                 index: start,
                 len,
-            });
+            }
+            .into());
         }
     }
     let mut vs = Vec::new();
+    vs.try_reserve_exact(length)?;
     match values {
         ValueSeq::ValueSeq(vs0) => {
             for i in 0..length {
@@ -729,6 +733,10 @@ impl Decoder {
                 Some((b, _)) => Err(input.kind.trailing(b, input.offset).into()),
             },
             Decoder::Align(n) => {
+                assert_ne!(
+                    *n, 0,
+                    "Decoder::Align: alignment modulus must be nonzero (this is a format-definition bug, not a data error)"
+                );
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
@@ -2104,6 +2112,19 @@ mod tests {
             &[],
             Value::Tuple(vec![Value::U8(0x00), Value::UNIT, Value::U8(0xFF)]),
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "alignment modulus must be nonzero")]
+    fn align_zero_panics() {
+        // `n` in `Format::Align(n)`/`Decoder::Align(n)` is always a static, format-author-supplied
+        // constant (never derived from parsed data), so `Align(0)` is a spec bug rather than a
+        // data-reachable failure - it stays a panic, but with a clear message instead of a raw
+        // "divisor of zero" arithmetic panic.
+        let f = Format::Align(0);
+        let d = Compiler::compile_one(&f).unwrap();
+        let program = Program::new();
+        let _ = d.parse(&program, &Scope::Empty, ReadCtxt::new(&[]));
     }
 
     #[test]
