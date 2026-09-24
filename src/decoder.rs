@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 
 use anyhow::{Result as AResult, anyhow};
@@ -205,7 +206,7 @@ pub enum Decoder {
     Pos,
     Fail,
     EndOfInput,
-    Align(usize),
+    Align(NonZeroUsize),
     Byte(ByteSet),
     Variant(Label, Box<Decoder>),
     Parallel(Vec<Decoder>),
@@ -733,10 +734,7 @@ impl Decoder {
                 Some((b, _)) => Err(input.kind.trailing(b, input.offset).into()),
             },
             Decoder::Align(n) => {
-                assert_ne!(
-                    *n, 0,
-                    "Decoder::Align: alignment modulus must be nonzero (this is a format-definition bug, not a data error)"
-                );
+                let n = n.get();
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
@@ -2090,7 +2088,7 @@ mod tests {
 
     #[test]
     fn compile_align1() {
-        let f = Format::Tuple(vec![is_byte(0x00), Format::Align(1), is_byte(0xFF)]);
+        let f = Format::Tuple(vec![is_byte(0x00), Format::align(1), is_byte(0xFF)]);
         let d = Compiler::compile_one(&f).unwrap();
         accepts(
             &d,
@@ -2102,7 +2100,7 @@ mod tests {
 
     #[test]
     fn compile_align2() {
-        let f = Format::Tuple(vec![is_byte(0x00), Format::Align(2), is_byte(0xFF)]);
+        let f = Format::Tuple(vec![is_byte(0x00), Format::align(2), is_byte(0xFF)]);
         let d = Compiler::compile_one(&f).unwrap();
         rejects(&d, &[0x00, 0xFF]);
         rejects(&d, &[0x00, 0x99, 0x99, 0xFF]);
@@ -2119,12 +2117,11 @@ mod tests {
     fn align_zero_panics() {
         // `n` in `Format::Align(n)`/`Decoder::Align(n)` is always a static, format-author-supplied
         // constant (never derived from parsed data), so `Align(0)` is a spec bug rather than a
-        // data-reachable failure - it stays a panic, but with a clear message instead of a raw
-        // "divisor of zero" arithmetic panic.
-        let f = Format::Align(0);
-        let d = Compiler::compile_one(&f).unwrap();
-        let program = Program::new();
-        let _ = d.parse(&program, &Scope::Empty, ReadCtxt::new(&[]));
+        // data-reachable failure. `Format::Align`'s inner type is `NonZeroUsize`, so this is now
+        // caught at format-construction time (the earliest possible point, before any compile or
+        // decode pass even runs), not at decode time - `Format::Align` itself can't be built with
+        // a zero modulus except via the validating `Format::align` constructor.
+        let _ = Format::align(0);
     }
 
     #[test]

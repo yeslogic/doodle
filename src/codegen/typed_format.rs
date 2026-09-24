@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -234,7 +235,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     Fail,
     EndOfInput,
-    Align(usize),
+    Align(NonZeroUsize),
     Byte(ByteSet),
     Variant(TypeRep, Label, Box<TypedFormat<TypeRep>>),
     Union(TypeRep, Vec<TypedFormat<TypeRep>>),
@@ -336,7 +337,7 @@ impl TypedFormat<GenType> {
                 inner.lookahead_bounds()
             }
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
+            TypedFormat::Align(n) => Bounds::new(0, n.get() - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.lookahead_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -418,7 +419,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Pos(_)
             | TypedFormat::Fail => Bounds::exact(0),
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
+            TypedFormat::Align(n) => Bounds::new(0, n.get() - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.match_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
