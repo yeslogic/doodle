@@ -4,7 +4,7 @@ use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::error::EvalError;
-use crate::numeric::core::{TypedConst, Value as NumValue};
+use crate::numeric::core::{MachineRep, NumRep, TypedConst, Value as NumValue};
 use crate::{Arith, IntRel, IntoLabel, Label, Pattern, UnaryOp};
 
 use super::eval::EvalValue;
@@ -802,7 +802,7 @@ impl Value {
         }
     }
 
-    pub fn arith(arith: Arith, left: Value, right: Value) -> Result<Value, ArithError> {
+    pub fn arith(arith: Arith, left: Value, right: Value) -> Result<Value, EvalError> {
         if matches!(arith, Arith::BoolOr | Arith::BoolAnd) {
             match (left, right) {
                 (Value::Bool(l), Value::Bool(r)) => match arith {
@@ -818,11 +818,48 @@ impl Value {
             }
         } else {
             match (left, right) {
-                (Value::U8(l), Value::U8(r)) => __arith(arith, l, r).map(Value::U8),
-                (Value::U16(l), Value::U16(r)) => __arith(arith, l, r).map(Value::U16),
-                (Value::U32(l), Value::U32(r)) => __arith(arith, l, r).map(Value::U32),
-                (Value::U64(l), Value::U64(r)) => __arith(arith, l, r).map(Value::U64),
-                (Value::Usize(l), Value::Usize(r)) => __arith(arith, l, r).map(Value::Usize),
+                (Value::U8(l), Value::U8(r)) => Ok(__arith(arith, l, r).map(Value::U8)?),
+                (Value::U16(l), Value::U16(r)) => Ok(__arith(arith, l, r).map(Value::U16)?),
+                (Value::U32(l), Value::U32(r)) => Ok(__arith(arith, l, r).map(Value::U32)?),
+                (Value::U64(l), Value::U64(r)) => Ok(__arith(arith, l, r).map(Value::U64)?),
+                (Value::Usize(l), Value::Usize(r)) => Ok(__arith(arith, l, r).map(Value::Usize)?),
+                // `Arith`/`Unary` unify both operands' `ValueType` (see `TypedConst::get_as_unsized`'s
+                // doc comment), so a `Numeric` operand's declared `NumRep` is pinned to exactly its
+                // sibling's concrete width in any sound tree - unlike `int_rel`/`AsCast`, which use
+                // the rep-agnostic `as_native` instead. Extract via `get_as_unsized`, then reuse the
+                // existing checked `__arith` on the native pair.
+                (Value::Numeric(ref n), Value::U8(r)) => {
+                    let l = n.get_as_unsized::<u8>()?;
+                    Ok(__arith(arith, l, r).map(Value::U8)?)
+                }
+                (Value::U8(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsized::<u8>()?;
+                    Ok(__arith(arith, l, r).map(Value::U8)?)
+                }
+                (Value::Numeric(ref n), Value::U16(r)) => {
+                    let l = n.get_as_unsized::<u16>()?;
+                    Ok(__arith(arith, l, r).map(Value::U16)?)
+                }
+                (Value::U16(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsized::<u16>()?;
+                    Ok(__arith(arith, l, r).map(Value::U16)?)
+                }
+                (Value::Numeric(ref n), Value::U32(r)) => {
+                    let l = n.get_as_unsized::<u32>()?;
+                    Ok(__arith(arith, l, r).map(Value::U32)?)
+                }
+                (Value::U32(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsized::<u32>()?;
+                    Ok(__arith(arith, l, r).map(Value::U32)?)
+                }
+                (Value::Numeric(ref n), Value::U64(r)) => {
+                    let l = n.get_as_unsized::<u64>()?;
+                    Ok(__arith(arith, l, r).map(Value::U64)?)
+                }
+                (Value::U64(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsized::<u64>()?;
+                    Ok(__arith(arith, l, r).map(Value::U64)?)
+                }
                 (Value::Numeric(_l), Value::Numeric(_r)) => {
                     panic!(
                         "raw arithmetic on numerics should be done in numeric model, or with Expr-level casts beforehand"
@@ -847,9 +884,33 @@ impl Value {
                 Value::U32(i) => Ok(Value::U32(__unary(op, i)?)),
                 Value::U64(i) => Ok(Value::U64(__unary(op, i)?)),
                 Value::Usize(i) => Ok(Value::Usize(__unary(op, i)?)),
-                Value::Numeric(_i) => {
-                    panic!("top-level unary operations should not be performed on raw-numeric");
-                }
+                // Unlike `arith`, there's no sibling native operand to pin the target width from,
+                // so dispatch on `n`'s own declared `NumRep` instead. Only a concrete unsigned rep
+                // has a sound native destination (`Value` has no signed variant); a signed rep or
+                // `NumRep::Auto` falls through to the panic below, deferring to `numeric::helper`,
+                // matching the `(Numeric, Numeric)` arith precedent.
+                Value::Numeric(ref n) => match n.get_rep() {
+                    NumRep::Concrete(MachineRep::U8) => {
+                        Ok(Value::U8(__unary(op, n.get_as_unsized::<u8>()?)?))
+                    }
+                    NumRep::Concrete(MachineRep::U16) => {
+                        Ok(Value::U16(__unary(op, n.get_as_unsized::<u16>()?)?))
+                    }
+                    NumRep::Concrete(MachineRep::U32) => {
+                        Ok(Value::U32(__unary(op, n.get_as_unsized::<u32>()?)?))
+                    }
+                    NumRep::Concrete(MachineRep::U64) => {
+                        Ok(Value::U64(__unary(op, n.get_as_unsized::<u64>()?)?))
+                    }
+                    NumRep::Concrete(
+                        MachineRep::I8 | MachineRep::I16 | MachineRep::I32 | MachineRep::I64,
+                    )
+                    | NumRep::Auto => {
+                        panic!(
+                            "top-level unary operations should not be performed on raw-numeric with signed or auto representation ({value:?})"
+                        );
+                    }
+                },
                 _ => panic!("cannot apply unary {op:?} to non-numeric operand (`{value:?}`)"),
             },
         }
@@ -1135,5 +1196,100 @@ mod tests {
             v.cast_to_char(),
             Err(EvalError::NumericConvert(_))
         ));
+    }
+
+    // ---- Arith support for Numeric (TypedConst) operands ----
+
+    #[test]
+    fn numeric_arith_matching_concrete_rep_both_orders() {
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U8));
+        assert_eq!(
+            Value::arith(Arith::Add, n.clone(), Value::U8(10)).unwrap(),
+            Value::U8(15)
+        );
+        assert_eq!(
+            Value::arith(Arith::Add, Value::U8(10), n).unwrap(),
+            Value::U8(15)
+        );
+    }
+
+    #[test]
+    fn numeric_arith_auto_rep_widens() {
+        let n = numeric_auto(5u8);
+        assert_eq!(
+            Value::arith(Arith::Add, n, Value::U32(10)).unwrap(),
+            Value::U32(15)
+        );
+    }
+
+    #[test]
+    fn numeric_arith_mismatched_concrete_rep_errs() {
+        // Unlike `int_rel`/As-casts (value-only, via `as_native`), `arith` uses the rep-checking
+        // `get_as_unsized`: a declared U16-rep is incompatible with a native U8 operand even though
+        // the raw value 5 would fit.
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U16));
+        assert!(matches!(
+            Value::arith(Arith::Add, n, Value::U8(10)),
+            Err(EvalError::NumericConvert(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_arith_unrepresentable_errs() {
+        // Declared as U8-rep, but the raw value doesn't fit in a u8 - caught by
+        // `get_as_unsized`'s representability check even though the rep nominally matches.
+        let n = numeric(300i32, NumRep::Concrete(MachineRep::U8));
+        assert!(matches!(
+            Value::arith(Arith::Add, n, Value::U8(10)),
+            Err(EvalError::NumericConvert(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_arith_overflow_errs() {
+        let n = numeric(250u8, NumRep::Concrete(MachineRep::U8));
+        assert!(matches!(
+            Value::arith(Arith::Add, n, Value::U8(10)),
+            Err(EvalError::Arith(_))
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "raw arithmetic on numerics")]
+    fn numeric_arith_numeric_vs_numeric_panics() {
+        let l = numeric(1u8, NumRep::Concrete(MachineRep::U8));
+        let r = numeric(2u8, NumRep::Concrete(MachineRep::U8));
+        let _ = Value::arith(Arith::Add, l, r);
+    }
+
+    // ---- Unary support for Numeric (TypedConst) operands ----
+
+    #[test]
+    fn numeric_unary_concrete_rep_dispatches_on_own_width() {
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U8));
+        assert_eq!(Value::unary(UnaryOp::IntSucc, n).unwrap(), Value::U8(6));
+    }
+
+    #[test]
+    fn numeric_unary_overflow_errs() {
+        let n = numeric(u32::MAX, NumRep::Concrete(MachineRep::U32));
+        assert!(matches!(
+            Value::unary(UnaryOp::IntSucc, n),
+            Err(EvalError::Arith(_))
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "signed or auto representation")]
+    fn numeric_unary_auto_rep_panics() {
+        let n = numeric_auto(5u8);
+        let _ = Value::unary(UnaryOp::IntSucc, n);
+    }
+
+    #[test]
+    #[should_panic(expected = "signed or auto representation")]
+    fn numeric_unary_signed_rep_panics() {
+        let n = numeric(5i32, NumRep::Concrete(MachineRep::I32));
+        let _ = Value::unary(UnaryOp::IntSucc, n);
     }
 }
