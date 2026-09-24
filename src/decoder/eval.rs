@@ -225,7 +225,7 @@ impl Expr {
                 {
                     Some(values) => {
                         let len = values.len();
-                        Cow::Owned(V::from_evaluated(Value::U32(len as u32)))
+                        Cow::Owned(V::from_evaluated(Value::U32(u32::try_from(len)?)))
                     }
                     _ => panic!("SeqLength: expected Seq"),
                 }
@@ -566,6 +566,26 @@ mod tests {
         // `start + length == range.len()`, the valid full-range case.
         let expr = Expr::SubSeq(b(range(0, 3)), b(Expr::U32(0)), b(Expr::U32(3)));
         assert_eq!(eval_ok(&expr), Value::EnumFromTo(0..3));
+    }
+
+    #[test]
+    fn seq_length_of_range_exceeding_u32_max_errors() {
+        // `Range<usize>::len()` is O(1) (no materialization needed), so this exercises the
+        // truncation fix without actually allocating billions of elements. `len as u32` used to
+        // silently wrap; now it errors via `EvalError::IntCast`.
+        let too_long = u64::from(u32::MAX) + 1;
+        let expr = Expr::SeqLength(b(Expr::EnumFromTo(b(Expr::U64(0)), b(Expr::U64(too_long)))));
+        assert!(matches!(eval_err(&expr), EvalError::IntCast(_)));
+    }
+
+    #[test]
+    fn seq_length_of_range_at_u32_max_succeeds() {
+        // Boundary check: a length of exactly `u32::MAX` still fits and must not error.
+        let expr = Expr::SeqLength(b(Expr::EnumFromTo(
+            b(Expr::U64(0)),
+            b(Expr::U64(u64::from(u32::MAX))),
+        )));
+        assert_eq!(eval_ok(&expr), Value::U32(u32::MAX));
     }
 
     #[test]

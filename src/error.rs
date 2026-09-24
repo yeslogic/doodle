@@ -34,6 +34,9 @@ pub enum EvalError {
     NumericConvert(anyhow::Error),
     /// A `SeqIx`/`SubSeq`/`SubSeqInflate` index or start-offset was out of bounds.
     SeqBounds(SeqBoundsError),
+    /// A `Vec` allocation needed to materialize a `SubSeqInflate` result failed — the requested
+    /// length (typically derived from parsed data) would exceed available memory.
+    Alloc(std::collections::TryReserveError),
     /// An `Expr::Match`'s scrutinee matched none of its branch patterns ("non-exhaustive"), or an
     /// `Expr::Destructure`'s scrutinee did not match its single pattern ("refuted"). Mirrors
     /// `DecodeErrorKind::RefutedPatternMatch`, the analogous error for `Decoder::Match`.
@@ -54,6 +57,7 @@ impl std::fmt::Display for EvalError {
             Self::IntCast(err) => write!(f, "integer conversion failed: {err}"),
             Self::NumericConvert(err) => write!(f, "numeric conversion failed: {err}"),
             Self::SeqBounds(err) => err.fmt(f),
+            Self::Alloc(err) => write!(f, "allocation failed: {err}"),
             Self::RefutedPattern { cases, value } => {
                 write!(
                     f,
@@ -72,6 +76,7 @@ impl std::error::Error for EvalError {
             Self::IntCast(err) => Some(err),
             Self::NumericConvert(err) => Some(err.as_ref()),
             Self::SeqBounds(err) => Some(err),
+            Self::Alloc(err) => Some(err),
             Self::RefutedPattern { .. } => None,
         }
     }
@@ -128,6 +133,12 @@ impl From<anyhow::Error> for EvalError {
 impl From<SeqBoundsError> for EvalError {
     fn from(err: SeqBoundsError) -> Self {
         Self::SeqBounds(err)
+    }
+}
+
+impl From<std::collections::TryReserveError> for EvalError {
+    fn from(err: std::collections::TryReserveError) -> Self {
+        Self::Alloc(err)
     }
 }
 
