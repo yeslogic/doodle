@@ -4,6 +4,7 @@ use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint}
 use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 
 use crate::codegen::typed_format::{GenType, TypedFixedReadKind, TypedPattern, TypedViewExpr};
@@ -125,7 +126,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     Fail,
     EndOfInput,
-    Align(usize),
+    Align(NonZeroUsize),
     Byte(ByteSet),
     Variant(TypeRep, Label, Box<TypedDecoderExt<TypeRep>>),
     Parallel(TypeRep, Vec<TypedDecoderExt<TypeRep>>),

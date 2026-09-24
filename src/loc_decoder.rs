@@ -754,10 +754,7 @@ impl Decoder {
                 }
             },
             Decoder::Align(n) => {
-                assert_ne!(
-                    *n, 0,
-                    "Decoder::Align: alignment modulus must be nonzero (this is a format-definition bug, not a data error)"
-                );
+                let n = n.get();
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
