@@ -65,6 +65,7 @@ impl Pattern {
             }
             (Pattern::Wildcard, _) => {}
             (Pattern::Bool(..), ValueType::Base(BaseType::Bool)) => {}
+            // REVIEW - should we consider NumericHole as a wildcard match for all Pattern::U*?
             (Pattern::U8(..), &ValueType::U8) => {}
             (Pattern::U16(..), &ValueType::U16) => {}
             (Pattern::U32(..), &ValueType::U32) => {}
