@@ -860,10 +860,31 @@ impl Value {
                     let r = n.get_as_unsized::<u64>()?;
                     Ok(__arith(arith, l, r).map(Value::U64)?)
                 }
-                (Value::Numeric(_l), Value::Numeric(_r)) => {
-                    panic!(
-                        "raw arithmetic on numerics should be done in numeric model, or with Expr-level casts beforehand"
-                    );
+                (Value::Numeric(l), Value::Numeric(r)) => {
+                    let x = l.get_rep();
+                    let y = r.get_rep();
+                    match x.unify(y)  {
+                        NumRep::Auto => {
+                            panic!("cannot apply native-arith {arith:?} to auto-or-mismatched (`{l:?}`, `{r:?}`)");
+                        }
+                        NumRep::Concrete(rep) => match rep {
+                            MachineRep::U8 => {
+                                Ok(__arith(arith, l.get_as_unsized::<u8>()?, r.get_as_unsized::<u8>()?).map(Value::U8)?)
+                            }
+                            MachineRep::U16 => {
+                                Ok(__arith(arith, l.get_as_unsized::<u16>()?, r.get_as_unsized::<u16>()?).map(Value::U16)?)
+                            }
+                            MachineRep::U32 => {
+                                Ok(__arith(arith, l.get_as_unsized::<u32>()?, r.get_as_unsized::<u32>()?).map(Value::U32)?)
+                            }
+                            MachineRep::U64 => {
+                                Ok(__arith(arith, l.get_as_unsized::<u64>()?, r.get_as_unsized::<u64>()?).map(Value::U64)?)
+                            }
+                            MachineRep::I8 | MachineRep::I16 | MachineRep::I32 | MachineRep::I64 => {
+                                panic!("cannot apply native-arith {arith:?} to signed-rep (`{l:?}`, `{r:?}`)")
+                            }
+                        }
+                    }
                 }
                 (left, right) => {
                     panic!("cannot apply arith {arith:?} to (`{left:?}`, `{right:?}`)")
@@ -884,11 +905,7 @@ impl Value {
                 Value::U32(i) => Ok(Value::U32(__unary(op, i)?)),
                 Value::U64(i) => Ok(Value::U64(__unary(op, i)?)),
                 Value::Usize(i) => Ok(Value::Usize(__unary(op, i)?)),
-                // Unlike `arith`, there's no sibling native operand to pin the target width from,
-                // so dispatch on `n`'s own declared `NumRep` instead. Only a concrete unsigned rep
-                // has a sound native destination (`Value` has no signed variant); a signed rep or
-                // `NumRep::Auto` falls through to the panic below, deferring to `numeric::helper`,
-                // matching the `(Numeric, Numeric)` arith precedent.
+                // Unlike `arith`, there's no sibling native operand to pin the target width from, so dispatch on `n`'s own declared `NumRep` instead.
                 Value::Numeric(ref n) => match n.get_rep() {
                     NumRep::Concrete(MachineRep::U8) => {
                         Ok(Value::U8(__unary(op, n.get_as_unsized::<u8>()?)?))
@@ -902,6 +919,8 @@ impl Value {
                     NumRep::Concrete(MachineRep::U64) => {
                         Ok(Value::U64(__unary(op, n.get_as_unsized::<u64>()?)?))
                     }
+                    // Only concrete, unsigned reps are accepted here, as `Value` is not designed to perform computations on `TypedConst` and there is no first-class Value for signed-ints
+                    // NOTE[epic=eval-panic] - this panic is tolerable because it cannot be triggered by data, only by misimplemnted format definitions.
                     NumRep::Concrete(
                         MachineRep::I8 | MachineRep::I16 | MachineRep::I32 | MachineRep::I64,
                     )

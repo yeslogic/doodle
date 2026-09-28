@@ -39,7 +39,7 @@ mod precedence;
 pub mod prelude;
 pub mod read;
 
-mod scope;
+pub mod scope;
 
 mod typecheck;
 pub use typecheck::{TCResult, base_set, error::TCError, typecheck};
@@ -442,11 +442,14 @@ impl Expr {
             Expr::SeqIx(seq, index) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let index_type = index.infer_type(scope)?;
-                    // FIXME[epic=seqlen-always-u32] - this should share whatever type SeqLen gets
-                    if index_type != ValueType::U32 {
-                        return Err(anyhow!(
-                            "SeqIx `index` param: expected U32, found {index_type:?}"
-                        ));
+                    match index_type {
+                        // FIXME[epic=seqlen-always-u32] - because SeqLength is currently hardcoded to U32-typing, we at least need SeqIx to accept U32; anything beyond that requires a deeper consideration
+                        ValueType::U32 => (),
+                        other => {
+                            return Err(anyhow!(
+                                "SeqIx `index` param: expected U32, found {other:?}"
+                            ));
+                        }
                     }
                     Ok(ValueType::clone(&t))
                 }

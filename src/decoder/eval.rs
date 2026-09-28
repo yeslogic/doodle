@@ -93,6 +93,7 @@ impl Expr {
             Expr::U16(i) => Cow::Owned(V::from_evaluated(Value::U16(*i))),
             Expr::U32(i) => Cow::Owned(V::from_evaluated(Value::U32(*i))),
             Expr::U64(i) => Cow::Owned(V::from_evaluated(Value::U64(*i))),
+            // REVIEW - should we use `n.eval_strict(scope)` instead?
             Expr::Numeric(n) => Cow::Owned(V::from_evaluated(Value::from(n.eval(scope)?))),
             Expr::Tuple(exprs) => Cow::Owned(V::from_evaluated(Value::Tuple(
                 exprs
