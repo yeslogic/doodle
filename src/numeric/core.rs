@@ -203,11 +203,11 @@ impl MachineRep {
     }
 
     pub const fn const_eq(self, other: MachineRep) -> bool {
-       self.is_signed == other.is_signed
-                    && unsafe {
-                        std::mem::transmute::<_, u8>(self.bit_width)
-                            == std::mem::transmute::<_, u8>(other.bit_width)
-                    }
+        self.is_signed == other.is_signed
+            && unsafe {
+                std::mem::transmute::<_, u8>(self.bit_width)
+                    == std::mem::transmute::<_, u8>(other.bit_width)
+            }
     }
 }
 

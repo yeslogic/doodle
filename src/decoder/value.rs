@@ -863,27 +863,46 @@ impl Value {
                 (Value::Numeric(l), Value::Numeric(r)) => {
                     let x = l.get_rep();
                     let y = r.get_rep();
-                    match x.unify(y)  {
+                    match x.unify(y) {
                         NumRep::Auto => {
-                            panic!("cannot apply native-arith {arith:?} to auto-or-mismatched (`{l:?}`, `{r:?}`)");
+                            panic!(
+                                "cannot apply native-arith {arith:?} to auto-or-mismatched (`{l:?}`, `{r:?}`)"
+                            );
                         }
                         NumRep::Concrete(rep) => match rep {
-                            MachineRep::U8 => {
-                                Ok(__arith(arith, l.get_as_unsized::<u8>()?, r.get_as_unsized::<u8>()?).map(Value::U8)?)
+                            MachineRep::U8 => Ok(__arith(
+                                arith,
+                                l.get_as_unsized::<u8>()?,
+                                r.get_as_unsized::<u8>()?,
+                            )
+                            .map(Value::U8)?),
+                            MachineRep::U16 => Ok(__arith(
+                                arith,
+                                l.get_as_unsized::<u16>()?,
+                                r.get_as_unsized::<u16>()?,
+                            )
+                            .map(Value::U16)?),
+                            MachineRep::U32 => Ok(__arith(
+                                arith,
+                                l.get_as_unsized::<u32>()?,
+                                r.get_as_unsized::<u32>()?,
+                            )
+                            .map(Value::U32)?),
+                            MachineRep::U64 => Ok(__arith(
+                                arith,
+                                l.get_as_unsized::<u64>()?,
+                                r.get_as_unsized::<u64>()?,
+                            )
+                            .map(Value::U64)?),
+                            MachineRep::I8
+                            | MachineRep::I16
+                            | MachineRep::I32
+                            | MachineRep::I64 => {
+                                panic!(
+                                    "cannot apply native-arith {arith:?} to signed-rep (`{l:?}`, `{r:?}`)"
+                                )
                             }
-                            MachineRep::U16 => {
-                                Ok(__arith(arith, l.get_as_unsized::<u16>()?, r.get_as_unsized::<u16>()?).map(Value::U16)?)
-                            }
-                            MachineRep::U32 => {
-                                Ok(__arith(arith, l.get_as_unsized::<u32>()?, r.get_as_unsized::<u32>()?).map(Value::U32)?)
-                            }
-                            MachineRep::U64 => {
-                                Ok(__arith(arith, l.get_as_unsized::<u64>()?, r.get_as_unsized::<u64>()?).map(Value::U64)?)
-                            }
-                            MachineRep::I8 | MachineRep::I16 | MachineRep::I32 | MachineRep::I64 => {
-                                panic!("cannot apply native-arith {arith:?} to signed-rep (`{l:?}`, `{r:?}`)")
-                            }
-                        }
+                        },
                     }
                 }
                 (left, right) => {

@@ -1,0 +1,3804 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index a4232769..08d87ce0 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -20,20 +20,11 @@ dependencies = [
+  "cc",
+ ]
+ 
+-[[package]]
+-name = "analytic-engine"
+-version = "0.1.0"
+-dependencies = [
+- "num-bigint",
+- "num-traits",
+- "proptest",
+-]
+-
+ [[package]]
+ name = "analytic-parser"
+ version = "0.1.0"
+ dependencies = [
+- "analytic-engine",
++ "doodle",
+  "lalrpop",
+  "lalrpop-util 0.21.0",
+  "linefeed",
+diff --git a/Cargo.toml b/Cargo.toml
+index e3d58146..287a9d2e 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -4,7 +4,6 @@ members = [
+     "generated/",
+     "doodle-formats/",
+     "smallsorts",
+-    "experiments/analytic-engine/",
+     "experiments/analytic-parser",
+     "experiments/doodle-rec/",
+ ]
+diff --git a/experiments/analytic-engine/Cargo.toml b/experiments/analytic-engine/Cargo.toml
+deleted file mode 100644
+index 9c70e384..00000000
+--- a/experiments/analytic-engine/Cargo.toml
++++ /dev/null
+@@ -1,13 +0,0 @@
+-[package]
+-name = "analytic-engine"
+-version = "0.1.0"
+-edition = "2021"
+-
+-[lib]
+-name = "analytic_engine"
+-bench = false
+-
+-[dependencies]
+-num-bigint = "0.4"
+-num-traits = "0.2"
+-proptest = "1.5.0"
+diff --git a/experiments/analytic-engine/src/core.rs b/experiments/analytic-engine/src/core.rs
+deleted file mode 100644
+index d4f9f77e..00000000
+--- a/experiments/analytic-engine/src/core.rs
++++ /dev/null
+@@ -1,644 +0,0 @@
+-use num_bigint::BigInt;
+-use num_traits::{Signed, Zero};
+-use std::borrow::Cow;
+-
+-pub type Number = BigInt;
+-
+-/// Standalone ground operations on two numeric arguments
+-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+-pub enum BasicBinOp {
+-    Add,
+-    Sub,
+-    Mul,
+-    Div,
+-    Rem,
+-}
+-
+-impl std::fmt::Display for BasicBinOp {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self {
+-            BasicBinOp::Add => write!(f, "+"),
+-            BasicBinOp::Sub => write!(f, "-"),
+-            BasicBinOp::Mul => write!(f, "*"),
+-            BasicBinOp::Div => write!(f, "/"),
+-            BasicBinOp::Rem => write!(f, "%"),
+-        }
+-    }
+-}
+-
+-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+-pub enum BasicUnaryOp {
+-    Negate,
+-    AbsVal,
+-}
+-
+-impl std::fmt::Display for BasicUnaryOp {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self {
+-            BasicUnaryOp::Negate => write!(f, "~"),
+-            BasicUnaryOp::AbsVal => write!(f, "abs"),
+-        }
+-    }
+-}
+-
+-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+-pub enum BitWidth {
+-    Bits8,
+-    Bits16,
+-    Bits32,
+-    Bits64,
+-}
+-
+-/// Machine-representation of a numeric value, consisting of its signedness
+-/// and its bit-width.
+-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+-pub struct MachineRep {
+-    pub is_signed: bool,
+-    pub bit_width: BitWidth,
+-}
+-
+-impl MachineRep {
+-    pub const I8: Self = MachineRep {
+-        is_signed: true,
+-        bit_width: BitWidth::Bits8,
+-    };
+-    pub const I16: Self = MachineRep {
+-        is_signed: true,
+-        bit_width: BitWidth::Bits16,
+-    };
+-    pub const I32: Self = MachineRep {
+-        is_signed: true,
+-        bit_width: BitWidth::Bits32,
+-    };
+-    pub const I64: Self = MachineRep {
+-        is_signed: true,
+-        bit_width: BitWidth::Bits64,
+-    };
+-
+-    pub const U8: Self = MachineRep {
+-        is_signed: false,
+-        bit_width: BitWidth::Bits8,
+-    };
+-    pub const U16: Self = MachineRep {
+-        is_signed: false,
+-        bit_width: BitWidth::Bits16,
+-    };
+-    pub const U32: Self = MachineRep {
+-        is_signed: false,
+-        bit_width: BitWidth::Bits32,
+-    };
+-    pub const U64: Self = MachineRep {
+-        is_signed: false,
+-        bit_width: BitWidth::Bits64,
+-    };
+-}
+-
+-impl From<MachineRep> for NumRep {
+-    fn from(value: MachineRep) -> Self {
+-        NumRep::Concrete(value)
+-    }
+-}
+-
+-/// Marker-type for the intended representation fo a numeric value,
+-/// which an either be an explicit, concrete `MachineRep` or `Auto`.
+-///
+-/// Using `Auto` may not always work, but whenever there is a single
+-/// intuitive choice for what representation is natural, it should
+-/// yield the same result as using the concrete representation of that expected
+-/// interpretation.
+-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+-pub enum NumRep {
+-    Auto,
+-    Concrete(MachineRep),
+-}
+-
+-impl MachineRep {
+-    /// Outputs a string representation of this machine-representation,
+-    /// suitable for value suffixing of numeric consts in Rust.
+-    pub const fn to_static_str(self) -> &'static str {
+-        if self.is_signed {
+-            match self.bit_width {
+-                BitWidth::Bits8 => "i8",
+-                BitWidth::Bits16 => "i16",
+-                BitWidth::Bits32 => "i32",
+-                BitWidth::Bits64 => "i64",
+-            }
+-        } else {
+-            match self.bit_width {
+-                BitWidth::Bits8 => "u8",
+-                BitWidth::Bits16 => "u16",
+-                BitWidth::Bits32 => "u32",
+-                BitWidth::Bits64 => "u64",
+-            }
+-        }
+-    }
+-}
+-
+-impl std::fmt::Display for MachineRep {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        f.write_str(self.to_static_str())
+-    }
+-}
+-
+-impl NumRep {
+-    /// Outputs a string representation of this numeric representation.
+-    ///
+-    /// When concrete, this is the same as [`MachineRep::to_static_str`].
+-    ///
+-    /// For `Auto`, outputs the notation chosen for auto-value suffixing
+-    /// (and auto-output-type for arithmetic operations), namely `?`.
+-    pub const fn to_static_str(self) -> &'static str {
+-        match self {
+-            NumRep::Auto => "?",
+-            NumRep::Concrete(machine) => machine.to_static_str(),
+-        }
+-    }
+-}
+-
+-impl std::fmt::Display for NumRep {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        write!(f, "{}", self.to_static_str())
+-    }
+-}
+-
+-impl NumRep {
+-    pub const I8: NumRep = NumRep::Concrete(MachineRep::I8);
+-    pub const I16: NumRep = NumRep::Concrete(MachineRep::I16);
+-    pub const I32: NumRep = NumRep::Concrete(MachineRep::I32);
+-    pub const I64: NumRep = NumRep::Concrete(MachineRep::I64);
+-
+-    pub const U8: NumRep = NumRep::Concrete(MachineRep::U8);
+-    pub const U16: NumRep = NumRep::Concrete(MachineRep::U16);
+-    pub const U32: NumRep = NumRep::Concrete(MachineRep::U32);
+-    pub const U64: NumRep = NumRep::Concrete(MachineRep::U64);
+-
+-    pub const AUTO: NumRep = NumRep::Auto;
+-}
+-
+-/// Representative min and max bounds for a numeric type
+-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+-pub struct Bounds {
+-    min: Number,
+-    max: Number,
+-}
+-
+-impl std::fmt::Display for Bounds {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        write!(f, "[{},{}]", &self.min, &self.max)
+-    }
+-}
+-
+-impl Bounds {
+-    pub fn new(min: Number, max: Number) -> Self {
+-        Self { min, max }
+-    }
+-
+-    pub fn singleton(n: Number) -> Self {
+-        Self {
+-            min: n.clone(),
+-            max: n,
+-        }
+-    }
+-
+-    /// Returns `true` if every value in `sub_range` is also within `self`.
+-    ///
+-    /// If `inferior` has inverted bounds, will panic.
+-    pub fn encompasses(&self, inferior: &Self) -> bool {
+-        assert!(inferior.min <= inferior.max);
+-        self.min <= inferior.min && self.max >= inferior.max
+-    }
+-
+-    /// Dual to [`encompasses`].
+-    ///
+-    /// Returns `true` if every value in `self` is also within `superior`.
+-    ///
+-    /// If `superior` has inverted bounds, will panic.
+-    pub fn is_encompassed_by(&self, superior: &Self) -> bool {
+-        assert!(superior.min <= superior.max);
+-        self.min >= superior.min && self.max <= superior.max
+-    }
+-
+-    pub(crate) fn unify<'a>(&'a self, bs2: &'a Bounds) -> Cow<'a, Bounds> {
+-        if self.is_encompassed_by(bs2) {
+-            Cow::Borrowed(bs2)
+-        } else if self.encompasses(bs2) {
+-            Cow::Borrowed(self)
+-        } else {
+-            Cow::Owned(Bounds {
+-                min: Ord::min(&self.min, &bs2.min).clone(),
+-                max: Ord::max(&self.max, &bs2.max).clone(),
+-            })
+-        }
+-    }
+-}
+-
+-macro_rules! bounds_of {
+-    ( $t:ty ) => {
+-        (Number::from(<$t>::MIN), Number::from(<$t>::MAX))
+-    };
+-}
+-
+-impl MachineRep {
+-    pub(crate) fn as_bounds(self) -> Bounds {
+-        let (min, max) = match self {
+-            Self::U8 => bounds_of!(u8),
+-            Self::U16 => bounds_of!(u16),
+-            Self::U32 => bounds_of!(u32),
+-            Self::U64 => bounds_of!(u64),
+-            Self::I8 => bounds_of!(i8),
+-            Self::I16 => bounds_of!(i16),
+-            Self::I32 => bounds_of!(i32),
+-            Self::I64 => bounds_of!(i64),
+-        };
+-        Bounds { min, max }
+-    }
+-
+-    pub(crate) const fn is_signed(self) -> bool {
+-        self.is_signed
+-    }
+-
+-    pub(crate) fn compare_width(self, other: Self) -> std::cmp::Ordering {
+-        self.bit_width.cmp(&other.bit_width)
+-    }
+-
+-    pub(crate) fn encompasses(self, other: Self) -> bool {
+-        self.as_bounds().encompasses(&other.as_bounds())
+-    }
+-}
+-
+-impl NumRep {
+-    pub(crate) fn as_bounds(self) -> Option<Bounds> {
+-        match self {
+-            NumRep::Auto => return None,
+-            NumRep::Concrete(mr) => Some(mr.as_bounds()),
+-        }
+-    }
+-
+-    pub(crate) const fn is_auto(self) -> bool {
+-        matches!(self, NumRep::Auto)
+-    }
+-}
+-
+-/// Value-level numeric constant with an accompanying representation.
+-///
+-/// If the representation is `Auto`, the exact choice of concrete representation
+-/// that will be assumed is determined contextually based on the operation the value is
+-/// involved in. Top-level TypedConst values (i.e. those that where no further arithmetic is to
+-/// be performed on) should not be `Auto`-representation.
+-#[derive(Clone, PartialEq, Debug)]
+-pub struct TypedConst(pub BigInt, pub NumRep);
+-
+-impl std::fmt::Display for TypedConst {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        let n = &self.0;
+-        let r = &self.1;
+-        write!(f, "{n}{r}")
+-    }
+-}
+-
+-impl TypedConst {
+-    /// Returns `true` if the stored `NumRep` is abstract (i.e. `Auto`).
+-    pub fn is_abstract(self) -> bool {
+-        self.1.is_auto()
+-    }
+-
+-    /// Returns `true` if `self` is 'representable', i.e. if its value is representable within the
+-    /// implicit bounds of the `NumRep` it is associated with. This always true when for `NumRep::Auto`,
+-    /// and otherwise is true when the value is in the bounds of the concrete `NumRep`.
+-    pub fn is_representable(&self) -> bool {
+-        let TypedConst(ref n, rep) = self;
+-        if let Some(bounds) = rep.as_bounds() {
+-            n >= &bounds.min && n <= &bounds.max
+-        } else {
+-            debug_assert!(rep.is_auto());
+-            true
+-        }
+-    }
+-
+-    /// Returns the inner `BigInt` of a `TypedConst`.
+-    pub fn as_raw_value(&self) -> &BigInt {
+-        &self.0
+-    }
+-
+-    /// Type-agnostic equality on a pure mathematical level.
+-    ///
+-    /// This check will return `true` if `self` and `other` have the same value,
+-    /// regardless of their individual representations, even in cases where either
+-    /// value is not representable (see [`TypedConst::is_representable`]).
+-    pub fn eq_val(&self, other: &TypedConst) -> bool {
+-        &self.0 == &other.0
+-    }
+-
+-    /// Numeric equality test on `self`, that the value it holds is equal to `other` regardless of the
+-    /// `NumRep` chosen.
+-    ///
+-    /// Saves the construction of a new TypedConst compared to [`eq_val`] if the query is made starting with a BigInt in mind.
+-    pub fn eq_num(&self, other: &BigInt) -> bool {
+-        &self.0 == other
+-    }
+-
+-    /// Returns the NumRep of a `TypedConst`.
+-    pub fn get_rep(&self) -> NumRep {
+-        self.1
+-    }
+-}
+-
+-#[derive(Clone, PartialEq, Debug)]
+-pub enum Value {
+-    Const(TypedConst),
+-    // Opt(Option<Box<Value>>),
+-}
+-
+-impl Value {
+-    /// Returns `true` if `self` is representable:
+-    ///   - If `self` is a constant value, it must itself be representable
+-    ///   - If `self` is Some(x), `x` must be representable
+-    ///
+-    /// `None` is always representable.
+-    pub fn is_representable(&self) -> bool {
+-        match self {
+-            Value::Const(c) => c.is_representable(),
+-            // Value::Opt(value) => value.as_deref().map_or(true, Value::is_representable),
+-        }
+-    }
+-
+-    /// Extracts a reference to the `TypedConst` held within a Value, irrespective of its numeric representative.
+-    pub fn as_const(&self) -> Option<&TypedConst> {
+-        match self {
+-            Value::Const(c) => Some(c),
+-            // Value::Opt(value) => value.as_deref().and_then(Value::as_const),
+-        }
+-    }
+-}
+-
+-impl std::fmt::Display for Value {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self {
+-            Value::Const(num) => write!(f, "{num}"),
+-            // Value::Opt(None) => write!(f, "None"),
+-            // Value::Opt(Some(x)) => write!(f, "Some({})", x),
+-        }
+-    }
+-}
+-
+-#[derive(Clone, Copy, Debug)]
+-pub struct BinOp {
+-    op: BasicBinOp,
+-    // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
+-    out_rep: Option<MachineRep>,
+-}
+-
+-impl std::fmt::Display for BinOp {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self.out_rep {
+-            None => write!(f, "{}", self.op),
+-            Some(rep) => write!(f, "{}{}", self.op, rep),
+-        }
+-    }
+-}
+-
+-impl BinOp {
+-    pub const fn new(op: BasicBinOp, out_rep: Option<MachineRep>) -> Self {
+-        Self { op, out_rep }
+-    }
+-
+-    pub fn cast_rep(&self) -> Option<MachineRep> {
+-        self.out_rep
+-    }
+-
+-    pub fn is_cast_and(&self, predicate: impl Fn(MachineRep) -> bool) -> bool {
+-        self.out_rep.is_some_and(predicate)
+-    }
+-
+-    pub(crate) fn get_op(&self) -> BasicBinOp {
+-        self.op
+-    }
+-}
+-
+-#[derive(Clone, Copy, Debug)]
+-pub struct UnaryOp {
+-    op: BasicUnaryOp,
+-    // If None, will pick the same type as the input (even if this produces a temporary unrepresentable)
+-    out_rep: Option<MachineRep>,
+-}
+-
+-impl std::fmt::Display for UnaryOp {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self.out_rep {
+-            None => write!(f, "{}", self.op),
+-            Some(rep) => write!(f, "{}{}", self.op, rep),
+-        }
+-    }
+-}
+-
+-impl UnaryOp {
+-    pub const fn new(op: BasicUnaryOp, out_rep: Option<MachineRep>) -> Self {
+-        Self { op, out_rep }
+-    }
+-
+-    pub fn cast_rep(&self) -> Option<MachineRep> {
+-        self.out_rep
+-    }
+-
+-    pub fn is_cast_and(&self, predicate: fn(MachineRep) -> bool) -> bool {
+-        self.out_rep.is_some_and(predicate)
+-    }
+-
+-    pub(crate) fn get_op(&self) -> BasicUnaryOp {
+-        self.op
+-    }
+-}
+-
+-#[derive(Clone)]
+-pub enum Expr {
+-    Const(TypedConst),
+-    BinOp(BinOp, Box<Expr>, Box<Expr>),
+-    UnaryOp(UnaryOp, Box<Expr>),
+-    Cast(MachineRep, Box<Expr>),
+-}
+-
+-impl std::fmt::Debug for Expr {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self {
+-            Self::Const(arg0) => write!(f, "{}", arg0),
+-            Self::BinOp(op, lhs, rhs) => write!(f, "({:?} {} {:?})", lhs, op, rhs),
+-            Self::UnaryOp(op, inner) => write!(f, "{}({:?})", op, inner),
+-            Self::Cast(rep, inner) => write!(f, "Cast({:?}, {:?})", inner, rep),
+-        }
+-    }
+-}
+-
+-#[derive(Debug)]
+-pub enum EvalError {
+-    DivideByZero,
+-    RemainderNonPositive,
+-    Ambiguous(NumRep, NumRep),
+-}
+-
+-impl std::fmt::Display for EvalError {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self {
+-            EvalError::DivideByZero => write!(f, "attempted division by zero"),
+-            EvalError::RemainderNonPositive => write!(f, "remainder rhs must be positive"),
+-            EvalError::Ambiguous(rep0, rep1) => {
+-                write!(f, "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated")
+-            }
+-        }
+-    }
+-}
+-
+-impl std::error::Error for EvalError {}
+-
+-impl Expr {
+-    pub fn eval(&self) -> Result<Value, EvalError> {
+-        match self {
+-            Expr::Const(typed_const) => Ok(Value::Const(typed_const.clone())),
+-            Expr::BinOp(bin_op, lhs, rhs) => {
+-                let lhs = lhs.eval()?;
+-                let rhs = rhs.eval()?;
+-                let BinOp { op, out_rep } = *bin_op;
+-                let (raw, rep0, rep1) = match (op, lhs, rhs) {
+-                    (BasicBinOp::Add, Value::Const(lhs), Value::Const(rhs)) => {
+-                        (lhs.0 + rhs.0, lhs.1, rhs.1)
+-                    }
+-                    (BasicBinOp::Sub, Value::Const(lhs), Value::Const(rhs)) => {
+-                        (lhs.0 - rhs.0, lhs.1, rhs.1)
+-                    }
+-                    (BasicBinOp::Mul, Value::Const(lhs), Value::Const(rhs)) => {
+-                        (lhs.0 * rhs.0, lhs.1, rhs.1)
+-                    }
+-                    (BasicBinOp::Div, Value::Const(lhs), Value::Const(rhs)) => {
+-                        if rhs.0.is_zero() {
+-                            return Err(EvalError::DivideByZero);
+-                        }
+-                        (lhs.0 / rhs.0, lhs.1, rhs.1)
+-                    }
+-                    (BasicBinOp::Rem, Value::Const(lhs), Value::Const(rhs)) => {
+-                        if rhs.0.is_positive() {
+-                            (lhs.0 % rhs.0, lhs.1, rhs.1)
+-                        } else {
+-                            return Err(EvalError::RemainderNonPositive);
+-                        }
+-                    } // (_, Value::Opt(..), _) | (_, _, Value::Opt(..)) => {
+-                      //     return Err(EvalError::ArithOrCastOption)
+-                      // }
+-                };
+-                let rep_out = match out_rep {
+-                    Some(rep) => NumRep::Concrete(rep),
+-                    None => {
+-                        if rep0 == rep1 || rep1.is_auto() {
+-                            rep0
+-                        } else if rep0.is_auto() {
+-                            rep1
+-                        } else {
+-                            return Err(EvalError::Ambiguous(rep0, rep1));
+-                        }
+-                    }
+-                };
+-                Ok(Value::Const(TypedConst(raw, rep_out)))
+-            }
+-            Expr::UnaryOp(unary_op, expr) => {
+-                let expr = expr.eval()?;
+-                match (unary_op.op, expr) {
+-                    (BasicUnaryOp::Negate, Value::Const(TypedConst(n, rep))) => {
+-                        let rep_out = match unary_op.out_rep {
+-                            Some(rep) => NumRep::Concrete(rep),
+-                            None => rep,
+-                        };
+-                        Ok(Value::Const(TypedConst(-n, rep_out)))
+-                    }
+-                    (BasicUnaryOp::AbsVal, Value::Const(TypedConst(n, rep))) => {
+-                        let rep_out = match unary_op.out_rep {
+-                            Some(rep) => NumRep::Concrete(rep),
+-                            None => rep,
+-                        };
+-                        Ok(Value::Const(TypedConst(n.abs(), rep_out)))
+-                    }
+-                }
+-            }
+-            Expr::Cast(mach_rep, expr) => {
+-                let val = expr.eval()?;
+-                match val {
+-                    Value::Const(TypedConst(num, _rep)) => {
+-                        Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
+-                    }
+-                }
+-            }
+-        }
+-    }
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use crate::core::*;
+-    use num_traits::One;
+-    use proptest::prelude::*;
+-
+-    fn abstract_strategy() -> BoxedStrategy<NumRep> {
+-        prop_oneof![Just(NumRep::AUTO)].boxed()
+-    }
+-
+-    fn concrete_strategy() -> BoxedStrategy<NumRep> {
+-        prop_oneof![
+-            Just(NumRep::U8),
+-            Just(NumRep::U16),
+-            Just(NumRep::U32),
+-            Just(NumRep::U64),
+-            Just(NumRep::I8),
+-            Just(NumRep::I16),
+-            Just(NumRep::I32),
+-            Just(NumRep::I64),
+-        ]
+-        .boxed()
+-    }
+-
+-    fn numrep_strategy() -> BoxedStrategy<NumRep> {
+-        prop_oneof![abstract_strategy(), concrete_strategy(),].boxed()
+-    }
+-
+-    #[test]
+-    fn one_plus_one_is_two() -> Result<(), EvalError> {
+-        let one = TypedConst(BigInt::one(), NumRep::AUTO);
+-        let should_be_two = Expr::BinOp(
+-            BinOp {
+-                op: BasicBinOp::Add,
+-                out_rep: None,
+-            },
+-            Box::new(Expr::Const(one.clone())),
+-            Box::new(Expr::Const(one)),
+-        );
+-        assert!(should_be_two
+-            .eval()?
+-            .as_const()
+-            .unwrap()
+-            .eq_num(&BigInt::from(2)));
+-        Ok(())
+-    }
+-
+-    proptest! {
+-        #[test]
+-        fn cast_works(orig in numrep_strategy(), tgt in numrep_strategy()) {
+-            let one = TypedConst(BigInt::one(), orig);
+-            let casted_one = Expr::Cast(tgt.into(), Box::new(Expr::Const(one)));
+-            let val = casted_one.eval().unwrap();
+-            let rep = val.as_const().unwrap().get_rep();
+-            prop_assert_eq!(rep, tgt);
+-        }
+-
+-        #[test]
+-        fn auto_is_eagerly_erased(rep in numrep_strategy()) {
+-            let one = TypedConst(BigInt::one(), NumRep::AUTO);
+-            let rep_one = TypedConst(BigInt::one(), rep);
+-            let two_should_be_rep = Expr::BinOp(
+-                BinOp {
+-                    op: BasicBinOp::Add,
+-                    out_rep: None,
+-                },
+-                Box::new(Expr::Const(one)),
+-                Box::new(Expr::Const(rep_one)),
+-            );
+-            let actual = two_should_be_rep.eval().unwrap().as_const().unwrap().get_rep();
+-            prop_assert_eq!(actual, rep);
+-        }
+-    }
+-}
+diff --git a/experiments/analytic-engine/src/elaborator.rs b/experiments/analytic-engine/src/elaborator.rs
+deleted file mode 100644
+index 398e5ace..00000000
+--- a/experiments/analytic-engine/src/elaborator.rs
++++ /dev/null
+@@ -1,1140 +0,0 @@
+-use crate::core::{BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
+-
+-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+-pub enum PrimInt {
+-    U8,
+-    U16,
+-    U32,
+-    U64,
+-    I8,
+-    I16,
+-    I32,
+-    I64,
+-}
+-
+-impl PrimInt {
+-    pub const fn to_static_str(self) -> &'static str {
+-        match self {
+-            PrimInt::U8 => "u8",
+-            PrimInt::U16 => "u16",
+-            PrimInt::U32 => "u32",
+-            PrimInt::U64 => "u64",
+-            PrimInt::I8 => "i8",
+-            PrimInt::I16 => "i16",
+-            PrimInt::I32 => "i32",
+-            PrimInt::I64 => "i64",
+-        }
+-    }
+-}
+-
+-pub(crate) const PRIM_INTS: [PrimInt; 8] = [
+-    PrimInt::U8,
+-    PrimInt::U16,
+-    PrimInt::U32,
+-    PrimInt::U64,
+-    PrimInt::I8,
+-    PrimInt::I16,
+-    PrimInt::I32,
+-    PrimInt::I64,
+-];
+-
+-#[derive(Debug)]
+-pub struct TryFromAutoError;
+-
+-impl std::fmt::Display for TryFromAutoError {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        write!(f, "cannot convert `NumRep::AUTO` to `PrimInt`")
+-    }
+-}
+-
+-impl std::error::Error for TryFromAutoError {}
+-
+-impl TryFrom<NumRep> for PrimInt {
+-    type Error = TryFromAutoError;
+-
+-    fn try_from(value: NumRep) -> Result<Self, Self::Error> {
+-        match value {
+-            NumRep::Auto => Err(TryFromAutoError),
+-            NumRep::Concrete(mr) => Ok(mr.into()),
+-        }
+-    }
+-}
+-
+-impl From<MachineRep> for PrimInt {
+-    fn from(value: MachineRep) -> Self {
+-        match value {
+-            MachineRep::U8 => PrimInt::U8,
+-            MachineRep::U16 => PrimInt::U16,
+-            MachineRep::U32 => PrimInt::U32,
+-            MachineRep::U64 => PrimInt::U64,
+-            MachineRep::I8 => PrimInt::I8,
+-            MachineRep::I16 => PrimInt::I16,
+-            MachineRep::I32 => PrimInt::I32,
+-            MachineRep::I64 => PrimInt::I64,
+-        }
+-    }
+-}
+-
+-impl From<PrimInt> for MachineRep {
+-    fn from(value: PrimInt) -> Self {
+-        match value {
+-            PrimInt::U8 => MachineRep::U8,
+-            PrimInt::U16 => MachineRep::U16,
+-            PrimInt::U32 => MachineRep::U32,
+-            PrimInt::U64 => MachineRep::U64,
+-            PrimInt::I8 => MachineRep::I8,
+-            PrimInt::I16 => MachineRep::I16,
+-            PrimInt::I32 => MachineRep::I32,
+-            PrimInt::I64 => MachineRep::I64,
+-        }
+-    }
+-}
+-
+-impl From<IntType> for NumRep {
+-    fn from(value: IntType) -> Self {
+-        match value {
+-            IntType::Prim(prim) => NumRep::from(prim),
+-        }
+-    }
+-}
+-
+-impl From<PrimInt> for NumRep {
+-    fn from(value: PrimInt) -> Self {
+-        match value {
+-            PrimInt::U8 => NumRep::U8,
+-            PrimInt::U16 => NumRep::U16,
+-            PrimInt::U32 => NumRep::U32,
+-            PrimInt::U64 => NumRep::U64,
+-            PrimInt::I8 => NumRep::I8,
+-            PrimInt::I16 => NumRep::I16,
+-            PrimInt::I32 => NumRep::I32,
+-            PrimInt::I64 => NumRep::I64,
+-        }
+-    }
+-}
+-
+-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+-pub(crate) enum IntType {
+-    Prim(PrimInt),
+-}
+-
+-impl IntType {
+-    pub fn to_prim(self) -> PrimInt {
+-        let IntType::Prim(ret) = self;
+-        ret
+-    }
+-
+-    pub const fn to_static_str(self) -> &'static str {
+-        match self {
+-            Self::Prim(p) => p.to_static_str(),
+-        }
+-    }
+-}
+-
+-impl std::fmt::Display for IntType {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        write!(f, "{}", self.to_static_str())
+-    }
+-}
+-
+-#[derive(Clone, Debug)]
+-pub(crate) enum TypedExpr<TypeRep> {
+-    ElabConst(TypeRep, TypedConst),
+-    ElabBinOp(
+-        TypeRep,
+-        TypedBinOp<TypeRep>,
+-        Box<TypedExpr<TypeRep>>,
+-        Box<TypedExpr<TypeRep>>,
+-    ),
+-    ElabUnaryOp(TypeRep, TypedUnaryOp<TypeRep>, Box<TypedExpr<TypeRep>>),
+-    ElabCast(TypeRep, TypedCast<TypeRep>, Box<TypedExpr<TypeRep>>),
+-}
+-
+-impl<T> TypedExpr<T> {
+-    pub fn get_type(&self) -> &T {
+-        match self {
+-            TypedExpr::ElabConst(t, _) => t,
+-            TypedExpr::ElabBinOp(t, _, _, _) => t,
+-            TypedExpr::ElabUnaryOp(t, _, _) => t,
+-            TypedExpr::ElabCast(t, _, _) => t,
+-        }
+-    }
+-}
+-
+-pub(crate) type Sig1<T> = (T, T);
+-pub(crate) type Sig2<T> = ((T, T), T);
+-
+-#[derive(Clone, Debug)]
+-pub(crate) struct TypedBinOp<TypeRep> {
+-    pub(crate) sig: Sig2<TypeRep>,
+-    pub(crate) inner: BinOp,
+-}
+-
+-#[derive(Clone, Debug)]
+-pub(crate) struct TypedUnaryOp<TypeRep> {
+-    pub(crate) sig: Sig1<TypeRep>,
+-    pub(crate) inner: UnaryOp,
+-}
+-
+-#[derive(Clone, Copy, Debug)]
+-pub(crate) struct TypedCast<TypeRep> {
+-    pub(crate) sig: Sig1<TypeRep>,
+-    pub(crate) _rep: NumRep,
+-}
+-pub(crate) mod inference {
+-    use std::collections::HashSet;
+-
+-    use crate::core::{Bounds, Expr, MachineRep, NumRep};
+-
+-    use super::{IntType, PrimInt};
+-
+-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+-    #[repr(transparent)]
+-    pub struct UVar(usize);
+-
+-    impl std::fmt::Display for UVar {
+-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-            write!(f, "?{}", self.0)
+-        }
+-    }
+-
+-    impl UVar {
+-        pub fn new(ix: usize) -> Self {
+-            Self(ix)
+-        }
+-
+-        // pub fn to_usize(self) -> usize {
+-        //     self.0
+-        // }
+-    }
+-
+-    #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+-    pub enum UType {
+-        Var(UVar),
+-        Int(IntType),
+-    }
+-
+-    impl From<IntType> for UType {
+-        fn from(value: IntType) -> Self {
+-            UType::Int(value)
+-        }
+-    }
+-
+-    impl From<UVar> for UType {
+-        fn from(value: UVar) -> Self {
+-            UType::Var(value)
+-        }
+-    }
+-
+-    #[derive(Clone, Debug, PartialEq, Eq)]
+-    pub(crate) enum VType {
+-        Int(IntType),
+-        Within(Bounds),
+-        Abstract(UType),
+-    }
+-
+-    #[derive(Clone, Debug, Default)]
+-    enum Alias {
+-        #[default]
+-        Ground,
+-        BackRef(usize),
+-        Canonical(HashSet<usize>),
+-    }
+-
+-    impl Alias {
+-        pub const fn new() -> Alias {
+-            Alias::Ground
+-        }
+-
+-        pub fn is_canonical_nonempty(&self) -> bool {
+-            match self {
+-                Alias::Canonical(x) => !x.is_empty(),
+-                _ => false,
+-            }
+-        }
+-
+-        pub fn add_forward_ref(&mut self, tgt: usize) {
+-            match self {
+-                Alias::Ground => {
+-                    let _ = std::mem::replace(self, Alias::Canonical(HashSet::from([tgt])));
+-                }
+-                Alias::BackRef(_ix) => panic!("cannot add forward-ref to Alias::BackRef"),
+-                Alias::Canonical(fwds) => {
+-                    fwds.insert(tgt);
+-                }
+-            }
+-        }
+-
+-        fn set_backref(&mut self, tgt: usize) -> Alias {
+-            std::mem::replace(self, Alias::BackRef(tgt))
+-        }
+-
+-        fn iter_fwd_refs<'a>(&'a self) -> Box<dyn Iterator<Item = usize> + 'a> {
+-            match self {
+-                Alias::Ground | Alias::BackRef(_) => Box::new(std::iter::empty()),
+-                Alias::Canonical(fwds) => Box::new(fwds.iter().copied()),
+-            }
+-        }
+-
+-        fn contains_fwd_ref(&self, tgt: usize) -> bool {
+-            match self {
+-                Alias::Ground | Alias::BackRef(_) => false,
+-                Alias::Canonical(fwds) => fwds.contains(&tgt),
+-            }
+-        }
+-    }
+-
+-    #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+-    pub enum Constraints {
+-        #[default]
+-        Indefinite,
+-        Invariant(Constraint),
+-    }
+-
+-    impl Constraints {
+-        pub fn new() -> Constraints {
+-            Constraints::Indefinite
+-        }
+-    }
+-
+-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+-    pub enum Constraint {
+-        Equiv(UType),
+-        // Must be able to represent all values within the specified range
+-        Encompasses(crate::core::Bounds),
+-    }
+-
+-    impl std::fmt::Display for Constraint {
+-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-            match self {
+-                Constraint::Equiv(utype) => write!(f, "= {utype:?}"),
+-                Constraint::Encompasses(bounds) => write!(f, "∈ {}", bounds),
+-            }
+-        }
+-    }
+-
+-    impl From<UType> for Constraint {
+-        fn from(value: UType) -> Self {
+-            Constraint::Equiv(value)
+-        }
+-    }
+-
+-    impl Constraint {
+-        /// Speculatively checks if this constraint is definitely satisfiable (as-is) by a given type-assignment.
+-        ///
+-        /// If this is not statically deterministic, returns `None`.
+-        /// Returns `Some(true)` if the constraint is satisfiable by the assignment, and `Some(false)` otherwise.
+-        pub(crate) fn is_satisfied_by(&self, candidate: IntType) -> Option<bool> {
+-            match self {
+-                Constraint::Equiv(utype) => match utype {
+-                    UType::Var(_) => None,
+-                    UType::Int(int_type) => Some(int_type == &candidate),
+-                },
+-                Constraint::Encompasses(bounds) => {
+-                    let IntType::Prim(candidate) = candidate;
+-                    Some(bounds.is_encompassed_by(
+-                        &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds(),
+-                    ))
+-                }
+-            }
+-        }
+-
+-        // NOTE - should only be called on Encompasses
+-        pub(crate) fn get_unique_solution(&self) -> InferenceResult<IntType> {
+-            // REVIEW - there are smarter ways of calculating this
+-            let mut solutions = Vec::with_capacity(8);
+-            for prim_int in super::PRIM_INTS.iter() {
+-                match self.is_satisfied_by(IntType::Prim(*prim_int)) {
+-                    Some(true) => {
+-                        solutions.push(*prim_int);
+-                    }
+-                    Some(false) => (),
+-                    None => panic!("unexpected call to get_unique_solution on `{self}` (either trivial or insoluble)"),
+-                }
+-            }
+-            match solutions.as_slice() {
+-                [] => Err(InferenceError::NoSolution),
+-                [uniq] => Ok(IntType::Prim(*uniq)),
+-                _ => Err(InferenceError::MultipleSolutions),
+-            }
+-        }
+-    }
+-
+-    #[derive(Debug)]
+-    pub struct InferenceEngine {
+-        constraints: Vec<Constraints>,
+-        aliases: Vec<Alias>,
+-    }
+-
+-    #[derive(Debug)]
+-    pub enum InferenceError {
+-        // Unrepresentable(TypedConst, IntType),
+-        BadUnification(Constraint, Constraint),
+-        Ambiguous,
+-        NoSolution,
+-        MultipleSolutions,
+-        Eval(crate::core::EvalError),
+-    }
+-
+-    impl std::fmt::Display for InferenceError {
+-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-            match self {
+-                // InferenceError::Unrepresentable(c, int_type) => write!(f, "inference requires that `{}` be assigned type `{}`, which cannot represent it", c, int_type),
+-                InferenceError::BadUnification(cx1, cx2) => write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2),
+-                InferenceError::Ambiguous => write!(f, "mixed-type binary operation must have out_rep on operation to avoid ambiguity"),
+-                InferenceError::Eval(e) => write!(f, "inference abandoned due to evaluation error: {}", e),
+-                InferenceError::NoSolution => write!(f, "no valid assignment of PrimInt types produce a fully representable tree"),
+-                InferenceError::MultipleSolutions => write!(f, "multiple assignments of PrimInt produce a fully representable tree, in absence of tie-breaking mechanism"),
+-            }
+-        }
+-    }
+-
+-    impl std::error::Error for InferenceError {
+-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+-            match self {
+-                InferenceError::Eval(e) => Some(e),
+-                _ => None,
+-            }
+-        }
+-    }
+-
+-    pub type InferenceResult<T> = Result<T, InferenceError>;
+-
+-    impl InferenceEngine {
+-        pub fn new() -> Self {
+-            Self {
+-                constraints: Vec::new(),
+-                aliases: Vec::new(),
+-            }
+-        }
+-
+-        pub fn init_var_simple(&mut self, typ: UType) -> InferenceResult<(UVar, UType)> {
+-            let newvar = self.get_new_uvar();
+-            let constr = Constraint::Equiv(typ);
+-            self.unify_var_constraint(newvar, constr)?;
+-            Ok((newvar, typ))
+-        }
+-
+-        fn get_new_uvar(&mut self) -> UVar {
+-            let ret = UVar(self.constraints.len());
+-            self.constraints.push(Constraints::new());
+-            self.aliases.push(Alias::new());
+-            ret
+-        }
+-    }
+-
+-    impl InferenceEngine {
+-        #[cfg_attr(not(test), allow(dead_code))]
+-        pub fn check_uvar_sanity(&self) {
+-            assert_eq!(self.constraints.len(), self.aliases.len());
+-        }
+-    }
+-
+-    impl InferenceEngine {
+-        fn get_canonical_uvar(&self, v: UVar) -> UVar {
+-            match self.aliases[v.0] {
+-                Alias::Canonical(_) | Alias::Ground => v,
+-                Alias::BackRef(ix) => UVar(ix),
+-            }
+-        }
+-
+-        fn unify_var_constraint(
+-            &mut self,
+-            uvar: UVar,
+-            constraint: Constraint,
+-        ) -> InferenceResult<Constraint> {
+-            let can_ix = self.get_canonical_uvar(uvar).0;
+-
+-            match &self.constraints[can_ix] {
+-                Constraints::Indefinite => {
+-                    let ret = constraint.clone();
+-                    self.constraints[can_ix] = Constraints::Invariant(constraint);
+-                    Ok(ret)
+-                }
+-                Constraints::Invariant(prior) => {
+-                    let c1 = prior.clone();
+-                    if c1 == constraint {
+-                        return Ok(c1);
+-                    }
+-                    let ret = self.unify_constraint_pair(c1, constraint)?;
+-                    self.constraints[can_ix] = Constraints::Invariant(ret.clone());
+-                    Ok(ret)
+-                }
+-            }
+-        }
+-
+-        unsafe fn repoint(&mut self, lo: usize, hi: usize) {
+-            self.aliases[hi].set_backref(lo);
+-            self.aliases[lo].add_forward_ref(hi);
+-        }
+-
+-        unsafe fn transfer_constraints(
+-            &mut self,
+-            a1: usize,
+-            a2: usize,
+-        ) -> InferenceResult<&Constraints> {
+-            if a1 == a2 {
+-                return Ok(&self.constraints[a1]);
+-            }
+-
+-            match (&self.constraints[a1], &self.constraints[a2]) {
+-                (Constraints::Indefinite, Constraints::Indefinite) => Ok(&Constraints::Indefinite),
+-                (Constraints::Indefinite, _) => Ok(self.replace_constraints_from_index(a1, a2)),
+-                (_, Constraints::Indefinite) => Ok(self.replace_constraints_from_index(a2, a1)),
+-                (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
+-                    let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
+-                    let _ =
+-                        self.replace_constraints_with_value(a1, Constraints::Invariant(c0.clone()));
+-                    let _ = self.replace_constraints_with_value(a2, Constraints::Invariant(c0));
+-                    Ok(&self.constraints[a1])
+-                }
+-            }
+-        }
+-
+-        #[must_use]
+-        fn replace_constraints_from_index(&mut self, tgt_ix: usize, src_ix: usize) -> &Constraints {
+-            assert_ne!(tgt_ix, src_ix);
+-            let val = self.constraints[src_ix].clone();
+-            self.replace_constraints_with_value(tgt_ix, val)
+-        }
+-
+-        #[must_use]
+-        fn replace_constraints_with_value(&mut self, ix: usize, val: Constraints) -> &Constraints {
+-            self.constraints[ix] = val;
+-            &self.constraints[ix]
+-        }
+-
+-        fn unify_var_pair(&mut self, v1: UVar, v2: UVar) -> InferenceResult<&Constraints> {
+-            if v1 == v2 {
+-                return Ok(&self.constraints[v1.0]);
+-            }
+-
+-            // short-circuit if already equated
+-            match (&self.aliases[v1.0], &self.aliases[v2.0]) {
+-                (Alias::Ground, Alias::Ground) => {
+-                    if v1 < v2 {
+-                        unsafe {
+-                            self.repoint(v1.0, v2.0);
+-                            self.transfer_constraints(v1.0, v2.0)
+-                        }
+-                    } else {
+-                        unsafe {
+-                            self.repoint(v2.0, v1.0);
+-                            self.transfer_constraints(v2.0, v1.0)
+-                        }
+-                    }
+-                }
+-                (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 > can_ix => unsafe {
+-                    self.repoint(can_ix, v1.0);
+-                    self.transfer_constraints(can_ix, v1.0)
+-                },
+-                (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 < can_ix => {
+-                    debug_assert!(
+-                        self.aliases[can_ix].is_canonical_nonempty(),
+-                        "half-alias ?{can_ix}-|<-{v1}"
+-                    );
+-                    debug_assert!(
+-                        !self.aliases[can_ix].contains_fwd_ref(v2.0),
+-                        "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v2}"
+-                    );
+-                    unsafe { self.recanonicalize(v1.0, can_ix) }
+-                }
+-                (Alias::Ground, &Alias::BackRef(_can_ix)) => {
+-                    unreachable!("unexpected half-alias {v1}-|<-{v2}");
+-                }
+-                (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 > can_ix => unsafe {
+-                    self.repoint(can_ix, v2.0);
+-                    self.transfer_constraints(can_ix, v2.0)
+-                },
+-                (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 < can_ix => {
+-                    debug_assert!(
+-                        self.aliases[can_ix].is_canonical_nonempty(),
+-                        "half-alias ?{can_ix}-|<-{v1}"
+-                    );
+-                    debug_assert!(
+-                        !self.aliases[can_ix].contains_fwd_ref(v2.0),
+-                        "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v2}"
+-                    );
+-                    unsafe { self.recanonicalize(v2.0, can_ix) }
+-                }
+-                (&Alias::BackRef(_can_ix), Alias::Ground) => {
+-                    unreachable!("unexpected half-alias {v2}-|<-{v1}");
+-                }
+-                (Alias::Ground, Alias::Canonical(_)) => {
+-                    if v1.0 < v2.0 {
+-                        debug_assert!(
+-                            !self.aliases[v2.0].contains_fwd_ref(v1.0),
+-                            "retrograde half-aliased 'forward' ref {v2}->|-{v1}"
+-                        );
+-                        unsafe { self.recanonicalize(v1.0, v2.0) }
+-                    } else {
+-                        unsafe {
+-                            self.repoint(v2.0, v1.0);
+-                            self.transfer_constraints(v2.0, v1.0)
+-                        }
+-                    }
+-                }
+-                (Alias::Canonical(_), Alias::Ground) => {
+-                    if v2.0 < v1.0 {
+-                        debug_assert!(
+-                            !self.aliases[v1.0].contains_fwd_ref(v2.0),
+-                            "retrograde half-aliased 'forward' ref {v1}->|-{v2}"
+-                        );
+-                        unsafe { self.recanonicalize(v2.0, v1.0) }
+-                    } else {
+-                        unsafe {
+-                            self.repoint(v1.0, v2.0);
+-                            self.transfer_constraints(v1.0, v2.0)
+-                        }
+-                    }
+-                }
+-                (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) if ix1 < ix2 => unsafe {
+-                    self.recanonicalize(ix1, ix2)
+-                },
+-                (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) if ix2 < ix1 => unsafe {
+-                    self.recanonicalize(ix2, ix1)
+-                },
+-                (&Alias::BackRef(ix), &Alias::BackRef(_ix)) => {
+-                    // the two are equal so nothing needs to be changed; we will check both are forward-aliased, however
+-                    let common = &self.aliases[ix];
+-                    debug_assert!(
+-                        common.contains_fwd_ref(v1.0),
+-                        "unexpected half-alias ?{ix}<-{v1}"
+-                    );
+-                    debug_assert!(
+-                        common.contains_fwd_ref(v2.0),
+-                        "unexpected half-alias ?{ix}<-{v2}"
+-                    );
+-                    Ok(&self.constraints[ix])
+-                }
+-                (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwds)) => {
+-                    let left = fwds.contains(&v1.0);
+-                    let right = *tgt == v2.0;
+-
+-                    match (left, right) {
+-                        (true, true) => {
+-                            return Ok(&self.constraints[v2.0]);
+-                        }
+-                        (true, false) | (false, true) => {
+-                            unreachable!(
+-                                "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+-                            )
+-                        }
+-                        (false, false) => (),
+-                    }
+-
+-                    let ix1 = *tgt;
+-                    let ix2 = v2.0;
+-
+-                    // check not the actual indices, but the canonical indices for tie-breaking
+-                    if ix1 < ix2 {
+-                        unsafe { self.recanonicalize(ix1, ix2) }
+-                    } else {
+-                        unsafe { self.recanonicalize(ix2, ix1) }
+-                    }
+-                }
+-                (a1 @ Alias::Canonical(fwds), a2 @ Alias::BackRef(tgt)) => {
+-                    let left = fwds.contains(&v2.0);
+-                    let right = *tgt == v1.0;
+-
+-                    match (left, right) {
+-                        (true, true) => {
+-                            return Ok(&self.constraints[v1.0]);
+-                        }
+-                        (true, false) | (false, true) => {
+-                            unreachable!(
+-                                "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+-                            )
+-                        }
+-                        (false, false) => (),
+-                    }
+-
+-                    let ix1 = v1.0;
+-                    let ix2 = *tgt;
+-
+-                    // check not the actual indices, but the canonical indices for tie-breaking
+-                    if ix1 < ix2 {
+-                        unsafe { self.recanonicalize(ix1, ix2) }
+-                    } else {
+-                        unsafe { self.recanonicalize(ix2, ix1) }
+-                    }
+-                }
+-                (Alias::Canonical(_), Alias::Canonical(_)) => {
+-                    if v1 < v2 {
+-                        unsafe { self.recanonicalize(v1.0, v2.0) }
+-                    } else {
+-                        unsafe { self.recanonicalize(v2.0, v1.0) }
+-                    }
+-                }
+-            }
+-        }
+-
+-        unsafe fn recanonicalize(&mut self, a1: usize, a2: usize) -> InferenceResult<&Constraints> {
+-            let tmp = self.aliases[a2].set_backref(a1);
+-            let iter = tmp.iter_fwd_refs();
+-            for a in iter {
+-                assert!(
+-                    !self.aliases[a1].contains_fwd_ref(a),
+-                    "forward ref of ?{a2} is also a forward_ref of ?{a1}, somehow"
+-                );
+-                self.repoint(a1, a);
+-            }
+-            self.aliases[a1].add_forward_ref(a2);
+-            self.transfer_constraints(a1, a2)
+-        }
+-
+-        fn unify_utype(&mut self, left: UType, right: UType) -> InferenceResult<UType> {
+-            match (left, right) {
+-                (UType::Var(v1), UType::Var(v2)) => {
+-                    self.unify_var_pair(v1, v2)?;
+-                    Ok(UType::Var(Ord::min(v1, v2)))
+-                }
+-                (UType::Var(v), _) => {
+-                    let constraint = Constraint::Equiv(right);
+-                    let after = self.unify_var_constraint(v, constraint)?;
+-                    match after {
+-                        Constraint::Equiv(t) => Ok(t),
+-                        Constraint::Encompasses(_) => {
+-                            unreachable!("equiv should erase encompasses")
+-                        }
+-                    }
+-                }
+-                (_, UType::Var(v)) => {
+-                    let constraint = Constraint::Equiv(left);
+-                    let after = self.unify_var_constraint(v, constraint)?;
+-                    match after {
+-                        Constraint::Equiv(t) => Ok(t),
+-                        Constraint::Encompasses(_) => {
+-                            unreachable!("equiv should erase encompasses")
+-                        }
+-                    }
+-                }
+-                (UType::Int(t0), UType::Int(t1)) => {
+-                    if t0 != t1 {
+-                        return Err(InferenceError::BadUnification(
+-                            Constraint::Equiv(left),
+-                            Constraint::Equiv(right),
+-                        ));
+-                    }
+-                    Ok(left)
+-                }
+-            }
+-        }
+-
+-        fn unify_utype_bounds(
+-            &mut self,
+-            utype: UType,
+-            bounds: &Bounds,
+-        ) -> InferenceResult<Constraint> {
+-            match utype {
+-                UType::Var(uvar) => {
+-                    self.unify_var_constraint(uvar, Constraint::Encompasses(bounds.clone()))
+-                }
+-                UType::Int(int_type) => {
+-                    let IntType::Prim(candidate) = int_type;
+-                    let soluble = bounds.is_encompassed_by(
+-                        &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds(),
+-                    );
+-                    if soluble {
+-                        Ok(Constraint::Equiv(utype))
+-                    } else {
+-                        Err(InferenceError::BadUnification(
+-                            Constraint::Equiv(utype),
+-                            Constraint::Encompasses(bounds.clone()),
+-                        ))
+-                    }
+-                }
+-            }
+-        }
+-
+-        fn unify_var_utype(&mut self, uvar: UVar, utype: UType) -> InferenceResult<()> {
+-            let _ = self.unify_var_constraint(uvar, Constraint::Equiv(utype))?;
+-            Ok(())
+-        }
+-
+-        fn unify_var_rep(&mut self, uvar: UVar, rep: NumRep) -> InferenceResult<()> {
+-            if rep.is_auto() {
+-                return Ok(());
+-            }
+-            let t = UType::Int(IntType::Prim(PrimInt::try_from(rep).unwrap()));
+-            self.unify_var_utype(uvar, t)
+-        }
+-
+-        fn unify_constraint_pair(
+-            &mut self,
+-            c1: Constraint,
+-            c2: Constraint,
+-        ) -> InferenceResult<Constraint> {
+-            match (c1, c2) {
+-                (Constraint::Equiv(t1), Constraint::Equiv(t2)) => {
+-                    if t1 == t2 {
+-                        Ok(Constraint::Equiv(t1))
+-                    } else {
+-                        let t0 = self.unify_utype(t1, t2)?;
+-                        Ok(Constraint::Equiv(t0))
+-                    }
+-                }
+-                (Constraint::Equiv(utype), Constraint::Encompasses(bounds))
+-                | (Constraint::Encompasses(bounds), Constraint::Equiv(utype)) => {
+-                    Ok(self.unify_utype_bounds(utype, &bounds)?)
+-                }
+-                (Constraint::Encompasses(bs1), Constraint::Encompasses(bs2)) => {
+-                    let bs0 = bs1.unify(&bs2).into_owned();
+-                    Ok(Constraint::Encompasses(bs0))
+-                }
+-            }
+-        }
+-    }
+-
+-    impl InferenceEngine {
+-        pub(crate) fn infer_var_expr(&mut self, e: &Expr) -> InferenceResult<(UVar, NumRep)> {
+-            let (top_var, top_rep) = match e {
+-                Expr::Const(typed_const) => {
+-                    let rep = typed_const.get_rep();
+-                    let var = match rep {
+-                        NumRep::AUTO => {
+-                            let this_var = self.get_new_uvar();
+-                            self.unify_var_constraint(
+-                                this_var,
+-                                Constraint::Encompasses(Bounds::singleton(
+-                                    typed_const.as_raw_value().clone(),
+-                                )),
+-                            )?;
+-                            this_var
+-                        }
+-                        NumRep::U8 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U8)))?
+-                                .0
+-                        }
+-                        NumRep::U16 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U16)))?
+-                                .0
+-                        }
+-                        NumRep::U32 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U32)))?
+-                                .0
+-                        }
+-                        NumRep::U64 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U64)))?
+-                                .0
+-                        }
+-                        NumRep::I8 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I8)))?
+-                                .0
+-                        }
+-                        NumRep::I16 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I16)))?
+-                                .0
+-                        }
+-                        NumRep::I32 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I32)))?
+-                                .0
+-                        }
+-                        NumRep::I64 => {
+-                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I64)))?
+-                                .0
+-                        }
+-                    };
+-                    (var, rep)
+-                }
+-                Expr::BinOp(bin_op, lhs, rhs) => {
+-                    let this_var = self.get_new_uvar();
+-                    let (l_var, l_rep) = self.infer_var_expr(&lhs)?;
+-                    let (r_var, r_rep) = self.infer_var_expr(&rhs)?;
+-                    let cast_rep = bin_op.cast_rep();
+-                    let this_rep = match (l_rep, r_rep) {
+-                        (NumRep::AUTO, NumRep::AUTO) => {
+-                            self.unify_var_pair(this_var, l_var)?;
+-                            self.unify_var_pair(this_var, r_var)?;
+-                            if let Some(rep) = cast_rep {
+-                                self.unify_var_rep(this_var, NumRep::Concrete(rep))?;
+-                                NumRep::Concrete(rep)
+-                            } else {
+-                                {
+-                                    // REVIEW - do we need to go this far?
+-                                    match e.eval() {
+-                                        Ok(v) => match v.as_const() {
+-                                            Some(c) => {
+-                                                // NOTE - if there is a const-evaluable result for the computation, use it to refine our constraints on which types satisfy the aliased Auto
+-                                                let bounds =
+-                                                    Bounds::singleton(c.as_raw_value().clone());
+-                                                self.unify_var_constraint(
+-                                                    this_var,
+-                                                    Constraint::Encompasses(bounds),
+-                                                )?;
+-                                            }
+-                                            None => {
+-                                                // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
+-                                                unimplemented!("Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr");
+-                                            }
+-                                        },
+-                                        Err(e) => {
+-                                            // NOTE - If the computation will fail regardless, there is no need to infer the type-information of the AST
+-                                            // REVIEW - make sure that we are confident in EvalErrors being sound reasons to fail type-inference, both now and going forward
+-                                            return Err(InferenceError::Eval(e));
+-                                        }
+-                                    }
+-                                }
+-                                NumRep::AUTO
+-                            }
+-                        }
+-                        (rep0, rep1) if rep0 == rep1 => {
+-                            if let Some(rep) = cast_rep {
+-                                let rep = rep.into();
+-                                self.unify_var_rep(this_var, rep)?;
+-                                rep
+-                            } else {
+-                                self.unify_var_rep(this_var, rep0)?;
+-                                rep0
+-                            }
+-                        }
+-                        (rep0, rep1) => {
+-                            if let Some(rep) = cast_rep {
+-                                let rep = rep.into();
+-                                self.unify_var_rep(this_var, rep)?;
+-                                if l_rep.is_auto() {
+-                                    debug_assert!(!r_rep.is_auto());
+-                                    self.unify_var_pair(this_var, l_var)?;
+-                                }
+-                                if r_rep.is_auto() {
+-                                    debug_assert!(!l_rep.is_auto());
+-                                    self.unify_var_pair(this_var, r_var)?;
+-                                }
+-                                rep
+-                            } else {
+-                                if l_rep.is_auto() {
+-                                    debug_assert!(!r_rep.is_auto());
+-                                    self.unify_var_rep(this_var, rep1)?;
+-                                    self.unify_var_rep(l_var, rep1)?;
+-                                    rep1
+-                                } else if r_rep.is_auto() {
+-                                    self.unify_var_rep(this_var, rep0)?;
+-                                    self.unify_var_rep(r_var, rep0)?;
+-                                    rep0
+-                                } else {
+-                                    return Err(InferenceError::Ambiguous);
+-                                }
+-                            }
+-                        }
+-                    };
+-                    (this_var, this_rep)
+-                }
+-                Expr::UnaryOp(unary_op, expr) => {
+-                    let this_var = self.get_new_uvar();
+-                    let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
+-                    let cast_rep = unary_op.cast_rep();
+-                    let this_rep = match inner_rep {
+-                        NumRep::AUTO => {
+-                            self.unify_var_pair(this_var, inner_var)?;
+-                            if let Some(rep) = cast_rep {
+-                                let rep = rep.into();
+-                                self.unify_var_rep(this_var, rep)?;
+-                                rep
+-                            } else {
+-                                {
+-                                    // REVIEW - do we need to go this far?
+-                                    match e.eval() {
+-                                        Ok(v) => match v.as_const() {
+-                                            Some(c) => {
+-                                                // NOTE - if there is a const-evaluable result for the computation, use it to refine our constraints on which types satisfy the aliased Auto
+-                                                let bounds =
+-                                                    Bounds::singleton(c.as_raw_value().clone());
+-                                                self.unify_var_constraint(
+-                                                    this_var,
+-                                                    Constraint::Encompasses(bounds),
+-                                                )?;
+-                                            }
+-                                            None => {
+-                                                // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
+-                                                unimplemented!("Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr");
+-                                            }
+-                                        },
+-                                        Err(e) => {
+-                                            // NOTE - If the computation will fail regardless, there is no need to infer the type-information of the AST
+-                                            // REVIEW - make sure that we are confident in EvalErrors being sound reasons to fail type-inference, both now and going forward
+-                                            return Err(InferenceError::Eval(e));
+-                                        }
+-                                    }
+-                                }
+-                                NumRep::AUTO
+-                            }
+-                        }
+-                        rep0 => {
+-                            if let Some(rep) = cast_rep {
+-                                let rep = rep.into();
+-                                self.unify_var_rep(this_var, rep)?;
+-                                rep
+-                            } else {
+-                                self.unify_var_rep(this_var, rep0)?;
+-                                rep0
+-                            }
+-                        }
+-                    };
+-                    (this_var, this_rep)
+-                }
+-                &Expr::Cast(rep, ref expr) => {
+-                    let this_var = self.get_new_uvar();
+-                    let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
+-                    let rep = rep.into();
+-                    if inner_rep.is_auto() {
+-                        self.unify_var_rep(inner_var, rep)?;
+-                    }
+-                    self.unify_var_rep(this_var, rep)?;
+-                    (this_var, rep)
+-                }
+-            };
+-            Ok((top_var, top_rep))
+-        }
+-
+-        fn to_whnf_vtype(&self, t: UType) -> VType {
+-            match t {
+-                UType::Var(v) => {
+-                    let v0 = self.get_canonical_uvar(v);
+-                    match &self.constraints[v0.0] {
+-                        Constraints::Indefinite => VType::Abstract(v0.into()),
+-                        Constraints::Invariant(Constraint::Equiv(ut)) => self.to_whnf_vtype(*ut),
+-                        Constraints::Invariant(Constraint::Encompasses(bounds)) => {
+-                            VType::Within(bounds.clone())
+-                        }
+-                    }
+-                }
+-                UType::Int(int_type) => VType::Int(int_type),
+-            }
+-        }
+-
+-        pub(crate) fn substitute_uvar_vtype(&self, v: UVar) -> InferenceResult<Option<VType>> {
+-            match &self.constraints[self.get_canonical_uvar(v).0] {
+-                Constraints::Indefinite => Ok(None),
+-                Constraints::Invariant(cx) => Ok(match cx {
+-                    Constraint::Equiv(ut) => Some(self.to_whnf_vtype(*ut)),
+-                    Constraint::Encompasses(bounds) => Some(VType::Within(bounds.clone())),
+-                }),
+-            }
+-        }
+-    }
+-
+-    impl InferenceEngine {
+-        pub fn reify(&self, t: UType) -> Option<IntType> {
+-            match t {
+-                UType::Var(uv) => {
+-                    let v = self.get_canonical_uvar(uv);
+-                    match self.substitute_uvar_vtype(v) {
+-                        Ok(Some(t0)) => match t0 {
+-                            VType::Int(int_type) => Some(int_type),
+-                            VType::Within(bounds) => match Constraint::get_unique_solution(
+-                                &Constraint::Encompasses(bounds.clone()),
+-                            ) {
+-                                Ok(int_type) => Some(int_type),
+-                                Err(_) => None,
+-                            },
+-                            VType::Abstract(utype) => self.reify(utype),
+-                        },
+-                        Err(_) => None,
+-                        Ok(None) => match &self.constraints[v.0] {
+-                            _ => None,
+-                        },
+-                    }
+-                }
+-                UType::Int(i) => Some(i),
+-            }
+-        }
+-    }
+-}
+-
+-use inference::{InferenceEngine, UVar};
+-
+-/// Alias for whatever value-type we use to associate a failed reification with some indication of what went wrong, or where
+-type Hint = usize;
+-
+-#[derive(Debug)]
+-pub enum ElaborationError {
+-    BadReification(Hint),
+-}
+-
+-impl std::fmt::Display for ElaborationError {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        match self {
+-            ElaborationError::BadReification(hint) => {
+-                write!(f, "bad reification on UVar ?{}", hint)
+-            }
+-        }
+-    }
+-}
+-
+-impl std::error::Error for ElaborationError {}
+-
+-pub(crate) type ElaborationResult<T> = Result<T, ElaborationError>;
+-
+-pub struct Elaborator {
+-    next_index: usize,
+-    ie: InferenceEngine,
+-}
+-
+-impl Elaborator {
+-    pub(crate) fn new(ie: InferenceEngine) -> Self {
+-        Self { next_index: 0, ie }
+-    }
+-
+-    fn get_and_increment_index(&mut self) -> usize {
+-        let ret = self.next_index;
+-        self.next_index += 1;
+-        ret
+-    }
+-
+-    fn get_type_from_index(&self, index: usize) -> ElaborationResult<IntType> {
+-        let uvar = UVar::new(index);
+-        let Some(t) = self.ie.reify(uvar.into()) else {
+-            return Err(ElaborationError::BadReification(index));
+-        };
+-        Ok(t)
+-    }
+-
+-    pub(crate) fn elaborate_expr(&mut self, expr: &Expr) -> ElaborationResult<TypedExpr<IntType>> {
+-        let index = self.get_and_increment_index();
+-        match expr {
+-            Expr::Const(typed_const) => {
+-                let t = self.get_type_from_index(index)?;
+-                Ok(TypedExpr::ElabConst(t, typed_const.clone()))
+-            }
+-            Expr::BinOp(bin_op, x, y) => {
+-                let t_x = self.elaborate_expr(x)?;
+-                let t_y = self.elaborate_expr(y)?;
+-                let t = self.get_type_from_index(index)?;
+-                Ok(TypedExpr::ElabBinOp(
+-                    t,
+-                    TypedBinOp {
+-                        sig: ((*t_x.get_type(), *t_y.get_type()), t),
+-                        inner: *bin_op,
+-                    },
+-                    Box::new(t_x),
+-                    Box::new(t_y),
+-                ))
+-            }
+-            Expr::UnaryOp(unary_op, inner) => {
+-                let t_inner = self.elaborate_expr(inner)?;
+-                let t = self.get_type_from_index(index)?;
+-                Ok(TypedExpr::ElabUnaryOp(
+-                    t,
+-                    TypedUnaryOp {
+-                        sig: (*t_inner.get_type(), t),
+-                        inner: *unary_op,
+-                    },
+-                    Box::new(t_inner),
+-                ))
+-            }
+-            &Expr::Cast(rep, ref inner) => {
+-                let rep = NumRep::Concrete(rep);
+-                let t_inner = self.elaborate_expr(inner)?;
+-                let t = self.get_type_from_index(index)?;
+-                Ok(TypedExpr::ElabCast(
+-                    t,
+-                    TypedCast {
+-                        sig: (*t_inner.get_type(), t),
+-                        _rep: rep,
+-                    },
+-                    Box::new(t_inner),
+-                ))
+-            }
+-        }
+-    }
+-}
+diff --git a/experiments/analytic-engine/src/eval.rs b/experiments/analytic-engine/src/eval.rs
+deleted file mode 100644
+index 0c71aed8..00000000
+--- a/experiments/analytic-engine/src/eval.rs
++++ /dev/null
+@@ -1,858 +0,0 @@
+-use num_bigint::{BigInt, TryFromBigIntError};
+-use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Signed, Zero};
+-use std::any::type_name;
+-use std::cell::LazyCell;
+-use std::ops::Neg;
+-use std::rc::Rc;
+-
+-// SECTION - Evaluation model for arbitrary operations over machine integer types
+-#[derive(Clone)]
+-pub struct IndirectEval {
+-    value: Rc<LazyCell<BigInt, Box<dyn FnOnce() -> BigInt>>>,
+-}
+-
+-impl std::fmt::Debug for IndirectEval {
+-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-        f.debug_struct("IndirectEval")
+-            .field("value", &self.value)
+-            .finish()
+-    }
+-}
+-
+-#[derive(Clone, Debug)]
+-pub enum Eval<T> {
+-    NaN,
+-    Direct(T),
+-    Indirect(IndirectEval),
+-}
+-
+-impl<T> Eval<T> {
+-    pub const fn is_nan(&self) -> bool {
+-        matches!(self, &Eval::NaN)
+-    }
+-}
+-
+-impl<T> PartialEq for Eval<T>
+-where
+-    T: PartialEq + Copy,
+-    BigInt: From<T>,
+-{
+-    fn eq(&self, other: &Self) -> bool {
+-        match (self, other) {
+-            (Self::NaN, _) | (_, Self::NaN) => false,
+-            (Self::Direct(l0), Self::Direct(r0)) => l0 == r0,
+-            (Self::Indirect(l0), Self::Indirect(r0)) => &**l0.value == &**r0.value,
+-            (Self::Direct(n), Self::Indirect(IndirectEval { ref value, .. }))
+-            | (Self::Indirect(IndirectEval { ref value, .. }), Self::Direct(n)) => {
+-                &***value == &BigInt::from(*n)
+-            }
+-        }
+-    }
+-}
+-
+-pub enum EvalError {
+-    Indirect(BigInt),
+-    NotANumber,
+-}
+-
+-impl<T: Copy> Eval<T> {
+-    pub fn eval(&self) -> Result<T, EvalError> {
+-        match self {
+-            Eval::NaN => Err(EvalError::NotANumber),
+-            Eval::Direct(x) => Ok(*x),
+-            Eval::Indirect(IndirectEval { value, .. }) => {
+-                Err(EvalError::Indirect((&***value).clone()))
+-            }
+-        }
+-    }
+-}
+-
+-// !SECTION
+-
+-// SECTION - Binary Operation Backend
+-
+-/// Macro for bulk definition of homogenously typed binary operations with a checked version provided by a trait (`num_traits`), where
+-/// `None`` indicates underflow or overflow, falling back on available saturating and wrapping variants of the same operation for indirect computations
+-macro_rules! homogenous {
+-    ( $( $tr:ident, $meth:ident => $( ( $fname:ident , $t:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(lhs: $t, rhs: $t) -> Eval<$t> {
+-                    match <$t as $tr>::$meth(&lhs, &rhs) {
+-                        Some(res) => Eval::Direct(res),
+-                        None => {
+-                            Eval::Indirect(
+-                                IndirectEval {
+-                                    value: Rc::new(LazyCell::new(
+-                                        Box::new(move ||
+-                                            BigInt::from(lhs).$meth(&BigInt::from(rhs)).unwrap()
+-                                        )
+-                                    )),
+-                                }
+-                            )
+-                        }
+-                    }
+-                }
+-            )*
+-        )*
+-    };
+-}
+-
+-/// Macro for bulk definition of homogenously typed binary operations with a quotient version provided by a trait (`num_traits`), where None indicates NaN
+-macro_rules! homogenous_quotient {
+-    ( $( $tr:ident, $meth:ident => $( ( $fname:ident, $t:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(lhs: $t, rhs: $t) -> Eval<$t> {
+-                    match <$t as $tr>::$meth(&lhs, &rhs) {
+-                        Some(res) => Eval::Direct(res),
+-                        None => Eval::NaN,
+-                    }
+-                }
+-            )*
+-        )*
+-    }
+-}
+-
+-/// Macro for bulk definition of homogenous source-type typed binary operations where the output type can represent every possible input type, but the computation might not succeed
+-macro_rules! widening {
+-    ( $( $tr:ident, $meth:ident => $( ( $in_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                $(
+-                    pub fn $fname(lhs: $in_t, rhs: $in_t) -> Eval<$out_t> {
+-                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+-                            Some(res) => Eval::Direct(res),
+-                            None => Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || BigInt::$meth(&BigInt::from(lhs), &BigInt::from(rhs)).unwrap()))) }),
+-                        }
+-                    }
+-                )*
+-            )*
+-        )*
+-    };
+-}
+-
+-macro_rules! widening_quotient {
+-    ( $( $tr:ident, $meth:ident => $( ( $in_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                $(
+-                    pub fn $fname(lhs: $in_t, rhs: $in_t) -> Eval<$out_t> {
+-                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+-                            Some(res) => Eval::Direct(res),
+-                            None => Eval::NaN,
+-                        }
+-                    }
+-                )*
+-            )*
+-        )*
+-    };
+-}
+-
+-/// Macro for bulk definition of heterogenous source-type typed binary operations where the output type can represent every possible input type, but the computation might not succeed
+-macro_rules! mixed_widening {
+-    ( $( $tr:ident, $meth:ident => $( ( $left_t:ty, $right_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                $(
+-                    pub fn $fname(lhs: $left_t, rhs: $right_t) -> Eval<$out_t> {
+-                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+-                            Some(res) => Eval::Direct(res),
+-                            None => Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || BigInt::$meth(&BigInt::from(lhs), &BigInt::from(rhs)).unwrap()))) }),
+-                        }
+-                    }
+-                )*
+-            )*
+-        )*
+-    };
+-}
+-
+-macro_rules! mixed_widening_quotient {
+-    ( $( $tr:ident, $meth:ident => $( ( $left_t:ty, $right_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                $(
+-                    pub fn $fname(lhs: $left_t, rhs: $right_t) -> Eval<$out_t> {
+-                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+-                            Some(res) => Eval::Direct(res),
+-                            None => Eval::NaN,
+-                        }
+-                    }
+-                )*
+-            )*
+-        )*
+-    };
+-}
+-
+-// SECTION - strictly homogenous (T -> T -> T) binary operations (40 total)
+-
+-// Responsible for 24 function definitions
+-homogenous! {
+-    CheckedAdd, checked_add =>
+-        (add_u8, u8),
+-        (add_u16, u16),
+-        (add_u32, u32),
+-        (add_u64, u64),
+-        (add_i8, i8),
+-        (add_i16, i16),
+-        (add_i32, i32),
+-        (add_i64, i64);
+-    CheckedSub, checked_sub =>
+-        (sub_u8, u8),
+-        (sub_u16, u16),
+-        (sub_u32, u32),
+-        (sub_u64, u64),
+-        (sub_i8, i8),
+-        (sub_i16, i16),
+-        (sub_i32, i32),
+-        (sub_i64, i64);
+-    CheckedMul, checked_mul =>
+-        (mul_u8, u8),
+-        (mul_u16, u16),
+-        (mul_u32, u32),
+-        (mul_u64, u64),
+-        (mul_i8, i8),
+-        (mul_i16, i16),
+-        (mul_i32, i32),
+-        (mul_i64, i64);
+-}
+-
+-// (T, T) -> T binary operations involving quotients (failure is NaN)
+-// Responsible for 16 function definitions
+-homogenous_quotient! {
+-    CheckedDiv, checked_div =>
+-        (div_u8, u8),
+-        (div_u16, u16),
+-        (div_u32, u32),
+-        (div_u64, u64),
+-        (div_i8, i8),
+-        (div_i16, i16),
+-        (div_i32, i32),
+-        (div_i64, i64);
+-    CheckedRem, checked_rem =>
+-        (rem_u8, u8),
+-        (rem_u16, u16),
+-        (rem_u32, u32),
+-        (rem_u64, u64),
+-        (rem_i8, i8),
+-        (rem_i16, i16),
+-        (rem_i32, i32),
+-        (rem_i64, i64);
+-}
+-// !SECTION
+-
+-// SECTION - heterogenous-type binary operations ( `(T0, T0) -> T1` or `(T0, T1) -> T` )
+-// (T0, T0) -> T1 binary operations where the values of T0 are a subset of T1 and failure indicates overflow/underflow
+-
+-// responsible for 42 function definitions
+-widening! {
+-    CheckedAdd, checked_add =>
+-        (u8 => (add_u8_u16, u16), (add_u8_u32, u32), (add_u8_u64, u64), (add_u8_i16, i16), (add_u8_i32, i32), (add_u8_i64, i64)),
+-        (u16 => (add_u16_u32, u32), (add_u16_u64, u64), (add_u16_i32, i32), (add_u16_i64, i64)),
+-        (u32 => (add_u32_u64, u64), (add_u32_i64, i64)),
+-        (i8 => (add_i8_i16, i16), (add_i8_i32, i32), (add_i8_i64, i64)),
+-        (i16 => (add_i16_i32, i32), (add_i16_i64, i64)),
+-        (i32 => (add_i32_i64, i64));
+-    CheckedSub, checked_sub =>
+-        (u8 => (sub_u8_u16, u16), (sub_u8_u32, u32), (sub_u8_u64, u64), (sub_u8_i16, i16), (sub_u8_i32, i32), (sub_u8_i64, i64)),
+-        (u16 => (sub_u16_u32, u32), (sub_u16_u64, u64), (sub_u16_i32, i32), (sub_u16_i64, i64)),
+-        (u32 => (sub_u32_u64, u64), (sub_u32_i64, i64)),
+-        (i8 => (sub_i8_i16, i16), (sub_i8_i32, i32), (sub_i8_i64, i64)),
+-        (i16 => (sub_i16_i32, i32), (sub_i16_i64, i64)),
+-        (i32 => (sub_i32_i64, i64));
+-    CheckedMul, checked_mul =>
+-        (u8 => (mul_u8_u16, u16), (mul_u8_u32, u32), (mul_u8_u64, u64), (mul_u8_i16, i16), (mul_u8_i32, i32), (mul_u8_i64, i64)),
+-        (u16 => (mul_u16_u32, u32), (mul_u16_u64, u64), (mul_u16_i32, i32), (mul_u16_i64, i64)),
+-        (u32 => (mul_u32_u64, u64), (mul_u32_i64, i64)),
+-        (i8 => (mul_i8_i16, i16), (mul_i8_i32, i32), (mul_i8_i64, i64)),
+-        (i16 => (mul_i16_i32, i32), (mul_i16_i64, i64)),
+-        (i32 => (mul_i32_i64, i64));
+-}
+-
+-// (T0, T0) -> T1 binary operations where the values of T0 are a subset of T1 and failure indicates NaN
+-// Responsible for 28 function definitions
+-widening_quotient! {
+-    CheckedDiv, checked_div =>
+-        // 14 functions
+-        (u8 => (div_u8_u16, u16), (div_u8_u32, u32), (div_u8_u64, u64), (div_u8_i16, i16), (div_u8_i32, i32), (div_u8_i64, i64)),
+-        (u16 => (div_u16_u32, u32), (div_u16_u64, u64), (div_u16_i32, i32), (div_u16_i64, i64)),
+-        (u32 => (div_u32_u64, u64), (div_u32_i64, i64)),
+-        (i8 => (div_i8_i16, i16), (div_i8_i32, i32), (div_i8_i64, i64)),
+-        (i16 => (div_i16_i32, i32), (div_i16_i64, i64)),
+-        (i32 => (div_i32_i64, i64));
+-    CheckedRem, checked_rem =>
+-        // 14 functions
+-        (u8 => (rem_u8_u16, u16), (rem_u8_u32, u32), (rem_u8_u64, u64), (rem_u8_i16, i16), (rem_u8_i32, i32), (rem_u8_i64, i64)), // 6
+-        (u16 => (rem_u16_u32, u32), (rem_u16_u64, u64), (rem_u16_i32, i32), (rem_u16_i64, i64)), // 4
+-        (u32 => (rem_u32_u64, u64), (rem_u32_i64, i64)), // 2
+-        (i8 => (rem_i8_i16, i16), (rem_i8_i32, i32), (rem_i8_i64, i64)), // 3
+-        (i16 => (rem_i16_i32, i32), (rem_i16_i64, i64)), // 2
+-        (i32 => (rem_i32_i64, i64)); // 1
+-}
+-
+-// (T0, T1) -> T binary operations
+-// Responsible for 210 functions
+-mixed_widening! {
+-    CheckedAdd, checked_add =>
+-        // <= Bits8 (6 functions)
+-        (u8, i8 => (add_u8_i8_i16, i16), (add_u8_i8_i32, i32), (add_u8_i8_i64, i64)),
+-        (i8, u8 => (add_i8_u8_i16, i16), (add_i8_u8_i32, i32), (add_i8_u8_i64, i64)),
+-
+-        // >Bits8, <= Bits16 (30 functions)
+-        (u16, u8 => (add_u16_u8_u16, u16), (add_u16_u8_u32, u32), (add_u16_u8_u64, u64), (add_u16_u8_i32, i32), (add_u16_u8_i64, i64)),
+-        (u8, u16 => (add_u8_u16_u16, u16), (add_u8_u16_u32, u32), (add_u8_u16_u64, u64), (add_u8_u16_i32, i32), (add_u8_u16_i64, i64)),
+-        (u16, i8 => (add_u16_i8_i32, i32), (add_u16_i8_i64, i64)),
+-        (i8, u16 => (add_i8_u16_i32, i32), (add_i8_u16_i64, i64)),
+-
+-        (i16, u8 => (add_i16_u8_i16, i16), (add_i16_u8_i32, i32), (add_i16_u8_i64, i64)),
+-        (u8, i16 => (add_u8_i16_i16, i16), (add_u8_i16_i32, i32), (add_u8_i16_i64, i64)),
+-        (i16, i8 => (add_i16_i8_i16, i16), (add_i16_i8_i32, i32), (add_i16_i8_i64, i64)),
+-        (i8, i16 => (add_i8_i16_i16, i16), (add_i8_i16_i32, i32), (add_i8_i16_i64, i64)),
+-
+-        (u16, i16 => (add_u16_i16_i32, i32), (add_u16_i16_i64, i64)),
+-        (i16, u16 => (add_i16_u16_i32, i32), (add_i16_u16_i64, i64)),
+-
+-        // >Bits16, <=Bits32 (34 functions)
+-        (u32, u8 => (add_u32_u8_u32, u32), (add_u32_u8_u64, u64), (add_u32_u8_i64, i64)),
+-        (u8, u32 => (add_u8_u32_u32, u32), (add_u8_u32_u64, u64), (add_u8_u32_i64, i64)),
+-        (u32, i8 => (add_u32_i8_i64, i64)),
+-        (i8, u32 => (add_i8_u32_i64, i64)),
+-
+-        (u32, u16 => (add_u32_u16_u32, u32), (add_u32_u16_u64, u64), (add_u32_u16_i64, i64)),
+-        (u16, u32 => (add_u16_u32_u32, u32), (add_u16_u32_u64, u64), (add_u16_u32_i64, i64)),
+-        (u32, i16 => (add_u32_i16_i64, i64)),
+-        (i16, u32 => (add_i16_u32_i64, i64)),
+-
+-        (i32, u8 => (add_i32_u8_i32, i32), (add_i32_u8_i64, i64)),
+-        (u8, i32 => (add_u8_i32_i32, i32), (add_u8_i32_i64, i64)),
+-        (i32, i8 => (add_i32_i8_i32, i32), (add_i32_i8_i64, i64)),
+-        (i8, i32 => (add_i8_i32_i32, i32), (add_i8_i32_i64, i64)),
+-
+-        (i32, u16 => (add_i32_u16_i32, i32), (add_i32_u16_i64, i64)),
+-        (u16, i32 => (add_u16_i32_i32, i32), (add_u16_i32_i64, i64)),
+-        (i32, i16 => (add_i32_i16_i32, i32), (add_i32_i16_i64, i64)),
+-        (i16, i32 => (add_i16_i32_i32, i32), (add_i16_i32_i64, i64)),
+-
+-        (u32, i32 => (add_u32_i32_i64, i64)),
+-        (i32, u32 => (add_i32_u32_i64, i64)),
+-        ;
+-    CheckedSub, checked_sub =>
+-        // <= Bits8 (6 functions)
+-        (u8, i8 => (sub_u8_i8_i16, i16), (sub_u8_i8_i32, i32), (sub_u8_i8_i64, i64)),
+-        (i8, u8 => (sub_i8_u8_i16, i16), (sub_i8_u8_i32, i32), (sub_i8_u8_i64, i64)),
+-
+-        // >Bits8, <= Bits16 (30 functions)
+-        (u16, u8 => (sub_u16_u8_u16, u16), (sub_u16_u8_u32, u32), (sub_u16_u8_u64, u64), (sub_u16_u8_i32, i32), (sub_u16_u8_i64, i64)),
+-        (u8, u16 => (sub_u8_u16_u16, u16), (sub_u8_u16_u32, u32), (sub_u8_u16_u64, u64), (sub_u8_u16_i32, i32), (sub_u8_u16_i64, i64)),
+-        (u16, i8 => (sub_u16_i8_i32, i32), (sub_u16_i8_i64, i64)),
+-        (i8, u16 => (sub_i8_u16_i32, i32), (sub_i8_u16_i64, i64)),
+-
+-        (u8, i16 => (sub_u8_i16_i16, i16), (sub_u8_i16_i32, i32), (sub_u8_i16_i64, i64)),
+-        (i16, u8 => (sub_i16_u8_i16, i16), (sub_i16_u8_i32, i32), (sub_i16_u8_i64, i64)),
+-        (i8, i16 => (sub_i8_i16_i16, i16), (sub_i8_i16_i32, i32), (sub_i8_i16_i64, i64)),
+-        (i16, i8 => (sub_i16_i8_i16, i16), (sub_i16_i8_i32, i32), (sub_i16_i8_i64, i64)),
+-
+-        (u16, i16 => (sub_u16_i16_i32, i32), (sub_u16_i16_i64, i64)),
+-        (i16, u16 => (sub_i16_u16_i32, i32), (sub_i16_u16_i64, i64)),
+-
+-        // >Bits16, <= Bits32 (34 functions)
+-        (u32, u8 => (sub_u32_u8_u32, u32), (sub_u32_u8_u64, u64), (sub_u32_u8_i64, i64)),
+-        (u8, u32 => (sub_u8_u32_u32, u32), (sub_u8_u32_u64, u64), (sub_u8_u32_i64, i64)),
+-        (u32, i8 => (sub_u32_i8_i64, i64)),
+-        (i8, u32 => (sub_i8_u32_i64, i64)),
+-
+-        (u32, u16 => (sub_u32_u16_u32, u32), (sub_u32_u16_u64, u64), (sub_u32_u16_i64, i64)),
+-        (u16, u32 => (sub_u16_u32_u32, u32), (sub_u16_u32_u64, u64), (sub_u16_u32_i64, i64)),
+-        (u32, i16 => (sub_u32_i16_i64, i64)),
+-        (i16, u32 => (sub_i16_u32_i64, i64)),
+-
+-        (i32, u8 => (sub_i32_u8_i32, i32), (sub_i32_u8_i64, i64)),
+-        (u8, i32 => (sub_u8_i32_i32, i32), (sub_u8_i32_i64, i64)),
+-        (i32, i8 => (sub_i32_i8_i32, i32), (sub_i32_i8_i64, i64)),
+-        (i8, i32 => (sub_i8_i32_i32, i32), (sub_i8_i32_i64, i64)),
+-
+-        (i32, u16 => (sub_i32_u16_i32, i32), (sub_i32_u16_i64, i64)),
+-        (u16, i32 => (sub_u16_i32_i32, i32), (sub_u16_i32_i64, i64)),
+-        (i32, i16 => (sub_i32_i16_i32, i32), (sub_i32_i16_i64, i64)),
+-        (i16, i32 => (sub_i16_i32_i32, i32), (sub_i16_i32_i64, i64)),
+-
+-        (u32, i32 => (sub_u32_i32_i64, i64)),
+-        (i32, u32 => (sub_i32_u32_i64, i64));
+-    CheckedMul, checked_mul =>
+-        // <= Bits8 (6 functions)
+-        (u8, i8 => (mul_u8_i8_i16, i16), (mul_u8_i8_i32, i32), (mul_u8_i8_i64, i64)),
+-        (i8, u8 => (mul_i8_u8_i16, i16), (mul_i8_u8_i32, i32), (mul_i8_u8_i64, i64)),
+-
+-        // >Bits8, <= Bits16 (30 functions)
+-        (u16, u8 => (mul_u16_u8_u16, u16), (mul_u16_u8_u32, u32), (mul_u16_u8_u64, u64), (mul_u16_u8_i32, i32), (mul_u16_u8_i64, i64)),
+-        (u8, u16 => (mul_u8_u16_u16, u16), (mul_u8_u16_u32, u32), (mul_u8_u16_u64, u64), (mul_u8_u16_i32, i32), (mul_u8_u16_i64, i64)),
+-        (u16, i8 => (mul_u16_i8_i32, i32), (mul_u16_i8_i64, i64)),
+-        (i8, u16 => (mul_i8_u16_i32, i32), (mul_i8_u16_i64, i64)),
+-
+-        (u8, i16 => (mul_u8_i16_i16, i16), (mul_u8_i16_i32, i32), (mul_u8_i16_i64, i64)),
+-        (i16, u8 => (mul_i16_u8_i16, i16), (mul_i16_u8_i32, i32), (mul_i16_u8_i64, i64)),
+-        (i8, i16 => (mul_i8_i16_i16, i16), (mul_i8_i16_i32, i32), (mul_i8_i16_i64, i64)),
+-        (i16, i8 => (mul_i16_i8_i16, i16), (mul_i16_i8_i32, i32), (mul_i16_i8_i64, i64)),
+-
+-        (u16, i16 => (mul_u16_i16_i32, i32), (mul_u16_i16_i64, i64)),
+-        (i16, u16 => (mul_i16_u16_i32, i32), (mul_i16_u16_i64, i64)),
+-
+-        // >Bits16, <= Bits32 (34 functions)
+-        (u32, u8 => (mul_u32_u8_u32, u32), (mul_u32_u8_u64, u64), (mul_u32_u8_i64, i64)),
+-        (u8, u32 => (mul_u8_u32_u32, u32), (mul_u8_u32_u64, u64), (mul_u8_u32_i64, i64)),
+-        (u32, i8 => (mul_u32_i8_i64, i64)),
+-        (i8, u32 => (mul_i8_u32_i64, i64)),
+-
+-        (u32, u16 => (mul_u32_u16_u32, u32), (mul_u32_u16_u64, u64), (mul_u32_u16_i64, i64)),
+-        (u16, u32 => (mul_u16_u32_u32, u32), (mul_u16_u32_u64, u64), (mul_u16_u32_i64, i64)),
+-        (u32, i16 => (mul_u32_i16_i64, i64)),
+-        (i16, u32 => (mul_i16_u32_i64, i64)),
+-
+-        (i32, u8 => (mul_i32_u8_i32, i32), (mul_i32_u8_i64, i64)),
+-        (u8, i32 => (mul_u8_i32_i32, i32), (mul_u8_i32_i64, i64)),
+-        (i32, i8 => (mul_i32_i8_i32, i32), (mul_i32_i8_i64, i64)),
+-        (i8, i32 => (mul_i8_i32_i32, i32), (mul_i8_i32_i64, i64)),
+-
+-        (i32, u16 => (mul_i32_u16_i32, i32), (mul_i32_u16_i64, i64)),
+-        (u16, i32 => (mul_u16_i32_i32, i32), (mul_u16_i32_i64, i64)),
+-        (i32, i16 => (mul_i32_i16_i32, i32), (mul_i32_i16_i64, i64)),
+-        (i16, i32 => (mul_i16_i32_i32, i32), (mul_i16_i32_i64, i64)),
+-
+-        (u32, i32 => (mul_u32_i32_i64, i64)),
+-        (i32, u32 => (mul_i32_u32_i64, i64));
+-}
+-
+-// Responsible for 140 functions
+-mixed_widening_quotient! {
+-    CheckedDiv, checked_div =>
+-        // <= Bits8 (6 functions)
+-        (u8, i8 => (div_u8_i8_i16, i16), (div_u8_i8_i32, i32), (div_u8_i8_i64, i64)),
+-        (i8, u8 => (div_i8_u8_i16, i16), (div_i8_u8_i32, i32), (div_i8_u8_i64, i64)),
+-
+-        // >Bits8, <= Bits16 (30 functions)
+-        (u16, u8 => (div_u16_u8_u16, u16), (div_u16_u8_u32, u32), (div_u16_u8_u64, u64), (div_u16_u8_i32, i32), (div_u16_u8_i64, i64)),
+-        (u8, u16 => (div_u8_u16_u16, u16), (div_u8_u16_u32, u32), (div_u8_u16_u64, u64), (div_u8_u16_i32, i32), (div_u8_u16_i64, i64)),
+-        (u16, i8 => (div_u16_i8_i32, i32), (div_u16_i8_i64, i64)),
+-        (i8, u16 => (div_i8_u16_i32, i32), (div_i8_u16_i64, i64)),
+-
+-        (i16, u8 => (div_i16_u8_i16, i16), (div_i16_u8_i32, i32), (div_i16_u8_i64, i64)),
+-        (u8, i16 => (div_u8_i16_i16, i16), (div_u8_i16_i32, i32), (div_u8_i16_i64, i64)),
+-        (i16, i8 => (div_i16_i8_i16, i16), (div_i16_i8_i32, i32), (div_i16_i8_i64, i64)),
+-        (i8, i16 => (div_i8_i16_i16, i16), (div_i8_i16_i32, i32), (div_i8_i16_i64, i64)),
+-
+-        (u16, i16 => (div_u16_i16_i32, i32), (div_u16_i16_i64, i64)),
+-        (i16, u16 => (div_i16_u16_i32, i32), (div_i16_u16_i64, i64)),
+-
+-        // >Bits16, <=Bits32 (34 functions)
+-        (u32, u8 => (div_u32_u8_u32, u32), (div_u32_u8_u64, u64), (div_u32_u8_i64, i64)),
+-        (u8, u32 => (div_u8_u32_u32, u32), (div_u8_u32_u64, u64), (div_u8_u32_i64, i64)),
+-        (u32, i8 => (div_u32_i8_i64, i64)),
+-        (i8, u32 => (div_i8_u32_i64, i64)),
+-
+-        (u32, u16 => (div_u32_u16_u32, u32), (div_u32_u16_u64, u64), (div_u32_u16_i64, i64)),
+-        (u16, u32 => (div_u16_u32_u32, u32), (div_u16_u32_u64, u64), (div_u16_u32_i64, i64)),
+-        (u32, i16 => (div_u32_i16_i64, i64)),
+-        (i16, u32 => (div_i16_u32_i64, i64)),
+-
+-        (i32, u8 => (div_i32_u8_i32, i32), (div_i32_u8_i64, i64)),
+-        (u8, i32 => (div_u8_i32_i32, i32), (div_u8_i32_i64, i64)),
+-        (i32, i8 => (div_i32_i8_i32, i32), (div_i32_i8_i64, i64)),
+-        (i8, i32 => (div_i8_i32_i32, i32), (div_i8_i32_i64, i64)),
+-
+-        (i32, u16 => (div_i32_u16_i32, i32), (div_i32_u16_i64, i64)),
+-        (u16, i32 => (div_u16_i32_i32, i32), (div_u16_i32_i64, i64)),
+-        (i32, i16 => (div_i32_i16_i32, i32), (div_i32_i16_i64, i64)),
+-        (i16, i32 => (div_i16_i32_i32, i32), (div_i16_i32_i64, i64)),
+-
+-
+-        (u32, i32 => (div_u32_i32_i64, i64)),
+-        (i32, u32 => (div_i32_u32_i64, i64)),
+-        ;
+-    CheckedRem, checked_rem =>
+-        // <= Bits8 (6 functions)
+-        (u8, i8 => (rem_u8_i8_i16, i16), (rem_u8_i8_i32, i32), (rem_u8_i8_i64, i64)),
+-        (i8, u8 => (rem_i8_u8_i16, i16), (rem_i8_u8_i32, i32), (rem_i8_u8_i64, i64)),
+-
+-        // >Bits8, <= Bits16 (30 functions)
+-        (u16, u8 => (rem_u16_u8_u16, u16), (rem_u16_u8_u32, u32), (rem_u16_u8_u64, u64), (rem_u16_u8_i32, i32), (rem_u16_u8_i64, i64)),
+-        (u8, u16 => (rem_u8_u16_u16, u16), (rem_u8_u16_u32, u32), (rem_u8_u16_u64, u64), (rem_u8_u16_i32, i32), (rem_u8_u16_i64, i64)),
+-        (u16, i8 => (rem_u16_i8_i32, i32), (rem_u16_i8_i64, i64)),
+-        (i8, u16 => (rem_i8_u16_i32, i32), (rem_i8_u16_i64, i64)),
+-
+-        (u8, i16 => (rem_u8_i16_i16, i16), (rem_u8_i16_i32, i32), (rem_u8_i16_i64, i64)),
+-        (i16, u8 => (rem_i16_u8_i16, i16), (rem_i16_u8_i32, i32), (rem_i16_u8_i64, i64)),
+-        (i8, i16 => (rem_i8_i16_i16, i16), (rem_i8_i16_i32, i32), (rem_i8_i16_i64, i64)),
+-        (i16, i8 => (rem_i16_i8_i16, i16), (rem_i16_i8_i32, i32), (rem_i16_i8_i64, i64)),
+-
+-        (u16, i16 => (rem_u16_i16_i32, i32), (rem_u16_i16_i64, i64)),
+-        (i16, u16 => (rem_i16_u16_i32, i32), (rem_i16_u16_i64, i64)),
+-
+-        // >Bits16, <= Bits32 (34 functions)
+-        (u32, u8 => (rem_u32_u8_u32, u32), (rem_u32_u8_u64, u64), (rem_u32_u8_i64, i64)),
+-        (u8, u32 => (rem_u8_u32_u32, u32), (rem_u8_u32_u64, u64), (rem_u8_u32_i64, i64)),
+-        (u32, i8 => (rem_u32_i8_i64, i64)),
+-        (i8, u32 => (rem_i8_u32_i64, i64)),
+-
+-        (u32, u16 => (rem_u32_u16_u32, u32), (rem_u32_u16_u64, u64), (rem_u32_u16_i64, i64)),
+-        (u16, u32 => (rem_u16_u32_u32, u32), (rem_u16_u32_u64, u64), (rem_u16_u32_i64, i64)),
+-        (u32, i16 => (rem_u32_i16_i64, i64)),
+-        (i16, u32 => (rem_i16_u32_i64, i64)),
+-
+-        (i32, u8 => (rem_i32_u8_i32, i32), (rem_i32_u8_i64, i64)),
+-        (u8, i32 => (rem_u8_i32_i32, i32), (rem_u8_i32_i64, i64)),
+-        (i32, i8 => (rem_i32_i8_i32, i32), (rem_i32_i8_i64, i64)),
+-        (i8, i32 => (rem_i8_i32_i32, i32), (rem_i8_i32_i64, i64)),
+-
+-        (i32, u16 => (rem_i32_u16_i32, i32), (rem_i32_u16_i64, i64)),
+-        (u16, i32 => (rem_u16_i32_i32, i32), (rem_u16_i32_i64, i64)),
+-        (i32, i16 => (rem_i32_i16_i32, i32), (rem_i32_i16_i64, i64)),
+-        (i16, i32 => (rem_i16_i32_i32, i32), (rem_i16_i32_i64, i64)),
+-
+-        (u32, i32 => (rem_u32_i32_i64, i64)),
+-        (i32, u32 => (rem_i32_u32_i64, i64));
+-}
+-// !SECTION
+-
+-// !SECTION
+-
+-pub fn eval_fallback<Lhs, Rhs, Res>(
+-    lhs: Lhs,
+-    rhs: Rhs,
+-    _op_hint: &'static str,
+-    checked_op: impl FnOnce(&BigInt, &BigInt) -> Option<BigInt>,
+-) -> Eval<Res>
+-where
+-    BigInt: From<Lhs> + From<Rhs>,
+-    Res: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
+-{
+-    eprintln!("[INFO]: encountered fallback operation `{_op_hint} : (({}, {}) -> {})` that may benefit from standalone function",
+-         type_name::<Lhs>(), type_name::<Rhs>(), type_name::<Res>()
+-     );
+-    let big_l = BigInt::from(lhs);
+-    let big_r = BigInt::from(rhs);
+-    let o_big_res = checked_op(&big_l, &big_r);
+-    if let Some(big_res) = o_big_res {
+-        match <Res as TryFrom<BigInt>>::try_from(big_res) {
+-            Ok(res) => Eval::Direct(res),
+-            Err(e) => Eval::Indirect(IndirectEval {
+-                value: Rc::new(LazyCell::new(Box::new(move || e.into_original()))),
+-            }),
+-        }
+-    } else {
+-        Eval::NaN
+-    }
+-}
+-
+-// !SECTION
+-
+-// SECTION - Unary Operation Backend
+-
+-/// Macro for negating via the `Neg` trait impl on a signed integer output type
+-macro_rules! negate_as_signed {
+-    ( $( $t:ty, $fname:ident );+ $(;)? ) => {
+-        $(
+-            pub fn $fname(x: $t) -> Eval<$t> {
+-                Eval::Direct(<$t as Neg>::neg(x))
+-            }
+-        )*
+-    };
+-    ( $( $t0:ty => $( ( $fname:ident, $t1:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-               pub fn $fname(x: $t0) -> Eval<$t1> {
+-                    Eval::Direct(<$t1 as Neg>::neg(x as $t1))
+-               }
+-            )+
+-        )+
+-    };
+-}
+-
+-/// Macro for negating when the output type is unsigned
+-///
+-/// Contains rules for unsigned inputs (i.e. Indirect if non-zero, zero otherwise)
+-/// as well as for arbitrary inputs via signed intermediate representations (i.e. Indirect if positive, negation otherwise)
+-macro_rules! negate_into_unsigned {
+-    // If positive, return Indirect immediately
+-    // Check if positive (and therefore has no representable result), otherwise take absolute value and cast
+-    ( $( $t:ty => $( ( $fname:ident, $out:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(x: $t) -> Eval<$out> {
+-                    if <$t as ::num_traits::Signed>::is_positive(&x) {
+-                        Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || BigInt::from(x).neg()))) })
+-                    } else {
+-                        if x == <$t>::MIN {
+-                            // FIXME - this should work, but is there a more elegant way of doing this?
+-                            Eval::Direct(<$t>::MAX as $out + 1)
+-                        } else {
+-                            Eval::Direct(x.neg() as $out)
+-                        }
+-                    }
+-                }
+-            )*
+-        )*
+-    };
+-}
+-
+-// NOTE - This is the only macro which can specify narrowing conversions since 0 is the only representable value regardless of width
+-macro_rules! negate_unsigned_unsigned {
+-    ( $( $t:ty => $( ( $fname:ident, $out:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(x: $t) -> Eval<$out> {
+-                    if x.is_zero() {
+-                        Eval::Direct(<$out as Zero>::zero())
+-                    } else {
+-                        Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || ::num_bigint::BigInt::from(x).neg()))) })
+-                    }
+-                }
+-            )*
+-        )*
+-    };
+-}
+-
+-/// Macro for abs via the `Signed` trait impl on a signed integer output type
+-macro_rules! abs_as_signed {
+-    ( $( $t:ty, $fname:ident );+ $(;)? ) => {
+-        $( pub fn $fname(x: $t) -> Eval<$t> {
+-            let tmp = <$t as ::num_traits::Signed>::abs(&x);
+-            // NOTE - Signed::abs(iX::MIN) == iX::MIN
+-            if tmp == <$t>::MIN {
+-                Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || ::num_bigint::BigInt::from(x).abs()))) })
+-            } else {
+-                Eval::Direct(tmp)
+-            }
+-        } )+
+-    };
+-    ( $( $t:ty => $( ( $fname:ident, $t1:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(x: $t) -> Eval<$t1> {
+-                    let tmp = <$t1 as ::num_traits::Signed>::abs(&(x as $t1));
+-                    // We don't need to check this because the cast from $t cannot yield <$t1>::MIN
+-                    Eval::Direct(tmp)
+-                }
+-            )*
+-        )*
+-    };
+-}
+-
+-/// Macro for taking absolute value via `Signed` impl on input followed by as-cast
+-macro_rules! abs_signed_unsigned {
+-    ( $( $t:ty =>  $( ( $fname:ident, $t1:ty) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(x: $t) -> Eval<$t1> {
+-                    let tmp = <$t as ::num_traits::Signed>::abs(&x);
+-                    if tmp == <$t>::MIN {
+-                        Eval::Direct(<$t>::MAX as $t1 + 1)
+-                    } else {
+-                        Eval::Direct(tmp as $t1)
+-                    }
+-                }
+-            )+
+-        )+
+-    };
+-}
+-
+-/// Any 'abs' function that is operationally equivalent to a (safe) cast (i.e. unsigned input and wider output type)
+-macro_rules! abs_unsigned_unsigned {
+-    ( $( $t:ty, $fname:ident );+ $(;)? ) => {
+-        $(
+-            #[inline]
+-            pub const fn $fname(x: $t) -> Eval<$t> {
+-                Eval::Direct(x)
+-            }
+-        )+
+-    };
+-    ( $( $t:ty => $( ( $fname:ident, $t1:ty ) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                #[inline]
+-                pub fn $fname(x: $t) -> Eval<$t1> {
+-                    Eval::Direct(x as $t1)
+-                }
+-            )+
+-        )+
+-    };
+-}
+-
+-// SECTION - Negation Functions
+-
+-// Type-preserving negations on signed integers (4 functions)
+-negate_as_signed! {
+-    i8, neg_i8;
+-    i16, neg_i16;
+-    i32, neg_i32;
+-    i64, neg_i64;
+-}
+-
+-// Negations into signed integers (12 functions)
+-negate_as_signed! {
+-    u8 => (neg_u8_i16, i16), (neg_u8_i32, i32), (neg_u8_i64, i64);
+-    u16 => (neg_u16_i32, i32), (neg_u16_i64, i64);
+-    u32 => (neg_u32_i64, i64);
+-    i8 => (neg_i8_i16, i16), (neg_i8_i32, i32), (neg_i8_i64, i64);
+-    i16 => (neg_i16_i32, i32), (neg_i16_i64, i64);
+-    i32 => (neg_i32_i64, i64);
+-}
+-
+-// Sign-preserving negations between unsigned integers (16 functions)
+-negate_unsigned_unsigned! {
+-    u8 => (neg_u8, u8), (neg_u8_u16, u16), (neg_u8_u32, u32), (neg_u8_u64, u64);
+-    u16 => (neg_u16_u8, u8), (neg_u16, u16), (neg_u16_u32, u32), (neg_u16_u64, u64);
+-    u32 => (neg_u32_u8, u8), (neg_u32_u16, u16), (neg_u32, u32), (neg_u32_u64, u64);
+-    u64 => (neg_u64_u8, u8), (neg_u64_u16, u16), (neg_u64_u32, u32), (neg_u64, u64);
+-}
+-
+-// Negation from signed integers into unsigned integers (10 functions)
+-negate_into_unsigned! {
+-    i8 => (neg_i8_u8, u8), (neg_i8_u16, u16), (neg_i8_u32, u32), (neg_i8_u64, u64);
+-    i16 => (neg_i16_u16, u16), (neg_i16_u32, u32), (neg_i16_u64, u64);
+-    i32 => (neg_i32_u32, u32), (neg_i32_u64, u64);
+-    i64 => (neg_i64_u64, u64);
+-}
+-
+-/* 22 omitted negation functions involving lossy conversion
+- *  - u64 -> T != uX         (4)
+- *  - u32 -> T < i64, != uX  (3)
+- *  - u16 -> T < i32, != uX  (2)
+- *  - u8  -> i8              (1)
+- *  - i64 -> T < ?64         (6)
+- *  - i32 -> T < ?32         (4)
+- *  - i16 -> T < ?16         (2)
+- */
+-
+-// !SECTION
+-
+-// SECTION - Absolute-Value Functions
+-
+-// Type-preserving abs on signed integers (4 functions)
+-abs_as_signed! {
+-    i8, abs_i8;
+-    i16, abs_i16;
+-    i32, abs_i32;
+-    i64, abs_i64;
+-}
+-
+-// Abs into signed integers (12 functions)
+-abs_as_signed! {
+-    u8 => (abs_u8_i16, i16), (abs_u8_i32, i32), (abs_u8_i64, i64);
+-    u16 => (abs_u16_i32, i32), (abs_u16_i64, i64);
+-    u32 => (abs_u32_i64, i64);
+-    i8 => (abs_i8_i16, i16), (abs_i8_i32, i32), (abs_i8_i64, i64);
+-    i16 => (abs_i16_i32, i32), (abs_i16_i64, i64);
+-    i32 => (abs_i32_i64, i64);
+-}
+-
+-// Abs from signed into unsigned integers (10 functions)
+-abs_signed_unsigned! {
+-    i8 => (abs_i8_u8, u8), (abs_i8_u16, u16), (abs_i8_u32, u32), (abs_i8_u64, u64);
+-    i16 => (abs_i16_u16, u16), (abs_i16_u32, u32), (abs_i16_u64, u64);
+-    i32 => (abs_i32_u32, u32), (abs_i32_u64, u64);
+-    i64 => (abs_i64_u64, u64);
+-}
+-
+-// Type-preserving abs on unsigned integers (4 functions)
+-abs_unsigned_unsigned! {
+-    u8, abs_u8;
+-    u16, abs_u16;
+-    u32, abs_u32;
+-    u64, abs_u64;
+-}
+-
+-// Sign-preserving abs on unsigned integers (6 functions)
+-abs_unsigned_unsigned! {
+-    u8 => (abs_u8_u16, u16), (abs_u8_u32, u32), (abs_u8_u64, u64);
+-    u16 => (abs_u16_u32, u32), (abs_u16_u64, u64);
+-    u32 => (abs_u32_u64, u64);
+-}
+-
+-/* 28 omitted abs functions involving lossy conversion
+- *  - u64 -> T != u64        (7)
+- *  - u32 -> T < ?64, != u32 (5)
+- *  - u16 -> T < ?32, != u16 (3)
+- *  - u8  -> i8              (1)
+- *  - i64 -> T < ?64         (6)
+- *  - i32 -> T < ?32         (4)
+- *  - i16 -> T < ?16         (2)
+- */
+-
+-// !SECTION
+-
+-pub fn eval_unary_fallback<In, Out>(
+-    x: In,
+-    _op_hint: &'static str,
+-    op: impl FnOnce(&BigInt) -> BigInt,
+-) -> Eval<Out>
+-where
+-    BigInt: From<In>,
+-    Out: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
+-{
+-    eprintln!("[INFO]: encountered fallback operation `{_op_hint} : ({} -> {})` that may benefit from standalone function", type_name::<In>(), type_name::<Out>());
+-    let big_x = BigInt::from(x);
+-    let big_res = op(&big_x);
+-    match <Out as TryFrom<BigInt>>::try_from(big_res) {
+-        Ok(res) => Eval::Direct(res),
+-        Err(e) => Eval::Indirect(IndirectEval {
+-            value: Rc::new(LazyCell::new(Box::new(move || e.into_original()))),
+-        }),
+-    }
+-}
+-// !SECTION
+-
+-// SECTION - Pure Casts
+-
+-macro_rules! direct_cast {
+-    ($($from:ty => $( ($fname:ident, $to:ty) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(x: $from) -> Eval<$to> {
+-                    Eval::Direct(x as $to)
+-                }
+-            )+
+-        )+
+-    }
+-}
+-
+-macro_rules! attempt_cast {
+-    ($($from:ty => $( ($fname:ident, $to:ty) ),+ $(,)? );+ $(;)? ) => {
+-        $(
+-            $(
+-                pub fn $fname(x: $from) -> Eval<$to> {
+-                    match <$to as ::num_traits::NumCast>::from(x) {
+-                        Some(res) => Eval::Direct(res),
+-                        None => Eval::Indirect(IndirectEval {
+-                            value: Rc::new(LazyCell::new(Box::new(move || BigInt::from(x)))),
+-                        })
+-                    }
+-                }
+-            )+
+-        )+
+-    };
+-}
+-
+-// Identity casts [elided] (8 functions)
+-
+-// Natural casts (excluding identity casts) (18 functions)
+-direct_cast! {
+-    u8 => (cast_u8_u16, u16), (cast_u8_u32, u32), (cast_u8_u64, u64), (cast_u8_i16, i16), (cast_u8_i32, i32), (cast_u8_i64, i64);
+-    u16 => (cast_u16_u32, u32), (cast_u16_u64, u64), (cast_u16_i32, i32), (cast_u16_i64, i64);
+-    u32 => (cast_u32_u64, u64), (cast_u32_i64, i64);
+-    i8 => (cast_i8_i16, i16), (cast_i8_i32, i32), (cast_i8_i64, i64);
+-    i16 => (cast_i16_i32, i32), (cast_i16_i64, i64);
+-    i32 => (cast_i32_i64, i64);
+-}
+-
+-// Fallible casts (38 functions)
+-attempt_cast! {
+-    u8 => (cast_u8_i8, i8);
+-    u16 => (cast_u16_u8, u8), (cast_u16_i8, i8), (cast_u16_i16, i16);
+-    u32 => (cast_u32_u8, u8), (cast_u32_u16, u16), (cast_u32_i8, i8), (cast_u32_i16, i16), (cast_u32_i32, i32);
+-    u64 => (cast_u64_u8, u8), (cast_u64_u16, u16), (cast_u64_u32, u32), (cast_u64_i8, i8), (cast_u64_i16, i16), (cast_u64_i32, i32), (cast_u64_i64, i64);
+-    i8 => (cast_i8_u8, u8), (cast_i8_u16, u16), (cast_i8_u32, u32), (cast_i8_u64, u64);
+-    i16 => (cast_i16_u8, u8), (cast_i16_u16, u16), (cast_i16_u32, u32), (cast_i16_u64, u64), (cast_i16_i8, i8);
+-    i32 => (cast_i32_u8, u8), (cast_i32_u16, u16), (cast_i32_u32, u32), (cast_i32_u64, u64), (cast_i32_i8, i8), (cast_i32_i16, i16);
+-    i64 => (cast_i64_u8, u8), (cast_i64_u16, u16), (cast_i64_u32, u32), (cast_i64_u64, u64), (cast_i64_i8, i8), (cast_i64_i16, i16), (cast_i64_i32, i32);
+-}
+-// !SECTION
+diff --git a/experiments/analytic-engine/src/gen.rs b/experiments/analytic-engine/src/gen.rs
+deleted file mode 100644
+index fb5b15dc..00000000
+--- a/experiments/analytic-engine/src/gen.rs
++++ /dev/null
+@@ -1,443 +0,0 @@
+-use std::borrow::Cow;
+-
+-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp};
+-use crate::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedExpr};
+-use crate::printer::fragment::Fragment;
+-
+-pub(crate) mod ast {
+-    use crate::{core::TypedConst, elaborator::PrimInt};
+-
+-    pub type Label = std::borrow::Cow<'static, str>;
+-
+-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+-    pub(crate) enum SType {
+-        RustPrimInt(PrimInt),
+-    }
+-
+-    #[derive(Clone, Debug)]
+-    pub(crate) enum AstEntity {
+-        Unqualified(Label),
+-        Qualified(Vec<Label>, Label),
+-    }
+-
+-    impl From<Label> for AstEntity {
+-        fn from(l: Label) -> Self {
+-            AstEntity::Unqualified(l)
+-        }
+-    }
+-
+-    #[derive(Clone, Debug)]
+-    pub(crate) enum FnEntity {
+-        Specific {
+-            fname: AstEntity,
+-        },
+-        Synthetic {
+-            fname: AstEntity,
+-            type_params: Vec<SType>,
+-        },
+-    }
+-
+-    #[derive(Clone, Debug)]
+-    pub(crate) enum AstValue {
+-        Var(Label),
+-        StringLit(Label),
+-        Const(TypedConst, Option<SType>),
+-    }
+-
+-    #[derive(Clone, Debug)]
+-    pub(crate) struct AstClosure {
+-        pub(super) head_args: Vec<Label>,
+-        pub(super) body: Box<AstExpr>,
+-    }
+-
+-    #[derive(Clone, Debug)]
+-    pub(crate) enum AstExpr {
+-        Value(AstValue),
+-        Invoke(FnEntity, Vec<AstExpr>),
+-        Closure(AstClosure),
+-    }
+-}
+-
+-use ast::{AstClosure, AstEntity, AstExpr, AstValue, FnEntity, Label, SType};
+-
+-#[derive(Clone, Copy, Debug)]
+-enum BinOpClass<T> {
+-    Pure(T),
+-    HomWide(T, T),
+-    HetWide(T, T, T),
+-    HomLossy(T, T),
+-    HetLossy(T, T, T),
+-}
+-
+-#[derive(Clone, Copy, Debug)]
+-enum UnaryOpClass<T> {
+-    Pure(T),
+-    NonLossy(T, T),
+-    Lossy(T, T),
+-}
+-
+-fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
+-    let ((l, r), o) = sig;
+-    let l = l.to_prim();
+-    let r = r.to_prim();
+-    let o = o.to_prim();
+-
+-    let lrep = MachineRep::from(l);
+-    let rrep = MachineRep::from(r);
+-    let orep = MachineRep::from(o);
+-
+-    if lrep == rrep {
+-        if orep == lrep {
+-            BinOpClass::Pure(l)
+-        } else if orep.encompasses(lrep) {
+-            BinOpClass::HomWide(l, o)
+-        } else {
+-            BinOpClass::HomLossy(l, o)
+-        }
+-    } else if orep.encompasses(lrep) && orep.encompasses(rrep) {
+-        BinOpClass::HetWide(l, r, o)
+-    } else {
+-        BinOpClass::HetLossy(l, r, o)
+-    }
+-}
+-
+-// NOTE - depending on the op, widening vs lossy might be affected (e.g. Abs(i8) fits in u8)
+-// FIXME - while this technically works, there is some fuzziness with regard to the intended semantics vs what we are effectively measuring (i.e. did we bother implementing a backend function we can call)
+-fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
+-    let (i, o) = sig;
+-    let i = i.to_prim();
+-    let o = o.to_prim();
+-
+-    let irep = MachineRep::from(i);
+-    let orep = MachineRep::from(o);
+-
+-    match op {
+-        None => {
+-            // Cast - no operational influence on OpClass
+-            if irep == orep {
+-                UnaryOpClass::Pure(i)
+-            } else if orep.encompasses(irep) {
+-                UnaryOpClass::NonLossy(i, o)
+-            } else {
+-                UnaryOpClass::Lossy(i, o)
+-            }
+-        }
+-        Some(BasicUnaryOp::AbsVal) => {
+-            if irep == orep {
+-                UnaryOpClass::Pure(i)
+-            } else if absval_is_nonlossy(irep, orep) {
+-                UnaryOpClass::NonLossy(i, o)
+-            } else {
+-                UnaryOpClass::Lossy(i, o)
+-            }
+-        }
+-        Some(BasicUnaryOp::Negate) => {
+-            if irep == orep {
+-                UnaryOpClass::Pure(i)
+-            } else if negate_is_nonlossy(irep, orep) {
+-                UnaryOpClass::NonLossy(i, o)
+-            } else {
+-                UnaryOpClass::Lossy(i, o)
+-            }
+-        }
+-    }
+-}
+-
+-fn absval_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
+-    if source.is_signed() {
+-        // Signed -> Unsigned is non-lossy if the target-precision is greater-than-or-equal to target precision
+-        matches!(
+-            target.compare_width(source),
+-            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater
+-        )
+-    } else {
+-        target.encompasses(source)
+-    }
+-}
+-
+-fn negate_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
+-    if source.is_signed() {
+-        // Neg is effectively a no-op w.r.t the bounds of the input and output, so normal rules apply
+-        matches!(
+-            target.compare_width(source),
+-            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater
+-        )
+-    } else {
+-        // Unsigned negation is never lossy because we avoid downcasting entirely
+-        true
+-    }
+-}
+-
+-pub(crate) const SYNTHETIC_BINOP: &str = "eval_fallback";
+-pub(crate) const SYNTHETIC_UNARY: &str = "eval_unary_fallback";
+-
+-fn induce_binary_fname(op: BinOp, class: BinOpClass<PrimInt>) -> Label {
+-    let base = match op.get_op() {
+-        BasicBinOp::Add => "add",
+-        BasicBinOp::Sub => "sub",
+-        BasicBinOp::Mul => "mul",
+-        BasicBinOp::Div => "div",
+-        BasicBinOp::Rem => "rem",
+-    };
+-    let str = match class {
+-        BinOpClass::Pure(t) => format!("{}_{}", base, t.to_static_str()),
+-        BinOpClass::HomWide(t0, t1) | BinOpClass::HomLossy(t0, t1) => {
+-            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+-        }
+-        BinOpClass::HetWide(t0, t1, t2) | BinOpClass::HetLossy(t0, t1, t2) => format!(
+-            "{}_{}_{}_{}",
+-            base,
+-            t0.to_static_str(),
+-            t1.to_static_str(),
+-            t2.to_static_str()
+-        ),
+-    };
+-    Label::Owned(str)
+-}
+-
+-fn induce_unary_fname(op: UnaryOp, class: UnaryOpClass<PrimInt>) -> Label {
+-    let base = match op.get_op() {
+-        BasicUnaryOp::Negate => "neg",
+-        BasicUnaryOp::AbsVal => "abs",
+-    };
+-    let str = match class {
+-        UnaryOpClass::Pure(t) => format!("{}_{}", base, t.to_static_str()),
+-        UnaryOpClass::NonLossy(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
+-            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+-        }
+-    };
+-    Label::Owned(str)
+-}
+-
+-fn induce_cast_fname(class: UnaryOpClass<PrimInt>) -> Label {
+-    let base = "cast";
+-    let str = match class {
+-        UnaryOpClass::NonLossy(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
+-            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+-        }
+-        UnaryOpClass::Pure(_) => unreachable!("pure casts should be elided during synthesis"),
+-    };
+-    Label::Owned(str)
+-}
+-
+-fn synthesize_unary(op: UnaryOp) -> AstExpr {
+-    let ent = {
+-        let (qual, meth) = match op.get_op() {
+-            BasicUnaryOp::Negate => ("Neg", "neg"),
+-            BasicUnaryOp::AbsVal => ("Signed", "abs"),
+-        };
+-        AstEntity::Qualified(vec![Label::Borrowed(qual)], Label::Borrowed(meth))
+-    };
+-    let closure = {
+-        let input = Label::Borrowed("x");
+-        let head_args = vec![input.clone()];
+-        let body = {
+-            let fn_spec = FnEntity::Specific { fname: ent };
+-            let fn_args = vec![AstExpr::Value(AstValue::Var(input))];
+-            let invocation = AstExpr::Invoke(fn_spec, fn_args);
+-            Box::new(invocation)
+-        };
+-        AstClosure { head_args, body }
+-    };
+-    AstExpr::Closure(closure)
+-}
+-
+-fn synthesize_binop(op: BinOp) -> AstExpr {
+-    let ent = {
+-        let qual = Label::Borrowed("BigInt");
+-        let meth = match op.get_op() {
+-            BasicBinOp::Add => "checked_add",
+-            BasicBinOp::Sub => "checked_sub",
+-            BasicBinOp::Mul => "checked_mul",
+-            BasicBinOp::Div => "checked_div",
+-            BasicBinOp::Rem => "checked_rem",
+-        };
+-        AstEntity::Qualified(vec![qual], Label::Borrowed(meth))
+-    };
+-    let closure = {
+-        let lhs = Label::Borrowed("x");
+-        let rhs = Label::Borrowed("y");
+-        let head_args = vec![lhs.clone(), rhs.clone()];
+-        let body = {
+-            let fn_spec = FnEntity::Specific { fname: ent };
+-            let fn_args = vec![
+-                AstExpr::Value(AstValue::Var(lhs)),
+-                AstExpr::Value(AstValue::Var(rhs)),
+-            ];
+-            let invocation = AstExpr::Invoke(fn_spec, fn_args);
+-            Box::new(invocation)
+-        };
+-        AstClosure { head_args, body }
+-    };
+-    AstExpr::Closure(closure)
+-}
+-
+-pub(crate) fn synthesize(model: &TypedExpr<IntType>) -> ast::AstExpr {
+-    match model {
+-        TypedExpr::ElabConst(t, typed_const) => AstExpr::Value(AstValue::Const(
+-            typed_const.clone(),
+-            Some(ast::SType::RustPrimInt(t.to_prim())),
+-        )),
+-        TypedExpr::ElabBinOp(_, op, lhs, rhs) => {
+-            let lhs = synthesize(lhs);
+-            let rhs = synthesize(rhs);
+-            match classify_binary(op.sig) {
+-                class @ (BinOpClass::Pure(..)
+-                | BinOpClass::HomWide(..)
+-                | BinOpClass::HetWide(..)) => AstExpr::Invoke(
+-                    FnEntity::Specific {
+-                        fname: induce_binary_fname(op.inner, class).into(),
+-                    },
+-                    vec![lhs, rhs],
+-                ),
+-                class @ (BinOpClass::HomLossy(t1 @ t0, t2) | BinOpClass::HetLossy(t0, t1, t2)) => {
+-                    AstExpr::Invoke(
+-                        FnEntity::Synthetic {
+-                            fname: Label::Borrowed(SYNTHETIC_BINOP).into(),
+-                            type_params: vec![
+-                                SType::RustPrimInt(t0),
+-                                SType::RustPrimInt(t1),
+-                                SType::RustPrimInt(t2),
+-                            ],
+-                        },
+-                        vec![
+-                            lhs,
+-                            rhs,
+-                            AstExpr::Value(AstValue::StringLit(induce_binary_fname(
+-                                op.inner, class,
+-                            ))),
+-                            synthesize_binop(op.inner),
+-                        ],
+-                    )
+-                }
+-            }
+-        }
+-        TypedExpr::ElabUnaryOp(_, op, input) => {
+-            let input = synthesize(input);
+-            match classify_unary(Some(op.inner.get_op()), op.sig) {
+-                class @ (UnaryOpClass::Pure(..) | UnaryOpClass::NonLossy(..)) => AstExpr::Invoke(
+-                    FnEntity::Specific {
+-                        fname: AstEntity::Unqualified(induce_unary_fname(op.inner, class)),
+-                    },
+-                    vec![input],
+-                ),
+-                class @ UnaryOpClass::Lossy(t0, t1) => AstExpr::Invoke(
+-                    FnEntity::Synthetic {
+-                        fname: AstEntity::Unqualified(Label::Borrowed(SYNTHETIC_UNARY)),
+-                        type_params: vec![SType::RustPrimInt(t0), SType::RustPrimInt(t1)],
+-                    },
+-                    vec![
+-                        input,
+-                        AstExpr::Value(AstValue::StringLit(induce_unary_fname(op.inner, class))),
+-                        synthesize_unary(op.inner),
+-                    ],
+-                ),
+-            }
+-        }
+-        TypedExpr::ElabCast(_, cast, input) => {
+-            let input = synthesize(input);
+-            match classify_unary(None, cast.sig) {
+-                // NOTE - we avoid function stubbing for no-op casts (i.e. T -> T)
+-                UnaryOpClass::Pure(_) => input,
+-                class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => AstExpr::Invoke(
+-                    FnEntity::Specific {
+-                        fname: AstEntity::Unqualified(induce_cast_fname(class)),
+-                    },
+-                    vec![input],
+-                ),
+-            }
+-        }
+-    }
+-}
+-
+-pub(crate) trait ToFragment {
+-    fn to_fragment(&self) -> Fragment;
+-}
+-
+-impl ToFragment for AstClosure {
+-    fn to_fragment(&self) -> Fragment {
+-        let head_args = Fragment::seq(
+-            self.head_args.iter().cloned().map(Fragment::String),
+-            Some(Fragment::String(Cow::Borrowed(", "))),
+-        );
+-        let preamble = head_args.delimit(Fragment::Char('|'), Fragment::Char('|'));
+-        let body = self
+-            .body
+-            .to_fragment()
+-            .delimit(Fragment::Char('{'), Fragment::Char('}'));
+-        preamble.cat(Fragment::Char(' ')).cat(body)
+-    }
+-}
+-
+-impl ToFragment for AstEntity {
+-    fn to_fragment(&self) -> Fragment {
+-        match self {
+-            AstEntity::Unqualified(lbl) => Fragment::String(lbl.clone()),
+-            AstEntity::Qualified(path_elts, lbl) => Fragment::seq(
+-                path_elts
+-                    .iter()
+-                    .chain(std::iter::once(lbl))
+-                    .cloned()
+-                    .map(Fragment::String),
+-                Some(Fragment::String(Cow::Borrowed("::"))),
+-            ),
+-        }
+-    }
+-}
+-
+-impl ToFragment for AstValue {
+-    fn to_fragment(&self) -> Fragment {
+-        match self {
+-            AstValue::StringLit(s) => {
+-                Fragment::String(s.clone()).delimit(Fragment::Char('"'), Fragment::Char('"'))
+-            }
+-            AstValue::Var(vname) => Fragment::String(vname.clone()),
+-            AstValue::Const(typed_const, stype) => Fragment::String(Cow::Owned(format!(
+-                "{}{}",
+-                typed_const.as_raw_value(),
+-                match stype {
+-                    None => "",
+-                    Some(t) => match t {
+-                        SType::RustPrimInt(prim_int) => prim_int.to_static_str(),
+-                    },
+-                }
+-            ))),
+-        }
+-    }
+-}
+-
+-impl ToFragment for FnEntity {
+-    fn to_fragment(&self) -> Fragment {
+-        match self {
+-            FnEntity::Specific { fname } => fname.to_fragment(),
+-            FnEntity::Synthetic { fname, type_params } => fname.to_fragment().cat(
+-                Fragment::seq(
+-                    type_params.iter().map(|t| match t {
+-                        SType::RustPrimInt(p) => Fragment::String(Cow::Borrowed(p.to_static_str())),
+-                    }),
+-                    Some(Fragment::String(Cow::Borrowed(", "))),
+-                )
+-                .delimit(Fragment::Char('<'), Fragment::Char('>')),
+-            ),
+-        }
+-    }
+-}
+-
+-impl ToFragment for AstExpr {
+-    fn to_fragment(&self) -> Fragment {
+-        match self {
+-            AstExpr::Closure(closure) => closure.to_fragment(),
+-            AstExpr::Invoke(fn_spec, args) => {
+-                let args = args.iter().map(ToFragment::to_fragment);
+-                let paren_list = Fragment::seq(
+-                    args,
+-                    Some(Fragment::String(std::borrow::Cow::Borrowed(", "))),
+-                )
+-                .delimit(Fragment::Char('('), Fragment::Char(')'));
+-                let fn_spec = fn_spec.to_fragment();
+-                fn_spec.cat(paren_list)
+-            }
+-            AstExpr::Value(ast_value) => ast_value.to_fragment(),
+-        }
+-    }
+-}
+diff --git a/experiments/analytic-engine/src/lib.rs b/experiments/analytic-engine/src/lib.rs
+deleted file mode 100644
+index 95c91d5e..00000000
+--- a/experiments/analytic-engine/src/lib.rs
++++ /dev/null
+@@ -1,10 +0,0 @@
+-pub mod core;
+-pub mod elaborator;
+-pub mod eval;
+-pub mod gen;
+-pub mod printer;
+-
+-pub use core::{
+-    BasicBinOp, BasicUnaryOp, BinOp, BitWidth, MachineRep, NumRep, TypedConst, UnaryOp,
+-};
+-pub use elaborator::PrimInt;
+diff --git a/experiments/analytic-engine/src/printer.rs b/experiments/analytic-engine/src/printer.rs
+deleted file mode 100644
+index 03053142..00000000
+--- a/experiments/analytic-engine/src/printer.rs
++++ /dev/null
+@@ -1,545 +0,0 @@
+-use std::borrow::Cow;
+-use std::rc::Rc;
+-
+-use fragment::Fragment;
+-use precedence::{cond_paren, Precedence};
+-
+-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
+-use crate::elaborator::inference::InferenceEngine;
+-use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
+-use crate::gen::{synthesize, ToFragment};
+-
+-pub(crate) mod fragment {
+-    use std::borrow::Cow;
+-    use std::fmt::Write as _;
+-    use std::rc::Rc;
+-
+-    #[derive(Clone, Default)]
+-    pub enum Fragment {
+-        #[default]
+-        Empty,
+-        Char(char),
+-        String(Cow<'static, str>),
+-        DisplayAtom(Rc<dyn std::fmt::Display>),
+-        Cat(Box<Fragment>, Box<Fragment>),
+-        Sequence {
+-            sep: Option<Box<Fragment>>,
+-            items: Vec<Fragment>,
+-        },
+-    }
+-
+-    impl std::fmt::Debug for Fragment {
+-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-            match self {
+-                Self::Empty => write!(f, "Empty"),
+-                Self::Char(c) => f.debug_tuple("Char").field(c).finish(),
+-                Self::String(s) => f.debug_tuple("String").field(s).finish(),
+-                Self::DisplayAtom(at) => f
+-                    .debug_tuple("DisplayAtom")
+-                    .field(&format!("{}", at))
+-                    .finish(),
+-                Self::Cat(x, y) => f.debug_tuple("Cat").field(x).field(y).finish(),
+-                Self::Sequence { sep, items } => f
+-                    .debug_struct("Sequence")
+-                    .field("sep", sep)
+-                    .field("items", items)
+-                    .finish(),
+-            }
+-        }
+-    }
+-
+-    impl Fragment {
+-        pub fn cat(self, frag1: Self) -> Self {
+-            Self::Cat(Box::new(self), Box::new(frag1))
+-        }
+-
+-        pub fn delimit(self, before: Self, after: Self) -> Self {
+-            Self::cat(before, self).cat(after)
+-        }
+-
+-        pub fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
+-            Self::Sequence {
+-                items: items.into_iter().collect(),
+-                sep: sep.map(Box::new),
+-            }
+-        }
+-    }
+-
+-    impl std::fmt::Display for Fragment {
+-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+-            match self {
+-                Fragment::Empty => Ok(()),
+-                Fragment::Char(c) => f.write_char(*c),
+-                Fragment::String(s) => f.write_str(s.as_ref()),
+-                Fragment::DisplayAtom(atom) => std::fmt::Display::fmt(&atom, f),
+-                Fragment::Cat(frag0, frag1) => {
+-                    frag0.fmt(f)?;
+-                    frag1.fmt(f)
+-                }
+-                Fragment::Sequence { sep, items } => {
+-                    let mut iter = items.iter();
+-                    if let Some(head) = iter.next() {
+-                        head.fmt(f)?;
+-                    } else {
+-                        return Ok(());
+-                    }
+-                    let f_sep: Box<dyn Fn(&mut std::fmt::Formatter<'_>) -> std::fmt::Result> =
+-                        if let Some(frag) = sep.as_deref() {
+-                            Box::new(|f| frag.fmt(f))
+-                        } else {
+-                            Box::new(|_| Ok(()))
+-                        };
+-                    for item in iter {
+-                        f_sep(f)?;
+-                        item.fmt(f)?;
+-                    }
+-                    Ok(())
+-                }
+-            }
+-        }
+-    }
+-}
+-
+-pub(crate) mod precedence {
+-    use super::fragment::Fragment;
+-
+-    #[derive(Copy, Clone, Debug, Default)]
+-    pub(crate) enum Precedence {
+-        /// Highest precedence, as if implicitly (if not actually) parenthesized
+-        #[allow(dead_code)]
+-        Atomic,
+-        /// Highest natural precedence - used for unary operations and type-casts
+-        Mono(MonoLevel),
+-        /// Infix arithmetic operation of the designated arithmetic sub-precedence
+-        Arith(ArithLevel),
+-        /// Lowest natural precedence - used when no particular precedence is required or known        #[default]
+-        #[default]
+-        Top,
+-    }
+-
+-    #[derive(Copy, Clone, Debug)]
+-    pub(crate) enum MonoLevel {
+-        // AbsVal and Negate
+-        Prefix = 0,
+-        // Standalone type-casts
+-        Postfix,
+-    }
+-
+-    #[derive(Copy, Clone, Debug)]
+-    pub(crate) enum ArithLevel {
+-        DivRem = 0, // Highest arithmetic Precedence
+-        Mul,
+-        AddSub,
+-    }
+-
+-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+-    pub(crate) enum Relation {
+-        /// `.<`
+-        Inferior,
+-        /// `.=`
+-        Congruent,
+-        /// `.>`
+-        Superior,
+-        /// `><`
+-        Disjoint,
+-    }
+-
+-    pub(crate) trait IntransitiveOrd {
+-        fn relate(&self, other: &Self) -> Relation;
+-    }
+-
+-    impl IntransitiveOrd for MonoLevel {
+-        fn relate(&self, other: &Self) -> Relation {
+-            match (self, other) {
+-                (Self::Prefix, Self::Prefix) | (Self::Postfix, Self::Postfix) => {
+-                    Relation::Congruent
+-                }
+-                (Self::Prefix, Self::Postfix) => Relation::Superior,
+-                (Self::Postfix, Self::Prefix) => Relation::Inferior,
+-            }
+-        }
+-    }
+-
+-    impl IntransitiveOrd for ArithLevel {
+-        fn relate(&self, other: &Self) -> Relation {
+-            match (self, other) {
+-                (Self::DivRem, Self::DivRem)
+-                | (Self::Mul, Self::Mul)
+-                | (Self::AddSub, Self::AddSub) => Relation::Congruent,
+-                (Self::DivRem, Self::Mul) | (Self::Mul, Self::DivRem) => Relation::Disjoint,
+-                (Self::AddSub, _) => Relation::Inferior,
+-                (_, Self::AddSub) => Relation::Superior,
+-            }
+-        }
+-    }
+-
+-    /// Rules:
+-    ///   x .= x
+-    ///   Atomic .> Mono .> *Infix .> Top
+-    ///   rel(x, y) = rel(ArithInfix(x), ArithInfix(y))
+-    ///   rel(x, y) = rel(BitwiseInfix(x), BitwiseInfix(y))
+-    ///   rel(x, y) = rel(Calculus(x), Calculus(y))
+-    ///   Bitwise(_) >< Arith(_)
+-    impl IntransitiveOrd for Precedence {
+-        fn relate(&self, other: &Self) -> Relation {
+-            match (self, other) {
+-                // Trivial Congruences
+-                (Precedence::Atomic, Precedence::Atomic) => Relation::Congruent,
+-                (Precedence::Top, Precedence::Top) => Relation::Congruent,
+-
+-                // Descending relations
+-                (Precedence::Atomic, _) => Relation::Superior,
+-                (_, Precedence::Atomic) => Relation::Superior,
+-
+-                // Ascending relations
+-                (Precedence::Top, _) => Relation::Inferior,
+-                (_, Precedence::Top) => Relation::Superior,
+-
+-                // Implications
+-                (Precedence::Mono(x), Precedence::Mono(y)) => x.relate(y),
+-                (Precedence::Arith(x), Precedence::Arith(y)) => x.relate(y),
+-
+-                // Mixed Relations
+-                (Precedence::Mono(_), Precedence::Arith(_)) => Relation::Superior,
+-                (Precedence::Arith(_), Precedence::Mono(_)) => Relation::Inferior,
+-            }
+-        }
+-    }
+-
+-    impl Precedence {
+-        pub(crate) const TOP: Self = Precedence::Top;
+-        pub(crate) const DIVREM: Self = Precedence::Arith(ArithLevel::DivRem);
+-        pub(crate) const MUL: Self = Precedence::Arith(ArithLevel::Mul);
+-        pub(crate) const ADDSUB: Self = Precedence::Arith(ArithLevel::AddSub);
+-        pub(crate) const ABSNEG: Self = Precedence::Mono(MonoLevel::Prefix);
+-        pub(crate) const CAST: Self = Precedence::Mono(MonoLevel::Postfix);
+-
+-        #[allow(dead_code)]
+-        pub(crate) const ATOM: Self = Precedence::Atomic;
+-    }
+-
+-    pub(crate) fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
+-        match current.relate(&cutoff) {
+-            Relation::Disjoint | Relation::Superior => {
+-                frag.delimit(Fragment::Char('('), Fragment::Char(')'))
+-            }
+-            Relation::Congruent | Relation::Inferior => frag,
+-        }
+-    }
+-}
+-
+-fn compile_bin_op(bin_op: &BinOp) -> Fragment {
+-    let token = match bin_op.get_op() {
+-        BasicBinOp::Add => "+",
+-        BasicBinOp::Sub => "-",
+-        BasicBinOp::Mul => "*",
+-        BasicBinOp::Div => "/",
+-        BasicBinOp::Rem => "%",
+-    };
+-    if let Some(rep) = bin_op.cast_rep() {
+-        Fragment::cat(
+-            Fragment::String(Cow::Borrowed(token)),
+-            Fragment::String(Cow::Borrowed(rep.to_static_str())),
+-        )
+-    } else {
+-        Fragment::String(Cow::Borrowed(token))
+-    }
+-    .delimit(Fragment::Char(' '), Fragment::Char(' '))
+-}
+-
+-fn compile_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> Fragment {
+-    let token = match bin_op.inner.get_op() {
+-        BasicBinOp::Add => "+",
+-        BasicBinOp::Sub => "-",
+-        BasicBinOp::Mul => "*",
+-        BasicBinOp::Div => "/",
+-        BasicBinOp::Rem => "%",
+-    };
+-    let ((t_in_l, t_in_r), t_out) = bin_op.sig;
+-    if t_in_l == t_in_r && t_in_l == t_out {
+-        // If the input types and output type all agree, render as operator only
+-        Fragment::String(Cow::Borrowed(token))
+-    } else {
+-        Fragment::cat(
+-            Fragment::String(Cow::Borrowed(token)),
+-            Fragment::String(Cow::Owned(format!("@({},{})->{}", t_in_l, t_in_r, t_out))),
+-        )
+-    }
+-    .delimit(Fragment::Char(' '), Fragment::Char(' '))
+-}
+-
+-fn compile_typed_unary_op(unary_op: &'_ TypedUnaryOp<IntType>) -> Fragment {
+-    let token = match unary_op.inner.get_op() {
+-        BasicUnaryOp::Negate => "~",
+-        BasicUnaryOp::AbsVal => "abs",
+-    };
+-    let (t_in, t_out) = unary_op.sig;
+-    if t_in == t_out {
+-        Fragment::String(Cow::Borrowed(token))
+-    } else {
+-        Fragment::String(Cow::Borrowed(token)).cat(Fragment::String(Cow::Owned(format!(
+-            "@{}->{}",
+-            t_in, t_out
+-        ))))
+-    }
+-    .cat(Fragment::Char(' '))
+-}
+-
+-fn compile_prefix(op: &UnaryOp, inner: &Expr, inner_prec: Precedence) -> Fragment {
+-    Fragment::cat(compile_unary_op(op), compile_expr(inner, inner_prec))
+-}
+-
+-fn compile_postfix<'a>(
+-    token: &'static str,
+-    rep: MachineRep,
+-    inner: &Expr,
+-    inner_prec: Precedence,
+-) -> Fragment {
+-    Fragment::cat(
+-        compile_expr(inner, inner_prec),
+-        Fragment::cat(
+-            Fragment::String(Cow::Borrowed(token)),
+-            Fragment::String(Cow::Borrowed(rep.to_static_str())),
+-        ),
+-    )
+-}
+-
+-fn compile_unary_op<'a>(unary_op: &UnaryOp) -> Fragment {
+-    let token = match unary_op.get_op() {
+-        BasicUnaryOp::Negate => "~",
+-        BasicUnaryOp::AbsVal => "abs",
+-    };
+-    if let Some(rep) = unary_op.cast_rep() {
+-        Fragment::cat(
+-            Fragment::String(Cow::Borrowed(token)),
+-            Fragment::String(Cow::Borrowed(rep.to_static_str())),
+-        )
+-    } else {
+-        Fragment::String(Cow::Borrowed(token))
+-    }
+-}
+-
+-fn compile_binop(
+-    op: BinOp,
+-    lhs: &Expr,
+-    rhs: &Expr,
+-    lhs_prec: Precedence,
+-    rhs_prec: Precedence,
+-) -> Fragment {
+-    Fragment::delimit(
+-        compile_bin_op(&op),
+-        compile_expr(lhs, lhs_prec),
+-        compile_expr(rhs, rhs_prec),
+-    )
+-}
+-
+-// FIXME - adopt pretty-printing engine with precedence rules
+-fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
+-    match expr {
+-        Expr::Const(typed_const) => Fragment::DisplayAtom(Rc::new(typed_const.clone())),
+-        Expr::BinOp(op, lhs, rhs) => match op.get_op() {
+-            BasicBinOp::Add | BasicBinOp::Sub => cond_paren(
+-                compile_binop(*op, lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+-                prec,
+-                Precedence::ADDSUB,
+-            ),
+-            BasicBinOp::Mul => cond_paren(
+-                compile_binop(*op, lhs, rhs, Precedence::MUL, Precedence::MUL),
+-                prec,
+-                Precedence::MUL,
+-            ),
+-            BasicBinOp::Div | BasicBinOp::Rem => cond_paren(
+-                compile_binop(*op, lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+-                prec,
+-                Precedence::DIVREM,
+-            ),
+-        },
+-        Expr::UnaryOp(unary_op, expr) => cond_paren(
+-            compile_prefix(unary_op, expr, Precedence::ABSNEG),
+-            prec,
+-            Precedence::ABSNEG,
+-        ),
+-        Expr::Cast(num_rep, expr) => cond_paren(
+-            compile_postfix(" as ", *num_rep, expr, Precedence::CAST),
+-            prec,
+-            Precedence::CAST,
+-        ),
+-    }
+-}
+-
+-pub fn show_expr(expr: &Expr) -> String {
+-    format!("{}", compile_expr(expr, Precedence::TOP))
+-}
+-
+-fn compile_elab_const(t: IntType, typed_const: &TypedConst) -> Fragment {
+-    if NumRep::from(t) == typed_const.get_rep() {
+-        // If the int-type is directly analogous to the original rep, omit the type-annotation
+-        Fragment::DisplayAtom(Rc::new(typed_const.clone()))
+-    } else {
+-        Fragment::cat(
+-            Fragment::DisplayAtom(Rc::new(typed_const.clone())),
+-            Fragment::cat(
+-                Fragment::Char('@'),
+-                Fragment::String(Cow::Borrowed(t.to_static_str())),
+-            ),
+-        )
+-    }
+-}
+-
+-fn compile_elab_binop(
+-    t: IntType,
+-    op: &TypedBinOp<IntType>,
+-    lhs: &TypedExpr<IntType>,
+-    rhs: &TypedExpr<IntType>,
+-    lhs_prec: Precedence,
+-    rhs_prec: Precedence,
+-) -> Fragment {
+-    compile_typed_expr(lhs, lhs_prec)
+-        .cat(compile_typed_bin_op(op))
+-        .cat(compile_typed_expr(rhs, rhs_prec))
+-        .cat(Fragment::String(Cow::Borrowed(" :: ")))
+-        .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
+-}
+-
+-fn compile_elab_prefix(
+-    t: IntType,
+-    op: &TypedUnaryOp<IntType>,
+-    inner: &TypedExpr<IntType>,
+-    inner_prec: Precedence,
+-) -> Fragment {
+-    if t == op.sig.0 && op.sig.0 == op.sig.1 {
+-        compile_typed_unary_op(op).cat(compile_typed_expr(inner, inner_prec))
+-    } else {
+-        compile_typed_unary_op(op)
+-            .cat(compile_typed_expr(inner, inner_prec))
+-            .cat(Fragment::String(Cow::Borrowed(" :: ")))
+-            .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
+-    }
+-}
+-
+-fn compile_elab_postfix<'a>(
+-    t: IntType,
+-    rep: NumRep,
+-    inner: &TypedExpr<IntType>,
+-    inner_prec: Precedence,
+-) -> Fragment {
+-    if NumRep::from(t) == rep {
+-        // If the int-type is directly analogous to the original rep, omit the type-annotation
+-        compile_typed_expr(inner, inner_prec)
+-            .cat(Fragment::String(Cow::Borrowed(" as ")))
+-            .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
+-    } else {
+-        // NOTE - this would normally be a panic but we are content to observe it without failing
+-        eprintln!("[WARNING]: Postfix operation (assumed to be Cast) has mismatched NumRep and IntType...");
+-        compile_typed_expr(inner, inner_prec)
+-            .cat(Fragment::String(Cow::Borrowed(" as ")))
+-            .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
+-            .cat(Fragment::String(Cow::Borrowed(" :: ")))
+-            .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
+-    }
+-}
+-
+-// FIXME - adopt pretty-printing engine with precedence rules
+-fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment {
+-    match t_expr {
+-        TypedExpr::ElabConst(t, typed_const) => compile_elab_const(*t, typed_const),
+-        TypedExpr::ElabBinOp(t, typed_bin_op, lhs, rhs) => match typed_bin_op.inner.get_op() {
+-            BasicBinOp::Add | BasicBinOp::Sub => cond_paren(
+-                compile_elab_binop(
+-                    *t,
+-                    typed_bin_op,
+-                    lhs,
+-                    rhs,
+-                    Precedence::ADDSUB,
+-                    Precedence::ADDSUB,
+-                ),
+-                prec,
+-                Precedence::ADDSUB,
+-            ),
+-            BasicBinOp::Mul => cond_paren(
+-                compile_elab_binop(*t, typed_bin_op, lhs, rhs, Precedence::MUL, Precedence::MUL),
+-                prec,
+-                Precedence::MUL,
+-            ),
+-            BasicBinOp::Div | BasicBinOp::Rem => cond_paren(
+-                compile_elab_binop(
+-                    *t,
+-                    typed_bin_op,
+-                    lhs,
+-                    rhs,
+-                    Precedence::DIVREM,
+-                    Precedence::DIVREM,
+-                ),
+-                prec,
+-                Precedence::DIVREM,
+-            ),
+-        },
+-        TypedExpr::ElabUnaryOp(t, typed_unary_op, inner) => cond_paren(
+-            compile_elab_prefix(*t, typed_unary_op, inner, Precedence::ABSNEG),
+-            prec,
+-            Precedence::ABSNEG,
+-        ),
+-        TypedExpr::ElabCast(t, TypedCast { _rep, .. }, inner) => cond_paren(
+-            compile_elab_postfix(*t, *_rep, inner, Precedence::CAST),
+-            prec,
+-            Precedence::CAST,
+-        ),
+-    }
+-}
+-
+-fn show_typed_expr(expr: &TypedExpr<IntType>) -> String {
+-    format!("{}", compile_typed_expr(expr, Precedence::TOP))
+-}
+-
+-fn show_code(expr: &TypedExpr<IntType>) -> String {
+-    let ast = synthesize(expr);
+-    format!("{}", ast.to_fragment())
+-}
+-
+-pub fn print_conversion(expr: &Expr) {
+-    let mut ie = InferenceEngine::new();
+-    match ie.infer_var_expr(expr) {
+-        Ok(_) => {
+-            let mut elab = Elaborator::new(ie);
+-            match elab.elaborate_expr(expr) {
+-                Ok(t_expr) => {
+-                    println!("Raw: {}", show_expr(expr));
+-                    println!("Elaborated: {}", show_typed_expr(&t_expr));
+-                    println!("Transcribed: {}", show_code(&t_expr));
+-                }
+-                Err(elab_err) => {
+-                    eprintln!(
+-                        "Error encountered during elaboration of `{}`: {}",
+-                        show_expr(expr),
+-                        elab_err
+-                    );
+-                }
+-            }
+-        }
+-        Err(e) => {
+-            eprintln!("Inference failed ({}) on {:?}", e, expr);
+-        }
+-    }
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-    use crate::core::TypedConst;
+-
+-    #[test]
+-    fn test_print_conversion() {
+-        let expr = {
+-            Expr::BinOp(
+-                BinOp::new(BasicBinOp::Add, None),
+-                Box::new(Expr::BinOp(
+-                    BinOp::new(BasicBinOp::Add, Some(MachineRep::U32)),
+-                    Box::new(Expr::Const(TypedConst(BigInt::from(10), NumRep::U32))),
+-                    Box::new(Expr::Const(TypedConst(BigInt::from(-1), NumRep::I32))),
+-                )),
+-                Box::new(Expr::Const(TypedConst(BigInt::from(5), NumRep::Auto))),
+-            )
+-        };
+-        print_conversion(&expr)
+-    }
+-}
+diff --git a/experiments/analytic-parser/Cargo.toml b/experiments/analytic-parser/Cargo.toml
+index cfcbea5a..0baf767f 100644
+--- a/experiments/analytic-parser/Cargo.toml
++++ b/experiments/analytic-parser/Cargo.toml
+@@ -8,6 +8,6 @@ lalrpop = "0.23.0"
+ 
+ [dependencies]
+ lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
+-analytic-engine = { path = "../analytic-engine/" }
++doodle = { path = "../../" }
+ num-bigint = "0.4.6"
+ linefeed = "0.6.0"
+diff --git a/experiments/analytic-parser/src/expr.lalrpop b/experiments/analytic-parser/src/expr.lalrpop
+index 70de2985..31d6ab94 100644
+--- a/experiments/analytic-parser/src/expr.lalrpop
++++ b/experiments/analytic-parser/src/expr.lalrpop
+@@ -1,6 +1,7 @@
+ use std::str::FromStr;
++use std::borrow::Cow;
+ use num_bigint::BigInt;
+-use analytic_engine::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, Expr, NumRep, MachineRep};
++use doodle::numeric::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, CastOp, Expr, NumRep, MachineRep};
+ 
+ grammar;
+ 
+@@ -10,7 +11,7 @@ pub Tree: Expr = {
+     #[precedence(level="1")]
+     <op:Op0> <t:Tree> => Expr::UnaryOp(op, Box::new(t)),
+     #[precedence(level="2")]
+-    <t:Tree> "as" <mr:MRep> => Expr::Cast(mr, Box::new(t)),
++    <t:Tree> "as" <op:COp> => Expr::Cast(op, Box::new(t)),
+     #[precedence(level="3")] #[assoc(side="left")]
+     <l:Tree> <op:Op1> <r:Tree> => Expr::BinOp(op, Box::new(l), Box::new(r)),
+     #[precedence(level="4")] #[assoc(side="left")]
+@@ -19,6 +20,7 @@ pub Tree: Expr = {
+ 
+ Term: Expr = {
+     Const => Expr::Const(<>),
++    Var => Expr::NumVar(<>),
+     "(" <Tree> ")",
+ }
+ 
+@@ -53,11 +55,18 @@ Op2: BinOp = {
+     OpCode2 => BinOp::new(<>, None),
+ }
+ 
++Var: Cow<'static, str> = "'" <s:r"[_a-z][_a-zA-Z]*"> "'" => Cow::Owned(String::from(s));
++
+ Const: TypedConst = {
+     <n:Num> => TypedConst(n, NumRep::AUTO),
+     <n:Num><r:Rep> => TypedConst(n, r),
+ }
+ 
++COp: CastOp = {
++    MRep => CastOp::arith(<>),
++    "r#" <r:MRep> => CastOp::bitwise(r),
++}
++
+ Rep: NumRep = {
+     "?" => NumRep::AUTO,
+     MRep => NumRep::Concrete(<>),
+diff --git a/experiments/analytic-parser/src/main.rs b/experiments/analytic-parser/src/main.rs
+index bfd83bf9..710643e0 100644
+--- a/experiments/analytic-parser/src/main.rs
++++ b/experiments/analytic-parser/src/main.rs
+@@ -1,4 +1,4 @@
+-use analytic_engine::printer::print_conversion;
++use doodle::numeric::printer::print_conversion;
+ use lalrpop_util::lalrpop_mod;
+ use linefeed::{Interface, ReadResult};
+ 
