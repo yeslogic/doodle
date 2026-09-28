@@ -73,6 +73,7 @@ impl std::fmt::Display for BasicUnaryOp {
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+#[repr(u8)]
 pub enum BitWidth {
     Bits8,
     Bits16,
@@ -154,25 +155,6 @@ impl MachineRep {
     };
 }
 
-impl From<MachineRep> for NumRep {
-    fn from(value: MachineRep) -> Self {
-        NumRep::Concrete(value)
-    }
-}
-
-/// Marker-type for the intended representation fo a numeric value,
-/// which an either be an explicit, concrete `MachineRep` or `Auto`.
-///
-/// Using `Auto` may not always work, but whenever there is a single
-/// intuitive choice for what representation is natural, it should
-/// yield the same result as using the concrete representation of that expected
-/// interpretation.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
-pub enum NumRep {
-    Auto,
-    Concrete(MachineRep),
-}
-
 impl MachineRep {
     /// Outputs a string representation of this machine-representation,
     /// suitable for value suffixing of numeric consts in Rust.
@@ -219,11 +201,38 @@ impl MachineRep {
             _ => false,
         }
     }
+
+    pub const fn const_eq(self, other: MachineRep) -> bool {
+       self.is_signed == other.is_signed
+                    && unsafe {
+                        std::mem::transmute::<_, u8>(self.bit_width)
+                            == std::mem::transmute::<_, u8>(other.bit_width)
+                    }
+    }
 }
 
 impl std::fmt::Display for MachineRep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.to_static_str())
+    }
+}
+
+/// Marker-type for the intended representation fo a numeric value,
+/// which an either be an explicit, concrete `MachineRep` or `Auto`.
+///
+/// Using `Auto` may not always work, but whenever there is a single
+/// intuitive choice for what representation is natural, it should
+/// yield the same result as using the concrete representation of that expected
+/// interpretation.
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+pub enum NumRep {
+    Auto,
+    Concrete(MachineRep),
+}
+
+impl From<MachineRep> for NumRep {
+    fn from(value: MachineRep) -> Self {
+        NumRep::Concrete(value)
     }
 }
 
@@ -238,6 +247,23 @@ impl NumRep {
         match self {
             NumRep::Auto => "?",
             NumRep::Concrete(machine) => machine.to_static_str(),
+        }
+    }
+
+    /// Attempts to unify `self` with `other`.
+    ///
+    /// If both are `Auto`, or they are distinct concrete reps, returns `Auto`.
+    /// Otherwise, returns a common concrete rep (i.e. if they are the same, or only one is `Auto`).
+    pub const fn unify(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Auto, x) | (x, Self::Auto) => x,
+            (Self::Concrete(a), Self::Concrete(b)) => {
+                if a.const_eq(b) {
+                    self
+                } else {
+                    Self::Auto
+                }
+            }
         }
     }
 }
