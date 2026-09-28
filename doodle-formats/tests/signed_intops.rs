@@ -1,12 +1,15 @@
 #![cfg(test)]
 
-use doodle::{codegen::{ToFragment, generate_code}, decoder::{
-    Compiler, Value,
-    seq_kind::{SeqKind, ValueSeq},
-}};
 use doodle::helper::*;
 use doodle::read::ReadCtxt;
 use doodle::{Format, FormatModule, FormatRef};
+use doodle::{
+    codegen::{ToFragment, generate_code},
+    decoder::{
+        Compiler, Value,
+        seq_kind::{SeqKind, ValueSeq},
+    },
+};
 use doodle_numexpr_macro::numexpr;
 
 /// Setup for a format that converts an i8-read into char
@@ -14,11 +17,7 @@ fn setup_char() -> (FormatModule, FormatRef) {
     let mut module = FormatModule::new();
     let f = module.define_format(
         "test.signed_intops",
-        chain(
-            i8(),
-            "x",
-            compute(as_char(var("x"))),
-        )
+        chain(i8(), "x", compute(as_char(var("x")))),
     );
     (module, f)
 }
@@ -50,11 +49,7 @@ fn setup_unary() -> (FormatModule, FormatRef) {
     let mut module = FormatModule::new();
     let f = module.define_format(
         "test.signed_intops",
-        chain(
-            i8(),
-            "x",
-            compute(pred(succ(var("x")))),
-        )
+        chain(i8(), "x", compute(pred(succ(var("x"))))),
     );
     (module, f)
 }
@@ -69,7 +64,9 @@ fn test_interp_unary() {
     let input = [0x00];
     let ctxt = ReadCtxt::new(&input);
     let (res, _) = prog.run(ctxt).expect("decoding failed on buf");
-    let expected = numeric(numexpr!(0i8)).eval_value(&doodle::scope::GScope::Empty).expect("eval failed");
+    let expected = numeric(numexpr!(0i8))
+        .eval_value(&doodle::scope::GScope::Empty)
+        .expect("eval failed");
     assert_eq!(res, expected);
 }
 
@@ -88,11 +85,7 @@ fn setup_binary() -> (FormatModule, FormatRef) {
     let mut module = FormatModule::new();
     let f = module.define_format(
         "test.signed_intops",
-        chain(
-            i8(),
-            "x",
-            compute(add(var("x"), poly_zero())),
-        )
+        chain(i8(), "x", compute(add(var("x"), poly_zero()))),
     );
     (module, f)
 }
@@ -107,7 +100,9 @@ fn test_interp_binary() {
     let input = [0x00];
     let ctxt = ReadCtxt::new(&input);
     let (res, _) = prog.run(ctxt).expect("decoding failed on buf");
-    let expected = numeric(numexpr!(0i8)).eval_value(&doodle::scope::GScope::Empty).expect("eval failed");
+    let expected = numeric(numexpr!(0i8))
+        .eval_value(&doodle::scope::GScope::Empty)
+        .expect("eval failed");
     assert_eq!(res, expected);
 }
 
