@@ -4543,22 +4543,24 @@ mod tests {
     #[should_panic = "intrel constrained to uany"]
     fn test_repro_intrel_on_signed_fails_to_unify() {
         use crate::helper::*;
-        use crate::numeric::helper as num;
         use crate::numeric::core::TypedConst;
+        use crate::numeric::helper as num;
 
         let mut tc = TypeChecker::new();
-        let x =
-            expr_eq(
-                numeric(num::expr_const(TypedConst::from_i16(0))),
-                poly_zero()
-            );
+        let x = expr_eq(
+            numeric(num::expr_const(TypedConst::from_i16(0))),
+            poly_zero(),
+        );
         match tc.infer_var_expr(&x, &UScope::new()) {
             Err(e) => match e.err.as_ref() {
-                TCErrorKind::CrossLayerNumeric(CrossLayerNumericError::PrimNotInBaseSet(PrimInt::I16, BaseSet::UAny)) => {
+                TCErrorKind::CrossLayerNumeric(CrossLayerNumericError::PrimNotInBaseSet(
+                    PrimInt::I16,
+                    BaseSet::UAny,
+                )) => {
                     panic!("intrel constrained to uany")
                 }
                 _ => panic!("unexpected error: {e}"),
-            }
+            },
             Ok(_) => panic!("expected error"),
         }
     }
