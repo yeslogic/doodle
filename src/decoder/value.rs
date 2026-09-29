@@ -560,7 +560,9 @@ impl Value {
             | (Value::U16(_), Value::U16(_))
             | (Value::U32(_), Value::U32(_))
             | (Value::U64(_), Value::U64(_))
-            | (Value::Numeric(_), Value::Numeric(_)) => Ok((Cow::Borrowed(left), Cow::Borrowed(right))),
+            | (Value::Numeric(_), Value::Numeric(_)) => {
+                Ok((Cow::Borrowed(left), Cow::Borrowed(right)))
+            }
             (Value::U8(_), Value::Numeric(n)) => {
                 let r = n.get_as_unsigned::<u8>()?;
                 Ok((Cow::Borrowed(left), Cow::Owned(Value::U8(r))))
@@ -601,7 +603,9 @@ impl Value {
                 let l = n.as_usize()?;
                 Ok((Cow::Owned(Value::Usize(l)), Cow::Borrowed(right)))
             }
-            _ => Err(anyhow::anyhow!("to_uniform_integer pair called on pair with non-integer element: ({left:?}, {right:?})")),
+            _ => Err(anyhow::anyhow!(
+                "to_uniform_integer pair called on pair with non-integer element: ({left:?}, {right:?})"
+            )),
         }
     }
 

@@ -18,7 +18,8 @@ pub(crate) trait AsKey {
 
 impl AsKey for Value {
     fn compare_as_key(&self, other: &Self) -> std::cmp::Ordering {
-        let (this, that) = Value::to_uniform_integer_pair(self, other).expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
+        let (this, that) = Value::to_uniform_integer_pair(self, other)
+            .expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
         match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a.cmp(b),
             (Value::U16(a), Value::U16(b)) => a.cmp(b),
@@ -27,13 +28,14 @@ impl AsKey for Value {
             (Value::Numeric(a), Value::Numeric(b)) => {
                 log::warn!("Value::compare_as_key called on numeric/numeric pair: ({a}, {b})");
                 Ord::cmp(a.as_raw_value(), b.as_raw_value())
-            },
+            }
             _ => panic!("Value::compare_as_key: Can't compare {self:?} and {other:?} as keys"),
         }
     }
 
     fn eq_key(&self, other: &Self) -> bool {
-        let (this, that) = Value::to_uniform_integer_pair(self, other).expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
+        let (this, that) = Value::to_uniform_integer_pair(self, other)
+            .expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
         match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a == b,
             (Value::U16(a), Value::U16(b)) => a == b,
@@ -42,7 +44,7 @@ impl AsKey for Value {
             (Value::Numeric(a), Value::Numeric(b)) => {
                 log::warn!("Value::eq_key called on numeric/numeric pair: ({a}, {b})");
                 a.eq_val(b)
-            },
+            }
             _ => panic!("Value::eq_key: can't compare {self:?} and {other:?} as keys"),
         }
     }
