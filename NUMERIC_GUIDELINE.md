@@ -34,7 +34,7 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
 - **NumExpr eval errors**: `DivideByZero`, `RemainderNonPositive` (the divisor must be > 0), `Ambiguous(rep0, rep1)` (untagged `BinOp` over two different concrete reps; `Auto` defers to the other side), `UnknownVar`, `BadVariable`. Arithmetic is unbounded `BigInt` with no overflow checks. `Cast` is arithmetic (value kept, rep retagged) or bitwise (`bitwise_cast` reinterprets).
 - **Native operations on a `Value::Numeric` operand** (`decoder/value.rs`):
   - **`int_rel`**: Numeric vs Numeric compares by value, ignoring rep. Numeric vs `U8`–`U64` uses `as_native` (value-only; errors if the value doesn't fit the native width). **Numeric vs `Usize` panics.**
-  - **`arith`**: Numeric vs `U8`–`U64` uses `get_as_unsized`, which is rep-checked: the rep must be exactly the sibling's width or `Auto`, and the value must be representable. **Numeric vs Numeric panics by design** (it should be done in the numeric model). **Numeric vs `Usize` panics.**
+  - **`arith`**: Numeric vs `U8`–`U64` uses `get_as_unsigned`, which is rep-checked: the rep must be exactly the sibling's width or `Auto`, and the value must be representable. **Numeric vs Numeric panics by design** (it should be done in the numeric model). **Numeric vs `Usize` panics.**
   - **`unary` (`IntSucc`/`IntPred`)**: dispatches on the Numeric's own rep. Only concrete `U8`–`U64` work. **Signed or `Auto` panics.**
   - **`AsU8`–`AsU64`/`AsChar`**: `as_native`, value-only and rep-agnostic; errors if the value doesn't fit.
   - **`as_usize` sites** (lengths, counts, offsets): value-only; negative or oversized values error.
