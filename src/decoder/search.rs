@@ -1,7 +1,8 @@
 use crate::Expr;
 use crate::decoder::{Value, seq_kind::SeqKind};
 
-/// Helper trait to apply find_index_by_key_sorted to ParsedValue and Value generically
+/// Trait providing key-comparison functionality used in binary search to an interpreter value-node,
+/// notably `Value` and `ParsedValue`. Used to implement `find_index_by_key_sorted`
 pub(crate) trait AsKey {
     /// Compares two values as keys, using natural order on the types being represented.
     ///
@@ -17,21 +18,31 @@ pub(crate) trait AsKey {
 
 impl AsKey for Value {
     fn compare_as_key(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
+        let (this, that) = Value::to_uniform_integer_pair(self, other).expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
+        match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a.cmp(b),
             (Value::U16(a), Value::U16(b)) => a.cmp(b),
             (Value::U32(a), Value::U32(b)) => a.cmp(b),
             (Value::U64(a), Value::U64(b)) => a.cmp(b),
+            (Value::Numeric(a), Value::Numeric(b)) => {
+                log::warn!("Value::compare_as_key called on numeric/numeric pair: ({a}, {b})");
+                Ord::cmp(a.as_raw_value(), b.as_raw_value())
+            },
             _ => panic!("Value::compare_as_key: Can't compare {self:?} and {other:?} as keys"),
         }
     }
 
     fn eq_key(&self, other: &Self) -> bool {
-        match (self, other) {
+        let (this, that) = Value::to_uniform_integer_pair(self, other).expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
+        match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a == b,
             (Value::U16(a), Value::U16(b)) => a == b,
             (Value::U32(a), Value::U32(b)) => a == b,
             (Value::U64(a), Value::U64(b)) => a == b,
+            (Value::Numeric(a), Value::Numeric(b)) => {
+                log::warn!("Value::eq_key called on numeric/numeric pair: ({a}, {b})");
+                a.eq_val(b)
+            },
             _ => panic!("Value::eq_key: can't compare {self:?} and {other:?} as keys"),
         }
     }

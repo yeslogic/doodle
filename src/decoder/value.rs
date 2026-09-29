@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -539,6 +540,71 @@ impl Value {
         })
     }
 
+    /// Takes two (borrowed) `Value`s and coerces any `Numeric` paired with a native integer into
+    /// the same variant as its co-term, returning the pair in the original order.
+    ///
+    /// `(Numeric, Numeric)` is returned as-is since there is no unambiguous variant to collapse them to.
+    ///
+    /// Any term other than `Numeric` is returned as-is.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `TypedConst::get_as_unsigned` errors, or if either term is not recognized
+    /// as an integer-typed `Value`.
+    pub(crate) fn to_uniform_integer_pair<'a, 'b>(
+        left: &'a Value,
+        right: &'b Value,
+    ) -> Result<(Cow<'a, Value>, Cow<'b, Value>), anyhow::Error> {
+        match (left, right) {
+            (Value::U8(_), Value::U8(_))
+            | (Value::U16(_), Value::U16(_))
+            | (Value::U32(_), Value::U32(_))
+            | (Value::U64(_), Value::U64(_))
+            | (Value::Numeric(_), Value::Numeric(_)) => Ok((Cow::Borrowed(left), Cow::Borrowed(right))),
+            (Value::U8(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u8>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U8(r))))
+            }
+            (Value::Numeric(n), Value::U8(_)) => {
+                let l = n.get_as_unsigned::<u8>()?;
+                Ok((Cow::Owned(Value::U8(l)), Cow::Borrowed(right)))
+            }
+            (Value::U16(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u16>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U16(r))))
+            }
+            (Value::Numeric(n), Value::U16(_)) => {
+                let l = n.get_as_unsigned::<u16>()?;
+                Ok((Cow::Owned(Value::U16(l)), Cow::Borrowed(right)))
+            }
+            (Value::U32(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u32>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U32(r))))
+            }
+            (Value::Numeric(n), Value::U32(_)) => {
+                let l = n.get_as_unsigned::<u32>()?;
+                Ok((Cow::Owned(Value::U32(l)), Cow::Borrowed(right)))
+            }
+            (Value::U64(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u64>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U64(r))))
+            }
+            (Value::Numeric(n), Value::U64(_)) => {
+                let l = n.get_as_unsigned::<u64>()?;
+                Ok((Cow::Owned(Value::U64(l)), Cow::Borrowed(right)))
+            }
+            (Value::Usize(_), Value::Numeric(n)) => {
+                let r = n.as_usize()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::Usize(r))))
+            }
+            (Value::Numeric(n), Value::Usize(_)) => {
+                let l = n.as_usize()?;
+                Ok((Cow::Owned(Value::Usize(l)), Cow::Borrowed(right)))
+            }
+            _ => Err(anyhow::anyhow!("to_uniform_integer pair called on pair with non-integer element: ({left:?}, {right:?})")),
+        }
+    }
+
     /// Unwraps `Value::U8` and returns the contained value, or panics if the value is not `Value::U8`.
     pub(crate) fn get_as_u8(&self) -> u8 {
         match self {
@@ -823,41 +889,41 @@ impl Value {
                 (Value::U32(l), Value::U32(r)) => Ok(__arith(arith, l, r).map(Value::U32)?),
                 (Value::U64(l), Value::U64(r)) => Ok(__arith(arith, l, r).map(Value::U64)?),
                 (Value::Usize(l), Value::Usize(r)) => Ok(__arith(arith, l, r).map(Value::Usize)?),
-                // `Arith`/`Unary` unify both operands' `ValueType` (see `TypedConst::get_as_unsized`'s
+                // `Arith`/`Unary` unify both operands' `ValueType` (see `TypedConst::get_as_unsigned`'s
                 // doc comment), so a `Numeric` operand's declared `NumRep` is pinned to exactly its
                 // sibling's concrete width in any sound tree - unlike `int_rel`/`AsCast`, which use
-                // the rep-agnostic `as_native` instead. Extract via `get_as_unsized`, then reuse the
+                // the rep-agnostic `as_native` instead. Extract via `get_as_unsigned`, then reuse the
                 // existing checked `__arith` on the native pair.
                 (Value::Numeric(ref n), Value::U8(r)) => {
-                    let l = n.get_as_unsized::<u8>()?;
+                    let l = n.get_as_unsigned::<u8>()?;
                     Ok(__arith(arith, l, r).map(Value::U8)?)
                 }
                 (Value::U8(l), Value::Numeric(ref n)) => {
-                    let r = n.get_as_unsized::<u8>()?;
+                    let r = n.get_as_unsigned::<u8>()?;
                     Ok(__arith(arith, l, r).map(Value::U8)?)
                 }
                 (Value::Numeric(ref n), Value::U16(r)) => {
-                    let l = n.get_as_unsized::<u16>()?;
+                    let l = n.get_as_unsigned::<u16>()?;
                     Ok(__arith(arith, l, r).map(Value::U16)?)
                 }
                 (Value::U16(l), Value::Numeric(ref n)) => {
-                    let r = n.get_as_unsized::<u16>()?;
+                    let r = n.get_as_unsigned::<u16>()?;
                     Ok(__arith(arith, l, r).map(Value::U16)?)
                 }
                 (Value::Numeric(ref n), Value::U32(r)) => {
-                    let l = n.get_as_unsized::<u32>()?;
+                    let l = n.get_as_unsigned::<u32>()?;
                     Ok(__arith(arith, l, r).map(Value::U32)?)
                 }
                 (Value::U32(l), Value::Numeric(ref n)) => {
-                    let r = n.get_as_unsized::<u32>()?;
+                    let r = n.get_as_unsigned::<u32>()?;
                     Ok(__arith(arith, l, r).map(Value::U32)?)
                 }
                 (Value::Numeric(ref n), Value::U64(r)) => {
-                    let l = n.get_as_unsized::<u64>()?;
+                    let l = n.get_as_unsigned::<u64>()?;
                     Ok(__arith(arith, l, r).map(Value::U64)?)
                 }
                 (Value::U64(l), Value::Numeric(ref n)) => {
-                    let r = n.get_as_unsized::<u64>()?;
+                    let r = n.get_as_unsigned::<u64>()?;
                     Ok(__arith(arith, l, r).map(Value::U64)?)
                 }
                 (Value::Numeric(l), Value::Numeric(r)) => {
@@ -872,26 +938,26 @@ impl Value {
                         NumRep::Concrete(rep) => match rep {
                             MachineRep::U8 => Ok(__arith(
                                 arith,
-                                l.get_as_unsized::<u8>()?,
-                                r.get_as_unsized::<u8>()?,
+                                l.get_as_unsigned::<u8>()?,
+                                r.get_as_unsigned::<u8>()?,
                             )
                             .map(Value::U8)?),
                             MachineRep::U16 => Ok(__arith(
                                 arith,
-                                l.get_as_unsized::<u16>()?,
-                                r.get_as_unsized::<u16>()?,
+                                l.get_as_unsigned::<u16>()?,
+                                r.get_as_unsigned::<u16>()?,
                             )
                             .map(Value::U16)?),
                             MachineRep::U32 => Ok(__arith(
                                 arith,
-                                l.get_as_unsized::<u32>()?,
-                                r.get_as_unsized::<u32>()?,
+                                l.get_as_unsigned::<u32>()?,
+                                r.get_as_unsigned::<u32>()?,
                             )
                             .map(Value::U32)?),
                             MachineRep::U64 => Ok(__arith(
                                 arith,
-                                l.get_as_unsized::<u64>()?,
-                                r.get_as_unsized::<u64>()?,
+                                l.get_as_unsigned::<u64>()?,
+                                r.get_as_unsigned::<u64>()?,
                             )
                             .map(Value::U64)?),
                             MachineRep::I8
@@ -927,16 +993,16 @@ impl Value {
                 // Unlike `arith`, there's no sibling native operand to pin the target width from, so dispatch on `n`'s own declared `NumRep` instead.
                 Value::Numeric(ref n) => match n.get_rep() {
                     NumRep::Concrete(MachineRep::U8) => {
-                        Ok(Value::U8(__unary(op, n.get_as_unsized::<u8>()?)?))
+                        Ok(Value::U8(__unary(op, n.get_as_unsigned::<u8>()?)?))
                     }
                     NumRep::Concrete(MachineRep::U16) => {
-                        Ok(Value::U16(__unary(op, n.get_as_unsized::<u16>()?)?))
+                        Ok(Value::U16(__unary(op, n.get_as_unsigned::<u16>()?)?))
                     }
                     NumRep::Concrete(MachineRep::U32) => {
-                        Ok(Value::U32(__unary(op, n.get_as_unsized::<u32>()?)?))
+                        Ok(Value::U32(__unary(op, n.get_as_unsigned::<u32>()?)?))
                     }
                     NumRep::Concrete(MachineRep::U64) => {
-                        Ok(Value::U64(__unary(op, n.get_as_unsized::<u64>()?)?))
+                        Ok(Value::U64(__unary(op, n.get_as_unsigned::<u64>()?)?))
                     }
                     // Only concrete, unsigned reps are accepted here, as `Value` is not designed to perform computations on `TypedConst` and there is no first-class Value for signed-ints
                     // NOTE[epic=eval-panic] - this panic is tolerable because it cannot be triggered by data, only by misimplemnted format definitions.
@@ -1150,7 +1216,7 @@ mod tests {
     fn numeric_with_mismatched_concrete_rep_still_compares_by_value() {
         // Declared as U16-rep, but the raw value 5 fits fine in a u8: `int_rel` is purely
         // value-based (like `as_native`) and ignores the declared `NumRep` entirely. Regression
-        // test: this used to error, back when the (now-removed) `get_as_unsized` required the
+        // test: this used to error when `int_rel` called `get_as_unsigned`, which required the
         // declared rep to match the native operand's width.
         let left = numeric(5u8, NumRep::Concrete(MachineRep::U16));
         let right = Value::U8(5);
@@ -1263,7 +1329,7 @@ mod tests {
     #[test]
     fn numeric_arith_mismatched_concrete_rep_errs() {
         // Unlike `int_rel`/As-casts (value-only, via `as_native`), `arith` uses the rep-checking
-        // `get_as_unsized`: a declared U16-rep is incompatible with a native U8 operand even though
+        // `get_as_unsigned`: a declared U16-rep is incompatible with a native U8 operand even though
         // the raw value 5 would fit.
         let n = numeric(5u8, NumRep::Concrete(MachineRep::U16));
         assert!(matches!(
@@ -1275,7 +1341,7 @@ mod tests {
     #[test]
     fn numeric_arith_unrepresentable_errs() {
         // Declared as U8-rep, but the raw value doesn't fit in a u8 - caught by
-        // `get_as_unsized`'s representability check even though the rep nominally matches.
+        // `get_as_unsigned`'s representability check even though the rep nominally matches.
         let n = numeric(300i32, NumRep::Concrete(MachineRep::U8));
         assert!(matches!(
             Value::arith(Arith::Add, n, Value::U8(10)),

@@ -398,7 +398,7 @@ impl NumRep {
     /// Returns `Some(bounds)` if `self` is a concrete machine-rep, or `None` if `self` is `Auto`.
     pub fn as_bounds(self) -> Option<Bounds> {
         match self {
-            NumRep::Auto => return None,
+            NumRep::Auto => None,
             NumRep::Concrete(mr) => Some(mr.as_bounds()),
         }
     }
@@ -482,7 +482,7 @@ impl TypedConst {
         &self.0
     }
 
-    /// Attempts to perform a one-to-one value conversion to `usize`.
+    /// Attempts to perform a one-to-one value conversion mapping the value of `self` into `usize`.
     ///
     /// Does not check if `self` is properly representable, only if its nominal
     /// value fits within the bounds of `usize`.
@@ -497,17 +497,26 @@ impl TypedConst {
         }
     }
 
-    /// Attempts a purely value-based conversion of `self`'s value to a native integer type `U`,
-    /// succeeding exactly when the value fits within `U`'s range - completely irrespective of
-    /// `self`'s declared `NumRep`. Generalizes [`Self::as_usize`] to an arbitrary target width.
+    /// Attempts to perform a one-to-one value conversion mapping the value of `self` into native integer-type `U`.
+    ///
+    /// Generalizes [`Self::as_usize`] to an arbitrary target width, as well as for native signed-integer target-types.
+    ///
+    /// This method succeeds if and only if the value of `self` fits within `U`'s range.
+    ///
+    /// This ignores both compatibility between the declared `NumRep` and the target `U` type,
+    /// as well as the representability of `self` within its own `NumRep`.
+    ///
+    /// # Notes
     ///
     /// Used both by the `AsU8`/`AsU16`/`AsU32`/`AsU64` casts and by `Value::int_rel`'s
-    /// `Numeric`-vs-native-integer arms: numeric equality/ordering and native-cast conversions are
-    /// value-only questions (a `NumRep::Concrete(MachineRep::U32)`-tagged constant with value `0`
-    /// compares/casts exactly as `Value::U32(0)` would), in contrast to *pattern*-matching
-    /// (`Pattern::U8`/`matches_u8`/etc.), which does care whether a value's declared type is
-    /// nominally compatible - that's a different question (`v` conceptually *is* a `U8`) from
-    /// value equality/ordering or reinterpretation (`v`'s numeric value fits/compares as a `U8`).
+    /// `Numeric`-vs-native-integer arms. For such purposes, the cast/comparison operation is treated
+    /// as part of the `numeric` sub-model, where sub-terms are exempted from operation-specific
+    /// type-constraints as long as the result-type is unambiguous. This allows both `Auto`, as well
+    /// as positive-valued Signed-rep to be compared against or native-cast into `U8`/`U16`/`U32`/`U64`.
+    ///
+    /// This is in contrast to the convention adopted for pattern-matching, in which the declared
+    /// type/rep must be nominally compatible with the pattern being matched on (auto, or the analogous NumRep for a
+    /// given `Pattern::U*`). For such purposes
     pub fn as_native<U>(&self) -> Result<U, anyhow::Error>
     where
         for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
@@ -519,52 +528,51 @@ impl TypedConst {
         })
     }
 
-    /// Attempts to coerce `self` to a native unsigned integer type `U`, requiring that `self`'s
-    /// declared `NumRep` is either `NumRep::Auto` or exactly the `NumRep` corresponding to `U`
-    /// (unlike [`Self::as_native`], which is purely value-based and ignores the declared `NumRep`
-    /// entirely).
+    /// Rep-checked coercion of `self` to a native unsigned integer type `U`.
     ///
-    /// Use this (rep-checking) rather than [`Self::as_native`] (value-only) whenever the calling
-    /// operation already has a type-equality invariant it needs `self` to hold to - e.g.
-    /// `Expr::Arith`/`Expr::Unary` unify a `Numeric` operand's declared `NumRep` with its sibling's
-    /// concrete width during type-checking (per `impl From<NumRep> for ValueType`), so for a sound
-    /// tree "does this value legitimately inhabit the type it claims" is the right question, not
-    /// "does the magnitude opportunistically fit". This matters because the numeric model does not
-    /// eagerly check overflow/underflow: a `BinOp`/`UnaryOp` evaluation can silently produce a
-    /// `TypedConst` tagged e.g. `Concrete(U32)` whose actual raw value is out of range, and
-    /// [`Self::is_representable`] (checked here) is what catches that. By contrast, `AsU8`-style
-    /// casts and `int_rel`'s `Numeric`-vs-native arms have no such invariant to hold to (their
-    /// operations don't themselves constrain both operands to share a type), so they use
-    /// [`Self::as_native`] instead.
-    pub fn get_as_unsized<U>(&self) -> Result<U, anyhow::Error>
+    /// Like [`Self::as_native`], with an additional guard requiring that `self` have a declared `NumRep` that
+    /// is compatible with `U` (i.e. that it is either `NumRep::Auto` or exactly the `NumRep` corresponding to `U`).
+    ///
+    /// Further requires that `self` is representable, which is not directly checked by `as_native`;
+    /// values are only required to be representable in the *native target type*, not their own `NumRep`.
+    ///
+    /// # Notes
+    ///
+    /// This method is preferred over [`Self::as_native`] whenever there is already a strict guard
+    /// enforced by type-inference or type-checking that restricts `self` to the `ValueType` corresponding
+    /// with `U`. For example, `Expr::Arith`/`Expr::IntRel` require their terms to be homogenously-typed
+    /// *a priori*, regardless of whether they are native-grammar integers or part of the `numeric` sub-model.
+    pub fn get_as_unsigned<U>(&self) -> Result<U, anyhow::Error>
     where
         U: num_traits::PrimInt + num_traits::Unsigned,
-        PhantomData<U>: Into<NumRep>,
+        NumRep: From<PhantomData<U>>,
         for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
     {
-        let _proxy: PhantomData<U> = PhantomData;
-        let tgt = _proxy.into();
+        // turn the type parameter U into a value-level NumRep we can test equality against
+        let tgt = NumRep::from(PhantomData::<U>);
         match self.1 {
             n if n == tgt => {
                 if self.is_representable() {
+                    // REVIEW[epic=log-err-panic] - should the Err case be `unreachable!` instead?
                     self.get_unsigned_unchecked::<U>().inspect_err(|e| {
                         log::error!(
-                            "TypedConst::get_as_unsized: `{self:?}` supposedly representable (as {n:?}), but conversion failed: {e}"
+                            "TypedConst::get_as_unsigned: `{self:?}` supposedly representable (as {n:?}), but conversion failed: {e}"
                         );
                     })
                 } else {
                     Err(anyhow!(
-                        "TypedConst::get_as_unsized: `{self:?}` not representable (as {n:?})"
+                        "TypedConst::get_as_unsigned: `{self:?}` not representable (as {n:?})"
                     ))
                 }
             }
             NumRep::Auto => self.get_unsigned_unchecked::<U>(),
             other => Err(anyhow!(
-                "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
+                "TypedConst::get_as_unsigned: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
             )),
         }
     }
 
+    /// Internal helper for [`Self::get_as_unsigned`], called only once the `NumRep` is known to be compatible.
     fn get_unsigned_unchecked<U>(&self) -> Result<U, anyhow::Error>
     where
         for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
@@ -580,6 +588,7 @@ impl TypedConst {
         match self.1 {
             NumRep::U8 => {
                 if self.is_representable() {
+                    // REVIEW[epic=log-err-panic] - should the Err case be `unreachable!` instead?
                     self.get_u8_unchecked().inspect_err(|e| {
                     log::error!(
                         "TypedConst::get_as_u8: `{self:?}` supposedly u8-representable, but conversion failed: {e}"
@@ -608,7 +617,7 @@ impl TypedConst {
     /// Does not validate the `NumRep` of `self`, which may lead to undesired behavior if used incorrectly.
     ///
     /// However, this method is not expected to ever panic, and its only caveat is that it will silently
-    /// ignore a `NumRep` that is not inherently compatible with `ValueType::U8` (namely, `NumRep::U8` or `NumRep::Auto`).
+    /// ignore a `NumRep` that is not inherently compatible with `ValueType::U8` (i.e. other than `NumRep::U8` or `NumRep::Auto`).
     fn get_u8_unchecked(&self) -> Result<u8, anyhow::Error> {
         Ok((&self.0).try_into()?)
     }
@@ -631,7 +640,7 @@ impl TypedConst {
     }
 
     /// Returns `true` if and only if `self` is notionally equivalent to the `M`-value `other` and
-    /// has a nominal representation that is compatible with `rep`.
+    /// has a nominal representation that is compatible (i.e. identity under unification) with `rep`.
     ///
     /// # Notes
     ///
@@ -687,7 +696,7 @@ impl TypedConst {
 
     /// Returns `true` if `self` should be considered a match for pattern `Pattern::Int(bounds)`
     pub fn matches_int_range(&self, bounds: UBounds) -> bool {
-        // REVIEW - if self.0 exceeds the maximum of the nominal type of the pattern, but bounds.max is None, what behavior is correct?
+        // REVIEW - what should the correct behavior be when `Pattern::Int` is matching on a `U8` with `bounds.max == None`, but `self.0` is greater than 255, and so forth?
         self.falls_within(bounds)
     }
 
@@ -699,8 +708,7 @@ impl TypedConst {
     /// Returns `true` if `l <rel> r` holds, based on general arithmetic value and
     /// irrespective of either `NumRep`.
     ///
-    /// In particular, either or both `TypedConst` can have rep-values for which their
-    /// nominal value is inexpressible, without the comparison being affected.
+    /// In particular, neither `l` nor `r` need be representable.
     pub(crate) fn rel(rel: IntRel, l: &Self, r: &Self) -> bool {
         let x = &l.0;
         let y = &r.0;
