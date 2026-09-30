@@ -30,7 +30,6 @@ pub enum Value {
     U32(u32),
     U64(u64),
     Char(char),
-    Usize(usize),
     // TODO[epic=embedded-num] - implement proper support for Numeric
     Numeric(Rc<TypedConst>),
     View {
@@ -38,7 +37,7 @@ pub enum Value {
     },
     PhantomData,
     // REVIEW - should EnumFromTo be considered a flat value?
-    EnumFromTo(std::ops::Range<usize>),
+    EnumFromTo(std::ops::Range<usize>, IntTag),
     // vvvv Non-flat values vvvv
     Option(Option<Box<Value>>),
     Tuple(Vec<Value>),
@@ -51,6 +50,118 @@ pub enum Value {
     Branch(usize, Box<Value>),
     /// Wrapper to indicate whether a value was parsed successfully, or generated from a fallback `Expr`, for a Decoder within a `Permit` context.
     Permit(Result<Box<Value>, Option<Box<Value>>>),
+}
+
+/// Element-type of a [`Value::EnumFromTo`] range, taken from the runtime type of its evaluated start-bound.
+///
+/// Unsigned `Numeric` bounds are collapsed into the corresponding native tag, so that only signed
+/// or auto-rep bounds yield `Value::Numeric` elements.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum IntTag {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    Auto,
+}
+
+impl IntTag {
+    /// Returns the appropriate display-string to use for suffixing int-tag to the display-form of the min/max bound of an `EnumFromTo` value.
+    pub const fn to_static_str(&self) -> &'static str {
+        match self {
+            IntTag::U8 => "u8",
+            IntTag::U16 => "u16",
+            IntTag::U32 => "u32",
+            IntTag::U64 => "u64",
+            IntTag::I8 => "i8",
+            IntTag::I16 => "i16",
+            IntTag::I32 => "i32",
+            IntTag::I64 => "i64",
+            IntTag::Auto => "?",
+        }
+    }
+}
+
+impl std::fmt::Display for IntTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
+}
+
+impl IntTag {
+    /// Determines the `IntTag` of an integer-typed `Value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not an integer, as this is an invariant enforced by the type-checker.
+    pub(crate) fn of(value: &Value) -> IntTag {
+        match value {
+            Value::U8(_) => IntTag::U8,
+            Value::U16(_) => IntTag::U16,
+            Value::U32(_) => IntTag::U32,
+            Value::U64(_) => IntTag::U64,
+            Value::Numeric(tc) => match tc.get_rep() {
+                NumRep::Auto => IntTag::Auto,
+                NumRep::Concrete(MachineRep::U8) => IntTag::U8,
+                NumRep::Concrete(MachineRep::U16) => IntTag::U16,
+                NumRep::Concrete(MachineRep::U32) => IntTag::U32,
+                NumRep::Concrete(MachineRep::U64) => IntTag::U64,
+                NumRep::Concrete(MachineRep::I8) => IntTag::I8,
+                NumRep::Concrete(MachineRep::I16) => IntTag::I16,
+                NumRep::Concrete(MachineRep::I32) => IntTag::I32,
+                NumRep::Concrete(MachineRep::I64) => IntTag::I64,
+            },
+            other => panic!("value is not a number: {other:?}"),
+        }
+    }
+
+    /// Checks that every element of `range` is representable under `self`, so that [`Self::mk`]
+    /// cannot fail on any of them (e.g. a `U8` start-bound paired with an oversized end-bound).
+    pub(crate) fn check_range(self, range: &std::ops::Range<usize>) -> Result<(), EvalError> {
+        if range.is_empty() {
+            return Ok(());
+        }
+        let last = range.end - 1;
+        match self {
+            IntTag::U8 => _ = u8::try_from(last)?,
+            IntTag::U16 => _ = u16::try_from(last)?,
+            IntTag::U32 => _ = u32::try_from(last)?,
+            IntTag::U64 => _ = u64::try_from(last)?,
+            IntTag::I8 => _ = i8::try_from(last)?,
+            IntTag::I16 => _ = i16::try_from(last)?,
+            IntTag::I32 => _ = i32::try_from(last)?,
+            IntTag::I64 => _ = i64::try_from(last)?,
+            IntTag::Auto => {}
+        }
+        Ok(())
+    }
+
+    /// Constructs the range-element `Value` for `n`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `n` is not representable under `self`, which [`Self::check_range`] rules out for
+    /// any element of a range it accepted.
+    pub(crate) fn mk(self, n: usize) -> Value {
+        const CHECKED: &str = "range-element should be representable (see IntTag::check_range)";
+        let signed =
+            |rep: MachineRep| Value::Numeric(Rc::new(TypedConst::new(n, NumRep::Concrete(rep))));
+        match self {
+            IntTag::U8 => Value::U8(u8::try_from(n).expect(CHECKED)),
+            IntTag::U16 => Value::U16(u16::try_from(n).expect(CHECKED)),
+            IntTag::U32 => Value::U32(u32::try_from(n).expect(CHECKED)),
+            IntTag::U64 => Value::U64(u64::try_from(n).expect(CHECKED)),
+            IntTag::I8 => signed(MachineRep::I8),
+            IntTag::I16 => signed(MachineRep::I16),
+            IntTag::I32 => signed(MachineRep::I32),
+            IntTag::I64 => signed(MachineRep::I64),
+            IntTag::Auto => Value::Numeric(Rc::new(TypedConst::new(n, NumRep::Auto))),
+        }
+    }
 }
 
 impl Value {
@@ -185,12 +296,6 @@ impl<T> From<T> for Coerced<T> {
     }
 }
 
-impl From<usize> for Value {
-    fn from(value: usize) -> Value {
-        Value::Usize(value)
-    }
-}
-
 const MAX_SEQ_LEN: usize = 64;
 
 impl std::fmt::Display for Value {
@@ -202,10 +307,9 @@ impl std::fmt::Display for Value {
             Value::U32(i) => write!(f, "{i}"),
             Value::U64(i) => write!(f, "{i}"),
             Value::Char(c) => write!(f, "{c:?}"),
-            Value::Usize(i) => write!(f, "{i}"),
             Value::Numeric(n) => write!(f, "{n}"),
             Value::View { offset } => write!(f, "View[+{offset}]"),
-            Value::EnumFromTo(r) => write!(f, "{r:?}"),
+            Value::EnumFromTo(r, tag) => write!(f, "{r:?}{tag}"),
             Value::Option(v) => match v {
                 None => write!(f, "None"),
                 Some(v) => write!(f, "Some({v})"),
@@ -322,7 +426,6 @@ impl Value {
                 Value::U16(n) => bounds.contains(usize::from(*n)),
                 Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
                 Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                Value::Usize(n) => bounds.contains(*n),
                 Value::Numeric(n) => n.matches_int_range(*bounds),
                 _ => false,
             },
@@ -331,7 +434,6 @@ impl Value {
                 Value::U16(n) => z == &BigInt::from(*n),
                 Value::U32(n) => z == &BigInt::from(*n),
                 Value::U64(n) => z == &BigInt::from(*n),
-                Value::Usize(n) => z == &BigInt::from(*n),
                 Value::Numeric(n) => n.eq_num(z),
                 _ => false,
             },
@@ -340,7 +442,6 @@ impl Value {
                 Value::U16(n) => range.contains(&BigInt::from(*n)),
                 Value::U32(n) => range.contains(&BigInt::from(*n)),
                 Value::U64(n) => range.contains(&BigInt::from(*n)),
-                Value::Usize(n) => range.contains(&BigInt::from(*n)),
                 Value::Numeric(n) => range.contains(n.as_raw_value()),
                 _ => false,
             },
@@ -447,7 +548,7 @@ impl Value {
     pub(crate) fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
         match self {
             Value::Seq(elts) => Some(ValueSeq::ValueSeq(elts)),
-            Value::EnumFromTo(range) => Some(ValueSeq::IntRange(range.clone())),
+            Value::EnumFromTo(range, tag) => Some(ValueSeq::IntRange(range.clone(), *tag)),
             _ => None,
         }
     }
@@ -534,7 +635,6 @@ impl Value {
             Value::U16(n) => usize::from(*n),
             Value::U32(n) => usize::try_from(*n)?,
             Value::U64(n) => usize::try_from(*n)?,
-            Value::Usize(n) => *n,
             Value::Numeric(tc) => tc.as_usize()?,
             other => panic!("value is not a number: {other:?}"),
         })
@@ -595,14 +695,6 @@ impl Value {
                 let l = n.get_as_unsigned::<u64>()?;
                 Ok((Cow::Owned(Value::U64(l)), Cow::Borrowed(right)))
             }
-            (Value::Usize(_), Value::Numeric(n)) => {
-                let r = n.as_usize()?;
-                Ok((Cow::Borrowed(left), Cow::Owned(Value::Usize(r))))
-            }
-            (Value::Numeric(n), Value::Usize(_)) => {
-                let l = n.as_usize()?;
-                Ok((Cow::Owned(Value::Usize(l)), Cow::Borrowed(right)))
-            }
             _ => Err(anyhow::anyhow!(
                 "to_uniform_integer pair called on pair with non-integer element: ({left:?}, {right:?})"
             )),
@@ -613,7 +705,7 @@ impl Value {
     pub(crate) fn get_as_u8(&self) -> u8 {
         match self {
             Value::U8(n) => *n,
-            Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!(
+            Value::U16(..) | Value::U32(..) | Value::U64(..) => panic!(
                 "value is numeric but not u8 (this may be a soft error, or even success, in future)"
             ),
             Value::Numeric(tc) => tc.get_as_u8().unwrap(),
@@ -634,7 +726,6 @@ impl Value {
             Value::U16(x) => u8::try_from(x)?,
             Value::U32(x) => u8::try_from(x)?,
             Value::U64(x) => u8::try_from(x)?,
-            Value::Usize(x) => u8::try_from(x)?,
             Value::Numeric(n) => n.as_native::<u8>()?,
             x => panic!("cannot convert {x:?} to U8"),
         }))
@@ -647,7 +738,6 @@ impl Value {
             Value::U16(x) => x,
             Value::U32(x) => u16::try_from(x)?,
             Value::U64(x) => u16::try_from(x)?,
-            Value::Usize(x) => u16::try_from(x)?,
             Value::Numeric(n) => n.as_native::<u16>()?,
             x => panic!("cannot convert {x:?} to U16"),
         }))
@@ -660,7 +750,6 @@ impl Value {
             Value::U16(x) => u32::from(x),
             Value::U32(x) => x,
             Value::U64(x) => u32::try_from(x)?,
-            Value::Usize(x) => u32::try_from(x)?,
             Value::Numeric(n) => n.as_native::<u32>()?,
             x => panic!("cannot convert {x:?} to U32"),
         }))
@@ -673,7 +762,6 @@ impl Value {
             Value::U16(x) => u64::from(x),
             Value::U32(x) => u64::from(x),
             Value::U64(x) => x,
-            Value::Usize(x) => u64::try_from(x)?,
             Value::Numeric(n) => n.as_native::<u64>()?,
             x => panic!("cannot convert {x:?} to U64"),
         }))
@@ -693,9 +781,8 @@ impl Value {
             Value::U16(x) => u32::from(x),
             Value::U32(x) => x,
             Value::U64(x) => u32::try_from(x)?,
-            Value::Usize(x) => u32::try_from(x)?,
             Value::Numeric(n) => n.as_native::<u32>()?,
-            _ => panic!("AsChar: expected U8, U16, U32, U64, Usize, or Numeric"),
+            _ => panic!("AsChar: expected U8, U16, U32, U64, or Numeric"),
         };
         Ok(Value::Char(
             char::from_u32(code_point).unwrap_or(char::REPLACEMENT_CHARACTER),
@@ -832,7 +919,6 @@ impl Value {
             (Value::U16(l), Value::U16(r)) => Ok(Value::Bool(__rel(rel, l, r))),
             (Value::U32(l), Value::U32(r)) => Ok(Value::Bool(__rel(rel, l, r))),
             (Value::U64(l), Value::U64(r)) => Ok(Value::Bool(__rel(rel, l, r))),
-            (Value::Usize(l), Value::Usize(r)) => Ok(Value::Bool(__rel(rel, l, r))),
             (Value::Numeric(l), Value::Numeric(r)) => Ok(Value::Bool(TypedConst::rel(rel, &l, &r))),
             (Value::Numeric(ref num), Value::U8(r)) => {
                 let l = num.as_native::<u8>()?;
@@ -892,7 +978,6 @@ impl Value {
                 (Value::U16(l), Value::U16(r)) => Ok(__arith(arith, l, r).map(Value::U16)?),
                 (Value::U32(l), Value::U32(r)) => Ok(__arith(arith, l, r).map(Value::U32)?),
                 (Value::U64(l), Value::U64(r)) => Ok(__arith(arith, l, r).map(Value::U64)?),
-                (Value::Usize(l), Value::Usize(r)) => Ok(__arith(arith, l, r).map(Value::Usize)?),
                 // `Arith`/`Unary` unify both operands' `ValueType` (see `TypedConst::get_as_unsigned`'s
                 // doc comment), so a `Numeric` operand's declared `NumRep` is pinned to exactly its
                 // sibling's concrete width in any sound tree - unlike `int_rel`/`AsCast`, which use
@@ -993,7 +1078,6 @@ impl Value {
                 Value::U16(i) => Ok(Value::U16(__unary(op, i)?)),
                 Value::U32(i) => Ok(Value::U32(__unary(op, i)?)),
                 Value::U64(i) => Ok(Value::U64(__unary(op, i)?)),
-                Value::Usize(i) => Ok(Value::Usize(__unary(op, i)?)),
                 // Unlike `arith`, there's no sibling native operand to pin the target width from, so dispatch on `n`'s own declared `NumRep` instead.
                 Value::Numeric(ref n) => match n.get_rep() {
                     NumRep::Concrete(MachineRep::U8) => {
@@ -1100,11 +1184,6 @@ mod tests {
             5,
             10_000_000_000,
         );
-    }
-
-    #[test]
-    fn usize_vs_usize() {
-        check_all_rels(&Value::Usize(5), &Value::Usize(10), 5, 10);
     }
 
     #[test]
@@ -1363,11 +1442,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "raw arithmetic on numerics")]
-    fn numeric_arith_numeric_vs_numeric_panics() {
+    fn numeric_arith_same_rep_resolves_to_native() {
         let l = numeric(1u8, NumRep::Concrete(MachineRep::U8));
         let r = numeric(2u8, NumRep::Concrete(MachineRep::U8));
-        let _ = Value::arith(Arith::Add, l, r);
+        let res = Value::arith(Arith::Add, l, r);
+        assert!(matches!(res, Ok(Value::U8(3))))
     }
 
     // ---- Unary support for Numeric (TypedConst) operands ----

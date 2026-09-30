@@ -1161,15 +1161,6 @@ impl<'a> TryFrom<&'a crate::decoder::Value> for StrictValue {
             Raw::U16(i) => Ok(StrictValue::from_u16(*i)),
             Raw::U32(i) => Ok(StrictValue::from_u32(*i)),
             Raw::U64(i) => Ok(StrictValue::from_u64(*i)),
-            Raw::Usize(i) => {
-                log::warn!(
-                    "StrictValue::try_from: Value::Usize coerced as auto-rep, inference may fail..."
-                );
-                Ok(StrictValue::new(Value::Const(TypedConst::new(
-                    *i,
-                    NumRep::Auto,
-                ))))
-            }
             Raw::Bool(..)
             | Raw::Char(..)
             | Raw::View { .. }

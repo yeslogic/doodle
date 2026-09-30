@@ -73,7 +73,7 @@ pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
 /// to fit it). The output `Vec` is allocated via `try_reserve_exact` rather than the infallible
 /// allocation APIs, so a `length` large enough to exhaust available memory surfaces as
 /// `EvalError::Alloc` instead of aborting the process.
-pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
+pub(crate) fn sub_seq_inflate<V: Clone + From<Value>>(
     values: ValueSeq<'_, V>,
     start: usize,
     length: usize,
@@ -111,13 +111,13 @@ pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
                 }
             }
         }
-        ValueSeq::IntRange(range) => {
+        ValueSeq::IntRange(range, tag) => {
             // REVIEW - double-check this logic
             let len = range.len();
             let mut iter = range.skip(start);
             for i in 0..length {
                 if let Some(val) = iter.next() {
-                    vs.push(val.into());
+                    vs.push(tag.mk(val).into());
                 } else {
                     vs.push(vs[i + start - len].clone());
                 }
@@ -129,7 +129,7 @@ pub(crate) fn sub_seq_inflate<V: Clone + From<usize>>(
 
 pub mod value;
 pub use crate::error::EvalError;
-pub use value::{ArithError, ArithOp, Value};
+pub use value::{ArithError, ArithOp, IntTag, Value};
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
 pub type EDecodeResult<T> = EResult<T, DecodeError>;

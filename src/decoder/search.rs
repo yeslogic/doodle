@@ -19,7 +19,7 @@ pub(crate) trait AsKey {
 impl AsKey for Value {
     fn compare_as_key(&self, other: &Self) -> std::cmp::Ordering {
         let (this, that) = Value::to_uniform_integer_pair(self, other)
-            .expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
+            .expect("Value::compare_as_key: Value::to_uniform_integer_pair encountered error");
         match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a.cmp(b),
             (Value::U16(a), Value::U16(b)) => a.cmp(b),
@@ -35,7 +35,7 @@ impl AsKey for Value {
 
     fn eq_key(&self, other: &Self) -> bool {
         let (this, that) = Value::to_uniform_integer_pair(self, other)
-            .expect("Value::eq_key cannot compare non-integer keys: {self:?} vs. {other:?}");
+            .expect("Value::eq_key: Value::to_uniform_integer_pair encountered error");
         match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a == b,
             (Value::U16(a), Value::U16(b)) => a == b,

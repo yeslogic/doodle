@@ -168,12 +168,9 @@ pub enum ParsedValue {
     Option(Option<Box<ParsedValue>>),
 }
 
-impl From<usize> for ParsedValue {
-    fn from(v: usize) -> Self {
-        ParsedValue::Flat(Parsed {
-            inner: Value::Usize(v),
-            loc: ParseLoc::Synthesized,
-        })
+impl From<Value> for ParsedValue {
+    fn from(v: Value) -> Self {
+        ParsedValue::from_evaluated(v)
     }
 }
 
@@ -434,7 +431,6 @@ impl ParsedValue {
                     Value::U16(n) => bounds.contains(usize::from(*n)),
                     Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
                     Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                    Value::Usize(n) => bounds.contains(*n),
                     _ => false,
                 },
                 _ => false,
@@ -445,7 +441,6 @@ impl ParsedValue {
                     Value::U16(n) => z == &BigInt::from(*n),
                     Value::U32(n) => z == &BigInt::from(*n),
                     Value::U64(n) => z == &BigInt::from(*n),
-                    Value::Usize(n) => z == &BigInt::from(*n),
                     Value::Numeric(tc) => tc.eq_num(z),
                     _ => false,
                 },
@@ -457,7 +452,6 @@ impl ParsedValue {
                     Value::U16(n) => bounds.contains(&BigInt::from(*n)),
                     Value::U32(n) => bounds.contains(&BigInt::from(*n)),
                     Value::U64(n) => bounds.contains(&BigInt::from(*n)),
-                    Value::Usize(n) => bounds.contains(&BigInt::from(*n)),
                     Value::Numeric(tc) => bounds.contains(tc.as_raw_value()),
                     _ => false,
                 },
@@ -518,8 +512,7 @@ impl ParsedValue {
             | Value::U64(_)
             | Value::Numeric(_)
             | Value::View { .. }
-            | Value::Usize(_)
-            | Value::EnumFromTo(_)
+            | Value::EnumFromTo(..)
             | Value::PhantomData
             | Value::Char(_) => ParsedValue::Flat(Parsed {
                 loc: ParseLoc::Synthesized,
@@ -591,9 +584,9 @@ impl ParsedValue {
         match self {
             ParsedValue::Seq(parsed) => Some(ValueSeq::ValueSeq(&parsed.inner)),
             ParsedValue::Flat(Parsed {
-                inner: Value::EnumFromTo(range),
+                inner: Value::EnumFromTo(range, tag),
                 ..
-            }) => Some(ValueSeq::IntRange(range.clone())),
+            }) => Some(ValueSeq::IntRange(range.clone(), *tag)),
             _ => None,
         }
     }
