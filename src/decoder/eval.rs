@@ -17,7 +17,7 @@ use crate::scope::{GMultiScope, GScope, GSingleScope};
 use crate::{Expr, Label, Pattern};
 
 use super::seq_kind::{SeqBoundsOp, ValueSeq, sub_range};
-use super::value::{Coerced, Value};
+use super::value::{Coerced, IntTag, Value};
 use super::{SeqKind, cow_map, cow_remap, extract_pair, search, sub_seq_inflate};
 
 /// The operations `Expr::eval_generic` needs from a leaf value representation. Implemented by
@@ -29,7 +29,7 @@ use super::{SeqKind, cow_map, cow_remap, extract_pair, search, sub_seq_inflate};
 /// broke inference at call sites (the HRTB `for<'x>` combined with the `Error = CoerceValueError`
 /// associated-type-equality bound doesn't elaborate cleanly through a supertrait in current
 /// rustc), so it's repeated as a `where` clause on every function below that needs it instead.
-pub(crate) trait EvalValue: Sized + Clone + std::fmt::Debug + From<usize> + 'static {
+pub(crate) trait EvalValue: Sized + Clone + std::fmt::Debug + From<Value> + 'static {
     /// Wraps a fully-evaluated, plain [`Value`] as `Self`.
     fn from_evaluated(v: Value) -> Self;
 
@@ -241,8 +241,8 @@ impl Expr {
                 cow_remap(head, |v| match v.coerce_mapped_value().get_sequence() {
                     Some(values) => match values {
                         ValueSeq::ValueSeq(values) => Cow::Borrowed(&values[index]),
-                        ValueSeq::IntRange(mut range) => {
-                            Cow::Owned(V::from(range.nth(index).unwrap()))
+                        ValueSeq::IntRange(mut range, tag) => {
+                            Cow::Owned(V::from(tag.mk(range.nth(index).unwrap())))
                         }
                     },
                     _ => unreachable!("bounds already checked above"),
@@ -263,13 +263,11 @@ impl Expr {
                                     .sub_seq(SeqBoundsOp::SubSeq, start, length)?
                                     .into_vec(),
                             )),
-                            ValueSeq::IntRange(range) => {
-                                Cow::Owned(V::from_evaluated(Value::EnumFromTo(sub_range(
-                                    SeqBoundsOp::SubSeq,
-                                    range,
-                                    start,
-                                    length,
-                                )?)))
+                            ValueSeq::IntRange(range, tag) => {
+                                Cow::Owned(V::from_evaluated(Value::EnumFromTo(
+                                    sub_range(SeqBoundsOp::SubSeq, range, start, length)?,
+                                    tag,
+                                )))
                             }
                         }
                     }
@@ -327,8 +325,8 @@ impl Expr {
                                 Value::Seq(vn) => {
                                     vs.extend(vn.into_vec());
                                 }
-                                Value::EnumFromTo(range) => {
-                                    vs.extend(range.map(Value::from));
+                                Value::EnumFromTo(range, tag) => {
+                                    vs.extend(range.map(|n| tag.mk(n)));
                                 }
                                 _ => {
                                     panic!("FlatMap: expected Seq (or EnumFromTo)");
@@ -419,7 +417,7 @@ impl Expr {
                         // `Value::Option`.
                         Cow::Owned(V::lift_option(found.map(|ix| values[ix].clone())))
                     }
-                    Some(ValueSeq::IntRange(_)) => {
+                    Some(ValueSeq::IntRange(..)) => {
                         unimplemented!("FindByKey: unimplemented on IntRange")
                     }
                     _ => panic!("FindByKey: expected Seq"),
@@ -465,9 +463,13 @@ impl Expr {
                 ))))
             }
             Expr::EnumFromTo(start, stop) => {
-                let start = start.eval_value_generic(scope)?.try_as_usize()?;
+                // NOTE - the element-type is taken from `start` alone; `stop` only bounds the range
+                let start = start.eval_value_generic(scope)?;
+                let tag = IntTag::of(&start);
+                let start = start.try_as_usize()?;
                 let stop = stop.eval_value_generic(scope)?.try_as_usize()?;
-                Cow::Owned(V::from_evaluated(Value::EnumFromTo(start..stop)))
+                tag.check_range(&(start..stop))?;
+                Cow::Owned(V::from_evaluated(Value::EnumFromTo(start..stop, tag)))
             }
             Expr::LiftOption(opt) => Cow::Owned(V::from_evaluated(Value::Option(
                 opt.as_ref()
@@ -566,7 +568,7 @@ mod tests {
         // Regression test for an off-by-one in `sub_range`'s bounds check that used to reject
         // `start + length == range.len()`, the valid full-range case.
         let expr = Expr::SubSeq(b(range(0, 3)), b(Expr::U32(0)), b(Expr::U32(3)));
-        assert_eq!(eval_ok(&expr), Value::EnumFromTo(0..3));
+        assert_eq!(eval_ok(&expr), Value::EnumFromTo(0..3, IntTag::U32));
     }
 
     #[test]
@@ -577,6 +579,90 @@ mod tests {
         let too_long = u64::from(u32::MAX) + 1;
         let expr = Expr::SeqLength(b(Expr::EnumFromTo(b(Expr::U64(0)), b(Expr::U64(too_long)))));
         assert!(matches!(eval_err(&expr), EvalError::IntCast(_)));
+    }
+
+    fn num_const(n: i64, rep: crate::numeric::core::NumRep) -> Expr {
+        use crate::numeric::core::{Expr as NumExpr, TypedConst};
+        Expr::Numeric(Box::new(NumExpr::Const(TypedConst::new(n, rep))))
+    }
+
+    fn concrete(rep: crate::numeric::MachineRep) -> crate::numeric::core::NumRep {
+        crate::numeric::core::NumRep::Concrete(rep)
+    }
+
+    /// Materializes an `EnumFromTo` via `FlatMap` with a singleton lambda.
+    fn materialize(range: Expr) -> Value {
+        eval_ok(&Expr::FlatMap(
+            b(lam("x", Expr::Seq(vec![var("x")]))),
+            b(range),
+        ))
+    }
+
+    #[test]
+    fn enum_from_to_native_bounds_yield_native_elements() {
+        let expr = Expr::EnumFromTo(b(Expr::U8(1)), b(Expr::U8(3)));
+        assert_eq!(eval_ok(&expr), Value::EnumFromTo(1..3, IntTag::U8));
+        assert_eq!(
+            materialize(expr.clone()),
+            Value::Seq(SeqKind::Strict(vec![Value::U8(1), Value::U8(2)]))
+        );
+        assert_eq!(
+            eval_ok(&Expr::SeqIx(b(expr), b(Expr::U32(1)))),
+            Value::U8(2)
+        );
+    }
+
+    #[test]
+    fn enum_from_to_unsigned_numeric_bounds_yield_native_elements() {
+        use crate::numeric::MachineRep;
+        let expr = Expr::EnumFromTo(
+            b(num_const(1, concrete(MachineRep::U16))),
+            b(num_const(3, concrete(MachineRep::U16))),
+        );
+        assert_eq!(eval_ok(&expr), Value::EnumFromTo(1..3, IntTag::U16));
+        assert_eq!(
+            materialize(expr),
+            Value::Seq(SeqKind::Strict(vec![Value::U16(1), Value::U16(2)]))
+        );
+    }
+
+    #[test]
+    fn enum_from_to_signed_and_auto_bounds_yield_numeric_elements() {
+        use crate::numeric::MachineRep;
+        use crate::numeric::core::{NumRep, TypedConst};
+        let numeric = |n: i64, rep| Value::Numeric(std::rc::Rc::new(TypedConst::new(n, rep)));
+
+        let signed = Expr::EnumFromTo(
+            b(num_const(0, concrete(MachineRep::I8))),
+            b(num_const(2, concrete(MachineRep::I8))),
+        );
+        let i8_rep = concrete(MachineRep::I8);
+        assert_eq!(
+            materialize(signed),
+            Value::Seq(SeqKind::Strict(vec![
+                numeric(0, i8_rep),
+                numeric(1, i8_rep)
+            ]))
+        );
+
+        let auto = Expr::EnumFromTo(b(num_const(0, NumRep::Auto)), b(num_const(2, NumRep::Auto)));
+        assert_eq!(
+            materialize(auto),
+            Value::Seq(SeqKind::Strict(vec![
+                numeric(0, NumRep::Auto),
+                numeric(1, NumRep::Auto)
+            ]))
+        );
+    }
+
+    #[test]
+    fn enum_from_to_start_type_wins_and_end_is_range_checked() {
+        // U8 start with a U16 end that still fits: elements take the start's type
+        let fits = Expr::EnumFromTo(b(Expr::U8(254)), b(Expr::U16(256)));
+        assert_eq!(eval_ok(&fits), Value::EnumFromTo(254..256, IntTag::U8));
+        // ...but an element that would not fit in the start's type is an error, not a panic
+        let overflows = Expr::EnumFromTo(b(Expr::U8(254)), b(Expr::U16(257)));
+        assert!(matches!(eval_err(&overflows), EvalError::IntCast(_)));
     }
 
     #[test]

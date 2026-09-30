@@ -70,13 +70,19 @@ Auto-rep numerics can only be matched via `Pattern::Int` if they resolve to an u
 
 For signed Numerics, the only patterns that are compatible are `ZConst` and `ZRange`, neither of which care about the rep of the scrutinee.
 
-## `Expr::infer_type`/`ValueType`
+## `Expr::infer_type`/`ValueType` (registration/legacy typechecker)
 
-A `NumExpr` with `Auto` rep is inferred as `ValueType::NumericHole`.
+Unsigned-rep Numerics are judged to have `ValueType::U8`/`ValueType::U16`/`ValueType::U32`/`ValueType::U64` based on the width of their rep. In this way, from a ValueType context,
+they are indistinguishable from core grammar integers of that type.
 
-An untagged `NumExpr::BinOp` requires its arguments to agree via unification, so two distinct non-`Auto` operands result in an error; anything else is resolved to the natural `ValueType` corresponding with the `MachineRep`.
+Signed-rep Numerics are ascribed `ValueType::Signed(SignedIntType::*)` according to their rep.
 
-`ValueType::is_numeric()` returns `true` for both `NumericHole` and `ValueType::Signed(..)`. Both of these are then accepted as well-formed argument (`Expr`) types for `IntRel`, `Arith`, `IntSucc/IntPred`, `AsU*`/`AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes`, and `ViewFormat::ReadArray` (in the 'length' position).
+Anything with `Auto` rep is inferred as `ValueType::NumericHole`. `ValueType::NumericHole` acts like `ValueType::Any`, but the only concrete value-type it can unify against are numeric `ValueType`s (i.e. `ValueType::Base` holding a numeric `BaseType`, or `ValueType::Signed`).
+
+The type-inference logic for `Expr::Numeric` recurses into the rep-solver for `NumExpr`, which can result in unification failure if an untagged `NumExpr::BinOp` holds terms with distinct non-`Auto` reps. Otherwise, the same type will be inferred as with `TypeChecker`, though a locally `Auto`-rep node will be judged as `NumericHole` because `infer_type` is a context-free
+type-solver, whereas `TypeChecker` does full bidirectional type-checking that can solve locally-`Auto` nodes if they are later referenced in type-constrained contexts.
+
+`ValueType::is_numeric()` returns `true` for `ValueType::Base(b)` when `b.is_numeric()` holds, as well as for `NumericHole` and `ValueType::Signed(..)`. Both of these are then accepted as well-formed argument (`Expr`) types for `IntRel`, `Arith`, `IntSucc/IntPred`, `AsU*`/`AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes`, and `ViewFormat::ReadArray` (in the 'length' position).
 
 Certain sites in `Expr::infer_type` mandate `ValueType::Base(b)` guarded by `b.is_numeric()`, not just `ValueType::is_numeric` on the overall type (i.e. they reject `Signed` and `NumericHole`); these include `RepeatCount`, `RepeatBetween`, and the 'key' field of `FindByKey`.[^1]
 
@@ -140,11 +146,11 @@ The scrutinee for a pattern-match against the following patterns are constrained
 - `X ~ Pattern::ZConst(N) | Pattern::ZRange(N..=M)`: `X` must have a repr in which `N` (and `M`) are representable values; if either is negative, `X` cannot be an unsigned Numeric; similarly enforces bit-width minima
 - `X ~ Pattern:Int(..)`: `X` restricted to `UintSet`, precluding signed Numerics
 
-## `Expr::eval`/`Value`
+## `Expr::eval`/`Value` (interpreter)
 
-When called on `Expr::Numeric(n)`, `Expr::eval` calls into `NumExpr::eval`, which does not guard against out-of-bounds values (underflow, overflow) on the claimed numrep. `NumExpr::eval_strict` does perform these checks, not only on the end-result but also on all intermediate terms.
+When called on `Expr::Numeric(n)`, `Expr::eval` calls into `NumExpr::eval`, which does not guard against out-of-bounds values (underflow, overflow) on the claimed numrep. `NumExpr::eval_strict`,on the other hand, will always perform these checks, on all intermediate terms as well as on the final result.
 
-However, `NumExpr::eval` can still produce errors, in the case of division-by-zero, modulo-non-positive (negative or zero), ambiguous untagged binary operations over different concrete reps, out-of-scope or non-numeric variable referenced by `NumVar`.
+However, `NumExpr::eval` can still produce errors for certain numeric operations, in the case of division-by-zero, modulo-non-positive (negative or zero), ambiguous untagged bin-ops over different concrete reps, and out-of-scope or non-numeric variable-bindings through `NumVar`.
 
 Furthermore, whenever the `TypedConst` held by a `Value` is coerced to a fixed machine-type by an enclosing `Expr::eval` call, unrepresentable values are eventually caught.
 
