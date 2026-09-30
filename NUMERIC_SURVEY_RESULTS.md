@@ -64,50 +64,48 @@ Only cases where the layers behave inconsistently appear in the table. Cases eve
 | `Dup(5auto, U8(0))` | ✗ #31 | ✓ | – | codegen looser |
 | `Dup(-1auto, U8(0))` | ✗ #32 | ! #18 | – | codegen panics |
 | `Dup(u8()=5, U8(0))` | ✗ #33 | ✓ | – | codegen looser |
-| `FindByKey(id, 5u8, [U8(5)])` | ✓ | ✓ | ! #34 | interp panics after registration accepts |
-| `FindByKey(id, 5auto, [U8(5)])` | ✓ | ✓ | ! #35 | interp panics after registration accepts |
-| `FindByKey(id, -1auto, [U8(5)])` | ✓ | ✗ #36 | ! #37 | interp panics after registration accepts |
-| `RepeatCount(5auto, u8)` | ✗ #38 | ! #39 | – | codegen panics |
-| `RepeatCount(-1auto, u8)` | ✗ #38 | ! #40 | – | codegen panics |
+| `FindByKey(id, -1auto, [U8(5)])` | ✓ | ✗ #34 | ! #35 | interp panics after registration accepts |
+| `RepeatCount(5auto, u8)` | ✗ #36 | ! #37 | – | codegen panics |
+| `RepeatCount(-1auto, u8)` | ✗ #36 | ! #38 | – | codegen panics |
 | `CaptureBytes(5i8)` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `CaptureBytes(-1i8)` | ✓ | ✗ #1 | ✗ #41 | codegen stricter |
-| `CaptureBytes(5auto)` | ✓ | ! #42 | ✓ | codegen panics |
-| `CaptureBytes(-1auto)` | ✓ | ! #43 | ✗ #44 | codegen panics |
+| `CaptureBytes(-1i8)` | ✓ | ✗ #1 | ✗ #39 | codegen stricter |
+| `CaptureBytes(5auto)` | ✓ | ! #40 | ✓ | codegen panics |
+| `CaptureBytes(-1auto)` | ✓ | ! #41 | ✗ #42 | codegen panics |
 | `CaptureBytes(i8()=5)` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `CaptureBytes(i8()=-1)` | ✓ | ✗ #1 | ✗ #45 | codegen stricter |
+| `CaptureBytes(i8()=-1)` | ✓ | ✗ #1 | ✗ #43 | codegen stricter |
 | `ReadArray(5i8, U8)` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `ReadArray(-1i8, U8)` | ✓ | ✗ #1 | ✗ #46 | codegen stricter |
-| `ReadArray(5auto, U8)` | ✓ | ! #42 | ✓ | codegen panics |
-| `ReadArray(-1auto, U8)` | ✓ | ! #43 | ✗ #47 | codegen panics |
+| `ReadArray(-1i8, U8)` | ✓ | ✗ #1 | ✗ #44 | codegen stricter |
+| `ReadArray(5auto, U8)` | ✓ | ! #40 | ✓ | codegen panics |
+| `ReadArray(-1auto, U8)` | ✓ | ! #41 | ✗ #45 | codegen panics |
 | `ReadArray(i8()=5, U8)` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `ReadArray(i8()=-1, U8)` | ✓ | ✗ #1 | ✗ #48 | codegen stricter |
+| `ReadArray(i8()=-1, U8)` | ✓ | ✗ #1 | ✗ #46 | codegen stricter |
 | `Offset(v, 5i8)` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `Offset(v, -1i8)` | ✓ | ✗ #1 | ✗ #49 | codegen stricter |
+| `Offset(v, -1i8)` | ✓ | ✗ #1 | ✗ #47 | codegen stricter |
 | `Offset(v, 5auto)` | ✓ | ! #17 | ✓ | codegen panics |
-| `Offset(v, -1auto)` | ✓ | ! #18 | ✗ #50 | codegen panics |
+| `Offset(v, -1auto)` | ✓ | ! #18 | ✗ #48 | codegen panics |
 | `Offset(v, i8()=5)` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `Offset(v, i8()=-1)` | ✓ | ✗ #1 | ✗ #51 | codegen stricter |
-| `5u16 ~ U8(5)` | ! #52 | ✗ #53 | – |  |
-| `5i8 ~ U8(5)` | ! #54 | ✗ #55 | – |  |
-| `-1i8 ~ U8(5)` | ! #54 | ✗ #55 | – |  |
-| `5auto ~ U8(5)` | ! #56 | ✓ | – | codegen looser |
-| `-1auto ~ U8(5)` | ! #56 | ✗ #36 | – |  |
-| `i8()=5 ~ U8(5)` | ! #54 | ✗ #55 | – |  |
-| `i8()=-1 ~ U8(5)` | ! #54 | ✗ #55 | – |  |
-| `5i8 ~ Int(0..=10)` | ! #57 | ✗ #1 | – |  |
-| `-1i8 ~ Int(0..=10)` | ! #57 | ✗ #1 | – |  |
-| `5auto ~ Int(0..=10)` | ! #58 | ! #17 | – | codegen panics |
-| `-1auto ~ Int(0..=10)` | ! #58 | ! #18 | – | codegen panics |
-| `i8()=5 ~ Int(0..=10)` | ! #57 | ✗ #1 | – |  |
-| `i8()=-1 ~ Int(0..=10)` | ! #57 | ✗ #1 | – |  |
+| `Offset(v, i8()=-1)` | ✓ | ✗ #1 | ✗ #49 | codegen stricter |
+| `5u16 ~ U8(5)` | ! #50 | ✗ #51 | – |  |
+| `5i8 ~ U8(5)` | ! #52 | ✗ #53 | – |  |
+| `-1i8 ~ U8(5)` | ! #52 | ✗ #53 | – |  |
+| `5auto ~ U8(5)` | ! #54 | ✓ | – | codegen looser |
+| `-1auto ~ U8(5)` | ! #54 | ✗ #34 | – |  |
+| `i8()=5 ~ U8(5)` | ! #52 | ✗ #53 | – |  |
+| `i8()=-1 ~ U8(5)` | ! #52 | ✗ #53 | – |  |
+| `5i8 ~ Int(0..=10)` | ! #55 | ✗ #1 | – |  |
+| `-1i8 ~ Int(0..=10)` | ! #55 | ✗ #1 | – |  |
+| `5auto ~ Int(0..=10)` | ! #56 | ! #17 | – | codegen panics |
+| `-1auto ~ Int(0..=10)` | ! #56 | ! #18 | – | codegen panics |
+| `i8()=5 ~ Int(0..=10)` | ! #55 | ✗ #1 | – |  |
+| `i8()=-1 ~ Int(0..=10)` | ! #55 | ✗ #1 | – |  |
 | `5auto ~ ZConst(5)` | ✓ | ! #9 | ✓ | codegen panics |
 | `-1auto ~ ZConst(5)` | ✓ | ! #10 | ✓ | codegen panics |
-| `U8(5) ~ ZConst(-1)` | ✓ | ✗ #59 | ✓ | codegen stricter |
-| `5u8 ~ ZConst(-1)` | ✓ | ✗ #59 | ✓ | codegen stricter |
-| `5u16 ~ ZConst(-1)` | ✓ | ✗ #60 | ✓ | codegen stricter |
+| `U8(5) ~ ZConst(-1)` | ✓ | ✗ #57 | ✓ | codegen stricter |
+| `5u8 ~ ZConst(-1)` | ✓ | ✗ #57 | ✓ | codegen stricter |
+| `5u16 ~ ZConst(-1)` | ✓ | ✗ #58 | ✓ | codegen stricter |
 | `5auto ~ ZConst(-1)` | ✓ | ! #10 | ✓ | codegen panics |
 | `-1auto ~ ZConst(-1)` | ✓ | ! #10 | ✓ | codegen panics |
-| `u8()=5 ~ ZConst(-1)` | ✓ | ✗ #59 | ✓ | codegen stricter |
+| `u8()=5 ~ ZConst(-1)` | ✓ | ✗ #57 | ✓ | codegen stricter |
 | `5i8 == 5i8` | ✓ | ✗ #1 | ✓ | codegen stricter |
 | `5auto == 5i8` | ✓ | ✗ #1 | ✓ | codegen stricter |
 | `5auto == 5auto` | ✓ | ! #17 | ✓ | codegen panics |
@@ -120,32 +118,32 @@ Only cases where the layers behave inconsistently appear in the table. Cases eve
 | `-1i8 < 5auto` | ✓ | ✗ #1 | ✓ | codegen stricter |
 | `i8()=5 < 5auto` | ✓ | ✗ #1 | ✓ | codegen stricter |
 | `i8()=5 < 5i8` | ✓ | ✗ #1 | ✓ | codegen stricter |
-| `5i8 + 5i8` | ✓ | ✗ #1 | ! #61 | interp panics after registration accepts |
-| `5auto + 5i8` | ✓ | ✗ #1 | ! #62 | interp panics after registration accepts |
-| `5auto + 5auto` | ✓ | ! #4 | ! #63 | interp panics after registration accepts |
-| `-1i8 + 5auto` | ✓ | ✗ #1 | ! #64 | interp panics after registration accepts |
-| `i8()=5 + 5auto` | ✓ | ✗ #1 | ! #65 | interp panics after registration accepts |
-| `i8()=5 + 5i8` | ✓ | ✗ #1 | ! #61 | interp panics after registration accepts |
-| `EnumFromTo(5i8, 5i8)` | ✓ | ✗ #66 | ✓ | codegen stricter |
-| `EnumFromTo(5auto, 5i8)` | ✓ | ✗ #66 | ✓ | codegen stricter |
-| `EnumFromTo(-1i8, 5auto)` | ✓ | ✗ #66 | ✗ #67 | codegen stricter |
-| `EnumFromTo(i8()=5, 5auto)` | ✓ | ✗ #66 | ✓ | codegen stricter |
-| `EnumFromTo(i8()=5, 5i8)` | ✓ | ✗ #66 | ✓ | codegen stricter |
+| `5i8 + 5i8` | ✓ | ✗ #1 | ! #59 | interp panics after registration accepts |
+| `5auto + 5i8` | ✓ | ✗ #1 | ! #60 | interp panics after registration accepts |
+| `5auto + 5auto` | ✓ | ! #4 | ! #61 | interp panics after registration accepts |
+| `-1i8 + 5auto` | ✓ | ✗ #1 | ! #62 | interp panics after registration accepts |
+| `i8()=5 + 5auto` | ✓ | ✗ #1 | ! #63 | interp panics after registration accepts |
+| `i8()=5 + 5i8` | ✓ | ✗ #1 | ! #59 | interp panics after registration accepts |
+| `EnumFromTo(5i8, 5i8)` | ✓ | ✗ #64 | ✓ | codegen stricter |
+| `EnumFromTo(5auto, 5i8)` | ✓ | ✗ #64 | ✓ | codegen stricter |
+| `EnumFromTo(-1i8, 5auto)` | ✓ | ✗ #64 | ✗ #65 | codegen stricter |
+| `EnumFromTo(i8()=5, 5auto)` | ✓ | ✗ #64 | ✓ | codegen stricter |
+| `EnumFromTo(i8()=5, 5i8)` | ✓ | ✗ #64 | ✓ | codegen stricter |
 | `[5auto, 5auto]` | ✓ | ! #9 | ✓ | codegen panics |
-| `if _ then 5auto else 5auto` | ✓ | ! #68 | ✓ | codegen panics |
-| `RepeatBetween(5u8, U8(5), u8)` | ✓ | ! #69 | ✓ | codegen panics |
-| `RepeatBetween(U8(5), 5u8, u8)` | ✓ | ! #69 | ✓ | codegen panics |
-| `RepeatBetween(5u8, 5u8, u8)` | ✓ | ! #69 | ✓ | codegen panics |
-| `RepeatBetween(5auto, U8(5), u8)` | ✗ #70 | ! #69 | – | codegen panics |
-| `RepeatBetween(5auto, 5auto, u8)` | ✗ #70 | ! #39 | – | codegen panics |
-| `RepeatBetween(u8()=5, 5u8, u8)` | ! #69 | ! #69 | – | codegen panics |
+| `if _ then 5auto else 5auto` | ✓ | ! #66 | ✓ | codegen panics |
+| `RepeatBetween(5u8, U8(5), u8)` | ✓ | ! #67 | ✓ | codegen panics |
+| `RepeatBetween(U8(5), 5u8, u8)` | ✓ | ! #67 | ✓ | codegen panics |
+| `RepeatBetween(5u8, 5u8, u8)` | ✓ | ! #67 | ✓ | codegen panics |
+| `RepeatBetween(5auto, U8(5), u8)` | ✗ #68 | ! #67 | – | codegen panics |
+| `RepeatBetween(5auto, 5auto, u8)` | ✗ #68 | ! #37 | – | codegen panics |
+| `RepeatBetween(u8()=5, 5u8, u8)` | ! #67 | ! #67 | – | codegen panics |
 
 ## Consistent cases (omitted from the table)
 
 - **increment/decrement**, all accept: `IntSucc(U8(5))`, `IntSucc(5u8)`, `IntSucc(5u16)`, `IntSucc(u8()=5)`, `IntPred(U8(5))`, `IntPred(5u8)`, `IntPred(5u16)`, `IntPred(u8()=5)`
 - **casts**, all accept: `AsU8(U8(5))`, `AsU8(5u8)`, `AsU8(5u16)`, `AsU8(5i8)`, `AsU8(i8()=5)`, `AsU8(u8()=5)`, `AsU32(U8(5))`, `AsU32(5u8)`, `AsU32(5u16)`, `AsU32(5i8)`, `AsU32(i8()=5)`, `AsU32(u8()=5)`, `AsChar(U8(5))`, `AsChar(5u8)`, `AsChar(5u16)`, `AsChar(u8()=5)`
 - **sequence index/length arguments**, all reject: `SeqIx(seq, 5i8)`, `SeqIx(seq, -1i8)`, `SeqIx(seq, i8()=5)`, `SeqIx(seq, i8()=-1)`, `SubSeq(seq, 5i8, 1)`, `SubSeq(seq, -1i8, 1)`, `SubSeq(seq, i8()=5, 1)`, `SubSeq(seq, i8()=-1, 1)`, `Dup(5i8, U8(0))`, `Dup(-1i8, U8(0))`, `Dup(i8()=5, U8(0))`, `Dup(i8()=-1, U8(0))`
-- **FindByKey keys**, all accept: `FindByKey(id, U8(5), [U8(5)])`, `FindByKey(id, u8()=5, [U8(5)])`
+- **FindByKey keys**, all accept: `FindByKey(id, U8(5), [U8(5)])`, `FindByKey(id, 5u8, [U8(5)])`, `FindByKey(id, 5auto, [U8(5)])`, `FindByKey(id, u8()=5, [U8(5)])`
 - **FindByKey keys**, all reject: `FindByKey(id, 5u16, [U8(5)])`, `FindByKey(id, 5i8, [U8(5)])`, `FindByKey(id, -1i8, [U8(5)])`, `FindByKey(id, i8()=5, [U8(5)])`, `FindByKey(id, i8()=-1, [U8(5)])`
 - **repetition counts**, all accept: `RepeatCount(U8(5), u8)`, `RepeatCount(5u8, u8)`, `RepeatCount(5u16, u8)`, `RepeatCount(u8()=5, u8)`, `RepeatBetween(U8(5), U8(5), u8)`
 - **repetition counts**, all reject: `RepeatCount(5i8, u8)`, `RepeatCount(-1i8, u8)`, `RepeatCount(i8()=5, u8)`, `RepeatCount(i8()=-1, u8)`, `RepeatBetween(U8(5), U16(5), u8)`, `RepeatBetween(5u8, 5u16, u8)`, `RepeatBetween(5i8, 5i8, u8)`, `RepeatBetween(5i8, 5u8, u8)`, `RepeatBetween(5auto, 5i8, u8)`, `RepeatBetween(-1i8, 5auto, u8)`, `RepeatBetween(i8()=5, 5auto, u8)`, `RepeatBetween(i8()=5, 5i8, u8)`
@@ -195,44 +193,42 @@ Only cases where the layers behave inconsistently appear in the table. Cases eve
 31. Dup: count is not U32: Numeric(5?)
 32. Dup: count is not U32: Numeric(-1?)
 33. Dup: count is not U32: Var("x")
-34. Value::eq_key: can't compare Numeric(TypedConst(5, Concrete(MachineRep { is_signed: false, bit_width: Bits8 }))) and U8(5) as keys
-35. Value::eq_key: can't compare Numeric(TypedConst(5, Auto)) and U8(5) as keys
-36. Failed to infer module-wide type annotations: unsatisfiable equivalence  `NumTree(Z(PrimIntSet { i8: At(3), i16: At(3), i32: At(3), i64: At(3) })) = Equiv(Int(Prim(U8)))` (
-37. Value::eq_key: can't compare Numeric(TypedConst(-1, Auto)) and U8(5) as keys
-38. RepeatCount first argument type should be numeric, found NumericHole instead
-39. no unique solution for `?1 ∈ { U8, U16, U32, U64 }`
-40. no valid solutions for `?1`
-41. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("CaptureBytes(len)", "Numeric(-1i8)"), ("LetView(parse)", "here_view", "CaptureBytes(Var(\"here_view\"), Numeric(-1i8))")] }
-42. no unique solution for `?3 ∈ { U8, U16, U32, U64 }`
-43. no valid solutions for `?3`
-44. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto) to usize: out of range conversion regarding big integer attempted)), _trace: [("CaptureBytes(len)", "Numeric(-1?)"), ("LetView(parse)", "here_view", "CaptureBytes(Var(\"here_view\"), Numeric(-1?))")] }
-45. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("CaptureBytes(len)", "Var(\"x\")"), ("LetView(parse)", "here_view", "CaptureBytes(Var(\"here_view\"), Var(\"x\"))")] }
-46. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("ReadArray(len)", "Numeric(-1i8)"), ("LetView(parse)", "here_view", "ReadArray(Var(\"here_view\"), Numeric(-1i8), Base(U8))")] }
-47. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto) to usize: out of range conversion regarding big integer attempted)), _trace: [("ReadArray(len)", "Numeric(-1?)"), ("LetView(parse)", "here_view", "ReadArray(Var(\"here_view\"), Numeric(-1?), Base(U8))")] }
-48. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("ReadArray(len)", "Var(\"x\")"), ("LetView(parse)", "here_view", "ReadArray(Var(\"here_view\"), Var(\"x\"), Base(U8))")] }
-49. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("LetView(parse)", "v", "CaptureBytes(Offset(Var(\"v\"), Numeric(-1i8)), U32(1))")] }
-50. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto) to usize: out of range conversion regarding big integer attempted)), _trace: [("LetView(parse)", "v", "CaptureBytes(Offset(Var(\"v\"), Numeric(-1?)), U32(1))")] }
-51. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("LetView(parse)", "v", "CaptureBytes(Offset(Var(\"v\"), Var(\"x\")), U32(1))")] }
-52. pattern build_scope failed: (U8(5), Base(U16))
-53. Failed to infer module-wide type annotations: cross-layer numeric error: non-matching PrimInt and BaseType: `u16` ≄ `u8` (
-54. pattern build_scope failed: (U8(5), Signed(I8))
-55. Failed to infer module-wide type annotations: cross-layer numeric error: non-matching PrimInt and BaseType: `i8` ≄ `u8` (
-56. pattern build_scope failed: (U8(5), NumericHole)
-57. pattern build_scope failed: (Int(Bounds { min: 0, max: Some(10) }), Signed(I8))
-58. pattern build_scope failed: (Int(Bounds { min: 0, max: Some(10) }), NumericHole)
-59. Failed to infer module-wide type annotations: unsatisfiable equivalence  `NumTree(Z(PrimIntSet { i8: At(7), i16: At(7), i32: At(7), i64: At(7) })) = Equiv(Int(Prim(U8)))` (
-60. Failed to infer module-wide type annotations: unsatisfiable equivalence  `NumTree(Z(PrimIntSet { i8: At(7), i16: At(7), i32: At(7), i64: At(7) })) = Equiv(Int(Prim(U16)))` (
-61. cannot apply native-arith Add to signed-rep (`TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`, `TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`)
-62. cannot apply native-arith Add to signed-rep (`TypedConst(5, Auto)`, `TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`)
-63. cannot apply native-arith Add to auto-or-mismatched (`TypedConst(5, Auto)`, `TypedConst(5, Auto)`)
-64. cannot apply native-arith Add to signed-rep (`TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`, `TypedConst(5, Auto)`)
-65. cannot apply native-arith Add to signed-rep (`TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`, `TypedConst(5, Auto)`)
-66. Failed to infer module-wide type annotations: cross-layer numeric error: PrimInt not in BaseSet: `i8` ∉ `{ U32 > U8, U16, U64 }` (
-67. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("Compute(expr)", "EnumFromTo(Numeric(-1i8), Numeric(5?))")] }
-68. no unique solution for `?0 ∈ ℤ { U8, U16, U32, U64, I8, I16, I32, I64 }`
-69. not implemented: RepeatBetween on inexact bounds-expr
-70. RepeatBetween first argument type should be numeric, found NumericHole instead
+34. Failed to infer module-wide type annotations: unsatisfiable equivalence  `NumTree(Z(PrimIntSet { i8: At(3), i16: At(3), i32: At(3), i64: At(3) })) = Equiv(Int(Prim(U8)))` (
+35. Value::eq_key: Value::to_uniform_integer_pair encountered error: out of range conversion regarding big integer attempted
+36. RepeatCount first argument type should be numeric, found NumericHole instead
+37. no unique solution for `?1 ∈ { U8, U16, U32, U64 }`
+38. no valid solutions for `?1`
+39. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("CaptureBytes(len)", "Numeric(-1i8)"), ("LetView(parse)", "here_view", "CaptureBytes(Var(\"here_view\"), Numeric(-1i8))")] }
+40. no unique solution for `?3 ∈ { U8, U16, U32, U64 }`
+41. no valid solutions for `?3`
+42. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto) to usize: out of range conversion regarding big integer attempted)), _trace: [("CaptureBytes(len)", "Numeric(-1?)"), ("LetView(parse)", "here_view", "CaptureBytes(Var(\"here_view\"), Numeric(-1?))")] }
+43. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("CaptureBytes(len)", "Var(\"x\")"), ("LetView(parse)", "here_view", "CaptureBytes(Var(\"here_view\"), Var(\"x\"))")] }
+44. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("ReadArray(len)", "Numeric(-1i8)"), ("LetView(parse)", "here_view", "ReadArray(Var(\"here_view\"), Numeric(-1i8), Base(U8))")] }
+45. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto) to usize: out of range conversion regarding big integer attempted)), _trace: [("ReadArray(len)", "Numeric(-1?)"), ("LetView(parse)", "here_view", "ReadArray(Var(\"here_view\"), Numeric(-1?), Base(U8))")] }
+46. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("ReadArray(len)", "Var(\"x\")"), ("LetView(parse)", "here_view", "ReadArray(Var(\"here_view\"), Var(\"x\"), Base(U8))")] }
+47. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("LetView(parse)", "v", "CaptureBytes(Offset(Var(\"v\"), Numeric(-1i8)), U32(1))")] }
+48. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto) to usize: out of range conversion regarding big integer attempted)), _trace: [("LetView(parse)", "v", "CaptureBytes(Offset(Var(\"v\"), Numeric(-1?)), U32(1))")] }
+49. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("LetView(parse)", "v", "CaptureBytes(Offset(Var(\"v\"), Var(\"x\")), U32(1))")] }
+50. pattern build_scope failed: (U8(5), Base(U16))
+51. Failed to infer module-wide type annotations: cross-layer numeric error: non-matching PrimInt and BaseType: `u16` ≄ `u8` (
+52. pattern build_scope failed: (U8(5), Signed(I8))
+53. Failed to infer module-wide type annotations: cross-layer numeric error: non-matching PrimInt and BaseType: `i8` ≄ `u8` (
+54. pattern build_scope failed: (U8(5), NumericHole)
+55. pattern build_scope failed: (Int(Bounds { min: 0, max: Some(10) }), Signed(I8))
+56. pattern build_scope failed: (Int(Bounds { min: 0, max: Some(10) }), NumericHole)
+57. Failed to infer module-wide type annotations: unsatisfiable equivalence  `NumTree(Z(PrimIntSet { i8: At(7), i16: At(7), i32: At(7), i64: At(7) })) = Equiv(Int(Prim(U8)))` (
+58. Failed to infer module-wide type annotations: unsatisfiable equivalence  `NumTree(Z(PrimIntSet { i8: At(7), i16: At(7), i32: At(7), i64: At(7) })) = Equiv(Int(Prim(U16)))` (
+59. cannot apply native-arith Add to signed-rep (`TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`, `TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`)
+60. cannot apply native-arith Add to signed-rep (`TypedConst(5, Auto)`, `TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`)
+61. cannot apply native-arith Add to auto-or-mismatched (`TypedConst(5, Auto)`, `TypedConst(5, Auto)`)
+62. cannot apply native-arith Add to signed-rep (`TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`, `TypedConst(5, Auto)`)
+63. cannot apply native-arith Add to signed-rep (`TypedConst(5, Concrete(MachineRep { is_signed: true, bit_width: Bits8 }))`, `TypedConst(5, Auto)`)
+64. Failed to infer module-wide type annotations: cross-layer numeric error: PrimInt not in BaseSet: `i8` ∉ `{ U32 > U8, U16, U64 }` (
+65. DecodeError { err: Eval(NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Concrete(MachineRep { is_signed: true, bit_width: Bits8 })) to usize: out of range conversion regarding big integer attempted)), _trace: [("Compute(expr)", "EnumFromTo(Numeric(-1i8), Numeric(5?))")] }
+66. no unique solution for `?0 ∈ ℤ { U8, U16, U32, U64, I8, I16, I32, I64 }`
+67. not implemented: RepeatBetween on inexact bounds-expr
+68. RepeatBetween first argument type should be numeric, found NumericHole instead
 
 ## Summary
 
-275 cases (119 inconsistent): registration ok 192, codegen ok 131, interpreter ok 152; interp panics after registration accepts 21, codegen stricter 35, codegen looser 16
+275 cases (117 inconsistent): registration ok 192, codegen ok 131, interpreter ok 154; interp panics after registration accepts 19, codegen stricter 35, codegen looser 16

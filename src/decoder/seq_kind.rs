@@ -4,6 +4,8 @@ use serde::Serialize;
 
 use crate::error::EvalError;
 
+use super::value::{IntTag, Value};
+
 /// The `Expr` variant that failed in a [`SeqBoundsError`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SeqBoundsOp {
@@ -62,21 +64,21 @@ pub enum SeqKind<T: Clone> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSeq<'a, V: Clone = super::Value> {
     ValueSeq(&'a SeqKind<V>),
-    IntRange(std::ops::Range<usize>),
+    IntRange(std::ops::Range<usize>, IntTag),
 }
 
 impl<'a, V: Clone> ValueSeq<'a, V> {
     pub fn len(&self) -> usize {
         match self {
             ValueSeq::ValueSeq(vs) => vs.len(),
-            ValueSeq::IntRange(r) => r.len(),
+            ValueSeq::IntRange(r, _) => r.len(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
             ValueSeq::ValueSeq(sk) => sk.is_empty(),
-            ValueSeq::IntRange(r) => r.is_empty(),
+            ValueSeq::IntRange(r, _) => r.is_empty(),
         }
     }
 
@@ -127,26 +129,26 @@ pub(crate) fn sub_range(
 
 pub enum ValueIter<'a, V: Clone = super::Value> {
     ValueIter(Iter<'a, V>),
-    IntRange(std::ops::Range<usize>),
+    IntRange(std::ops::Range<usize>, IntTag),
 }
 
 impl<'a, V> Iterator for ValueIter<'a, V>
 where
-    V: Clone + From<usize>,
+    V: Clone + From<Value>,
 {
     type Item = Cow<'a, V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             ValueIter::ValueIter(vs) => vs.next().map(Cow::Borrowed),
-            ValueIter::IntRange(r) => r.next().map(|i| Cow::Owned(V::from(i))),
+            ValueIter::IntRange(r, tag) => r.next().map(|i| Cow::Owned(V::from(tag.mk(i)))),
         }
     }
 }
 
 impl<'a, V: Clone> IntoIterator for ValueSeq<'a, V>
 where
-    V: From<usize>,
+    V: From<Value>,
 {
     type Item = Cow<'a, V>;
 
@@ -155,7 +157,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         match self {
             ValueSeq::ValueSeq(vs) => ValueIter::ValueIter(vs.into_iter()),
-            ValueSeq::IntRange(r) => ValueIter::IntRange(r),
+            ValueSeq::IntRange(r, tag) => ValueIter::IntRange(r, tag),
         }
     }
 }
