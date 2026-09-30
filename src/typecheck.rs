@@ -1028,7 +1028,7 @@ impl TypeChecker {
             ViewFormat::CaptureBytes(len) => {
                 let newvar = self.get_new_uvar();
                 let len_var = self.infer_var_expr(len, ctxt.scope)?;
-                self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
+                self.unify_var_baseset(len_var, BaseSet::UAny)?;
                 // REVIEW - should we have a special UType for captured View-window reads?
                 self.unify_var_utype(
                     newvar,
@@ -1146,7 +1146,7 @@ impl TypeChecker {
             ViewExpr::Offset(base, offs) => {
                 self.traverse_view_expr(base.as_ref(), ctxt)?;
                 let v_offs = self.infer_var_expr(offs, ctxt.scope)?;
-                self.unify_var_baseset(v_offs, BaseSet::U(UintSet::ANY))?;
+                self.unify_var_baseset(v_offs, BaseSet::UAny)?;
                 Ok(())
             }
         }
@@ -4497,6 +4497,10 @@ mod tests {
         Ok(())
     }
 
+    /// Standalone test that checks that even when a given node is ascribed auto with no default
+    /// resolution, if a variable bound to that node is later used in a context that is only soundly typed
+    /// for a specific Rep, the inference will succeed and the unique solution will be back-patched into
+    /// the original node being referenced-by-variable.
     #[test]
     fn test_standalone_auto_arith_inference() -> TCResult<()> {
         use crate::helper::{add, compute, poly_zero, record, var};
@@ -4518,5 +4522,46 @@ mod tests {
         ]);
         assert_eq!(output, expected);
         Ok(())
+    }
+
+    /// Regression test documenting a recently-discovered gap in the TypeChecker expression-level constraint logic:
+    /// `Expr::IntRel` currently applies the unification constraint of `Elem(BaseSet::UAny)` to its inner nodes,
+    /// which causes failure when they happen to have a signed-int type (even if they are positive).
+    ///
+    /// The only mechanism to compare signed-int values is through Pattern-matching, which is much less ergonomic
+    /// even for the simplest case of `IntRel::eq`, and more complex for all other int-rels.
+    ///
+    /// It is also possible to mistakenly apply `expr_eq` to a term that happens to hold a signed-int MachineRep,
+    /// since this gap is not well-documented within `lib.rs` or `helpers.rs`.
+    ///
+    /// This test exercises `infer_var_expr` against such an anti-pattern that theoretically should be typeable,
+    /// but happens to use I16 within `IntRel`. It is marked `#[should_panic]` with the exact panic-message that
+    /// is currently coded into the test for the "I16 vs UAny" unification failure; if this test fails, either
+    /// something else has drifted, or the gap has been patched, in which case this test can be safely replaced
+    /// with a positive-case regression test.
+    #[test]
+    #[should_panic = "intrel constrained to uany"]
+    fn test_repro_intrel_on_signed_fails_to_unify() {
+        use crate::helper::*;
+        use crate::numeric::core::TypedConst;
+        use crate::numeric::helper as num;
+
+        let mut tc = TypeChecker::new();
+        let x = expr_eq(
+            numeric(num::expr_const(TypedConst::from_i16(0))),
+            poly_zero(),
+        );
+        match tc.infer_var_expr(&x, &UScope::new()) {
+            Err(e) => match e.err.as_ref() {
+                TCErrorKind::CrossLayerNumeric(CrossLayerNumericError::PrimNotInBaseSet(
+                    PrimInt::I16,
+                    BaseSet::UAny,
+                )) => {
+                    panic!("intrel constrained to uany")
+                }
+                _ => panic!("unexpected error: {e}"),
+            },
+            Ok(_) => panic!("expected error"),
+        }
     }
 }

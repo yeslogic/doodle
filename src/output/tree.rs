@@ -248,13 +248,12 @@ impl<'module> TreePrinter<'module> {
             Value::Char(_) => true,
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) | Value::U64(_) => true,
-            Value::Usize(_) => true,
             Value::Numeric(_) => true,
             Value::View { .. } => true,
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
-            Value::EnumFromTo(range) => range.is_empty(), // since this nominally represents a Seq, apply Seq-style logic
+            Value::EnumFromTo(range, _) => range.is_empty(), // since this nominally represents a Seq, apply Seq-style logic
             // FIXME - we may need to check that the `format` being passed in will be appropriately expanded if it could be indirect via FormatRef
             Value::Variant(label, value) => match format {
                 Some(Format::Variant(label2, format)) => {
@@ -861,16 +860,16 @@ impl<'module> TreePrinter<'module> {
             Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
-            Value::Usize(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::Numeric(n) => Fragment::DisplayAtom(n.clone()),
             Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
             Value::View { offset } => Fragment::string(format!("VIEW[+{offset}]")),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
             Value::Seq(vals) => self.compile_seq(vals, None),
-            Value::EnumFromTo(range) => Fragment::intervene(
+            Value::EnumFromTo(range, tag) => Fragment::intervene(
                 Fragment::DisplayAtom(Rc::new(range.start)),
                 Fragment::string(".."),
-                Fragment::DisplayAtom(Rc::new(range.end)),
+                Fragment::DisplayAtom(Rc::new(range.end))
+                    .cat(Fragment::string(tag.to_static_str())),
             )
             .delimit(Fragment::Char('['), Fragment::Char(']')),
             Value::Record(fields) => self.compile_record(fields, None),

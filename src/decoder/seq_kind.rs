@@ -2,6 +2,51 @@ use std::{borrow::Cow, fmt::Debug, ops::Index};
 
 use serde::Serialize;
 
+use crate::error::EvalError;
+
+use super::value::{IntTag, Value};
+
+/// The `Expr` variant that failed in a [`SeqBoundsError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeqBoundsOp {
+    SeqIx,
+    SubSeq,
+    SubSeqInflate,
+}
+
+impl std::fmt::Display for SeqBoundsOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SeqBoundsOp::SeqIx => write!(f, "SeqIx"),
+            SeqBoundsOp::SubSeq => write!(f, "SubSeq"),
+            SeqBoundsOp::SubSeqInflate => write!(f, "SubSeqInflate"),
+        }
+    }
+}
+
+/// Error produced when `SeqIx`/`SubSeq`/`SubSeqInflate` indexes or slices past the end of a
+/// sequence (or `EnumFromTo` range).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SeqBoundsError {
+    pub op: SeqBoundsOp,
+    /// The (0-based) index, or sub-range start offset, that was out of bounds.
+    pub index: usize,
+    /// The length of the sequence (or range) that `index` was checked against.
+    pub len: usize,
+}
+
+impl std::fmt::Display for SeqBoundsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: index {} out of bounds for sequence of length {}",
+            self.op, self.index, self.len
+        )
+    }
+}
+
+impl std::error::Error for SeqBoundsError {}
+
 /// Represents a sequence of values, which is either explicitly constructed
 /// or yielded through an array-generator term (i.e. [`crate::Expr::Dup`]).
 #[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
@@ -19,21 +64,21 @@ pub enum SeqKind<T: Clone> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSeq<'a, V: Clone = super::Value> {
     ValueSeq(&'a SeqKind<V>),
-    IntRange(std::ops::Range<usize>),
+    IntRange(std::ops::Range<usize>, IntTag),
 }
 
 impl<'a, V: Clone> ValueSeq<'a, V> {
     pub fn len(&self) -> usize {
         match self {
             ValueSeq::ValueSeq(vs) => vs.len(),
-            ValueSeq::IntRange(r) => r.len(),
+            ValueSeq::IntRange(r, _) => r.len(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
             ValueSeq::ValueSeq(sk) => sk.is_empty(),
-            ValueSeq::IntRange(r) => r.is_empty(),
+            ValueSeq::IntRange(r, _) => r.is_empty(),
         }
     }
 
@@ -46,42 +91,64 @@ impl<'a, V: Clone> ValueSeq<'a, V> {
             _ => unreachable!(),
         }
     }
+
+    /// Checks that `index` is in-bounds for `self` (used by `SeqIx`, and by `SubSeqInflate` to
+    /// check its back-reference `start` — but not its `length`, which may legitimately
+    /// self-reference past `self.len()` once `start` itself is valid).
+    pub(crate) fn check_index(&self, op: SeqBoundsOp, index: usize) -> Result<(), EvalError> {
+        let len = self.len();
+        if index < len {
+            Ok(())
+        } else {
+            Err(SeqBoundsError { op, index, len }.into())
+        }
+    }
 }
 
+/// Performs a virtual 'slice' operation on a [`Range<usize>`](std::ops::Range) as if it were an array/slice holding those values,
+/// mirroring the intended behavior of [`Expr::SubSeq`] when applied to a sequence-value backed by `ValueSeq::IntRange`.
+///
+/// Checks its own bounds and returns `Err` rather than panicking: `start + len == range.len()`
+/// is the valid full-range case (e.g. `start=0, len=range.len()`), so the check is `<=`, not `<`.
 pub(crate) fn sub_range(
+    op: SeqBoundsOp,
     range: std::ops::Range<usize>,
     start: usize,
     len: usize,
-) -> std::ops::Range<usize> {
-    assert!(
-        start + len < range.len(),
-        "sub_range invalid: start={start} len={len} range={range:?}"
-    );
-    range.start + start..range.start + start + len
+) -> Result<std::ops::Range<usize>, SeqBoundsError> {
+    let range_len = range.len();
+    match start.checked_add(len) {
+        Some(end) if end <= range_len => Ok(range.start + start..range.start + start + len),
+        _ => Err(SeqBoundsError {
+            op,
+            index: start,
+            len: range_len,
+        }),
+    }
 }
 
 pub enum ValueIter<'a, V: Clone = super::Value> {
     ValueIter(Iter<'a, V>),
-    IntRange(std::ops::Range<usize>),
+    IntRange(std::ops::Range<usize>, IntTag),
 }
 
 impl<'a, V> Iterator for ValueIter<'a, V>
 where
-    V: Clone + From<usize>,
+    V: Clone + From<Value>,
 {
     type Item = Cow<'a, V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             ValueIter::ValueIter(vs) => vs.next().map(Cow::Borrowed),
-            ValueIter::IntRange(r) => r.next().map(|i| Cow::Owned(V::from(i))),
+            ValueIter::IntRange(r, tag) => r.next().map(|i| Cow::Owned(V::from(tag.mk(i)))),
         }
     }
 }
 
 impl<'a, V: Clone> IntoIterator for ValueSeq<'a, V>
 where
-    V: From<usize>,
+    V: From<Value>,
 {
     type Item = Cow<'a, V>;
 
@@ -90,7 +157,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         match self {
             ValueSeq::ValueSeq(vs) => ValueIter::ValueIter(vs.into_iter()),
-            ValueSeq::IntRange(r) => ValueIter::IntRange(r),
+            ValueSeq::IntRange(r, tag) => ValueIter::IntRange(r, tag),
         }
     }
 }
@@ -137,26 +204,27 @@ impl<T: Clone> SeqKind<T> {
         }
     }
 
-    /// Specialized method for getting a sub-sequence starting at index `start` and with length `len`,
-    /// that preserves laziness.
-    pub fn sub_seq(&self, start: usize, len: usize) -> Self {
-        match self {
-            SeqKind::Strict(vs) => {
-                let tmp = &vs[start..];
-                let tmp = &tmp[..len];
-                SeqKind::Strict(tmp.to_vec())
-            }
-            SeqKind::Dup(n, v) => {
-                if start + len <= *n {
-                    SeqKind::Dup(len, v.clone())
-                } else {
-                    // REVIEW - we can either enforce `T: Debug` above, to add in the T-param, or keep it abstract
-                    panic!(
-                        "sub-seq out of bounds: start-index={start}, len={len} on SeqKind::Dup({n}, _)"
-                    )
-                }
-            }
+    /// Specialized method for getting a sub-sequence starting at index `start` and with length
+    /// `len`, that preserves laziness. Checks its own bounds and returns `Err` rather than
+    /// panicking.
+    pub fn sub_seq(
+        &self,
+        op: SeqBoundsOp,
+        start: usize,
+        len: usize,
+    ) -> Result<Self, SeqBoundsError> {
+        let seq_len = self.len();
+        if start.checked_add(len).is_none_or(|end| end > seq_len) {
+            return Err(SeqBoundsError {
+                op,
+                index: start,
+                len: seq_len,
+            });
         }
+        Ok(match self {
+            SeqKind::Strict(vs) => SeqKind::Strict(vs[start..start + len].to_vec()),
+            SeqKind::Dup(_n, v) => SeqKind::Dup(len, v.clone()),
+        })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &T> {

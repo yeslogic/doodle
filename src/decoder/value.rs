@@ -1,11 +1,14 @@
+use std::borrow::Cow;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
 use serde::Serialize;
 
-use crate::numeric::core::{TypedConst, Value as NumValue};
+use crate::error::EvalError;
+use crate::numeric::core::{MachineRep, NumRep, TypedConst, Value as NumValue};
 use crate::{Arith, IntRel, IntoLabel, Label, Pattern, UnaryOp};
 
+use super::eval::EvalValue;
 use super::{
     MultiScope, Scope,
     seq_kind::{SeqKind, ValueSeq},
@@ -27,7 +30,6 @@ pub enum Value {
     U32(u32),
     U64(u64),
     Char(char),
-    Usize(usize),
     // TODO[epic=embedded-num] - implement proper support for Numeric
     Numeric(Rc<TypedConst>),
     View {
@@ -35,7 +37,7 @@ pub enum Value {
     },
     PhantomData,
     // REVIEW - should EnumFromTo be considered a flat value?
-    EnumFromTo(std::ops::Range<usize>),
+    EnumFromTo(std::ops::Range<usize>, IntTag),
     // vvvv Non-flat values vvvv
     Option(Option<Box<Value>>),
     Tuple(Vec<Value>),
@@ -48,6 +50,118 @@ pub enum Value {
     Branch(usize, Box<Value>),
     /// Wrapper to indicate whether a value was parsed successfully, or generated from a fallback `Expr`, for a Decoder within a `Permit` context.
     Permit(Result<Box<Value>, Option<Box<Value>>>),
+}
+
+/// Element-type of a [`Value::EnumFromTo`] range, taken from the runtime type of its evaluated start-bound.
+///
+/// Unsigned `Numeric` bounds are collapsed into the corresponding native tag, so that only signed
+/// or auto-rep bounds yield `Value::Numeric` elements.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum IntTag {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    Auto,
+}
+
+impl IntTag {
+    /// Returns the appropriate display-string to use for suffixing int-tag to the display-form of the min/max bound of an `EnumFromTo` value.
+    pub const fn to_static_str(&self) -> &'static str {
+        match self {
+            IntTag::U8 => "u8",
+            IntTag::U16 => "u16",
+            IntTag::U32 => "u32",
+            IntTag::U64 => "u64",
+            IntTag::I8 => "i8",
+            IntTag::I16 => "i16",
+            IntTag::I32 => "i32",
+            IntTag::I64 => "i64",
+            IntTag::Auto => "?",
+        }
+    }
+}
+
+impl std::fmt::Display for IntTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
+}
+
+impl IntTag {
+    /// Determines the `IntTag` of an integer-typed `Value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not an integer, as this is an invariant enforced by the type-checker.
+    pub(crate) fn of(value: &Value) -> IntTag {
+        match value {
+            Value::U8(_) => IntTag::U8,
+            Value::U16(_) => IntTag::U16,
+            Value::U32(_) => IntTag::U32,
+            Value::U64(_) => IntTag::U64,
+            Value::Numeric(tc) => match tc.get_rep() {
+                NumRep::Auto => IntTag::Auto,
+                NumRep::Concrete(MachineRep::U8) => IntTag::U8,
+                NumRep::Concrete(MachineRep::U16) => IntTag::U16,
+                NumRep::Concrete(MachineRep::U32) => IntTag::U32,
+                NumRep::Concrete(MachineRep::U64) => IntTag::U64,
+                NumRep::Concrete(MachineRep::I8) => IntTag::I8,
+                NumRep::Concrete(MachineRep::I16) => IntTag::I16,
+                NumRep::Concrete(MachineRep::I32) => IntTag::I32,
+                NumRep::Concrete(MachineRep::I64) => IntTag::I64,
+            },
+            other => panic!("value is not a number: {other:?}"),
+        }
+    }
+
+    /// Checks that every element of `range` is representable under `self`, so that [`Self::mk`]
+    /// cannot fail on any of them (e.g. a `U8` start-bound paired with an oversized end-bound).
+    pub(crate) fn check_range(self, range: &std::ops::Range<usize>) -> Result<(), EvalError> {
+        if range.is_empty() {
+            return Ok(());
+        }
+        let last = range.end - 1;
+        match self {
+            IntTag::U8 => _ = u8::try_from(last)?,
+            IntTag::U16 => _ = u16::try_from(last)?,
+            IntTag::U32 => _ = u32::try_from(last)?,
+            IntTag::U64 => _ = u64::try_from(last)?,
+            IntTag::I8 => _ = i8::try_from(last)?,
+            IntTag::I16 => _ = i16::try_from(last)?,
+            IntTag::I32 => _ = i32::try_from(last)?,
+            IntTag::I64 => _ = i64::try_from(last)?,
+            IntTag::Auto => {}
+        }
+        Ok(())
+    }
+
+    /// Constructs the range-element `Value` for `n`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `n` is not representable under `self`, which [`Self::check_range`] rules out for
+    /// any element of a range it accepted.
+    pub(crate) fn mk(self, n: usize) -> Value {
+        const CHECKED: &str = "range-element should be representable (see IntTag::check_range)";
+        let signed =
+            |rep: MachineRep| Value::Numeric(Rc::new(TypedConst::new(n, NumRep::Concrete(rep))));
+        match self {
+            IntTag::U8 => Value::U8(u8::try_from(n).expect(CHECKED)),
+            IntTag::U16 => Value::U16(u16::try_from(n).expect(CHECKED)),
+            IntTag::U32 => Value::U32(u32::try_from(n).expect(CHECKED)),
+            IntTag::U64 => Value::U64(u64::try_from(n).expect(CHECKED)),
+            IntTag::I8 => signed(MachineRep::I8),
+            IntTag::I16 => signed(MachineRep::I16),
+            IntTag::I32 => signed(MachineRep::I32),
+            IntTag::I64 => signed(MachineRep::I64),
+            IntTag::Auto => Value::Numeric(Rc::new(TypedConst::new(n, NumRep::Auto))),
+        }
+    }
 }
 
 impl Value {
@@ -155,24 +269,6 @@ impl<T> Coerced<T> {
     }
 }
 
-impl<'a> Coerced<&'a Value> {
-    /// Performs tuple-projection on the underlying `Value` of a `Coerced<&'_ Value>`, preserving
-    /// the fallback-tracking bit.
-    pub(crate) fn tuple_proj(self, index: usize) -> Self {
-        self.map(|v| v._tuple_proj(index))
-    }
-
-    /// Performs record-projection on the underlying `Value` of a `Coerced<&'_ Value>`, preserving
-    /// the fallback-tracking bit.
-    pub(crate) fn record_proj(self, label: &str) -> Self {
-        self.map(|v| v._record_proj(label))
-    }
-
-    pub(crate) fn cloned(self) -> Value {
-        self.value.clone()
-    }
-}
-
 impl<T> std::ops::Deref for Coerced<T> {
     type Target = T;
 
@@ -200,12 +296,6 @@ impl<T> From<T> for Coerced<T> {
     }
 }
 
-impl From<usize> for Value {
-    fn from(value: usize) -> Value {
-        Value::Usize(value)
-    }
-}
-
 const MAX_SEQ_LEN: usize = 64;
 
 impl std::fmt::Display for Value {
@@ -217,10 +307,9 @@ impl std::fmt::Display for Value {
             Value::U32(i) => write!(f, "{i}"),
             Value::U64(i) => write!(f, "{i}"),
             Value::Char(c) => write!(f, "{c:?}"),
-            Value::Usize(i) => write!(f, "{i}"),
             Value::Numeric(n) => write!(f, "{n}"),
             Value::View { offset } => write!(f, "View[+{offset}]"),
-            Value::EnumFromTo(r) => write!(f, "{r:?}"),
+            Value::EnumFromTo(r, tag) => write!(f, "{r:?}{tag}"),
             Value::Option(v) => match v {
                 None => write!(f, "None"),
                 Some(v) => write!(f, "Some({v})"),
@@ -337,7 +426,6 @@ impl Value {
                 Value::U16(n) => bounds.contains(usize::from(*n)),
                 Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
                 Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                Value::Usize(n) => bounds.contains(*n),
                 Value::Numeric(n) => n.matches_int_range(*bounds),
                 _ => false,
             },
@@ -346,7 +434,6 @@ impl Value {
                 Value::U16(n) => z == &BigInt::from(*n),
                 Value::U32(n) => z == &BigInt::from(*n),
                 Value::U64(n) => z == &BigInt::from(*n),
-                Value::Usize(n) => z == &BigInt::from(*n),
                 Value::Numeric(n) => n.eq_num(z),
                 _ => false,
             },
@@ -355,7 +442,6 @@ impl Value {
                 Value::U16(n) => range.contains(&BigInt::from(*n)),
                 Value::U32(n) => range.contains(&BigInt::from(*n)),
                 Value::U64(n) => range.contains(&BigInt::from(*n)),
-                Value::Usize(n) => range.contains(&BigInt::from(*n)),
                 Value::Numeric(n) => range.contains(n.as_raw_value()),
                 _ => false,
             },
@@ -462,13 +548,62 @@ impl Value {
     pub(crate) fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
         match self {
             Value::Seq(elts) => Some(ValueSeq::ValueSeq(elts)),
-            Value::EnumFromTo(range) => Some(ValueSeq::IntRange(range.clone())),
+            Value::EnumFromTo(range, tag) => Some(ValueSeq::IntRange(range.clone(), *tag)),
             _ => None,
         }
     }
 
     pub(crate) fn is_boolean(&self) -> bool {
         matches!(self.coerce_nominal_value(), Value::Bool(_))
+    }
+}
+
+impl EvalValue for Value {
+    fn from_evaluated(v: Value) -> Self {
+        v
+    }
+
+    fn from_evaluated_seq(vs: Vec<Self>) -> Self {
+        Value::Seq(SeqKind::Strict(vs))
+    }
+
+    fn clone_into_value(&self) -> Value {
+        self.clone()
+    }
+
+    fn coerce_mapped_value(&self) -> Coerced<&Self> {
+        // Calls the inherent `Value::coerce_mapped_value` above (inherent methods take priority
+        // over trait methods in resolution), which already returns `Coerced<&Self>`.
+        self.coerce_mapped_value()
+    }
+
+    fn extract_mapped_value(self) -> Value {
+        // Likewise calls the inherent `Value::extract_mapped_value` (owned, no-clone unwrap).
+        self.extract_mapped_value().into_inner()
+    }
+
+    fn tuple_proj_raw(&self, index: usize) -> &Self {
+        self._tuple_proj(index)
+    }
+
+    fn record_proj_raw(&self, label: &str) -> &Self {
+        self._record_proj(label)
+    }
+
+    fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
+        self.get_sequence()
+    }
+
+    fn collect_fields(fields: Vec<(Label, Self)>) -> Self {
+        Value::record(fields)
+    }
+
+    fn lift_option(opt: Option<Self>) -> Self {
+        Value::Option(opt.map(Box::new))
+    }
+
+    fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
+        self.matches(scope, pattern)
     }
 }
 
@@ -488,22 +623,81 @@ impl Value {
         Value::Variant(label.into(), value.into())
     }
 
-    /// Unwraps any compatible numeric-typed `Value` and returns the contained number as a `usize`.
+    /// Converts any compatible numeric-typed `Value` to a `usize`, returning `Err` if the number is not
+    /// representable as one (e.g. a negative or oversized `Numeric`).
     ///
     /// # Panics
     ///
-    /// Panics if the value is not numeric.
-    ///
-    /// May additionally panic in rare cases such as `u64`-to-`usize` conversion on 32-bit architectures.
-    pub(crate) fn unwrap_usize(&self) -> usize {
-        match self {
+    /// Panics if the value is not numeric at all, as this is an invariant enforced by the type-checker.
+    pub(crate) fn try_as_usize(&self) -> Result<usize, EvalError> {
+        Ok(match self {
             Value::U8(n) => usize::from(*n),
             Value::U16(n) => usize::from(*n),
-            Value::U32(n) => usize::try_from(*n).unwrap(),
-            Value::U64(n) => usize::try_from(*n).unwrap(),
-            Value::Usize(n) => *n,
-            Value::Numeric(tc) => tc.as_usize().unwrap(),
+            Value::U32(n) => usize::try_from(*n)?,
+            Value::U64(n) => usize::try_from(*n)?,
+            Value::Numeric(tc) => tc.as_usize()?,
             other => panic!("value is not a number: {other:?}"),
+        })
+    }
+
+    /// Takes two (borrowed) `Value`s and coerces any `Numeric` paired with a native integer into
+    /// the same variant as its co-term, returning the pair in the original order.
+    ///
+    /// `(Numeric, Numeric)` is returned as-is since there is no unambiguous variant to collapse them to.
+    ///
+    /// Any term other than `Numeric` is returned as-is.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `TypedConst::get_as_unsigned` errors, or if either term is not recognized
+    /// as an integer-typed `Value`.
+    pub(crate) fn to_uniform_integer_pair<'a, 'b>(
+        left: &'a Value,
+        right: &'b Value,
+    ) -> Result<(Cow<'a, Value>, Cow<'b, Value>), anyhow::Error> {
+        match (left, right) {
+            (Value::U8(_), Value::U8(_))
+            | (Value::U16(_), Value::U16(_))
+            | (Value::U32(_), Value::U32(_))
+            | (Value::U64(_), Value::U64(_))
+            | (Value::Numeric(_), Value::Numeric(_)) => {
+                Ok((Cow::Borrowed(left), Cow::Borrowed(right)))
+            }
+            (Value::U8(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u8>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U8(r))))
+            }
+            (Value::Numeric(n), Value::U8(_)) => {
+                let l = n.get_as_unsigned::<u8>()?;
+                Ok((Cow::Owned(Value::U8(l)), Cow::Borrowed(right)))
+            }
+            (Value::U16(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u16>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U16(r))))
+            }
+            (Value::Numeric(n), Value::U16(_)) => {
+                let l = n.get_as_unsigned::<u16>()?;
+                Ok((Cow::Owned(Value::U16(l)), Cow::Borrowed(right)))
+            }
+            (Value::U32(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u32>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U32(r))))
+            }
+            (Value::Numeric(n), Value::U32(_)) => {
+                let l = n.get_as_unsigned::<u32>()?;
+                Ok((Cow::Owned(Value::U32(l)), Cow::Borrowed(right)))
+            }
+            (Value::U64(_), Value::Numeric(n)) => {
+                let r = n.get_as_unsigned::<u64>()?;
+                Ok((Cow::Borrowed(left), Cow::Owned(Value::U64(r))))
+            }
+            (Value::Numeric(n), Value::U64(_)) => {
+                let l = n.get_as_unsigned::<u64>()?;
+                Ok((Cow::Owned(Value::U64(l)), Cow::Borrowed(right)))
+            }
+            _ => Err(anyhow::anyhow!(
+                "to_uniform_integer pair called on pair with non-integer element: ({left:?}, {right:?})"
+            )),
         }
     }
 
@@ -511,11 +705,107 @@ impl Value {
     pub(crate) fn get_as_u8(&self) -> u8 {
         match self {
             Value::U8(n) => *n,
-            Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!(
+            Value::U16(..) | Value::U32(..) | Value::U64(..) => panic!(
                 "value is numeric but not u8 (this may be a soft error, or even success, in future)"
             ),
             Value::Numeric(tc) => tc.get_as_u8().unwrap(),
             _ => panic!("value is not a number"),
+        }
+    }
+
+    /// Converts any fixed-width integer `Value` (including `Numeric`) to a `U8`, returning `Err`
+    /// if the value does not fit. A `Numeric` operand converts purely by value, irrespective of
+    /// its declared `NumRep` (see [`crate::numeric::core::TypedConst::as_native`]).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not an integer, as this is an invariant enforced by the type-checker.
+    pub(crate) fn cast_to_u8(self) -> Result<Value, EvalError> {
+        Ok(Value::U8(match self {
+            Value::U8(x) => x,
+            Value::U16(x) => u8::try_from(x)?,
+            Value::U32(x) => u8::try_from(x)?,
+            Value::U64(x) => u8::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u8>()?,
+            x => panic!("cannot convert {x:?} to U8"),
+        }))
+    }
+
+    /// As [`Self::cast_to_u8`], but to `U16`.
+    pub(crate) fn cast_to_u16(self) -> Result<Value, EvalError> {
+        Ok(Value::U16(match self {
+            Value::U8(x) => u16::from(x),
+            Value::U16(x) => x,
+            Value::U32(x) => u16::try_from(x)?,
+            Value::U64(x) => u16::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u16>()?,
+            x => panic!("cannot convert {x:?} to U16"),
+        }))
+    }
+
+    /// As [`Self::cast_to_u8`], but to `U32`.
+    pub(crate) fn cast_to_u32(self) -> Result<Value, EvalError> {
+        Ok(Value::U32(match self {
+            Value::U8(x) => u32::from(x),
+            Value::U16(x) => u32::from(x),
+            Value::U32(x) => x,
+            Value::U64(x) => u32::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u32>()?,
+            x => panic!("cannot convert {x:?} to U32"),
+        }))
+    }
+
+    /// As [`Self::cast_to_u8`], but to `U64`.
+    pub(crate) fn cast_to_u64(self) -> Result<Value, EvalError> {
+        Ok(Value::U64(match self {
+            Value::U8(x) => u64::from(x),
+            Value::U16(x) => u64::from(x),
+            Value::U32(x) => u64::from(x),
+            Value::U64(x) => x,
+            Value::Numeric(n) => n.as_native::<u64>()?,
+            x => panic!("cannot convert {x:?} to U64"),
+        }))
+    }
+
+    /// Converts any fixed-width integer `Value` (including `Numeric`) to a `Char`, substituting
+    /// `char::REPLACEMENT_CHARACTER` for any value that is not a Unicode scalar value. Returns
+    /// `Err` only if the value does not fit in a `u32`. As with the other `cast_to_*` methods, a
+    /// `Numeric` operand converts purely by value, irrespective of its declared `NumRep`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not an integer, as this is an invariant enforced by the type-checker.
+    pub(crate) fn cast_to_char(self) -> Result<Value, EvalError> {
+        let code_point = match self {
+            Value::U8(x) => u32::from(x),
+            Value::U16(x) => u32::from(x),
+            Value::U32(x) => x,
+            Value::U64(x) => u32::try_from(x)?,
+            Value::Numeric(n) => n.as_native::<u32>()?,
+            _ => panic!("AsChar: expected U8, U16, U32, U64, or Numeric"),
+        };
+        Ok(Value::Char(
+            char::from_u32(code_point).unwrap_or(char::REPLACEMENT_CHARACTER),
+        ))
+    }
+
+    /// Unwraps a `Value::Tuple` of exactly `N` `Value::U8`s into an array of bytes.
+    ///
+    /// `ctx` names the calling operation, for the panic message.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not a tuple of `N` `U8`s, as this is an invariant enforced by the type-checker.
+    pub(crate) fn unwrap_byte_array<const N: usize>(self, ctx: &str) -> [u8; N] {
+        match <[Value; N]>::try_from(self.unwrap_tuple()) {
+            Ok(values) => values.map(|v| match v {
+                Value::U8(b) => b,
+                other => panic!("{ctx}: expected a tuple of {N} U8s, found element {other:?}"),
+            }),
+            Err(values) => panic!(
+                "{ctx}: expected a tuple of {N} U8s, found {} elements",
+                values.len()
+            ),
         }
     }
 
@@ -548,7 +838,33 @@ where
     }
 }
 
-fn __arith<T>(arith: Arith, left: T, right: T) -> T
+/// The operator that failed in an [`ArithError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArithOp {
+    Binary(Arith),
+    Unary(UnaryOp),
+}
+
+/// Error produced when checked integer arithmetic underflows, overflows, or divides by zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArithError {
+    pub op: ArithOp,
+    pub type_name: &'static str,
+}
+
+impl std::fmt::Display for ArithError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "arithmetic error: {:?} on {} underflowed, overflowed, or divided by zero",
+            self.op, self.type_name
+        )
+    }
+}
+
+impl std::error::Error for ArithError {}
+
+fn __arith<T>(arith: Arith, left: T, right: T) -> Result<T, ArithError>
 where
     T: num_traits::CheckedAdd,
     T: num_traits::CheckedSub,
@@ -561,117 +877,80 @@ where
     T: std::ops::BitOr<Output = T>,
     T: std::ops::BitAnd<Output = T>,
 {
+    let err = || ArithError {
+        op: ArithOp::Binary(arith),
+        type_name: std::any::type_name::<T>(),
+    };
     match arith {
-        Arith::Add => left
-            .checked_add(&right)
-            .unwrap_or_else(|| panic!("integer overflow")),
-        Arith::Sub => left
-            .checked_sub(&right)
-            .unwrap_or_else(|| panic!("integer overflow")),
-        Arith::Mul => left
-            .checked_mul(&right)
-            .unwrap_or_else(|| panic!("integer overflow")),
-        Arith::Div => left
-            .checked_div(&right)
-            .unwrap_or_else(|| panic!("integer overflow")),
-        Arith::Rem => left
-            .checked_rem(&right)
-            .unwrap_or_else(|| panic!("integer overflow")),
-        Arith::Shl => left << right.as_(),
-        Arith::Shr => left >> right.as_(),
-        Arith::BitOr => left | right,
-        Arith::BitAnd => left & right,
+        Arith::Add => left.checked_add(&right).ok_or_else(err),
+        Arith::Sub => left.checked_sub(&right).ok_or_else(err),
+        Arith::Mul => left.checked_mul(&right).ok_or_else(err),
+        Arith::Div => left.checked_div(&right).ok_or_else(err),
+        Arith::Rem => left.checked_rem(&right).ok_or_else(err),
+        Arith::Shl => left.checked_shl(right.as_()).ok_or_else(err),
+        Arith::Shr => left.checked_shr(right.as_()).ok_or_else(err),
+        Arith::BitOr => Ok(left | right),
+        Arith::BitAnd => Ok(left & right),
         Arith::BoolOr | Arith::BoolAnd => unreachable!("bool ops should be handled separately"),
     }
 }
 
-fn __unary<T>(op: UnaryOp, value: T) -> T
+fn __unary<T>(op: UnaryOp, value: T) -> Result<T, ArithError>
 where
     T: num_traits::CheckedAdd,
     T: num_traits::CheckedSub,
     T: num_traits::One,
 {
+    let err = || ArithError {
+        op: ArithOp::Unary(op),
+        type_name: std::any::type_name::<T>(),
+    };
     match op {
-        UnaryOp::IntPred => value.checked_sub(&T::one()).unwrap_or_else(|| {
-            panic!(
-                "__unary::<{}>@IntPred: integer underflow",
-                std::any::type_name::<T>()
-            )
-        }),
-        UnaryOp::IntSucc => value.checked_add(&T::one()).unwrap_or_else(|| {
-            panic!(
-                "__unary::<{}>@IntSucc: integer overflow",
-                std::any::type_name::<T>()
-            )
-        }),
+        UnaryOp::IntPred => value.checked_sub(&T::one()).ok_or_else(err),
+        UnaryOp::IntSucc => value.checked_add(&T::one()).ok_or_else(err),
         UnaryOp::BoolNot => unreachable!("bool ops should be handled separately"),
     }
 }
 
 impl Value {
-    pub fn int_rel(rel: IntRel, left: Value, right: Value) -> Value {
+    pub fn int_rel(rel: IntRel, left: Value, right: Value) -> Result<Value, EvalError> {
         match (left, right) {
-            (Value::U8(l), Value::U8(r)) => Value::Bool(__rel(rel, l, r)),
-            (Value::U16(l), Value::U16(r)) => Value::Bool(__rel(rel, l, r)),
-            (Value::U32(l), Value::U32(r)) => Value::Bool(__rel(rel, l, r)),
-            (Value::U64(l), Value::U64(r)) => Value::Bool(__rel(rel, l, r)),
-            (Value::Usize(l), Value::Usize(r)) => Value::Bool(__rel(rel, l, r)),
-            (Value::Numeric(l), Value::Numeric(r)) => Value::Bool(TypedConst::rel(rel, &l, &r)),
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U8(r)) => {
-                if let Ok(l) = num.get_as_unsized::<u8>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::U8(l), Value::U8(r)) => Ok(Value::Bool(__rel(rel, l, r))),
+            (Value::U16(l), Value::U16(r)) => Ok(Value::Bool(__rel(rel, l, r))),
+            (Value::U32(l), Value::U32(r)) => Ok(Value::Bool(__rel(rel, l, r))),
+            (Value::U64(l), Value::U64(r)) => Ok(Value::Bool(__rel(rel, l, r))),
+            (Value::Numeric(l), Value::Numeric(r)) => Ok(Value::Bool(TypedConst::rel(rel, &l, &r))),
+            (Value::Numeric(ref num), Value::U8(r)) => {
+                let l = num.as_native::<u8>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::U8(l), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(r) = num.get_as_unsized::<u8>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::U8(l), Value::Numeric(ref num)) => {
+                let r = num.as_native::<u8>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U16(r)) => {
-                if let Ok(l) = num.get_as_unsized::<u16>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::Numeric(ref num), Value::U16(r)) => {
+                let l = num.as_native::<u16>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::U16(l), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(r) = num.get_as_unsized::<u16>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::U16(l), Value::Numeric(ref num)) => {
+                let r = num.as_native::<u16>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U32(r)) => {
-                if let Ok(l) = num.get_as_unsized::<u32>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::Numeric(ref num), Value::U32(r)) => {
+                let l = num.as_native::<u32>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::U32(l), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(r) = num.get_as_unsized::<u32>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::U32(l), Value::Numeric(ref num)) => {
+                let r = num.as_native::<u32>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U64(r)) => {
-                if let Ok(l) = num.get_as_unsized::<u64>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::Numeric(ref num), Value::U64(r)) => {
+                let l = num.as_native::<u64>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
-            (ref left @ Value::U64(l), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(r) = num.get_as_unsized::<u64>() {
-                    Value::Bool(__rel(rel, l, r))
-                } else {
-                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
-                }
+            (Value::U64(l), Value::Numeric(ref num)) => {
+                let r = num.as_native::<u64>()?;
+                Ok(Value::Bool(__rel(rel, l, r)))
             }
             (left, right) => {
                 panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
@@ -679,12 +958,12 @@ impl Value {
         }
     }
 
-    pub fn arith(arith: Arith, left: Value, right: Value) -> Value {
+    pub fn arith(arith: Arith, left: Value, right: Value) -> Result<Value, EvalError> {
         if matches!(arith, Arith::BoolOr | Arith::BoolAnd) {
             match (left, right) {
                 (Value::Bool(l), Value::Bool(r)) => match arith {
-                    Arith::BoolOr => Value::Bool(l || r),
-                    Arith::BoolAnd => Value::Bool(l && r),
+                    Arith::BoolOr => Ok(Value::Bool(l || r)),
+                    Arith::BoolAnd => Ok(Value::Bool(l && r)),
                     _ => unreachable!(),
                 },
                 (left, right) => {
@@ -695,15 +974,91 @@ impl Value {
             }
         } else {
             match (left, right) {
-                (Value::U8(l), Value::U8(r)) => Value::U8(__arith(arith, l, r)),
-                (Value::U16(l), Value::U16(r)) => Value::U16(__arith(arith, l, r)),
-                (Value::U32(l), Value::U32(r)) => Value::U32(__arith(arith, l, r)),
-                (Value::U64(l), Value::U64(r)) => Value::U64(__arith(arith, l, r)),
-                (Value::Usize(l), Value::Usize(r)) => Value::Usize(__arith(arith, l, r)),
-                (Value::Numeric(_l), Value::Numeric(_r)) => {
-                    panic!(
-                        "raw arithmetic on numerics should be done in numeric model, or with Expr-level casts beforehand"
-                    );
+                (Value::U8(l), Value::U8(r)) => Ok(__arith(arith, l, r).map(Value::U8)?),
+                (Value::U16(l), Value::U16(r)) => Ok(__arith(arith, l, r).map(Value::U16)?),
+                (Value::U32(l), Value::U32(r)) => Ok(__arith(arith, l, r).map(Value::U32)?),
+                (Value::U64(l), Value::U64(r)) => Ok(__arith(arith, l, r).map(Value::U64)?),
+                // `Arith`/`Unary` unify both operands' `ValueType` (see `TypedConst::get_as_unsigned`'s
+                // doc comment), so a `Numeric` operand's declared `NumRep` is pinned to exactly its
+                // sibling's concrete width in any sound tree - unlike `int_rel`/`AsCast`, which use
+                // the rep-agnostic `as_native` instead. Extract via `get_as_unsigned`, then reuse the
+                // existing checked `__arith` on the native pair.
+                (Value::Numeric(ref n), Value::U8(r)) => {
+                    let l = n.get_as_unsigned::<u8>()?;
+                    Ok(__arith(arith, l, r).map(Value::U8)?)
+                }
+                (Value::U8(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsigned::<u8>()?;
+                    Ok(__arith(arith, l, r).map(Value::U8)?)
+                }
+                (Value::Numeric(ref n), Value::U16(r)) => {
+                    let l = n.get_as_unsigned::<u16>()?;
+                    Ok(__arith(arith, l, r).map(Value::U16)?)
+                }
+                (Value::U16(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsigned::<u16>()?;
+                    Ok(__arith(arith, l, r).map(Value::U16)?)
+                }
+                (Value::Numeric(ref n), Value::U32(r)) => {
+                    let l = n.get_as_unsigned::<u32>()?;
+                    Ok(__arith(arith, l, r).map(Value::U32)?)
+                }
+                (Value::U32(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsigned::<u32>()?;
+                    Ok(__arith(arith, l, r).map(Value::U32)?)
+                }
+                (Value::Numeric(ref n), Value::U64(r)) => {
+                    let l = n.get_as_unsigned::<u64>()?;
+                    Ok(__arith(arith, l, r).map(Value::U64)?)
+                }
+                (Value::U64(l), Value::Numeric(ref n)) => {
+                    let r = n.get_as_unsigned::<u64>()?;
+                    Ok(__arith(arith, l, r).map(Value::U64)?)
+                }
+                (Value::Numeric(l), Value::Numeric(r)) => {
+                    let x = l.get_rep();
+                    let y = r.get_rep();
+                    match x.unify(y) {
+                        NumRep::Auto => {
+                            panic!(
+                                "cannot apply native-arith {arith:?} to auto-or-mismatched (`{l:?}`, `{r:?}`)"
+                            );
+                        }
+                        NumRep::Concrete(rep) => match rep {
+                            MachineRep::U8 => Ok(__arith(
+                                arith,
+                                l.get_as_unsigned::<u8>()?,
+                                r.get_as_unsigned::<u8>()?,
+                            )
+                            .map(Value::U8)?),
+                            MachineRep::U16 => Ok(__arith(
+                                arith,
+                                l.get_as_unsigned::<u16>()?,
+                                r.get_as_unsigned::<u16>()?,
+                            )
+                            .map(Value::U16)?),
+                            MachineRep::U32 => Ok(__arith(
+                                arith,
+                                l.get_as_unsigned::<u32>()?,
+                                r.get_as_unsigned::<u32>()?,
+                            )
+                            .map(Value::U32)?),
+                            MachineRep::U64 => Ok(__arith(
+                                arith,
+                                l.get_as_unsigned::<u64>()?,
+                                r.get_as_unsigned::<u64>()?,
+                            )
+                            .map(Value::U64)?),
+                            MachineRep::I8
+                            | MachineRep::I16
+                            | MachineRep::I32
+                            | MachineRep::I64 => {
+                                panic!(
+                                    "cannot apply native-arith {arith:?} to signed-rep (`{l:?}`, `{r:?}`)"
+                                )
+                            }
+                        },
+                    }
                 }
                 (left, right) => {
                     panic!("cannot apply arith {arith:?} to (`{left:?}`, `{right:?}`)")
@@ -712,21 +1067,42 @@ impl Value {
         }
     }
 
-    pub fn unary(op: UnaryOp, value: Value) -> Value {
+    pub fn unary(op: UnaryOp, value: Value) -> Result<Value, EvalError> {
         match op {
             UnaryOp::BoolNot => match value {
-                Value::Bool(b) => Value::Bool(!b),
+                Value::Bool(b) => Ok(Value::Bool(!b)),
                 _ => panic!("cannot apply bool-not to non-boolean operand (`{value:?}`)"),
             },
             op => match value {
-                Value::U8(i) => Value::U8(__unary(op, i)),
-                Value::U16(i) => Value::U16(__unary(op, i)),
-                Value::U32(i) => Value::U32(__unary(op, i)),
-                Value::U64(i) => Value::U64(__unary(op, i)),
-                Value::Usize(i) => Value::Usize(__unary(op, i)),
-                Value::Numeric(_i) => {
-                    panic!("top-level unary operations should not be performed on raw-numeric");
-                }
+                Value::U8(i) => Ok(Value::U8(__unary(op, i)?)),
+                Value::U16(i) => Ok(Value::U16(__unary(op, i)?)),
+                Value::U32(i) => Ok(Value::U32(__unary(op, i)?)),
+                Value::U64(i) => Ok(Value::U64(__unary(op, i)?)),
+                // Unlike `arith`, there's no sibling native operand to pin the target width from, so dispatch on `n`'s own declared `NumRep` instead.
+                Value::Numeric(ref n) => match n.get_rep() {
+                    NumRep::Concrete(MachineRep::U8) => {
+                        Ok(Value::U8(__unary(op, n.get_as_unsigned::<u8>()?)?))
+                    }
+                    NumRep::Concrete(MachineRep::U16) => {
+                        Ok(Value::U16(__unary(op, n.get_as_unsigned::<u16>()?)?))
+                    }
+                    NumRep::Concrete(MachineRep::U32) => {
+                        Ok(Value::U32(__unary(op, n.get_as_unsigned::<u32>()?)?))
+                    }
+                    NumRep::Concrete(MachineRep::U64) => {
+                        Ok(Value::U64(__unary(op, n.get_as_unsigned::<u64>()?)?))
+                    }
+                    // Only concrete, unsigned reps are accepted here, as `Value` is not designed to perform computations on `TypedConst` and there is no first-class Value for signed-ints
+                    // NOTE[epic=eval-panic] - this panic is tolerable because it cannot be triggered by data, only by misimplemnted format definitions.
+                    NumRep::Concrete(
+                        MachineRep::I8 | MachineRep::I16 | MachineRep::I32 | MachineRep::I64,
+                    )
+                    | NumRep::Auto => {
+                        panic!(
+                            "top-level unary operations should not be performed on raw-numeric with signed or auto representation ({value:?})"
+                        );
+                    }
+                },
                 _ => panic!("cannot apply unary {op:?} to non-numeric operand (`{value:?}`)"),
             },
         }
@@ -761,17 +1137,21 @@ mod tests {
         Value::Numeric(Rc::new(TypedConst::new_auto(n)))
     }
 
+    fn int_rel_ok(rel: IntRel, left: Value, right: Value) -> Value {
+        Value::int_rel(rel, left, right).unwrap()
+    }
+
     /// Checks that `Value::int_rel` agrees, for every `IntRel` variant and both operand
     /// orderings, with the natural `i128` comparison of `l` and `r`.
     fn check_all_rels(left: &Value, right: &Value, l: i128, r: i128) {
         for &rel in &ALL_RELS {
             assert_eq!(
-                Value::int_rel(rel, left.clone(), right.clone()),
+                int_rel_ok(rel, left.clone(), right.clone()),
                 Value::Bool(__rel(rel, l, r)),
                 "int_rel({rel:?}, {left:?}, {right:?})"
             );
             assert_eq!(
-                Value::int_rel(rel, right.clone(), left.clone()),
+                int_rel_ok(rel, right.clone(), left.clone()),
                 Value::Bool(__rel(rel, r, l)),
                 "int_rel({rel:?}, {right:?}, {left:?})"
             );
@@ -804,11 +1184,6 @@ mod tests {
             5,
             10_000_000_000,
         );
-    }
-
-    #[test]
-    fn usize_vs_usize() {
-        check_all_rels(&Value::Usize(5), &Value::Usize(10), 5, 10);
     }
 
     #[test]
@@ -892,28 +1267,28 @@ mod tests {
         let large = Value::U8(10);
 
         assert_eq!(
-            Value::int_rel(IntRel::Lt, small.clone(), large.clone()),
+            int_rel_ok(IntRel::Lt, small.clone(), large.clone()),
             Value::Bool(true)
         );
         assert_eq!(
-            Value::int_rel(IntRel::Gt, small.clone(), large.clone()),
+            int_rel_ok(IntRel::Gt, small.clone(), large.clone()),
             Value::Bool(false)
         );
         assert_eq!(
-            Value::int_rel(IntRel::Lte, small.clone(), large.clone()),
+            int_rel_ok(IntRel::Lte, small.clone(), large.clone()),
             Value::Bool(true)
         );
         assert_eq!(
-            Value::int_rel(IntRel::Gte, small.clone(), large.clone()),
+            int_rel_ok(IntRel::Gte, small.clone(), large.clone()),
             Value::Bool(false)
         );
 
         assert_eq!(
-            Value::int_rel(IntRel::Lt, large.clone(), small.clone()),
+            int_rel_ok(IntRel::Lt, large.clone(), small.clone()),
             Value::Bool(false)
         );
         assert_eq!(
-            Value::int_rel(IntRel::Gt, large.clone(), small.clone()),
+            int_rel_ok(IntRel::Gt, large.clone(), small.clone()),
             Value::Bool(true)
         );
     }
@@ -921,34 +1296,187 @@ mod tests {
     // ---- error cases ----
 
     #[test]
-    #[should_panic(expected = "cannot apply int-rel")]
-    fn numeric_with_mismatched_concrete_rep_panics() {
+    fn numeric_with_mismatched_concrete_rep_still_compares_by_value() {
+        // Declared as U16-rep, but the raw value 5 fits fine in a u8: `int_rel` is purely
+        // value-based (like `as_native`) and ignores the declared `NumRep` entirely. Regression
+        // test: this used to error when `int_rel` called `get_as_unsigned`, which required the
+        // declared rep to match the native operand's width.
         let left = numeric(5u8, NumRep::Concrete(MachineRep::U16));
         let right = Value::U8(5);
-        Value::int_rel(IntRel::Eq, left, right);
+        assert_eq!(
+            Value::int_rel(IntRel::Eq, left, right).unwrap(),
+            Value::Bool(true)
+        );
     }
 
     #[test]
-    #[should_panic(expected = "cannot apply int-rel")]
-    fn numeric_with_unrepresentable_concrete_rep_panics() {
-        // 300 does not fit in u8, despite being tagged with `NumRep::U8`
+    fn numeric_out_of_range_for_native_width_errs() {
+        // 300 does not fit in u8 - a pure value/range failure, irrespective of the (irrelevant)
+        // declared rep.
         let left = numeric(300i32, NumRep::Concrete(MachineRep::U8));
         let right = Value::U8(5);
-        Value::int_rel(IntRel::Eq, left, right);
+        assert!(matches!(
+            Value::int_rel(IntRel::Eq, left, right),
+            Err(EvalError::NumericConvert(_))
+        ));
     }
 
     #[test]
-    #[should_panic(expected = "cannot apply int-rel")]
-    fn numeric_auto_negative_vs_u8_panics() {
+    fn numeric_auto_negative_vs_u8_errs() {
         // -1 cannot be converted to u8, even under `NumRep::Auto`
         let left = numeric_auto(-1i32);
         let right = Value::U8(5);
-        Value::int_rel(IntRel::Eq, left, right);
+        assert!(matches!(
+            Value::int_rel(IntRel::Eq, left, right),
+            Err(EvalError::NumericConvert(_))
+        ));
     }
 
     #[test]
     #[should_panic(expected = "cannot apply int-rel")]
     fn fully_unsupported_combination_panics() {
-        Value::int_rel(IntRel::Eq, Value::Bool(true), Value::U8(1));
+        int_rel_ok(IntRel::Eq, Value::Bool(true), Value::U8(1));
+    }
+
+    // ---- As*-cast support for Numeric (TypedConst) operands ----
+
+    #[test]
+    fn numeric_as_u8_ignores_declared_rep() {
+        // Declared as U32-rep, but the value 0 fits fine in every native width - mirrors how
+        // AsU8(Expr::U32(0)) already succeeds for native-grammar values regardless of source
+        // width; the As*-casts are purely value-based, unlike int_rel's rep-aware coercion.
+        let v = numeric(0u32, NumRep::Concrete(MachineRep::U32));
+        assert_eq!(v.cast_to_u8().unwrap(), Value::U8(0));
+    }
+
+    #[test]
+    fn numeric_as_u8_out_of_range_errs() {
+        let v = numeric(300i32, NumRep::Concrete(MachineRep::U8));
+        assert!(matches!(v.cast_to_u8(), Err(EvalError::NumericConvert(_))));
+    }
+
+    #[test]
+    fn numeric_auto_as_u32_widens() {
+        let v = numeric_auto(9u8);
+        assert_eq!(v.cast_to_u32().unwrap(), Value::U32(9));
+    }
+
+    #[test]
+    fn numeric_as_char_valid_codepoint() {
+        let v = numeric_auto(65u8); // 'A'
+        assert_eq!(v.cast_to_char().unwrap(), Value::Char('A'));
+    }
+
+    #[test]
+    fn numeric_as_char_invalid_surrogate_uses_replacement() {
+        let v = numeric_auto(0xD800u32);
+        assert_eq!(
+            v.cast_to_char().unwrap(),
+            Value::Char(char::REPLACEMENT_CHARACTER)
+        );
+    }
+
+    #[test]
+    fn numeric_as_char_out_of_u32_range_errs() {
+        let v = numeric(u64::MAX, NumRep::Concrete(MachineRep::U64));
+        assert!(matches!(
+            v.cast_to_char(),
+            Err(EvalError::NumericConvert(_))
+        ));
+    }
+
+    // ---- Arith support for Numeric (TypedConst) operands ----
+
+    #[test]
+    fn numeric_arith_matching_concrete_rep_both_orders() {
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U8));
+        assert_eq!(
+            Value::arith(Arith::Add, n.clone(), Value::U8(10)).unwrap(),
+            Value::U8(15)
+        );
+        assert_eq!(
+            Value::arith(Arith::Add, Value::U8(10), n).unwrap(),
+            Value::U8(15)
+        );
+    }
+
+    #[test]
+    fn numeric_arith_auto_rep_widens() {
+        let n = numeric_auto(5u8);
+        assert_eq!(
+            Value::arith(Arith::Add, n, Value::U32(10)).unwrap(),
+            Value::U32(15)
+        );
+    }
+
+    #[test]
+    fn numeric_arith_mismatched_concrete_rep_errs() {
+        // Unlike `int_rel`/As-casts (value-only, via `as_native`), `arith` uses the rep-checking
+        // `get_as_unsigned`: a declared U16-rep is incompatible with a native U8 operand even though
+        // the raw value 5 would fit.
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U16));
+        assert!(matches!(
+            Value::arith(Arith::Add, n, Value::U8(10)),
+            Err(EvalError::NumericConvert(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_arith_unrepresentable_errs() {
+        // Declared as U8-rep, but the raw value doesn't fit in a u8 - caught by
+        // `get_as_unsigned`'s representability check even though the rep nominally matches.
+        let n = numeric(300i32, NumRep::Concrete(MachineRep::U8));
+        assert!(matches!(
+            Value::arith(Arith::Add, n, Value::U8(10)),
+            Err(EvalError::NumericConvert(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_arith_overflow_errs() {
+        let n = numeric(250u8, NumRep::Concrete(MachineRep::U8));
+        assert!(matches!(
+            Value::arith(Arith::Add, n, Value::U8(10)),
+            Err(EvalError::Arith(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_arith_same_rep_resolves_to_native() {
+        let l = numeric(1u8, NumRep::Concrete(MachineRep::U8));
+        let r = numeric(2u8, NumRep::Concrete(MachineRep::U8));
+        let res = Value::arith(Arith::Add, l, r);
+        assert!(matches!(res, Ok(Value::U8(3))))
+    }
+
+    // ---- Unary support for Numeric (TypedConst) operands ----
+
+    #[test]
+    fn numeric_unary_concrete_rep_dispatches_on_own_width() {
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U8));
+        assert_eq!(Value::unary(UnaryOp::IntSucc, n).unwrap(), Value::U8(6));
+    }
+
+    #[test]
+    fn numeric_unary_overflow_errs() {
+        let n = numeric(u32::MAX, NumRep::Concrete(MachineRep::U32));
+        assert!(matches!(
+            Value::unary(UnaryOp::IntSucc, n),
+            Err(EvalError::Arith(_))
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "signed or auto representation")]
+    fn numeric_unary_auto_rep_panics() {
+        let n = numeric_auto(5u8);
+        let _ = Value::unary(UnaryOp::IntSucc, n);
+    }
+
+    #[test]
+    #[should_panic(expected = "signed or auto representation")]
+    fn numeric_unary_signed_rep_panics() {
+        let n = numeric(5i32, NumRep::Concrete(MachineRep::I32));
+        let _ = Value::unary(UnaryOp::IntSucc, n);
     }
 }
