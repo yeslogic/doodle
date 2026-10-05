@@ -1,3 +1,5 @@
+use num_bigint::BigInt;
+use num_traits::Signed;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -82,6 +84,9 @@ impl<K: Eq + std::hash::Hash, V> MapLike<K, V> for FxHashMap<K, V> {
     }
 }
 
+/// Internal constant that determines the maximum number of Ranges stored in IntCoverage before SmallVec heap-allocation kicks in.
+///
+/// This should be a conservative estimate of the maximum number of non-overlapping, non-contiguous ranges that a set of Patterns in a given Match would typically contain
 const COVERAGE_RANGES: usize = 4;
 
 #[derive(Debug)]
@@ -129,14 +134,25 @@ impl IntCoverage {
                     self.covered.insert_range(min..=max);
                 }
             }
-            &TypedPattern::ZConst(..) => {
-                unreachable!("IntCoverage does not support ZConst yet");
-            }
-            &TypedPattern::ZRange(..) => {
-                unreachable!("IntCoverage does not support ZRange yet");
-            }
+            TypedPattern::ZConst(_, n) => self.insert_z_range(n, n),
+            TypedPattern::ZRange(_, range) => self.insert_z_range(&range.min, &range.max),
             _ => unreachable!("unexpected pattern for IntCoverage: {pat:?}"),
         }
+    }
+
+    /// Marks the values of `[min, max]` as covered, ignoring any part of the range outside `[0, usize::MAX]`;
+    /// `IntCoverage` is only used for unsigned scrutinees, which cannot take negative values.
+    fn insert_z_range(&mut self, min: &BigInt, max: &BigInt) {
+        if max.is_negative() {
+            return;
+        }
+        let zero = BigInt::from(0u8);
+        let Ok(lo) = usize::try_from(std::cmp::max(min, &zero)) else {
+            // `min` exceeds `usize::MAX`
+            return;
+        };
+        let hi = usize::try_from(max).unwrap_or(usize::MAX);
+        self.covered.insert_range(lo..=hi);
     }
 
     pub fn covers_all(&self, range: std::ops::RangeInclusive<usize>) -> bool {
