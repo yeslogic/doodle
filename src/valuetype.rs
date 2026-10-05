@@ -258,12 +258,6 @@ impl ValueType {
     pub const I32: ValueType = ValueType::Signed(SignedIntType::I32);
     pub const I64: ValueType = ValueType::Signed(SignedIntType::I64);
 
-    /// Formalization of the hard-coded `u32` type for sequence lengths to avoid hardcoding U32 directly over multiple modules.
-    ///
-    /// This can be freely changed in the future to uniformly re-type all instances of `SeqLength` to the same type-judgment without
-    /// leaving anything unchanged or touching the type-judgments of other AST nodes.
-    pub const SEQ_LEN_T: ValueType = ValueType::Base(BaseType::U32);
-
     /// Helper function for constructing `ValueType::Option`.
     pub fn option(ty: Self) -> ValueType {
         ValueType::Option(Box::new(ty))
