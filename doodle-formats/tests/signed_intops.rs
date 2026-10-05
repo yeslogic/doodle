@@ -233,6 +233,7 @@ mod survey {
         (Src::NumI8, Src::NumI8),
         (Src::NumI8, Src::NumU8),
         (Src::Auto, Src::NatU8),
+        (Src::Auto, Src::NumU8),
         (Src::Auto, Src::NumI8),
         (Src::Auto, Src::Auto),
         (Src::NumI8Neg, Src::Auto),
@@ -314,6 +315,44 @@ mod survey {
         ]
     }
 
+    /// Cases that don't fit the operand × context grid: each is a fixed format plus its input.
+    fn standalone_cases() -> Vec<(&'static str, Format, Vec<u8>)> {
+        let auto5 = || poly_const(5u8);
+        let with_pad = |bytes: &[u8]| [bytes, &PAD].concat();
+        vec![
+            (
+                "(5auto + 5auto) == U8(10)",
+                compute(expr_eq(add(auto5(), auto5()), Expr::U8(10))),
+                with_pad(&[]),
+            ),
+            (
+                "IntSucc(5auto) == U8(6)",
+                compute(expr_eq(succ(auto5()), Expr::U8(6))),
+                with_pad(&[]),
+            ),
+            (
+                "RepeatBetween(U8(1), u8()=2, u8)",
+                chain(u8(), "x", repeat_between(Expr::U8(1), var("x"), u8())),
+                with_pad(&[2]),
+            ),
+            (
+                "u8()=5 ~ ZConst(5) | ZRange(0..=255) (no wildcard)",
+                chain(
+                    u8(),
+                    "x",
+                    compute(expr_match(
+                        var("x"),
+                        [
+                            (Pattern::ZConst(5.into()), Expr::Bool(true)),
+                            (Pattern::z_range(0, 255), Expr::Bool(false)),
+                        ],
+                    )),
+                ),
+                with_pad(&[5]),
+            ),
+        ]
+    }
+
     /// Binds each operand (if it needs a variable), then builds the context around the operand exprs.
     fn assemble(srcs: &[Src], body: impl FnOnce(Vec<Expr>) -> Format) -> (Format, Vec<u8>) {
         const NAMES: [&str; 2] = ["x", "y"];
@@ -390,7 +429,10 @@ mod survey {
     }
 
     fn run_case(template: &'static str, srcs: &[Src], format: Format, input: Vec<u8>) -> Row {
-        let mut case = template.replace("{a}", srcs[0].label());
+        let mut case = template.to_string();
+        if let Some(a) = srcs.first() {
+            case = case.replace("{a}", a.label());
+        }
         if let Some(b) = srcs.get(1) {
             case = case.replace("{b}", b.label());
         }
@@ -504,6 +546,9 @@ mod survey {
                 let (format, input) = assemble(&[a, b], |es| build(es[0].clone(), es[1].clone()));
                 rows.push(run_case(context, &[a, b], format, input));
             }
+        }
+        for (case, format, input) in standalone_cases() {
+            rows.push(run_case(case, &[], format, input));
         }
         std::panic::set_hook(prev_hook);
 
