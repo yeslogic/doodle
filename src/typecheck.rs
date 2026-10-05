@@ -3864,7 +3864,29 @@ impl TypeChecker {
             }
             seen_levels = all_seen_levels;
         }
+        this.check_unique_solutions()?;
         Ok(this)
+    }
+
+    /// Checks that every canonical variable with an `Elem` or `NumTree` constraint has a unique solution,
+    /// so that [`TypeChecker::expand_var`] cannot fail on them during elaboration.
+    fn check_unique_solutions(&self) -> TCResult<()> {
+        for (ix, constraints) in self.constraints.iter().enumerate() {
+            let v = UVar(ix);
+            if self.get_canonical_uvar(v) != v {
+                continue;
+            }
+            match constraints {
+                Constraints::Invariant(Constraint::Elem(bs)) => {
+                    bs.get_unique_solution(v)?;
+                }
+                Constraints::Invariant(Constraint::NumTree(is)) => {
+                    is.get_unique_solution(v)?;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     pub fn lookup_level_var(&self, level: usize) -> Option<UVar> {
@@ -4033,11 +4055,11 @@ impl TypeChecker {
                 Constraint::Equiv(utype) => self.expand_type(utype.clone()),
                 Constraint::Elem(bs) => match bs.get_unique_solution(v) {
                     Ok(b) => Expansion::Base(b),
-                    Err(e) => panic!("{e}"),
+                    Err(e) => unreachable!("{e} (should be caught by check_unique_solutions)"),
                 },
                 Constraint::NumTree(is) => match is.get_unique_solution(v) {
                     Ok(i) => Expansion::Int(i),
-                    Err(e) => panic!("{e}"),
+                    Err(e) => unreachable!("{e} (should be caught by check_unique_solutions)"),
                 },
                 Constraint::Proj(proj_shape) => match proj_shape {
                     ProjShape::TupleWith(ix_vars) => {
@@ -4522,6 +4544,26 @@ mod tests {
         ]);
         assert_eq!(output, expected);
         Ok(())
+    }
+
+    /// Checks that an auto-ascribed node that is never pinned to a specific Rep causes `infer_module`
+    /// to return an error, rather than succeeding and leaving elaboration to panic.
+    #[test]
+    fn test_unpinned_auto_is_tc_error() {
+        use crate::helper::{compute, poly_zero};
+
+        let f: Format = compute(poly_zero());
+        let module = FormatModule::new();
+        match TypeChecker::infer_module(&module, &f) {
+            Ok(_) => panic!("unexpected success for unpinned auto"),
+            Err(e) => assert!(
+                matches!(
+                    e.err.as_ref(),
+                    TCErrorKind::MultipleSolutions(..) | TCErrorKind::MultipleIntSolutions(..)
+                ),
+                "unexpected error: {e}"
+            ),
+        }
     }
 
     /// Regression test documenting a recently-discovered gap in the TypeChecker expression-level constraint logic:
