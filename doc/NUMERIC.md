@@ -66,9 +66,11 @@ Though not directly an embedding of `TypedConst`, `ViewFormat::ReadArray` can ca
 A `NumExpr` with an unsigned `MachineRep` can match against the corresponding `Pattern::U?` variant: `Pattern::U8` will match against `TypedConst(N, U8)`, and similarly for `U16`, `U32`, and `U64`.
 All unsigned Numerics can also be matched by `Pattern::Int`.
 
-Auto-rep numerics can only be matched via `Pattern::Int` if they resolve to an unsigned value, and otherwise, can only match against `Pattern::ZConst` or `Pattern::ZRange`.
+Auto-rep Numerics can be matched by `Pattern::U8`–`Pattern::U64`, which compare them by value, and by `Pattern::Int`, `Pattern::ZConst` and `Pattern::ZRange`.
 
 For signed Numerics, the only patterns that are compatible are `ZConst` and `ZRange`, neither of which care about the rep of the scrutinee.
+
+Both interpreters (`decoder` and `loc_decoder`) match numeric-literal patterns through the shared `Value::matches_numeric_literal`.
 
 ## `Expr::infer_type`/`ValueType` (registration/legacy typechecker)
 
@@ -82,9 +84,13 @@ Anything with `Auto` rep is inferred as `ValueType::NumericHole`. `ValueType::Nu
 The type-inference logic for `Expr::Numeric` recurses into the rep-solver for `NumExpr`, which can result in unification failure if an untagged `NumExpr::BinOp` holds terms with distinct non-`Auto` reps. Otherwise, the same type will be inferred as with `TypeChecker`, though a locally `Auto`-rep node will be judged as `NumericHole` because `infer_type` is a context-free
 type-solver, whereas `TypeChecker` does full bidirectional type-checking that can solve locally-`Auto` nodes if they are later referenced in type-constrained contexts.
 
-`ValueType::is_numeric()` returns `true` for `ValueType::Base(b)` when `b.is_numeric()` holds, as well as for `NumericHole` and `ValueType::Signed(..)`. Both of these are then accepted as well-formed argument (`Expr`) types for `IntRel`, `Arith`, `IntSucc/IntPred`, `AsU*`/`AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes`, and `ViewFormat::ReadArray` (in the 'length' position).
+`ValueType::is_numeric()` returns `true` for `ValueType::Base(b)` when `b.is_numeric()` holds, as well as for `NumericHole` and `ValueType::Signed(..)`. It is the argument check for `IntRel` (whose operands must also unify) and `AsU8`–`AsU64`, which therefore accept signed operands.
 
-Certain sites in `Expr::infer_type` mandate `ValueType::Base(b)` guarded by `b.is_numeric()`, not just `ValueType::is_numeric` on the overall type (i.e. they reject `Signed` and `NumericHole`); these include `RepeatCount`, `RepeatBetween`, and the 'key' field of `FindByKey`.[^1]
+`ValueType::is_unsigned_or_auto()` accepts a native unsigned type or `NumericHole`, rejecting `Signed`. It is the argument check for native `Arith`, `IntSucc`/`IntPred`, `AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes` and `ViewFormat::ReadArray` (lengths), `RepeatCount`, `RepeatBetween`, and the `Slice` length and `WithRelativeOffset` base and offset. Where two operands are involved, they are unified first, so a signed operand cannot hide behind an Auto one. Signed arithmetic belongs in `NumExpr`, and the idiom for converting a signed value to a char is `AsChar(AsU32(x))`.
+
+`RepeatBetween` additionally requires both bounds to be constant (`Expr::exact_repeat_bounds`), as do the `TypeChecker` and the decoder compiler.
+
+The 'key' field of `FindByKey` mandates `ValueType::Base(b)` guarded by `b.is_numeric()` (i.e. it rejects `Signed`).[^1]
 
 [^1]: `FindByKey` is a special-case in that it combines (via ValueType unifcation) two
 separate sources-of-truth for the key-type, before testing that it is `ValueType::Base`
@@ -100,16 +106,18 @@ At this point in time `SeqIx` requires its argument to be typed as `ValueType::U
 
 The `TypeChecker` engine ascribes more specific types for any Numeric, and infers set-based constraints on certain `Expr` nodes that `infer_type` currently hard-codes to return specific `ValueType`s for.
 
+A Numeric whose type cannot be pinned to a unique solution (e.g. a bare Auto constant) is a `TCError` ("no unique solution", or "no valid solutions" for e.g. a negative Auto at an unsigned-only site), reported through `generate_code`'s normal "Failed to infer module-wide type annotations" path. No default types are applied.
+
 ### `BaseSet::UAny`
 
 All `Expr` nodes ascribed uppercase labels in in the following constructions receive a type-constraint marking them as 'unsigned of any width, no tiebreaker'.
 If the actual type inferred happens to be signed, a unification error will occur.
 
 - `X := Expr::Arith(Y, Z)`
-- `_ := Expr::IntRel(Y, Z)` [^2]
 - `X = Expr::IntSucc(Y)`/`X := Expr::IntPred(Y)` [^3]
 - `_ = Expr::AsChar(Y)` (Y) [^4]
-- `_ := Format::RepeatCount(Y)`/`_ := RepeatBetween(Y, Z)` (the types of Y and Z are also required to unify)
+- `_ := Format::RepeatCount(Y)`/`_ := RepeatBetween(Y, Z)` (in the case of `RepeatBetween` specifically, the types of Y and Z are also required to unify, and both must be constant)
+- `_ := Expr::FindByKey(_, _, Y, _)` (the query key)
 - `_ := ViewFormat::CaptureBytes(X)`/`_ := ViewFormat::ReadArray(X, _)`
 - `_ := ViewExpr::Offset(_, X)`
 
@@ -124,6 +132,10 @@ If `U32` is excluded but more than one possible unsignedsolution remains, a unif
 - `_ := SeqIx(_, Z)`
 - `_ := EnumFromTo(Y, Z)` (the types of Y and Z are also required to unify)
 - `X := SeqLength(_)` [^5]
+- `_ := Format::Slice(Y, _)`
+- `_ := Format::WithRelativeOffset(Y, Z, _)` (the types of Y and Z are also required to unify)
+
+Despite the name, `UAny32` admits every unsigned width, including `U64`; the `32` is only the tiebreak default.
 
 The following cases receive one-off UintSet constraints:
 
@@ -138,6 +150,7 @@ The following `Expr` nodes are constrained with the broadest, Numeric-permissive
 - `_ := Expr::AsU16(X)`
 - `_ := Expr::AsU32(X)`
 - `_ := Expr::AsU64(X)`
+- `_ := Expr::IntRel(X, Y)` (the types of X and Y are also required to unify, so mixed-sign comparisons are rejected) [^2]
 
 ### Dynamic
 
@@ -161,11 +174,9 @@ Various numeric-kinded expr nodes treat Numeric values differently:
 Comparison between `Numeric(X)` and `Numeric(Y)` is well-typed, and the reps of `X` and `Y` need not agree. `Numeric(X)` against `U8`-`U64` coerce `X` via `NumExpr::as_native`, which ignores rep and just requires that the value
 of `X` fit in the equivalent width to the other operand.
 
-### `eq_key`
+### `FindByKey` (`AsKey::eq_key`/`compare_as_key`)
 
-#### Panics
-
-Comparison of `Usize` against `Numeric` panics.
+A `Numeric(X)` key compared against a `U8`–`U64` key is coerced with `TypedConst::get_as_unsigned`. If that fails (e.g. a `-1` Auto query key against `U8` keys), the comparison returns `EvalError::NumericConvert` rather than panicking.
 
 ### `arith`
 
@@ -176,27 +187,28 @@ Arithmetic between `Numeric(X)` and `Value::U*(N)` (for U8--U64) call into `NumE
 The following combinations of terms (in either order) are accepted by `arith`:
 
 - `(Unsigned, Native)` (e.g. `add(numexpr!(5u8), Expr::U8(5))`)
+- `(Auto, Native)` (e.g. `add(poly_zero(), Expr::U8(5))`): the Auto operand takes the native operand's type
 - `(Unsigned, Auto)` (e.g. `add(numexpr!(5u8), poly_zero())`)
 - `(U0, U0)` (the same Unsigned rep; e.g. `add(numexpr!(5u8), numexpr!(5u8))`)
+- `(Auto, Auto)` (e.g. `add(poly_zero(), poly_zero())`): computed by value, and the result is Auto. No width is imposed until the value next meets a concrete type, where it is checked. Division by zero and shift amounts outside `0..64` are errors.
 
-Panics on ambiguous operations (both auto or different concrete rep) between two Numerics,
-and on any operations over one or more signed-rep Numerics.
+Panics on operations between two Numerics with different concrete reps, and on any operations over one or more signed-rep Numerics.
+Registration rejects both of these, so the panics are type-checker invariants rather than data-reachable failures.
 
-Also panics when mixing Numeric with Usize[^6]
+### `unary`
 
-[^6]: `Value::Usize` only appears when using `EnumFromTo`, and can propagate from there via index operations and through scoped variables. It is currently a candidate for deprecation since
-it is rare and complicates the model in certain ways, e.g. by failing to preserve the claimed type of a value derived by indexing into an `EnumFromTo` sequence.
+`IntSucc`/`IntPred` on a Numeric dispatch on its own rep: concrete `U8`–`U64` compute natively, and Auto is incremented or decremented by value, staying Auto. Signed reps panic (registration rejects them).
 
-## Noted Gaps
+## Notes
 
-[^2]: While `IntRel` applies properly in the interpreter layer over inner `Expr`s with signed-int `ValueType`s, the `TypeChecker` layer currently rejects any `IntRel` node whose terms do not both resolve
-to a unique unsigned `BaseType`. This is a gap in the design and may be patched later on. This is exdercised by unit-test `test_repro_intrel_on_signed_fails_to_unify` in `src/typecheck.rs`.
+[^2]: `IntRel` accepts signed operands in every layer. The operands must still have the same type, so comparing a signed value against an unsigned one is rejected by both type checkers. Exercised by `test_intrel_on_signed` in `src/typecheck.rs`.
+Codegen emits a plain infix comparison, which is also correct for signed types.
 
-[^3]: `IntPred` and `IntSucc` directly mirror Unary operators in the Numeric layer, so this is a less-glaring gap than `IntRel`. It may also benefit from an update, but this is lower-priority. Confirmed gap
-in both interpeter (`Expr::eval`) and code-generator (`TypeCheck::infer_var_expr`), exercised by [integration test (regression)](/doodle-formats/tests/signed_intops.rs)
+[^3]: `IntPred` and `IntSucc` on signed operands are rejected by both registration and the `TypeChecker`; signed increment/decrement belongs in `NumExpr`, which mirrors these as Unary operators.
+Exercised by the [integration tests](/doodle-formats/tests/signed_intops.rs) `test_registration_unary` and `test_gen_unary`.
 
-[^4]: On the interpreter-side, `AsChar` is allowed to run on any non-negative value without first converting to an unsigned ValueType via `AsU8`/`AsU16`/etc. This gap only exists in the typechecker, and is demonstrated
-in the same integation test as [^2].
+[^4]: `AsChar` on signed operands is rejected by both registration and the `TypeChecker`, unlike `AsU8`–`AsU64`. The idiom for a signed value is `AsChar(AsU32(x))`, exercised by `test_interp_char_via_u32` in the same
+integration test. The interpreter itself would accept any non-negative value, but registration prevents signed operands from reaching it.
 
 [^5]: `Expr::SeqLength` and `Format::Pos` are special cases in that they represent a numeric value is generated *ex nihilo*, and which therefore cannot cause constraint failures for local unification. However, if something downstream uses a variable bound to either one in a context
 where only a signed-Numeric assignment results in a well-typed tree, these constraints may still

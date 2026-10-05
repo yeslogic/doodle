@@ -1,6 +1,6 @@
 # Plan: where Numerics are accepted and rejected
 
-Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3, 8be98724); C1, C2, C3 (step 4).
+Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3, 8be98724); C1, C2, C3 (step 4, 5aa40bc3); R6; step 5. Everything except the open question Q2 (`Pos`) is implemented.
 
 Note: `BaseSet::UAny32` admits every unsigned type including `U64`; the `32` is only the default width used to break ties when several solutions are sound. Registration's counterpart to both `UAny` and `UAny32` is therefore the same "unsigned or Auto" rule.
 
@@ -144,7 +144,15 @@ Q1 and Q3 are resolved as items 12 and 13.
 ## Suggested order
 
 1. T3, so every later survey run reports failures as errors instead of panics. (Done.)
-2. R1, R3, R4 and R5, together with T1, T2 and T4. (Done, except R6 (`alt.rs`), which follows once these settle.)
+2. R1, R3, R4 and R5, together with T1, T2 and T4. (Done; R6 (`alt.rs`) done after step 4.)
 3. I1, I2 and I3. (Done.)
 4. C1, C2 and C3. (Done.)
-5. Survey and docs.
+5. Survey and docs. (Done.)
+
+## Completion notes
+
+- **R6 (`alt.rs`).** `ValueTypeExt::is_unsigned_or_auto` (treating `EngineSpecific` like `is_numeric` does) now guards native `Arith`, `IntSucc`/`IntPred`, `AsChar`, `EnumFromTo` (after unification), `RepeatCount`, `RepeatBetween` (after unification), `CaptureBytes`/`ReadArray` lengths, `ViewExpr::Offset` (`check_type_ext`), `Slice` (previously only a `debug_assert!`) and `WithRelativeOffset` (previously unchecked). `build_scope_ext` mirrors R3. Test: `alt::tests::ext_numeric_acceptance`.
+  - Not changed, though they still differ from registration: `IntRel` and `AsU8`–`AsU64` in `_ext` require a native unsigned `Base` type (registration uses `is_numeric()`), `RepeatBetween` bounds are not required to be constant (R4 was not in R6's scope; registration still enforces it after compilation to `Format`), and `Pos` is typed `U64`.
+  - The `doodle` binary fails to build with `--features alt` (`opentype.rs:621`, type annotations needed). This predates this work (it also fails at 5aa40bc3); the library builds.
+- **Step 5.** The survey gained the operand pair `(Auto, NumU8)` and a set of standalone cases: `(5auto + 5auto) == U8(10)`, `IntSucc(5auto) == U8(6)`, `RepeatBetween` with a variable bound, and a no-wildcard `ZConst`/`ZRange` match. All are consistent across the three layers. 286 cases, 55 inconsistent, none panicking; the remainder are item 5, item 9 and value-dependent interpreter errors. `doc/NUMERIC.md` (including footnotes 2–4) and `NUMERIC_GUIDELINE.md` are updated, and stale `Value::Usize` references in the rewritten sections are removed.
+
