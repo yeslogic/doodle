@@ -482,12 +482,11 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::RepeatBetween(xmin, xmax, a) => {
-                // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = xmin.bounds().as_exact() else {
-                    unimplemented!("RepeatBetween on inexact bounds-expr")
-                };
-                let Some(max) = xmax.bounds().as_exact() else {
-                    unimplemented!("RepeatBetween on inexact bounds-expr")
+                // NOTE - only constant bounds are supported (and accepted by registration and the TypeChecker)
+                let Some((min, max)) = Expr::exact_repeat_bounds(xmin, xmax) else {
+                    return Err(anyhow!(
+                        "RepeatBetween bounds should be constant, found {xmin:?} and {xmax:?}"
+                    ));
                 };
 
                 let da = self.compile_format(
