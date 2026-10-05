@@ -1,18 +1,21 @@
 #![cfg(test)]
-//! Regression tests pinning down the current behavior of `SeqLength`, `SeqIx`, `SubSeq` and `Dup`
+//! Regression tests pinning down the behavior of `SeqLength`, `SeqIx`, `SubSeq` and `Dup`
 //! (see `doc/SEQLEN_PLAN.md`).
 //!
-//! Registration types `SeqLength` as `U32` and requires exactly `U32` for the index/start/length/count
-//! arguments of `SeqIx`, `SubSeq`, `SubSeqInflate` and `Dup`; the `TypeChecker` accepts any unsigned type
-//! there (preferring `U32`); the interpreter produces a native `U32` for `SeqLength` and accepts any width
-//! for the arguments. These tests record what each layer currently does, so that the changes planned in
-//! `doc/SEQLEN_PLAN.md` show up here.
+//! Registration types `SeqLength` as `NumericHole` and accepts any unsigned type or Auto for the
+//! index/start/length/count arguments of `SeqIx`, `SubSeq`, `SubSeqInflate` and `Dup`; the `TypeChecker`
+//! accepts any unsigned type there (preferring `U32`); the interpreter produces an Auto Numeric for
+//! `SeqLength` (`Value::from_seq_len`) and accepts any width for the arguments.
+//!
+//! `assert_codegen_ok` only checks that codegen accepts a format; it does not compile the emitted code.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::rc::Rc;
 
 use doodle::codegen::{ToFragment, generate_code};
 use doodle::decoder::{Compiler, Value};
 use doodle::helper::*;
+use doodle::numeric::core::TypedConst;
 use doodle::read::ReadCtxt;
 use doodle::{Expr, Format, FormatModule};
 
@@ -38,6 +41,11 @@ fn catch<T>(f: impl FnOnce() -> T) -> Result<T, String> {
             String::from("<non-string panic payload>")
         }
     })
+}
+
+/// An Auto Numeric with value `n`, as produced by `SeqLength`.
+fn auto(n: u32) -> Value {
+    Value::Numeric(Rc::new(TypedConst::new_auto(n)))
 }
 
 /// Reads `n` bytes into the sequence `s` (a `Seq(U8)`), then runs `body`.
@@ -98,14 +106,6 @@ fn assert_interp_err(format: &Format, expected: &str) {
     }
 }
 
-/// Asserts that registration rejects `format` with an error containing `expected`.
-fn assert_registration_rejects(format: &Format, expected: &str) {
-    match Compiler::compile_program(&FormatModule::new(), format) {
-        Ok(_) => panic!("registration unexpectedly accepted the format"),
-        Err(e) => assert!(e.to_string().contains(expected), "unexpected error: {e}"),
-    }
-}
-
 /// Asserts that codegen (the `TypeChecker` plus code emission) accepts `format`.
 ///
 /// The emitted code itself is not compiled.
@@ -117,9 +117,9 @@ fn assert_codegen_ok(format: &Format) {
 // SECTION - SeqLength
 
 #[test]
-fn seq_length_is_native_u32() {
+fn seq_length_is_auto_numeric() {
     let f = with_seq(3, compute(seq_length(var("s"))));
-    assert_interp_ok(&f, Value::U32(3));
+    assert_interp_ok(&f, auto(3));
     assert_codegen_ok(&f);
 }
 
@@ -139,12 +139,11 @@ fn seq_length_gte_u32() {
     assert_codegen_ok(&f);
 }
 
-/// Registration types `SeqLength` as `U32`, so a `U8` comparison is rejected; the `TypeChecker` accepts it
-/// (resolving `SeqLength` to `U8`), even though codegen emits `len() as u32` regardless.
+/// Formerly rejected by registration, which typed `SeqLength` as `U32`.
 #[test]
 fn seq_length_eq_u8() {
     let f = with_seq(3, compute(expr_eq(seq_length(var("s")), Expr::U8(3))));
-    assert_registration_rejects(&f, "mismatched operand types for Eq");
+    assert_interp_ok(&f, Value::Bool(true));
     assert_codegen_ok(&f);
 }
 
@@ -156,22 +155,30 @@ fn seq_last_unchecked_nonempty() {
     assert_codegen_ok(&f);
 }
 
-/// On an empty sequence, `pred(seq_length(..))` currently fails at the `pred`, as a `U32` underflow.
+/// On an empty sequence, `pred(seq_length(..))` is `-1` (Auto), and the error is raised where it is used as
+/// an index. (When `SeqLength` was a native `U32`, it was a `U32` underflow at the `pred`.)
 #[test]
 fn seq_last_unchecked_empty() {
     let f = with_seq(0, compute(seq_last_unchecked(var("s"))));
-    assert_interp_err(&f, "IntPred");
+    assert_interp_err(
+        &f,
+        "NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto)",
+    );
     assert_codegen_ok(&f);
 }
 
-/// The `opentype` pattern: `enum_from_to(U32(0), pred(seq_length(..)))`, on an empty sequence.
+/// The `opentype` pattern: `enum_from_to(U32(0), pred(seq_length(..)))`, on an empty sequence. As above, the
+/// error is raised where `-1` is used as a bound.
 #[test]
 fn enum_from_to_pred_seq_length_empty() {
     let f = with_seq(
         0,
         compute(enum_from_to(Expr::U32(0), pred(seq_length(var("s"))))),
     );
-    assert_interp_err(&f, "IntPred");
+    assert_interp_err(
+        &f,
+        "NumericConvert(TypedConst::as_usize: unable to convert typed-const TypedConst(-1, Auto)",
+    );
     assert_codegen_ok(&f);
 }
 
@@ -195,11 +202,11 @@ fn seq_ix_u32() {
     assert_codegen_ok(&f);
 }
 
-/// Registration requires exactly `U32`; the `TypeChecker` accepts any unsigned index.
+/// Formerly rejected by registration, which required exactly `U32`.
 #[test]
 fn seq_ix_u8() {
     let f = with_seq(3, compute(index_unchecked(var("s"), Expr::U8(1))));
-    assert_registration_rejects(&f, "SeqIx `index` param: expected U32");
+    assert_interp_ok(&f, Value::U8(0x0B));
     assert_codegen_ok(&f);
 }
 
@@ -209,31 +216,36 @@ fn sub_seq_u32() {
         3,
         compute(seq_length(sub_seq(var("s"), Expr::U32(1), Expr::U32(2)))),
     );
-    assert_interp_ok(&f, Value::U32(2));
+    assert_interp_ok(&f, auto(2));
     assert_codegen_ok(&f);
 }
 
-/// Registration requires exactly `U32`; the `TypeChecker` accepts any unsigned start.
+/// Formerly rejected by registration, which required exactly `U32`.
 #[test]
 fn sub_seq_u16_start() {
-    let f = with_seq(3, compute(sub_seq(var("s"), Expr::U16(1), Expr::U32(2))));
-    assert_registration_rejects(&f, "SubSeq `start` param: expected U32");
+    let f = with_seq(
+        3,
+        compute(index_unchecked(
+            sub_seq(var("s"), Expr::U16(1), Expr::U32(2)),
+            Expr::U32(0),
+        )),
+    );
+    assert_interp_ok(&f, Value::U8(0x0B));
     assert_codegen_ok(&f);
 }
 
 #[test]
 fn dup_u32() {
     let f = compute(seq_length(dup(Expr::U32(4), Expr::U8(0))));
-    assert_interp_ok(&f, Value::U32(4));
+    assert_interp_ok(&f, auto(4));
     assert_codegen_ok(&f);
 }
 
-/// Registration requires exactly `U32`; the `TypeChecker` accepts any unsigned count, even though codegen
-/// emits a call to `dup32(count: u32, ..)` regardless.
+/// Formerly rejected by registration, which required exactly `U32`.
 #[test]
 fn dup_u8() {
-    let f = compute(dup(Expr::U8(4), Expr::U8(0)));
-    assert_registration_rejects(&f, "Dup: count is not U32");
+    let f = compute(seq_length(dup(Expr::U8(4), Expr::U8(0))));
+    assert_interp_ok(&f, auto(4));
     assert_codegen_ok(&f);
 }
 
@@ -247,6 +259,6 @@ fn dup_as_u32_count() {
             Expr::U8(0),
         ))),
     );
-    assert_interp_ok(&f, Value::U32(13));
+    assert_interp_ok(&f, auto(13));
     assert_codegen_ok(&f);
 }
