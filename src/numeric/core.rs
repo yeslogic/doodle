@@ -640,22 +640,17 @@ impl TypedConst {
     }
 
     /// Returns `true` if and only if `self` is notionally equivalent to the `M`-value `other` and
-    /// has a nominal representation that is compatible (i.e. identity under unification) with `rep`.
+    /// has a nominal representation that is compatible with `rep`.
     ///
     /// # Notes
     ///
-    /// If the feature-flag `"pattern_matches_auto_rep"` is set, then `self._rep() == NumRep::Auto`
-    /// is treated as a wildcard and will match for any choice of `rep`.
-    ///
-    /// If that same feature-flag is not enabled, then `self.get_rep() == NumRep::Auto` is treated
-    /// as a non-match and will always return `false`.
+    /// A `NumRep::Auto` value is compatible with every `rep`, and so is compared by value alone. A concrete
+    /// `NumRep` must be exactly `rep`.
     pub fn pat_matches<M>(&self, other: M, rep: MachineRep) -> bool
     where
         BigInt: From<M>,
     {
-        ((cfg!(feature = "pattern_matches_auto_rep") && self.is_abstract())
-            || self.1 == NumRep::Concrete(rep))
-            && &self.0 == &BigInt::from(other)
+        (self.is_abstract() || self.1 == NumRep::Concrete(rep)) && self.0 == BigInt::from(other)
     }
 
     /// Returns true if `self` can be considered to match `Pattern::U8(other)`.

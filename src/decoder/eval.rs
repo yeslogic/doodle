@@ -409,9 +409,11 @@ impl Expr {
                         } else {
                             search::find_index_by_key_unsorted(f_get_key, &query, values, eval)
                         };
+                        // A key-lambda error takes priority, as it may have caused a spurious comparison error
                         if let Some(err) = eval_err.take() {
                             return Err(err);
                         }
+                        let found = found?;
                         // Preserves the matched element's own location/structure (via
                         // `lift_option`) rather than discarding it by routing through a plain
                         // `Value::Option`.

@@ -27,7 +27,6 @@ test = true
 default = []
 alt = []
 format_enforce = []
-pattern_matches_auto_rep = []
 __unify_mixed_to_int = []
 
 [[bin]]
