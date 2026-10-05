@@ -851,11 +851,11 @@ impl ViewExpr {
             },
             ViewExpr::Offset(view_expr, expr) => {
                 let t = expr.infer_type_ext(scope)?;
-                if t.is_numeric() {
+                if t.is_unsigned_or_auto() {
                     view_expr.check_type_ext(scope)
                 } else {
                     Err(anyhow!(
-                        "non-numeric type for offset-expr in ViewExpr: {t:?}"
+                        "offset-expr in ViewExpr must be unsigned or auto, found {t:?}"
                     ))
                 }
             }

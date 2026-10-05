@@ -114,7 +114,7 @@ impl Pattern {
         &self,
         scope: &mut TypeScope<'_, ValueTypeExt>,
         t: Rc<ValueTypeExt>,
-    ) {
+    ) -> AResult<()> {
         match (self, t.as_ref()) {
             (Pattern::Binding(name), t) => {
                 scope.push(name.clone(), t.clone());
@@ -125,39 +125,46 @@ impl Pattern {
             (Pattern::U16(..), ValueTypeExt::Base(BaseType::U16)) => {}
             (Pattern::U32(..), ValueTypeExt::Base(BaseType::U32)) => {}
             (Pattern::U64(..), ValueTypeExt::Base(BaseType::U64)) => {}
+            // NOTE - an Auto scrutinee is matched against `U8(n)`..`U64(n)` by value
+            (
+                Pattern::U8(..) | Pattern::U16(..) | Pattern::U32(..) | Pattern::U64(..),
+                ValueTypeExt::NumericHole,
+            ) => {}
             (
                 Pattern::Int(..),
-                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)
+                | ValueTypeExt::NumericHole,
             ) => {}
             (Pattern::ZConst(..) | Pattern::ZRange(..), t) if t.is_numeric() => {}
             (Pattern::Tuple(ps), ValueTypeExt::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
-                    p.build_scope_ext(scope, Rc::new(t.clone()));
+                    p.build_scope_ext(scope, Rc::new(t.clone()))?;
                 }
             }
             (Pattern::Seq(ps), ValueTypeExt::Seq(t)) => {
                 for p in ps {
-                    p.build_scope_ext(scope, Rc::new((**t).clone()));
+                    p.build_scope_ext(scope, Rc::new((**t).clone()))?;
                 }
             }
             (Pattern::Option(None), ValueTypeExt::Option(_)) => {
                 // do nothing
             }
             (Pattern::Option(Some(p)), ValueTypeExt::Option(t)) => {
-                p.build_scope_ext(scope, Rc::new((**t).clone()))
+                p.build_scope_ext(scope, Rc::new((**t).clone()))?;
             }
             (Pattern::Variant(label, p), ValueTypeExt::Union(branches)) => {
-                if let Some(t) = branches.get(label) {
-                    // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
-                    let tmp = Rc::new(t.clone());
-                    p.build_scope_ext(scope, tmp);
-                } else {
-                    panic!("no {label} in {branches:?}");
-                }
+                let Some(t) = branches.get(label) else {
+                    return Err(anyhow!("pattern variant {label} not found in {branches:?}"));
+                };
+                // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
+                let tmp = Rc::new(t.clone());
+                p.build_scope_ext(scope, tmp)?;
             }
-            (l, r) => panic!("pattern build_scope_ext failed: ({l:?}, {r:?})"),
+            (l, r) => return Err(anyhow!("pattern {l:?} does not match type {r:?}")),
         }
+        Ok(())
     }
+
     pub(crate) fn infer_expr_branch_type(
         &self,
         scope: &TypeScope<'_>,
@@ -176,7 +183,7 @@ impl Pattern {
         expr: &Expr,
     ) -> AResult<ValueTypeExt> {
         let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope_ext(&mut pattern_scope, head_type);
+        self.build_scope_ext(&mut pattern_scope, head_type)?;
         expr.infer_type_ext(&pattern_scope)
     }
     pub(crate) fn infer_format_branch_type(
@@ -199,7 +206,7 @@ impl Pattern {
         format: &FormatExt,
     ) -> AResult<ValueTypeExt> {
         let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope_ext(&mut pattern_scope, head_type);
+        self.build_scope_ext(&mut pattern_scope, head_type)?;
         module.infer_format_ext_type(&pattern_scope, format)
     }
 
