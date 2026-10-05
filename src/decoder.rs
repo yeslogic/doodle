@@ -720,10 +720,7 @@ impl Decoder {
             }
             Decoder::Phantom => Ok(WithErr::new((Value::PhantomData, input))),
             Decoder::Fail => Err(DecodeErrorKind::<Value>::fail(scope, input).into()),
-            Decoder::Pos => {
-                let pos = input.offset as u64;
-                Ok(WithErr::new((Value::U64(pos), input)))
-            }
+            Decoder::Pos => Ok(WithErr::new((Value::from_pos(input.offset), input))),
             Decoder::SkipRemainder => {
                 let input = input.skip_remainder();
                 Ok(WithErr::new((Value::UNIT, input)))

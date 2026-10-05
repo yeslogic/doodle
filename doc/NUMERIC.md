@@ -57,7 +57,7 @@ The only Expr that can *directly* embed a Numeric value is `Expr::Numeric`, whic
 
 ## `Format`
 
-There is no native support for `Format`-level construction of Numerics. All Numerics are generated at the `Expr` layer through `Format::Map` or `Format::Compute` and similar.
+There is no native support for `Format`-level construction of Numerics, with one exception: `Format::Pos` evaluates to an Auto Numeric holding the current buffer offset, matching its `NumericHole` typing in registration. Otherwise, all Numerics are generated at the `Expr` layer through `Format::Map` or `Format::Compute` and similar.
 
 Though not directly an embedding of `TypedConst`, `ViewFormat::ReadArray` can carry a signed marker-type, though that does not directly result in Numerics being manifested in memory while parsing.
 

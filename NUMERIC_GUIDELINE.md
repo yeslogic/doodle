@@ -12,7 +12,7 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
   - `U8`–`U64` become concrete reps.
   - `Mapped`, `Branch` and `Permit(Ok|Err(Some))` are unwrapped transparently.
   - Everything else (Bool, Char, compound values, `Permit(Err(None))`) fails with `EvalError::BadVariable`.
-- **`Format`**: `decoder.rs` has no signed or Numeric read primitive. At the interpreter level, a Numeric value only enters a Format through `Compute`/`Map` over `Expr::Numeric`. The exceptions are `ReadArray`'s `FixedReadKind`, which has signed kinds (`BaseNumType::Signed`) in both type checkers, and `Format::Pos`, typed `NumericHole` by registration (see the open question below).
+- **`Format`**: `decoder.rs` has no signed or Numeric read primitive. At the interpreter level, a Numeric value only enters a Format through `Compute`/`Map` over `Expr::Numeric`. The exceptions are `ReadArray`'s `FixedReadKind`, which has signed kinds (`BaseNumType::Signed`) in both type checkers, and `Format::Pos`, typed `NumericHole` by registration and evaluated by the interpreter to an Auto Numeric (`Value::from_pos`), so it takes the type of whatever native operand it meets.
 - **`Pattern`**: there's no Numeric pattern node. The numeric-model patterns are `ZConst(BigInt)` and `ZRange(NumBounds)`, which ignore representation. `U8`–`U64` and `Int(Bounds)` can also match against `Value::Numeric`.
 
 ## Type inference: registration vs `TypeChecker`
@@ -67,7 +67,6 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
   - A signed scrutinee is always treated as `Refutable`, so a fallback arm is always emitted.
   - For an unsigned scrutinee, `IntCoverage` counts `U8`–`U64`, `Int`, and `ZConst`/`ZRange` arms (the latter clamped to the unsigned domain).
 
-## Open questions and known gaps
-- **`Format::Pos`**: the interpreter produces a native `Value::U64`, but registration types it as `NumericHole`, so `pos + U32(1)` passes registration and panics in `arith`. The fix is undecided (see `doc/NUMERIC_PLAN.md`, Q2).
+## Known gaps
 - **`src/alt.rs`** mirrors registration's "unsigned or Auto" rule and pattern errors, but its `IntRel` and `AsU8`–`AsU64` still require a native unsigned `Base` type, and it types `Pos` as `U64`.
 - Not yet surveyed: `output/tree.rs`, `read.rs`, `helper.rs` (e.g. how an `i8()` format is built) and the rest of `numeric/eval.rs`/`elaborator.rs`. The survey doesn't compile the code that codegen emits.
