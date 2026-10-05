@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::byte_set::ByteSet;
@@ -374,22 +373,16 @@ impl ParsedValue {
                     inner: Value::Bool(b1),
                     ..
                 }) if b0 == b1),
-            Pattern::U8(i0) => matches!(self, ParsedValue::Flat(Parsed {
-                    inner: Value::U8(i1),
-                    ..
-                }) if i0 == i1),
-            Pattern::U16(i0) => matches!(self, ParsedValue::Flat(Parsed {
-                    inner: Value::U16(i1),
-                    ..
-                }) if i0 == i1),
-            Pattern::U32(i0) => matches!(self, ParsedValue::Flat(Parsed {
-                    inner: Value::U32(i1),
-                    ..
-                }) if i0 == i1),
-            Pattern::U64(i0) => matches!(self, ParsedValue::Flat(Parsed {
-                    inner: Value::U64(i1),
-                    ..
-                }) if i0 == i1),
+            Pattern::U8(..)
+            | Pattern::U16(..)
+            | Pattern::U32(..)
+            | Pattern::U64(..)
+            | Pattern::Int(..)
+            | Pattern::ZConst(..)
+            | Pattern::ZRange(..) => match self {
+                ParsedValue::Flat(Parsed { inner: v, .. }) => v.matches_numeric_literal(pattern),
+                _ => false,
+            },
             Pattern::Char(c0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::Char(c1),
                     ..
@@ -423,38 +416,6 @@ impl ParsedValue {
             Pattern::Option(None) => matches!(self, ParsedValue::Option(None)),
             Pattern::Option(Some(p)) => match self {
                 ParsedValue::Option(Some(v)) => v.matches_inner(scope, p),
-                _ => false,
-            },
-            Pattern::Int(bounds) => match self {
-                ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
-                    Value::U8(n) => bounds.contains(usize::from(*n)),
-                    Value::U16(n) => bounds.contains(usize::from(*n)),
-                    Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                    Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                    _ => false,
-                },
-                _ => false,
-            },
-            Pattern::ZConst(z) => match self {
-                ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
-                    Value::U8(n) => z == &BigInt::from(*n),
-                    Value::U16(n) => z == &BigInt::from(*n),
-                    Value::U32(n) => z == &BigInt::from(*n),
-                    Value::U64(n) => z == &BigInt::from(*n),
-                    Value::Numeric(tc) => tc.eq_num(z),
-                    _ => false,
-                },
-                _ => false,
-            },
-            Pattern::ZRange(bounds) => match self {
-                ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
-                    Value::U8(n) => bounds.contains(&BigInt::from(*n)),
-                    Value::U16(n) => bounds.contains(&BigInt::from(*n)),
-                    Value::U32(n) => bounds.contains(&BigInt::from(*n)),
-                    Value::U64(n) => bounds.contains(&BigInt::from(*n)),
-                    Value::Numeric(tc) => bounds.contains(tc.as_raw_value()),
-                    _ => false,
-                },
                 _ => false,
             },
         }

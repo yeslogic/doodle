@@ -389,18 +389,17 @@ impl Value {
         }
     }
 
-    pub(crate) fn matches_inner<'a>(
-        &'a self,
-        scope: &mut MultiScope<'a>,
-        pattern: &Pattern,
-    ) -> bool {
+    /// Returns `true` if `self` matches the numeric-literal `pattern` (`U8`..`U64`, `Int`, `ZConst` or `ZRange`).
+    ///
+    /// Shared by [`Value::matches_inner`] and `ParsedValue::matches_inner` (`loc_decoder`), so that both
+    /// interpreters match numeric literals identically. In particular, a `NumRep::Auto` Numeric is
+    /// compared against `U8(n)`..`U64(n)` by value (see [`TypedConst::pat_matches`]).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pattern` is not a numeric-literal pattern.
+    pub(crate) fn matches_numeric_literal(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::Binding(name) => {
-                scope.push(name.clone(), self);
-                true
-            }
-            Pattern::Wildcard => true,
-            Pattern::Bool(b0) => matches!(self, Value::Bool(b1) if b0 == b1),
             Pattern::U8(i0) => match self {
                 Value::U8(i1) if i0 == i1 => true,
                 Value::Numeric(n) => n.matches_u8(*i0),
@@ -445,6 +444,31 @@ impl Value {
                 Value::Numeric(n) => range.contains(n.as_raw_value()),
                 _ => false,
             },
+            _ => {
+                unreachable!("matches_numeric_literal: not a numeric-literal pattern: {pattern:?}")
+            }
+        }
+    }
+
+    pub(crate) fn matches_inner<'a>(
+        &'a self,
+        scope: &mut MultiScope<'a>,
+        pattern: &Pattern,
+    ) -> bool {
+        match pattern {
+            Pattern::Binding(name) => {
+                scope.push(name.clone(), self);
+                true
+            }
+            Pattern::Wildcard => true,
+            Pattern::Bool(b0) => matches!(self, Value::Bool(b1) if b0 == b1),
+            Pattern::U8(..)
+            | Pattern::U16(..)
+            | Pattern::U32(..)
+            | Pattern::U64(..)
+            | Pattern::Int(..)
+            | Pattern::ZConst(..)
+            | Pattern::ZRange(..) => self.matches_numeric_literal(pattern),
             Pattern::Char(c0) => matches!(self, Value::Char(c1) if c0 == c1),
             Pattern::Tuple(ps) => match self {
                 Value::Tuple(vs) if ps.len() == vs.len() => {
@@ -912,6 +936,38 @@ where
     }
 }
 
+/// Value-level counterpart of [`__arith`] for a pair of `NumRep::Auto` operands, whose result is also `Auto`.
+///
+/// No width is imposed here: the result is checked against a concrete width wherever it next meets one.
+/// Division by zero and shift amounts outside `0..64` are errors, the latter mirroring the widest native
+/// `checked_shl`/`checked_shr`.
+fn __arith_auto(arith: Arith, left: &BigInt, right: &BigInt) -> Result<BigInt, ArithError> {
+    use num_traits::Zero;
+
+    let err = || ArithError {
+        op: ArithOp::Binary(arith),
+        type_name: "auto",
+    };
+    let shift = || match u32::try_from(right) {
+        Ok(n) if n < u64::BITS => Ok(n),
+        _ => Err(err()),
+    };
+    match arith {
+        Arith::Add => Ok(left + right),
+        Arith::Sub => Ok(left - right),
+        Arith::Mul => Ok(left * right),
+        Arith::Div if right.is_zero() => Err(err()),
+        Arith::Div => Ok(left / right),
+        Arith::Rem if right.is_zero() => Err(err()),
+        Arith::Rem => Ok(left % right),
+        Arith::Shl => Ok(left << shift()?),
+        Arith::Shr => Ok(left >> shift()?),
+        Arith::BitOr => Ok(left | right),
+        Arith::BitAnd => Ok(left & right),
+        Arith::BoolOr | Arith::BoolAnd => unreachable!("bool ops should be handled separately"),
+    }
+}
+
 impl Value {
     pub fn int_rel(rel: IntRel, left: Value, right: Value) -> Result<Value, EvalError> {
         match (left, right) {
@@ -1015,13 +1071,18 @@ impl Value {
                     let r = n.get_as_unsigned::<u64>()?;
                     Ok(__arith(arith, l, r).map(Value::U64)?)
                 }
+                // Auto with Auto is computed by value, and the result stays Auto
+                (Value::Numeric(l), Value::Numeric(r)) if l.is_abstract() && r.is_abstract() => {
+                    let n = __arith_auto(arith, l.as_raw_value(), r.as_raw_value())?;
+                    Ok(Value::Numeric(Rc::new(TypedConst::new_auto(n))))
+                }
                 (Value::Numeric(l), Value::Numeric(r)) => {
                     let x = l.get_rep();
                     let y = r.get_rep();
                     match x.unify(y) {
                         NumRep::Auto => {
                             panic!(
-                                "cannot apply native-arith {arith:?} to auto-or-mismatched (`{l:?}`, `{r:?}`)"
+                                "cannot apply native-arith {arith:?} to mismatched (`{l:?}`, `{r:?}`)"
                             );
                         }
                         NumRep::Concrete(rep) => match rep {
@@ -1092,14 +1153,25 @@ impl Value {
                     NumRep::Concrete(MachineRep::U64) => {
                         Ok(Value::U64(__unary(op, n.get_as_unsigned::<u64>()?)?))
                     }
-                    // Only concrete, unsigned reps are accepted here, as `Value` is not designed to perform computations on `TypedConst` and there is no first-class Value for signed-ints
-                    // NOTE[epic=eval-panic] - this panic is tolerable because it cannot be triggered by data, only by misimplemnted format definitions.
+                    // Auto is incremented/decremented by value, and the result stays Auto
+                    NumRep::Auto => {
+                        let n = match op {
+                            UnaryOp::IntSucc => n.as_raw_value() + BigInt::from(1u8),
+                            UnaryOp::IntPred => n.as_raw_value() - BigInt::from(1u8),
+                            UnaryOp::BoolNot => {
+                                unreachable!("bool ops should be handled separately")
+                            }
+                        };
+                        Ok(Value::Numeric(Rc::new(TypedConst::new_auto(n))))
+                    }
+                    // There is no first-class Value for signed ints, and registration rejects signed operands
+                    // to native IntSucc/IntPred.
+                    // NOTE[epic=eval-panic] - this panic is tolerable because it cannot be triggered by data, only by misimplemented format definitions.
                     NumRep::Concrete(
                         MachineRep::I8 | MachineRep::I16 | MachineRep::I32 | MachineRep::I64,
-                    )
-                    | NumRep::Auto => {
+                    ) => {
                         panic!(
-                            "top-level unary operations should not be performed on raw-numeric with signed or auto representation ({value:?})"
+                            "top-level unary operations should not be performed on raw-numeric with signed representation ({value:?})"
                         );
                     }
                 },
@@ -1467,14 +1539,63 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "signed or auto representation")]
-    fn numeric_unary_auto_rep_panics() {
-        let n = numeric_auto(5u8);
-        let _ = Value::unary(UnaryOp::IntSucc, n);
+    fn numeric_unary_auto_rep_by_value() {
+        assert_eq!(
+            Value::unary(UnaryOp::IntSucc, numeric_auto(5u8)).unwrap(),
+            numeric_auto(6u8)
+        );
+        // no width is imposed on Auto, so this is not an underflow
+        assert_eq!(
+            Value::unary(UnaryOp::IntPred, numeric_auto(0u8)).unwrap(),
+            numeric_auto(-1i8)
+        );
     }
 
     #[test]
-    #[should_panic(expected = "signed or auto representation")]
+    fn numeric_arith_auto_auto_by_value() {
+        assert_eq!(
+            Value::arith(Arith::Add, numeric_auto(5u8), numeric_auto(5u8)).unwrap(),
+            numeric_auto(10u8)
+        );
+        assert_eq!(
+            Value::arith(Arith::Add, numeric_auto(250u8), numeric_auto(10u8)).unwrap(),
+            numeric_auto(260u16)
+        );
+        // the width is checked where the Auto result next meets a concrete type
+        let sum = Value::arith(Arith::Add, numeric_auto(250u8), numeric_auto(10u8)).unwrap();
+        assert!(matches!(
+            Value::arith(Arith::Add, sum, Value::U8(0)),
+            Err(EvalError::NumericConvert(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_arith_auto_auto_errors() {
+        assert!(matches!(
+            Value::arith(Arith::Div, numeric_auto(5u8), numeric_auto(0u8)),
+            Err(EvalError::Arith(_))
+        ));
+        assert!(matches!(
+            Value::arith(Arith::Shl, numeric_auto(1u8), numeric_auto(64u8)),
+            Err(EvalError::Arith(_))
+        ));
+        assert!(matches!(
+            Value::arith(Arith::Shr, numeric_auto(1u8), numeric_auto(-1i8)),
+            Err(EvalError::Arith(_))
+        ));
+    }
+
+    #[test]
+    fn numeric_auto_matches_u8_pattern_by_value() {
+        assert!(numeric_auto(5u8).matches_numeric_literal(&Pattern::U8(5)));
+        assert!(!numeric_auto(6u8).matches_numeric_literal(&Pattern::U8(5)));
+        // a concrete rep must still match the pattern's width exactly
+        let n = numeric(5u8, NumRep::Concrete(MachineRep::U16));
+        assert!(!n.matches_numeric_literal(&Pattern::U8(5)));
+    }
+
+    #[test]
+    #[should_panic(expected = "signed representation")]
     fn numeric_unary_signed_rep_panics() {
         let n = numeric(5i32, NumRep::Concrete(MachineRep::I32));
         let _ = Value::unary(UnaryOp::IntSucc, n);
