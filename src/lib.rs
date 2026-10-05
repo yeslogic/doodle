@@ -325,7 +325,8 @@ impl Expr {
             Expr::Arith(_arith, x, y) => {
                 let (t1, t2) = (x.infer_type(scope)?, y.infer_type(scope)?);
                 t1.unify(&t2).map_err(|e| anyhow!("{e}")).and_then(|t0| {
-                    if t0.is_numeric() {
+                    // NOTE - signed arithmetic is only supported within `Expr::Numeric`
+                    if t0.is_unsigned_or_auto() {
                         Ok(t0)
                     } else {
                         Err(anyhow!(
@@ -340,7 +341,7 @@ impl Expr {
             },
             Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => {
                 let t = x.infer_type(scope)?;
-                if t.is_numeric() {
+                if t.is_unsigned_or_auto() {
                     Ok(t)
                 } else {
                     Err(anyhow!("unexpected operand type for {_op:?}: {t:?}"))
@@ -362,8 +363,9 @@ impl Expr {
                 t if t.is_numeric() => Ok(ValueType::U64),
                 x => Err(anyhow!("cannot convert {x:?} to U64")),
             },
+            // NOTE - unlike AsU8..AsU64, signed operands are rejected; use `AsChar(AsU32(x))` instead
             Expr::AsChar(x) => match x.infer_type(scope)? {
-                t if t.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
+                t if t.is_unsigned_or_auto() => Ok(ValueType::Base(BaseType::Char)),
                 x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
             },
             Expr::U16Be(bytes) => {
@@ -584,16 +586,18 @@ impl Expr {
                 let start_type = start.infer_type(scope)?;
                 let end_type = end.infer_type(scope)?;
 
-                if !start_type.is_numeric() {
-                    return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
-                }
-
-                // NOTE - we don't need to specifically check for `end_type` being numeric because the unification will effectively test that
                 let Ok(t) = start_type.unify(&end_type) else {
                     return Err(anyhow!(
                         "EnumFromTo: start and end do not agree: {start_type:?} ∩ {end_type:?} = ∅"
                     ));
                 };
+
+                // NOTE - checked after unification so that a signed bound cannot hide behind an Auto one
+                if !t.is_unsigned_or_auto() {
+                    return Err(anyhow!(
+                        "EnumFromTo: bounds must be unsigned or auto, found {t:?}"
+                    ));
+                }
 
                 Ok(ValueType::Seq(Box::new(t)))
             }
@@ -707,6 +711,15 @@ impl Expr {
         }
     }
 
+    /// Returns the exact values of the `min` and `max` bounds of a `Format::RepeatBetween`,
+    /// or `None` if either one is not a constant.
+    ///
+    /// Shared by registration, the TypeChecker and the decoder compiler, so that they all
+    /// accept the same set of `RepeatBetween` bounds.
+    pub(crate) fn exact_repeat_bounds(min: &Expr, max: &Expr) -> Option<(usize, usize)> {
+        Some((min.bounds().as_exact()?, max.bounds().as_exact()?))
+    }
+
     /// Conservative bounds for unsigned numeric expressions
     fn bounds(&self) -> Bounds {
         match self {
@@ -818,11 +831,11 @@ impl ViewExpr {
             },
             ViewExpr::Offset(view_expr, expr) => {
                 let t = expr.infer_type(scope)?;
-                if t.is_numeric() {
+                if t.is_unsigned_or_auto() {
                     view_expr.check_type(scope)
                 } else {
                     Err(anyhow!(
-                        "non-numeric type for offset-expr in ViewExpr: {t:?}"
+                        "offset-expr in ViewExpr must be unsigned or auto, found {t:?}"
                     ))
                 }
             }
@@ -1204,12 +1217,12 @@ impl FormatModule {
                 Ok(ValueType::Seq(Box::new(t)))
             }
             Format::RepeatCount(count, a) => match count.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => {
+                t if t.is_unsigned_or_auto() => {
                     let t = self.infer_format_type(scope, a)?;
                     Ok(ValueType::Seq(Box::new(t)))
                 }
                 other => Err(anyhow!(
-                    "RepeatCount first argument type should be numeric, found {other:?} instead"
+                    "RepeatCount first argument type should be unsigned or auto, found {other:?} instead"
                 )),
             },
             Format::Sequence(formats) => {
@@ -1219,20 +1232,26 @@ impl FormatModule {
                 }
                 Ok(ValueType::Seq(Box::new(elem_t)))
             }
-            Format::RepeatBetween(min, max, a) => match min.infer_type(scope)? {
-                ref t0 @ ValueType::Base(b0) if b0.is_numeric() => match max.infer_type(scope)? {
-                    ValueType::Base(b1) if b0 == b1 => {
-                        let t = self.infer_format_type(scope, a)?;
-                        Ok(ValueType::Seq(Box::new(t)))
-                    }
-                    other => Err(anyhow!(
-                        "RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})"
-                    )),
-                },
-                other => Err(anyhow!(
-                    "RepeatBetween first argument type should be numeric, found {other:?} instead"
-                )),
-            },
+            Format::RepeatBetween(min, max, a) => {
+                let (t0, t1) = (min.infer_type(scope)?, max.infer_type(scope)?);
+                let Ok(t) = t0.unify(&t1) else {
+                    return Err(anyhow!(
+                        "RepeatBetween bounds should have the same type, found {t0:?} and {t1:?}"
+                    ));
+                };
+                if !t.is_unsigned_or_auto() {
+                    return Err(anyhow!(
+                        "RepeatBetween bounds should be unsigned or auto, found {t:?} instead"
+                    ));
+                }
+                if Expr::exact_repeat_bounds(min, max).is_none() {
+                    return Err(anyhow!(
+                        "RepeatBetween bounds should be constant, found {min:?} and {max:?}"
+                    ));
+                }
+                let t = self.infer_format_type(scope, a)?;
+                Ok(ValueType::Seq(Box::new(t)))
+            }
             Format::RepeatUntilLast(lambda_elem, a) => match lambda_elem.as_ref() {
                 Expr::Lambda(head, expr) => {
                     let t = self.infer_format_type(scope, a)?;
@@ -1317,9 +1336,24 @@ impl FormatModule {
             },
             Format::Peek(a) => self.infer_format_type(scope, a),
             Format::PeekNot(_a) => Ok(ValueType::Tuple(vec![])),
-            Format::Slice(_expr, a) => self.infer_format_type(scope, a),
+            Format::Slice(len, a) => match len.infer_type(scope)? {
+                t if t.is_unsigned_or_auto() => self.infer_format_type(scope, a),
+                other => Err(anyhow!(
+                    "Slice length should be unsigned or auto, found {other:?} instead"
+                )),
+            },
             Format::Bits(a) => self.infer_format_type(scope, a),
-            Format::WithRelativeOffset(_base_addr, _offset, a) => self.infer_format_type(scope, a),
+            Format::WithRelativeOffset(base_addr, offset, a) => {
+                for (what, expr) in [("base address", base_addr), ("offset", offset)] {
+                    let t = expr.infer_type(scope)?;
+                    if !t.is_unsigned_or_auto() {
+                        return Err(anyhow!(
+                            "WithRelativeOffset {what} should be unsigned or auto, found {t:?} instead"
+                        ));
+                    }
+                }
+                self.infer_format_type(scope, a)
+            }
             Format::Map(a, expr) => {
                 let arg_type = self.infer_format_type(scope, a)?;
                 match expr.as_ref() {
@@ -1458,10 +1492,10 @@ impl FormatModule {
                 ViewFormat::CaptureBytes(len) => {
                     view.check_type(scope)?;
                     match len.infer_type(scope)? {
-                        t if t.is_numeric() => {}
+                        t if t.is_unsigned_or_auto() => {}
                         other => {
                             return Err(anyhow!(
-                                "CaptureBytes@0: expected numeric, found {other:?}"
+                                "CaptureBytes@0: expected unsigned or auto, found {other:?}"
                             ));
                         }
                     }
@@ -1471,9 +1505,11 @@ impl FormatModule {
                 ViewFormat::ReadArray(len, kind) => {
                     view.check_type(scope)?;
                     match len.infer_type(scope)? {
-                        t if t.is_numeric() => {}
+                        t if t.is_unsigned_or_auto() => {}
                         other => {
-                            return Err(anyhow!("ReadArray@0: expected numeric, found {other:?}"));
+                            return Err(anyhow!(
+                                "ReadArray@0: expected unsigned or auto, found {other:?}"
+                            ));
                         }
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
@@ -2522,6 +2558,67 @@ mod test {
     use decoder::Value;
 
     use super::*;
+
+    fn registration(f: &Format) -> AResult<ValueType> {
+        FormatModule::new().infer_format_type(&TypeScope::new(), f)
+    }
+
+    /// Registration rejects signed operands to native arithmetic/casts/counts/lengths but accepts Auto (`NumericHole`);
+    /// `RepeatBetween` bounds must be constant; and pattern/type mismatches are reported as errors rather than panics.
+    #[test]
+    fn registration_numeric_acceptance() {
+        use crate::byte_set::ByteSet;
+        use crate::helper::{add, poly_zero, var};
+        use crate::numeric::core::TypedConst;
+        use crate::numeric::helper as num;
+
+        let i16_one = || Expr::Numeric(Box::new(num::expr_const(TypedConst::from_i16(1))));
+        let byte = || Box::new(Format::Byte(ByteSet::full()));
+
+        // R1
+        assert!(registration(&compute(add(i16_one(), i16_one()))).is_err());
+        assert!(registration(&compute(add(poly_zero(), Expr::U8(1)))).is_ok());
+        assert!(registration(&compute(Expr::AsChar(Box::new(i16_one())))).is_err());
+        assert!(
+            registration(&compute(Expr::AsChar(Box::new(Expr::AsU32(Box::new(
+                i16_one()
+            ))))))
+            .is_ok()
+        );
+        assert!(registration(&Format::RepeatCount(Box::new(poly_zero()), byte())).is_ok());
+        assert!(registration(&Format::RepeatCount(Box::new(i16_one()), byte())).is_err());
+
+        // R4
+        let between = |min, max| Format::RepeatBetween(Box::new(min), Box::new(max), byte());
+        assert!(registration(&between(Expr::U8(1), Expr::U8(2))).is_ok());
+        assert!(
+            registration(&Format::Let(
+                "n".into(),
+                Box::new(Expr::U8(2)),
+                Box::new(between(Expr::U8(1), var("n"))),
+            ))
+            .is_err()
+        );
+
+        // R5
+        assert!(registration(&Format::Slice(Box::new(Expr::U32(1)), byte())).is_ok());
+        assert!(registration(&Format::Slice(Box::new(poly_zero()), byte())).is_ok());
+        assert!(registration(&Format::Slice(Box::new(Expr::U64(1)), byte())).is_ok());
+        assert!(registration(&Format::Slice(Box::new(Expr::Bool(true)), byte())).is_err());
+
+        // R3
+        let match_u8 = |head| {
+            Format::Match(
+                Box::new(head),
+                vec![
+                    (Pattern::U8(0), (*byte()).clone()),
+                    (Pattern::Wildcard, (*byte()).clone()),
+                ],
+            )
+        };
+        assert!(registration(&match_u8(poly_zero())).is_ok());
+        assert!(registration(&match_u8(Expr::Bool(true))).is_err());
+    }
 
     #[test]
     fn format_let_eval_precedence() {

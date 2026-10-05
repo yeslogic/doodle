@@ -405,6 +405,18 @@ impl ValueType {
             _ => false,
         }
     }
+
+    /// Returns `true` for unsigned machine-integer types and for `NumericHole` (Auto), but not for signed types.
+    ///
+    /// This is the registration-side counterpart of the TypeChecker's `BaseSet::UAny` and `BaseSet::UAny32`
+    /// (which differ only in their default width when no unique solution is otherwise determined).
+    pub(crate) fn is_unsigned_or_auto(&self) -> bool {
+        match self {
+            ValueType::Base(b) => b.is_numeric(),
+            ValueType::NumericHole => true,
+            _ => false,
+        }
+    }
 }
 
 /// Alias to reduce the number of code-sites we need to update if we pick a different Smart-Pointer type

@@ -2456,11 +2456,12 @@ impl TypeChecker {
             Expr::IntRel(_rel, x, y) => {
                 let zvar = self.get_new_uvar();
 
+                // NOTE - signed operands are allowed, but both operands must still have the same type
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
 
                 let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let _cy = self.unify_var_baseset(yvar, BaseSet::UAny)?;
+                let _cy = self.unify_var_intset(yvar, IntSet::ZAny)?;
 
                 let _cxy = self.unify_var_pair(xvar, yvar)?;
 
@@ -2655,6 +2656,7 @@ impl TypeChecker {
 
                 let (elem_var, ret_var) = self.infer_vars_expr_lambda(f_get_key, scope)?;
                 let key_var = self.infer_var_expr(query_key, scope)?;
+                self.unify_var_baseset(key_var, BaseSet::UAny)?;
                 let xs_var = self.infer_var_expr(seq_expr, scope)?;
 
                 let x_var = self.get_new_uvar();
@@ -3592,6 +3594,9 @@ impl TypeChecker {
                 Ok(newvar)
             }
             Format::RepeatBetween(min, max, inner) => {
+                if Expr::exact_repeat_bounds(min, max).is_none() {
+                    return Err(TCErrorKind::NonConstantRepeatBounds.into());
+                }
                 let newvar = self.get_new_uvar();
                 let min_var = self.infer_var_expr(min, ctxt.scope)?;
                 let max_var = self.infer_var_expr(max, ctxt.scope)?;
@@ -4566,44 +4571,51 @@ mod tests {
         }
     }
 
-    /// Regression test documenting a recently-discovered gap in the TypeChecker expression-level constraint logic:
-    /// `Expr::IntRel` currently applies the unification constraint of `Elem(BaseSet::UAny)` to its inner nodes,
-    /// which causes failure when they happen to have a signed-int type (even if they are positive).
-    ///
-    /// The only mechanism to compare signed-int values is through Pattern-matching, which is much less ergonomic
-    /// even for the simplest case of `IntRel::eq`, and more complex for all other int-rels.
-    ///
-    /// It is also possible to mistakenly apply `expr_eq` to a term that happens to hold a signed-int MachineRep,
-    /// since this gap is not well-documented within `lib.rs` or `helpers.rs`.
-    ///
-    /// This test exercises `infer_var_expr` against such an anti-pattern that theoretically should be typeable,
-    /// but happens to use I16 within `IntRel`. It is marked `#[should_panic]` with the exact panic-message that
-    /// is currently coded into the test for the "I16 vs UAny" unification failure; if this test fails, either
-    /// something else has drifted, or the gap has been patched, in which case this test can be safely replaced
-    /// with a positive-case regression test.
+    /// `Format::RepeatBetween` bounds that are not constant are a `TCError`.
     #[test]
-    #[should_panic = "intrel constrained to uany"]
-    fn test_repro_intrel_on_signed_fails_to_unify() {
+    fn test_repeat_between_non_constant_bounds() {
+        use crate::helper::var;
+
+        let f = Format::Let(
+            "n".into(),
+            Box::new(Expr::U8(2)),
+            Box::new(Format::RepeatBetween(
+                Box::new(Expr::U8(1)),
+                Box::new(var("n")),
+                Box::new(Format::Byte(ByteSet::full())),
+            )),
+        );
+        let module = FormatModule::new();
+        match TypeChecker::infer_module(&module, &f) {
+            Ok(_) => panic!("unexpected success for non-constant RepeatBetween bounds"),
+            Err(e) => assert!(
+                matches!(e.err.as_ref(), TCErrorKind::NonConstantRepeatBounds),
+                "unexpected error: {e}"
+            ),
+        }
+    }
+
+    /// `Expr::IntRel` accepts signed operands (its operands are constrained to `IntSet::ZAny`),
+    /// but the two operands must still have the same type, so mixed-sign comparisons are rejected.
+    #[test]
+    fn test_intrel_on_signed() {
         use crate::helper::*;
         use crate::numeric::core::TypedConst;
         use crate::numeric::helper as num;
 
+        let i16_zero = || numeric(num::expr_const(TypedConst::from_i16(0)));
+
         let mut tc = TypeChecker::new();
-        let x = expr_eq(
-            numeric(num::expr_const(TypedConst::from_i16(0))),
-            poly_zero(),
-        );
-        match tc.infer_var_expr(&x, &UScope::new()) {
-            Err(e) => match e.err.as_ref() {
-                TCErrorKind::CrossLayerNumeric(CrossLayerNumericError::PrimNotInBaseSet(
-                    PrimInt::I16,
-                    BaseSet::UAny,
-                )) => {
-                    panic!("intrel constrained to uany")
-                }
-                _ => panic!("unexpected error: {e}"),
-            },
-            Ok(_) => panic!("expected error"),
+        let same_sign = expr_eq(i16_zero(), poly_zero());
+        if let Err(e) = tc.infer_var_expr(&same_sign, &UScope::new()) {
+            panic!("signed IntRel should be accepted: {e}");
         }
+
+        let mut tc = TypeChecker::new();
+        let mixed_sign = expr_eq(i16_zero(), Expr::U8(0));
+        assert!(
+            tc.infer_var_expr(&mixed_sign, &UScope::new()).is_err(),
+            "mixed-sign IntRel should be rejected"
+        );
     }
 }

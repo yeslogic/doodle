@@ -2,7 +2,7 @@ use crate::alt::{FormatExt, FormatModuleExt, ValueTypeExt};
 use crate::bounds::Bounds;
 use crate::numeric::core::Bounds as NumBounds;
 use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
-use anyhow::Result as AResult;
+use anyhow::{Result as AResult, anyhow};
 use num_bigint::BigInt;
 use serde::Serialize;
 use std::rc::Rc;
@@ -57,7 +57,7 @@ impl Pattern {
         Pattern::Binding(name.into())
     }
 
-    pub(crate) fn build_scope(&self, scope: &mut TypeScope<'_>, t: Rc<ValueType>) {
+    pub(crate) fn build_scope(&self, scope: &mut TypeScope<'_>, t: Rc<ValueType>) -> AResult<()> {
         match (self, t.as_ref()) {
             (Pattern::Binding(name), t) => {
                 // FIXME - do we want to store an Rc<ValueType> in the scope instead, perhaps...?
@@ -65,44 +65,49 @@ impl Pattern {
             }
             (Pattern::Wildcard, _) => {}
             (Pattern::Bool(..), ValueType::Base(BaseType::Bool)) => {}
-            // REVIEW - should we consider NumericHole as a wildcard match for all Pattern::U*?
             (Pattern::U8(..), &ValueType::U8) => {}
             (Pattern::U16(..), &ValueType::U16) => {}
             (Pattern::U32(..), &ValueType::U32) => {}
             (Pattern::U64(..), &ValueType::U64) => {}
+            // NOTE - an Auto scrutinee is matched against `U8(n)`..`U64(n)` by value
+            (
+                Pattern::U8(..) | Pattern::U16(..) | Pattern::U32(..) | Pattern::U64(..),
+                ValueType::NumericHole,
+            ) => {}
             // REVIEW - should we allow `Pattern::Int` to yield matches for ValueType::Signed(..)?
             (
                 Pattern::Int(..),
-                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)
+                | ValueType::NumericHole,
             ) => {}
             (Pattern::ZConst(..) | Pattern::ZRange(..), t) if t.is_numeric() => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
-                    p.build_scope(scope, Rc::new(t.clone()));
+                    p.build_scope(scope, Rc::new(t.clone()))?;
                 }
             }
             (Pattern::Seq(ps), ValueType::Seq(t)) => {
                 for p in ps {
-                    p.build_scope(scope, Rc::new((**t).clone()));
+                    p.build_scope(scope, Rc::new((**t).clone()))?;
                 }
             }
             (Pattern::Option(None), ValueType::Option(_)) => {
                 // do nothing
             }
             (Pattern::Option(Some(p)), ValueType::Option(t)) => {
-                p.build_scope(scope, Rc::new((**t).clone()))
+                p.build_scope(scope, Rc::new((**t).clone()))?;
             }
             (Pattern::Variant(label, p), ValueType::Union(branches)) => {
-                if let Some(t) = branches.get(label) {
-                    // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
-                    let tmp = Rc::new(t.clone());
-                    p.build_scope(scope, tmp);
-                } else {
-                    panic!("no {label} in {branches:?}");
-                }
+                let Some(t) = branches.get(label) else {
+                    return Err(anyhow!("pattern variant {label} not found in {branches:?}"));
+                };
+                // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
+                let tmp = Rc::new(t.clone());
+                p.build_scope(scope, tmp)?;
             }
-            (l, r) => panic!("pattern build_scope failed: ({l:?}, {r:?})"),
+            (l, r) => return Err(anyhow!("pattern {l:?} does not match type {r:?}")),
         }
+        Ok(())
     }
 
     pub(crate) fn build_scope_ext(
@@ -160,7 +165,7 @@ impl Pattern {
         expr: &Expr,
     ) -> AResult<ValueType> {
         let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope(&mut pattern_scope, head_type);
+        self.build_scope(&mut pattern_scope, head_type)?;
         expr.infer_type(&pattern_scope)
     }
 
@@ -182,7 +187,7 @@ impl Pattern {
         format: &Format,
     ) -> AResult<ValueType> {
         let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope(&mut pattern_scope, head_type);
+        self.build_scope(&mut pattern_scope, head_type)?;
         module.infer_format_type(&pattern_scope, format)
     }
 

@@ -215,6 +215,8 @@ pub enum TCErrorKind {
     NonNumeric(UVar, Constraints),
     /// Any issue reconciling BaseType numerics and IntType numerics
     CrossLayerNumeric(CrossLayerNumericError),
+    /// `Format::RepeatBetween` with a min or max bound that is not a constant
+    NonConstantRepeatBounds,
 }
 
 impl TCErrorKind {
@@ -283,6 +285,9 @@ impl std::fmt::Display for TCErrorKind {
             }
             TCErrorKind::CrossLayerNumeric(err) => {
                 write!(f, "cross-layer numeric error: {err}")
+            }
+            TCErrorKind::NonConstantRepeatBounds => {
+                write!(f, "RepeatBetween bounds should be constant")
             }
         }
     }
