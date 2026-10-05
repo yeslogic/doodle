@@ -688,13 +688,10 @@ impl Decoder {
             }
             Decoder::Phantom => Ok(WithErr::new((ParsedValue::new_phantom(), input))),
             Decoder::Fail => Err(DecodeErrorKind::<ParsedValue>::loc_fail(scope, input).into()),
-            Decoder::Pos => {
-                let pos = input.offset as u64;
-                Ok(WithErr::new((
-                    ParsedValue::from_evaluated(Value::U64(pos)),
-                    input,
-                )))
-            }
+            Decoder::Pos => Ok(WithErr::new((
+                ParsedValue::from_evaluated(Value::from_pos(input.offset)),
+                input,
+            ))),
             Decoder::SkipRemainder => {
                 let start = input.offset;
                 let input = input.skip_remainder();

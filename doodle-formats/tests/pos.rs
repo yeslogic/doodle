@@ -1,23 +1,26 @@
 #![cfg(test)]
-//! Regression tests pinning down the current behavior of `Format::Pos` (see `doc/NUMERIC_PLAN.md`, Q2).
+//! Regression tests pinning down the behavior of `Format::Pos` (see `doc/NUMERIC_PLAN.md`, Q2).
 //!
-//! Registration types `Pos` as `NumericHole` and the `TypeChecker` as any unsigned type (preferring `U64`),
-//! while the interpreter produces a native `Value::U64`. These tests record what each layer currently does,
-//! so that a change to `Pos`'s runtime value shows up here (and in the `test2.jpg`/`test.waldo` decode
-//! snapshots, which cover the live uses of `Pos` in `tiff` and `waldo`).
+//! Registration types `Pos` as `NumericHole` and the `TypeChecker` as any unsigned type (preferring `U64`).
+//! To match, both interpreters produce an Auto Numeric (`Value::from_pos`), which takes the type of whatever
+//! native operand it meets. These tests record what each layer does, so that a change to `Pos`'s runtime
+//! value shows up here (and in the `test2.jpg`/`test.waldo` decode snapshots, which cover the live uses of
+//! `Pos` in `tiff` and `waldo`).
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::rc::Rc;
 
 use doodle::codegen::{ToFragment, generate_code};
 use doodle::decoder::{Compiler, Value};
 use doodle::helper::*;
+use doodle::numeric::core::TypedConst;
 use doodle::read::ReadCtxt;
 use doodle::{Expr, Format, FormatModule};
 
 /// Input for every test: two bytes are read before `Pos`, so it evaluates to 2, followed by padding.
 const INPUT: [u8; 8] = [0xAA, 0xBB, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60];
 
-// the `Err` message is only read through `Debug`, in assertion failures
+// the `Err`/`Panic` messages are only read through `Debug`, in assertion failures
 #[allow(dead_code)]
 #[derive(Debug)]
 enum Outcome {
@@ -81,21 +84,6 @@ fn assert_interp_ok(format: &Format, expected: Value) {
     }
 }
 
-/// Asserts that both interpreters panic with a message containing `expected`.
-fn assert_interp_panics(format: &Format, expected: &str) {
-    for (which, outcome) in [
-        ("interp", interp(format)),
-        ("interp_loc", interp_loc(format)),
-    ] {
-        match outcome {
-            Outcome::Panic(msg) => {
-                assert!(msg.contains(expected), "{which}: unexpected panic: {msg}")
-            }
-            other => panic!("{which}: expected panic containing {expected:?}, found {other:?}"),
-        }
-    }
-}
-
 /// Asserts that codegen (the `TypeChecker` plus code emission) accepts `format`.
 fn assert_codegen_ok(format: &Format) {
     let code = generate_code(&FormatModule::new(), format);
@@ -103,9 +91,9 @@ fn assert_codegen_ok(format: &Format) {
 }
 
 #[test]
-fn pos_is_native_u64() {
+fn pos_is_auto_numeric() {
     let f = with_pos(compute(var("p")));
-    assert_interp_ok(&f, Value::U64(2));
+    assert_interp_ok(&f, Value::Numeric(Rc::new(TypedConst::new_auto(2u8))));
     assert_codegen_ok(&f);
 }
 
@@ -131,20 +119,19 @@ fn pos_lt_u64() {
     assert_codegen_ok(&f);
 }
 
-/// Known gap (Q2): registration and codegen accept `pos + U32(1)`, but the interpreter panics on the
-/// native `U64`/`U32` mismatch.
+/// Formerly panicked in the interpreter, when `Pos` was a native `U64` (Q2).
 #[test]
-fn pos_plus_u32_panics_in_interp() {
+fn pos_plus_u32() {
     let f = with_pos(compute(add(var("p"), Expr::U32(1))));
-    assert_interp_panics(&f, "cannot apply arith");
+    assert_interp_ok(&f, Value::U32(3));
     assert_codegen_ok(&f);
 }
 
-/// Known gap (Q2): as above, for a comparison.
+/// Formerly panicked in the interpreter, when `Pos` was a native `U64` (Q2).
 #[test]
-fn pos_lt_u32_panics_in_interp() {
+fn pos_lt_u32() {
     let f = with_pos(compute(expr_lt(var("p"), Expr::U32(10))));
-    assert_interp_panics(&f, "cannot apply int-rel");
+    assert_interp_ok(&f, Value::Bool(true));
     assert_codegen_ok(&f);
 }
 

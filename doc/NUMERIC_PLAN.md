@@ -1,6 +1,6 @@
 # Plan: where Numerics are accepted and rejected
 
-Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3, 8be98724); C1, C2, C3 (step 4, 5aa40bc3); R6; step 5. Everything except the open question Q2 (`Pos`) is implemented.
+Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3, 8be98724); C1, C2, C3 (step 4, 5aa40bc3); R6; step 5. Q2 (`Pos`) is resolved as item 14. Everything is implemented.
 
 Note: `BaseSet::UAny32` admits every unsigned type including `U64`; the `32` is only the default width used to break ties when several solutions are sound. Registration's counterpart to both `UAny` and `UAny32` is therefore the same "unsigned or Auto" rule.
 
@@ -38,6 +38,7 @@ Terminology:
 | 11.2 | `RepeatBetween` with bounds that aren't constant | Registration and TC both reject it with an error. |
 | 11.3 | Match with only `ZConst`/`ZRange` arms on an unsigned value, no fallback arm | First confirm with a test that it hits `unreachable!` in `IntCoverage::add`. Then fix the coverage check: treat the arms like `Int` ranges, or otherwise treat the match as possibly incomplete. |
 | 12 | `Slice` length, `WithRelativeOffset` base and offset (was Q1) | TC is right (`UAny32`). Registration adopts the equivalent, which is R1's "unsigned or Auto" rule. Signed and non-numeric types are rejected. |
+| 14 | `Format::Pos` (was Q2) | Registration keeps typing `Pos` as `NumericHole`; both interpreters produce an Auto Numeric (`Value::from_pos`) instead of a native `U64`, so `Pos` takes the type of whatever operand it meets. Explored first against regression tests (`doodle-formats/tests/pos.rs`); the only live effect is display (`start_of_header := 12` becomes `12?` in the `test2.jpg` snapshot), which is acceptable. |
 | 13 | The `_ext` inference in `src/alt.rs` (was Q3) | Mirror the registration changes (R1, R3, R5) there to keep it current. `alt.rs` is the currently-unused "alternate processing model", so this is low priority and comes after the main registration work. |
 
 ## Changes by layer
@@ -135,11 +136,9 @@ These come from reading registration's format inference (`src/lib.rs`), TC's for
 
 ## Open questions from reading the code
 
-Q1 and Q3 are resolved as items 12 and 13.
+All three are resolved, as items 12, 13 and 14.
 
-- **Q2. `Format::Pos`.** Registration types it as `NumericHole`; TC gives it `UintSet::any_default(Bits64)`. Confirmed: the interpreter produces a native `Value::U64` (`decoder.rs:724`). So `pos + U32(1)` passes registration (the hole unifies with `U32`) and then panics in `arith` on mismatched native types. This has not yet been reproduced in a test, and the fix is undecided:
-  - registration types `Pos` as `U64`, or
-  - `Pos` produces an Auto Numeric, which depends on I3.
+- **Q2. `Format::Pos`.** Resolved as item 14. Registration types it as `NumericHole`; TC gives it `UintSet::any_default(Bits64)`; the interpreter produced a native `Value::U64`, so `pos + U32(1)` passed registration and then panicked in `arith`. The interpreter now produces an Auto Numeric.
 
 ## Suggested order
 

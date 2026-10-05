@@ -664,6 +664,14 @@ impl Value {
         })
     }
 
+    /// The value of `Format::Pos` at buffer offset `offset`.
+    ///
+    /// This is an Auto Numeric, matching registration's `NumericHole` typing of `Pos`: it takes the type of
+    /// whatever native operand it meets, rather than always being a native `U64`.
+    pub(crate) fn from_pos(offset: usize) -> Value {
+        Value::Numeric(Rc::new(TypedConst::new_auto(offset)))
+    }
+
     /// Takes two (borrowed) `Value`s and coerces any `Numeric` paired with a native integer into
     /// the same variant as its co-term, returning the pair in the original order.
     ///
