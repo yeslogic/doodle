@@ -2,7 +2,7 @@
 
 use doodle::helper::*;
 use doodle::read::ReadCtxt;
-use doodle::{Format, FormatModule};
+use doodle::{Expr, Format, FormatModule};
 use doodle::{
     codegen::{ToFragment, generate_code},
     decoder::{
@@ -93,6 +93,40 @@ fn test_registration_binary() {
 fn test_gen_binary() {
     let code = generate_code(&FormatModule::new(), &binary_format());
     println!("{}", code.to_fragment())
+}
+
+/// Format that matches a u8-read against `ZRange` arms covering `0..=255`, with no fallback arm
+fn zrange_match_format() -> Format {
+    use doodle::Pattern;
+    chain(
+        u8(),
+        "x",
+        compute(expr_match(
+            var("x"),
+            [
+                (Pattern::z_range(0, 127), Expr::Bool(false)),
+                (Pattern::z_range(128, 255), Expr::Bool(true)),
+            ],
+        )),
+    )
+}
+
+/// `ZConst`/`ZRange` arms count towards the exhaustiveness of a match on an unsigned value in codegen.
+#[test]
+fn test_gen_zrange_match() {
+    let code = generate_code(&FormatModule::new(), &zrange_match_format());
+    println!("{}", code.to_fragment())
+}
+
+#[test]
+fn test_interp_zrange_match() {
+    let prog = Compiler::compile_program(&FormatModule::new(), &zrange_match_format())
+        .expect("compilation failed");
+    let input = [0x80];
+    let (res, _) = prog
+        .run(ReadCtxt::new(&input))
+        .expect("decoding failed on buf");
+    assert_eq!(res, Value::Bool(true));
 }
 
 // SECTION - Numeric-handling survey across all three callers

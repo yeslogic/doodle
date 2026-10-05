@@ -910,17 +910,14 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
     }
 }
 
-impl<TypeRep> TypedExpr<TypeRep> {
+impl<TypeRep: Clone> TypedExpr<TypeRep> {
+    /// Conservative bounds for unsigned numeric expressions.
+    ///
+    /// Computed by converting to `Expr` and calling [`Expr::bounds`], so that codegen and the interpreter
+    /// share one analysis (in particular, codegen accepts exactly the `RepeatBetween` bounds that registration
+    /// and the TypeChecker accept).
     pub(crate) fn bounds(&self) -> Bounds {
-        match self {
-            TypedExpr::U8(n) => Bounds::exact(usize::from(*n)),
-            TypedExpr::U16(n) => Bounds::exact(usize::from(*n)),
-            TypedExpr::U32(n) => Bounds::exact(*n as usize),
-            TypedExpr::U64(n) => Bounds::exact(*n as usize),
-            TypedExpr::Arith(_t, Arith::Add, a, b) => a.bounds() + b.bounds(),
-            TypedExpr::Arith(_t, Arith::Mul, a, b) => a.bounds() * b.bounds(),
-            _ => Bounds::any(),
-        }
+        crate::Expr::from(self.clone()).bounds()
     }
 }
 

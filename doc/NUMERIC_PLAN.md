@@ -1,6 +1,6 @@
 # Plan: where Numerics are accepted and rejected
 
-Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3).
+Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3, 8be98724); C1, C2, C3 (step 4).
 
 Note: `BaseSet::UAny32` admits every unsigned type including `U64`; the `32` is only the default width used to break ties when several solutions are sound. Registration's counterpart to both `UAny` and `UAny32` is therefore the same "unsigned or Auto" rule.
 
@@ -125,6 +125,11 @@ These come from reading registration's format inference (`src/lib.rs`), TC's for
   - I2: `TypedConst::pat_matches` compares Auto by value; the `pattern_matches_auto_rep` Cargo feature (which made Auto a wildcard, and was off by default, making Auto never match) is removed. A concrete rep must still equal the pattern's width. Numeric-literal patterns go through one shared `Value::matches_numeric_literal`, used by both `Value::matches_inner` and `loc_decoder`'s `ParsedValue::matches_inner`, which gives `loc_decoder` its missing Numeric arms.
   - I3: Auto with a concrete operand already worked (`get_as_unsigned` accepts Auto). Auto with Auto now goes through `__arith_auto` on `BigInt`, returning Auto. Division by zero and shift amounts outside `0..64` are `ArithError`s. `IntSucc`/`IntPred` on Auto are ±1 by value, returning Auto. Signed reps still panic.
   - Survey after step 3: 0 rows where the interpreter panics after registration accepts. The remaining codegen panics are C1 (`RepeatBetween` with constant Numeric bounds).
+- **Step 4 implementation notes.**
+  - C1: `TypedExpr::bounds` converts to `Expr` and calls `Expr::bounds`. The `RepeatBetween` arm of `typed_decoder.rs` is now `unreachable!`, since T4 rejects non-constant bounds.
+  - C2: confirmed no change is needed. The emitted code for `x < y` and `x == -1i8` over two `i8` reads was compiled and run in a scratch crate against `doodle::prelude`, returning `(true, true)` for input `[0xFF, 0x01]`. This was a one-off check, not a checked-in test.
+  - C3: `test_gen_zrange_match` (`signed_intops.rs`) first confirmed the `unreachable!`. `IntCoverage` now inserts `ZConst`/`ZRange` values clamped to `[0, usize::MAX]`.
+  - Survey after step 4: 55 of 275 cases inconsistent, with no panics in any layer. All remaining rows are item 9 (TC rejects unpinned Auto; 36 "codegen stricter") or item 5 (`SeqIx`/`SubSeq`/`Dup`; 15 "codegen looser"), plus value-dependent interpreter errors.
 - **R3.** `build_scope` returns `()`, so it needs to return `AResult<()>`. Its callers already return `AResult`. The panic when a `Variant` label is missing converts in the same change.
 - **Doc correction.** TC's `ViewExpr::Offset` and `CaptureBytes` use `BaseSet::UAny`, not `UintSet::ANY`; only `ReadArray` uses `UintSet::ANY`. The behaviour is the same.
 
@@ -141,5 +146,5 @@ Q1 and Q3 are resolved as items 12 and 13.
 1. T3, so every later survey run reports failures as errors instead of panics. (Done.)
 2. R1, R3, R4 and R5, together with T1, T2 and T4. (Done, except R6 (`alt.rs`), which follows once these settle.)
 3. I1, I2 and I3. (Done.)
-4. C1, C2 and C3.
+4. C1, C2 and C3. (Done.)
 5. Survey and docs.
