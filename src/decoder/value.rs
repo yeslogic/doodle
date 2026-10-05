@@ -672,6 +672,14 @@ impl Value {
         Value::Numeric(Rc::new(TypedConst::new_auto(offset)))
     }
 
+    /// The value of `Expr::SeqLength` for a sequence of `len` elements.
+    ///
+    /// Like [`Value::from_pos`], this is an Auto Numeric, matching registration's `NumericHole` typing of
+    /// `SeqLength`.
+    pub(crate) fn from_seq_len(len: usize) -> Value {
+        Value::Numeric(Rc::new(TypedConst::new_auto(len)))
+    }
+
     /// Takes two (borrowed) `Value`s and coerces any `Numeric` paired with a native integer into
     /// the same variant as its co-term, returning the pair in the original order.
     ///

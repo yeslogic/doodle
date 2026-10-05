@@ -1642,57 +1642,42 @@ mod __impls {
                     }
                 }
                 Expr::SeqLength(seq) => match seq.infer_type_ext(scope)? {
-                    ValueTypeExt::Seq(_t) => Ok(ValueTypeExt::Base(BaseType::U32)),
+                    ValueTypeExt::Seq(_t) => Ok(ValueTypeExt::NumericHole),
                     other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
                 },
                 Expr::SeqIx(seq, index) => match seq.infer_type_ext(scope)? {
                     ValueTypeExt::Seq(t) => {
                         let index_type = index.infer_type_ext(scope)?;
-                        if index_type != ValueTypeExt::Base(BaseType::U32) {
+                        if !index_type.is_unsigned_or_auto() {
                             return Err(anyhow!(
-                                "SeqIx `index` param: expected U32, found {index_type:?}"
+                                "SeqIx `index` param: expected unsigned or auto, found {index_type:?}"
                             ));
                         }
                         Ok(ValueTypeExt::clone(&t))
                     }
                     other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
                 },
-                Expr::SubSeq(seq, start, length) => match seq.infer_type_ext(scope)? {
-                    ValueTypeExt::Seq(t) => {
-                        let start_type = start.infer_type_ext(scope)?;
-                        let length_type = length.infer_type_ext(scope)?;
-                        if start_type != ValueTypeExt::Base(BaseType::U32) {
-                            return Err(anyhow!(
-                                "SubSeq `start` param: expected U32, found {start_type:?}"
-                            ));
+                Expr::SubSeq(seq, start, length) | Expr::SubSeqInflate(seq, start, length) => {
+                    let op = if matches!(self, Expr::SubSeq(..)) {
+                        "SubSeq"
+                    } else {
+                        "SubSeqInflate"
+                    };
+                    match seq.infer_type_ext(scope)? {
+                        ValueTypeExt::Seq(t) => {
+                            for (what, expr) in [("start", start), ("length", length)] {
+                                let t = expr.infer_type_ext(scope)?;
+                                if !t.is_unsigned_or_auto() {
+                                    return Err(anyhow!(
+                                        "{op} `{what}` param: expected unsigned or auto, found {t:?}"
+                                    ));
+                                }
+                            }
+                            Ok(ValueTypeExt::Seq(t))
                         }
-                        if length_type != ValueTypeExt::Base(BaseType::U32) {
-                            return Err(anyhow!(
-                                "SubSeq length must be numeric, found {length_type:?}"
-                            ));
-                        }
-                        Ok(ValueTypeExt::Seq(t))
+                        other => Err(anyhow!("{op}: expected Seq, found {other:?}")),
                     }
-                    other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
-                },
-                Expr::SubSeqInflate(seq, start, length) => match seq.infer_type_ext(scope)? {
-                    ValueTypeExt::Seq(t) => {
-                        let start_type = start.infer_type_ext(scope)?;
-                        let length_type = length.infer_type_ext(scope)?;
-                        if start_type != ValueTypeExt::Base(BaseType::U32) {
-                            return Err(anyhow!(
-                                "SubSeqInflate `start` param: expected U32, found {start_type:?}"
-                            ));
-                        }
-                        if length_type != ValueTypeExt::Base(BaseType::U32) {
-                            return Err(anyhow!(
-                                "SubSeqInflate length must be numeric, found {length_type:?}"
-                            ));
-                        }
-                        Ok(ValueTypeExt::Seq(t))
-                    }
-                    other => Err(anyhow!("SubSeqInflate: expected Seq, found {other:?}")),
-                },
+                }
                 Expr::FlatMap(expr, seq) => match expr.as_ref() {
                     Expr::Lambda(name, expr) => match seq.infer_type_ext(scope)? {
                         ValueTypeExt::Seq(t) => {
@@ -1811,8 +1796,11 @@ mod __impls {
                     Ok(ValueTypeExt::Seq(Box::new(t)))
                 }
                 Expr::Dup(count, expr) => {
-                    if count.infer_type_ext(scope)? != ValueTypeExt::Base(BaseType::U32) {
-                        return Err(anyhow!("Dup: count is not U32: {count:?}"));
+                    let count_type = count.infer_type_ext(scope)?;
+                    if !count_type.is_unsigned_or_auto() {
+                        return Err(anyhow!(
+                            "Dup: count should be unsigned or auto, found {count_type:?}"
+                        ));
                     }
                     let t = expr.infer_type_ext(scope)?;
                     Ok(ValueTypeExt::Seq(Box::new(t)))

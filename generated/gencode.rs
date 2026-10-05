@@ -16613,7 +16613,7 @@ let literal_length_distance_alphabet_code_lengths_value = (try_fold_map_curried(
 let (last_symbol, cl_code_extra) = tuple_var;
 match cl_code_extra.code as u8 {
 16u8 => {
-(last_symbol, dup32((cl_code_extra.extra + 3u8) as u32, match last_symbol {
+(last_symbol, dup_n(((cl_code_extra.extra + 3u8) as u32) as usize, match last_symbol {
 Some(x) => {
 x
 },
@@ -16625,11 +16625,11 @@ return Err(ParseError::ExcludedBranch(15794382300316794652u64));
 },
 
 17u8 => {
-(Some(0u8), dup32((cl_code_extra.extra + 3u8) as u32, 0u8))
+(Some(0u8), dup_n(((cl_code_extra.extra + 3u8) as u32) as usize, 0u8))
 },
 
 18u8 => {
-(Some(0u8), dup32((cl_code_extra.extra + 11u8) as u32, 0u8))
+(Some(0u8), dup_n(((cl_code_extra.extra + 11u8) as u32) as usize, 0u8))
 },
 
 v => {
@@ -17036,7 +17036,7 @@ let y = &accum;
 let (last_symbol, cl_code_extra) = tuple_var;
 match cl_code_extra.code as u8 {
 16u8 => {
-(last_symbol, dup32((cl_code_extra.extra + 3u8) as u32, match last_symbol {
+(last_symbol, dup_n(((cl_code_extra.extra + 3u8) as u32) as usize, match last_symbol {
 Some(x) => {
 x
 },
@@ -17048,11 +17048,11 @@ return Err(ParseError::ExcludedBranch(17670535809278048255u64));
 },
 
 17u8 => {
-(Some(0u8), dup32((cl_code_extra.extra + 3u8) as u32, 0u8))
+(Some(0u8), dup_n(((cl_code_extra.extra + 3u8) as u32) as usize, 0u8))
 },
 
 18u8 => {
-(Some(0u8), dup32((cl_code_extra.extra + 11u8) as u32, 0u8))
+(Some(0u8), dup_n(((cl_code_extra.extra + 11u8) as u32) as usize, 0u8))
 },
 
 v => {
@@ -23516,7 +23516,7 @@ let (_len, flags) = tuple_var;
 flags
 }
 };
-(try_flat_map_vec(arr_flags.iter().cloned(), |packed: opentype_glyf_simple_flags_lhs| PResult::Ok(dup32((packed.repeats as u32) + 1u32, packed.field_set))))?
+(try_flat_map_vec(arr_flags.iter().cloned(), |packed: opentype_glyf_simple_flags_lhs| PResult::Ok(dup_n(((packed.repeats as u32) + 1u32) as usize, packed.field_set))))?
 };
 let x_coordinates = {
 let mut accum = Vec::new();

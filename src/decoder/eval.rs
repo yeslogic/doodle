@@ -225,8 +225,7 @@ impl Expr {
                     .get_sequence()
                 {
                     Some(values) => {
-                        let len = values.len();
-                        Cow::Owned(V::from_evaluated(Value::U32(u32::try_from(len)?)))
+                        Cow::Owned(V::from_evaluated(Value::from_seq_len(values.len())))
                     }
                     _ => panic!("SeqLength: expected Seq"),
                 }
@@ -574,13 +573,17 @@ mod tests {
     }
 
     #[test]
-    fn seq_length_of_range_exceeding_u32_max_errors() {
-        // `Range<usize>::len()` is O(1) (no materialization needed), so this exercises the
-        // truncation fix without actually allocating billions of elements. `len as u32` used to
-        // silently wrap; now it errors via `EvalError::IntCast`.
+    fn seq_length_beyond_u32_max_is_exact_until_it_meets_u32() {
+        // `Range<usize>::len()` is O(1) (no materialization needed), so this exercises lengths beyond
+        // `u32::MAX` without actually allocating billions of elements. `SeqLength` is an Auto Numeric,
+        // so the length is exact (no truncation or overflow error); the width is checked where the value
+        // next meets a concrete type.
         let too_long = u64::from(u32::MAX) + 1;
-        let expr = Expr::SeqLength(b(Expr::EnumFromTo(b(Expr::U64(0)), b(Expr::U64(too_long)))));
-        assert!(matches!(eval_err(&expr), EvalError::IntCast(_)));
+        let len = Expr::SeqLength(b(Expr::EnumFromTo(b(Expr::U64(0)), b(Expr::U64(too_long)))));
+        assert_eq!(eval_ok(&len), Value::from_seq_len(too_long as usize));
+
+        let as_u32 = Expr::Arith(crate::Arith::Add, b(len), b(Expr::U32(0)));
+        assert!(matches!(eval_err(&as_u32), EvalError::NumericConvert(_)));
     }
 
     fn num_const(n: i64, rep: crate::numeric::core::NumRep) -> Expr {
@@ -674,7 +677,7 @@ mod tests {
             b(Expr::U64(0)),
             b(Expr::U64(u64::from(u32::MAX))),
         )));
-        assert_eq!(eval_ok(&expr), Value::U32(u32::MAX));
+        assert_eq!(eval_ok(&expr), Value::from_seq_len(u32::MAX as usize));
     }
 
     #[test]
