@@ -27,11 +27,11 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
   - `RepeatCount` and `RepeatBetween` counts;
   - the `Slice` length and the `WithRelativeOffset` base and offset.
 - **Registration sites that keep `is_numeric()`** (which also accepts `Signed`): `IntRel` (the operands must still unify, so mixed-sign comparisons are rejected) and `AsU8`–`AsU64`.
-- **Other registration sites**: the `FindByKey` key must unify to a native unsigned `Base` type (so `Signed` is rejected and an Auto query key is accepted only if the key lambda pins it). `SeqIx`, `SubSeq`, `SubSeqInflate` and `Dup` require exactly `U32`, which is deferred to the `seqlen-always-u32` project.
+- **Other registration sites**: the `FindByKey` key must unify to a native unsigned `Base` type (so `Signed` is rejected and an Auto query key is accepted only if the key lambda pins it). `SeqLength` is typed `NumericHole`, like `Pos`, and the `SeqIx` index, `SubSeq`/`SubSeqInflate` start and length, and `Dup` count follow the "unsigned or Auto" rule (`doc/SEQLEN_PLAN.md`).
 - **`RepeatBetween` bounds must be constant** in registration, the `TypeChecker` and the decoder compiler alike. All three use `Expr::exact_repeat_bounds`, which evaluates closed Numerics.
 - **`TypeChecker`** (codegen path) constrains:
   - `BaseSet::UAny` (any unsigned type): `Arith`, `IntSucc`/`IntPred`, `AsChar`, `RepeatCount`, `RepeatBetween`, the `FindByKey` key, `CaptureBytes` length and `ViewExpr::Offset`.
-  - `UAny32` (any unsigned type, with `U32` as the tiebreak default; it does **not** exclude `U64`): `SeqIx`, `EnumFromTo`, `SeqLength`, `Slice`, `WithRelativeOffset`. `SubSeq`'s start and `Dup`'s count behave the same way, so the `TypeChecker` is looser than registration's exact-`U32` rule at those sites.
+  - `UAny32` (any unsigned type, with `U32` as the tiebreak default; it does **not** exclude `U64`): `SeqIx`, `EnumFromTo`, `SeqLength`, `Slice`, `WithRelativeOffset`. `SubSeq`/`SubSeqInflate`'s start and length and `Dup`'s count behave the same way.
   - `UintSet::ANY`: `ReadArray` length.
   - `IntSet::ZAny` (signed allowed): `AsU8`–`AsU64` and `IntRel`.
 - **Unresolved Auto in the `TypeChecker`**: with nothing to pin it, an Auto const is ambiguous and `infer_module` returns a `TCError` ("no unique solution"); a negative Auto at an unsigned-only site gives "no valid solutions". Both go through `generate_code`'s "Failed to infer module-wide type annotations:" path. No default types are applied. Registration stays looser here: it accepts a bare Auto, and the interpreter handles it by value.
@@ -47,7 +47,8 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
   - **`arith`, Numeric vs Numeric**: the same concrete unsigned rep computes natively. **Auto with Auto computes by value and stays Auto** (division by zero and shifts outside `0..64` are errors). Mismatched concrete reps and signed reps still panic; registration rejects them, so these are type-checker-invariant panics.
   - **`unary` (`IntSucc`/`IntPred`)**: dispatches on the Numeric's own rep. Concrete `U8`–`U64` compute natively; **Auto is ±1 by value and stays Auto**; signed panics (rejected by registration).
   - **`AsU8`–`AsU64`/`AsChar`**: `as_native`, value-only and rep-agnostic; errors if the value doesn't fit.
-  - **`as_usize` sites** (lengths, counts, offsets, `EnumFromTo` bounds): value-only; negative or oversized values error.
+  - **`as_usize` sites** (lengths, counts, offsets, `EnumFromTo` bounds, sequence indices): value-only; negative or oversized values error.
+- **`SeqLength` and `Format::Pos`** evaluate to Auto Numerics (`Value::from_seq_len`, `Value::from_pos`), so they take the type of whatever native operand they meet. A length is exact; its width is checked where it next meets a concrete type (e.g. `pred(seq_length(..))` on an empty sequence is `-1`, and errors where it is used as an index).
   - **`FindByKey` key (`AsKey`)**: Numeric vs `U8`–`U64` is coerced with `get_as_unsigned`; **an out-of-range key (e.g. `-1auto` against `U8`) returns `EvalError::NumericConvert`.**
 - **Pattern matching on `Value::Numeric`** (`Value::matches_numeric_literal`, shared by the main interpreter and `loc_decoder`):
   - `U8(n)`–`U64(n)`: a concrete rep must be exactly that width; **Auto is compared by value**.
@@ -63,6 +64,7 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
 - Embedded trees are elaborated to `TypedNumExpr` and emitted via `numeric::codegen::synthesize`. Operations classified `HomLossy`/`HetLossy` fall back to `eval_fallback` instead of boilerplated backend functions (`numeric/codegen.rs`).
 - `ZConst`/`ZRange` are emitted as untyped `SomeInt` literals and ranges, relying on Rust's type inference against the scrutinee.
 - `IntRel` is emitted as a plain infix comparison, which is also correct for signed operands.
+- `SeqLength` is emitted as `len() as <T>`, where `T` is the type the `TypeChecker` resolved for it; `Dup` as `dup_n(<count> as usize, ..)`; `SeqIx`/`SubSeq`/`SubSeqInflate` cast their arguments `as usize`. So any unsigned width works at all these sites.
 - **Match exhaustiveness** (`refutability_check` in `codegen/mod.rs`):
   - A signed scrutinee is always treated as `Refutable`, so a fallback arm is always emitted.
   - For an unsigned scrutinee, `IntCoverage` counts `U8`–`U64`, `Int`, and `ZConst`/`ZRange` arms (the latter clamped to the unsigned domain).

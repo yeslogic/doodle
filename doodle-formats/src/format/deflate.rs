@@ -600,11 +600,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                         Expr::Tuple(vec![
                             var("last-symbol"),
                             dup(
-                                // FIXME[epic=dup32]: we ought to be able to use dup without an explicit u32 cast
-                                as_u32(add(
-                                    record_proj(var("cl-code-extra"), "extra"),
-                                    Expr::U8(3),
-                                )),
+                                add(record_proj(var("cl-code-extra"), "extra"), Expr::U8(3)),
                                 expr_unwrap(var("last-symbol")),
                             ),
                         ]),
@@ -614,11 +610,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                         Expr::Tuple(vec![
                             expr_some(Expr::U8(0)),
                             dup(
-                                // FIXME[epic=dup32]: we ought to be able to use dup without an explicit u32 cast
-                                as_u32(add(
-                                    record_proj(var("cl-code-extra"), "extra"),
-                                    Expr::U8(3),
-                                )),
+                                add(record_proj(var("cl-code-extra"), "extra"), Expr::U8(3)),
                                 Expr::U8(0),
                             ),
                         ]),
@@ -628,10 +620,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                         Expr::Tuple(vec![
                             expr_some(Expr::U8(0)),
                             dup(
-                                as_u32(add(
-                                    record_proj(var("cl-code-extra"), "extra"),
-                                    Expr::U8(11),
-                                )),
+                                add(record_proj(var("cl-code-extra"), "extra"), Expr::U8(11)),
                                 Expr::U8(0),
                             ),
                         ]),
@@ -727,10 +716,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                                     Expr::Tuple(vec![
                                         var("last-symbol"),
                                         dup(
-                                            as_u32(add(
+                                            add(
                                                 record_proj(var("cl-code-extra"), "extra"),
                                                 Expr::U8(3),
-                                            )),
+                                            ),
                                             expr_unwrap(var("last-symbol")),
                                         ),
                                     ]),
@@ -740,10 +729,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                                     Expr::Tuple(vec![
                                         expr_some(Expr::U8(0)),
                                         dup(
-                                            as_u32(add(
+                                            add(
                                                 record_proj(var("cl-code-extra"), "extra"),
                                                 Expr::U8(3),
-                                            )),
+                                            ),
                                             Expr::U8(0),
                                         ),
                                     ]),
@@ -753,10 +742,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                                     Expr::Tuple(vec![
                                         expr_some(Expr::U8(0)),
                                         dup(
-                                            as_u32(add(
+                                            add(
                                                 record_proj(var("cl-code-extra"), "extra"),
                                                 Expr::U8(11),
-                                            )),
+                                            ),
                                             Expr::U8(0),
                                         ),
                                     ]),
