@@ -37,7 +37,7 @@ Terms like `Expr::Var(..)` carry no associated type-information. Because `Expr::
 that any non-constant numeric operation (comparison or arithmetic) can only be valid if one knows the type of any opaquely-typed terms within them.
 
 In order to add 1 to a variable `x`, in other words, one needs to know the exact `ValueType` bound to "x" in the exact scope where the expression would be evaluated.
-This becomes additionally more complicated with holdover type-ascriptions like `Expr::SeqLen` always being `U32`, which isn't visible anywhere except in the `doodle`
+This becomes additionally more complicated with historically hard-coded type-ascriptions like `Expr::SeqLength` always being `U32` (pending the `seqlen-always-u32` project change-plan `doc/SEQLEN_PLAN.md`), which wasn't visible anywhere except in the `doodle`
 source-code itself.
 
 In such cases, even a simple operation like `x + 2` requires knowledge of what `Expr` constructor to wrap around `2` to yield a well-typed expression.
@@ -100,7 +100,7 @@ in the array being searched. This means, in practice, that a query-key with an `
 may be accepted by `infer_type` as long as the lambda returns values of a concrete unsigned
 numeric type.
 
-At this point in time `SeqIx` requires its argument to be typed as `ValueType::U32`, as do other `Expr` with implied 'sequence index' or 'sequence length' semantics: `SubSeq`, `SubSeqInflate`, `Dup`.
+`Expr::SeqLength` is typed `ValueType::NumericHole`, like `Format::Pos`, and evaluates to an Auto Numeric. The `Expr`s with implied 'sequence index' or 'sequence length' arguments (`SeqIx`, `SubSeq`, `SubSeqInflate`, `Dup`) accept any unsigned type or `NumericHole` there, via `is_unsigned_or_auto` (see `doc/SEQLEN_PLAN.md`).
 
 ## [`TypeChecker`](/src/typecheck.rs)
 

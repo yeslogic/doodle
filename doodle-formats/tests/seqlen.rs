@@ -249,7 +249,7 @@ fn dup_u8() {
     assert_codegen_ok(&f);
 }
 
-/// The `deflate` `FIXME[epic=dup32]` pattern: a `U8`-derived count cast with `as_u32`.
+/// A `U8`-derived count cast with `as_u32`, as `deflate` did before the cast became unnecessary.
 #[test]
 fn dup_as_u32_count() {
     let f = with_seq(
