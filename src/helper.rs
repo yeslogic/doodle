@@ -898,12 +898,13 @@ pub fn shr(value: Expr, places: Expr) -> Expr {
 ///
 /// # Notes
 ///
-/// The default ValueType ascribed to `SeqLength` is currently pinned to `U32`.
+/// Like `Format::Pos`, the length takes the type of whatever operand it meets:
 ///
-/// - [`crate::Expr::infer_type`] currently assumes `U32` due to limitations in the type inference algorithm
-/// - [`crate::typecheck::TypeChecker::infer_var_expr`] currently assumes `U32`, and a historic effort
-///   to generalize it to the priority-set `[U32 > U8, U16, U64]` was reverted based on polymorphic
-///   unification with `Format::Pos` yielding no clear winner.
+/// - [`crate::Expr::infer_type`] types it as `NumericHole`, and the interpreter evaluates it to an Auto Numeric.
+/// - [`crate::typecheck::TypeChecker::infer_var_expr`] admits any unsigned type, preferring `U32` when nothing
+///   in the context pins one (a historic effort to use the priority-set `[U32 > U8, U16, U64]` instead was
+///   reverted, as polymorphic unification with `Format::Pos` yielded no clear winner). Codegen emits
+///   `len() as <inferred solution type>`.
 pub fn seq_length(seq: Expr) -> Expr {
     Expr::SeqLength(Box::new(seq))
 }
@@ -1404,12 +1405,11 @@ pub fn map_option(
 
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
 ///
-/// This will result in a runtime panic during parse-evaluation if the index is out of bounds.
+/// Evaluation fails with an error if the index is out of bounds.
 ///
 /// # Notes
 ///
-/// Under current implementation constraints, an `index` whose Expr-kind is not `U32` may lead to typechecking
-/// failure.
+/// The `index` may be of any unsigned type, or Auto.
 pub fn index_unchecked(seq: Expr, index: Expr) -> Expr {
     Expr::SeqIx(Box::new(seq), Box::new(index))
 }
@@ -1419,8 +1419,7 @@ pub fn index_unchecked(seq: Expr, index: Expr) -> Expr {
 ///
 /// # Notes
 ///
-/// Under current implementation constraints, an `index` whose Expr-kind is not `U32` may lead to typechecking
-/// failure.
+/// The `index` may be of any unsigned type, or Auto.
 pub fn index_checked(seq: Expr, index: Expr) -> Expr {
     let len = seq_length(seq.clone());
     let is_sound = expr_lt(index.clone(), len);
