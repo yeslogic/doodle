@@ -513,6 +513,22 @@ impl UintSet {
     ///
     /// If no solutions exist (i.e. the set is empty), or if there is more than one
     /// solution ascribed with the highest-priority rank, then `None` is returned.
+    // TODO - Two sets with different defaults (e.g. `UAny32` for `SeqLength` and
+    // `any_default(Bits64)` for `Format::Pos`) intersect to a top tier holding both defaults,
+    // which is ambiguous here (see NUMERIC_GUIDELINE.md). A possible narrow fix, applied here at
+    // solve time rather than in `intersection`/`cherrypick`:
+    //   if the top tier has more than one member AND at least one member sits in a strictly
+    //   lower tier (taken as evidence that defaults collided), return the widest top-tier member.
+    // This leaves sets with a unique top member unchanged (it only resolves cases that currently
+    // fail), keeps `ANY`/`at_least` ambiguous (they have no lower tier), and doesn't depend on
+    // unification order. Caveats:
+    // - it makes "widest wins on a default clash" a global policy (e.g. `any_default(Bits8) ∩ UAny32` -> U32);
+    // - `normalize` discards provenance, so a clash whose lower tier was later excluded
+    //   (e.g. `UAny32 ∩ any_default(Bits64) ∩ at_least(Bits32)` -> `[Ex, Ex, 1, 1]`) is
+    //   indistinguishable from a set with no default and stays ambiguous. Fixing that robustly
+    //   means tracking defaults separately from membership in `UintSet`.
+    // `PrimIntSet::get_unique_solution` would need the same change if `NumTree` constraints
+    // are ever affected.
     pub fn get_unique_solution(self) -> Option<BaseType> {
         let this = self.normalize();
         let mut candidate = None;
@@ -1029,6 +1045,55 @@ mod tests {
 
         // this is the constraint that would result from any (x := Pos), (y := SeqLength), Type(x) ~ Type(y) unification
         let unified = BaseSet::cherrypick(seqlen_set, pos_set, [Bits64, Bits32]).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
+    }
+
+    /// A fixed cascade also splits ties between sets that deliberately have no default.
+    #[test]
+    fn cherrypick_cascade_defaults_non_defaulting_sets() {
+        use crate::numeric::core::BitWidth::*;
+        let any = BaseSet::UAny;
+        let at_least16 = BaseSet::U(UintSet::at_least(Bits16));
+
+        // without a cascade, both are ambiguous
+        assert!(
+            any.unify(any)
+                .unwrap()
+                .get_unique_solution(UVar(0))
+                .is_err()
+        );
+        assert!(
+            at_least16
+                .unify(any)
+                .unwrap()
+                .get_unique_solution(UVar(0))
+                .is_err()
+        );
+
+        // with the cascade, both resolve to U64
+        let unified = any.cherrypick(any, [Bits64, Bits32]).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
+        let unified = at_least16.cherrypick(any, [Bits64, Bits32]).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
+    }
+
+    /// The cascade's tiebreak is baked into ranks that a later plain `unify` can override,
+    /// so the result depends on whether every unification site uses `cherrypick`.
+    #[test]
+    fn cherrypick_then_unify_is_ambiguous_again() {
+        use crate::numeric::core::BitWidth::*;
+        let seqlen_set = BaseSet::UAny32;
+        let pos_set = BaseSet::U(UintSet::any_default(Bits64));
+
+        let picked = BaseSet::cherrypick(seqlen_set, pos_set, [Bits64, Bits32]).unwrap();
+        assert_eq!(picked.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
+
+        // a second SeqLength-like constraint, unified without the cascade
+        let unified = picked.unify(seqlen_set).unwrap();
+        assert!(unified.get_unique_solution(UVar(0)).is_err());
+
+        // ...whereas with the cascade it stays U64
+        let unified = picked.cherrypick(seqlen_set, [Bits64, Bits32]).unwrap();
         assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
     }
 }
