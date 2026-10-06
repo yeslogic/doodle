@@ -1,39 +1,57 @@
 use crate::Expr;
-use crate::decoder::{Value, seq_kind::SeqKind};
+use crate::decoder::{EvalError, Value, seq_kind::SeqKind};
 
-/// Helper trait to apply find_index_by_key_sorted to ParsedValue and Value generically
+/// Trait providing key-comparison functionality used in binary search to an interpreter value-node,
+/// notably `Value` and `ParsedValue`. Used to implement `find_index_by_key_sorted`
 pub(crate) trait AsKey {
     /// Compares two values as keys, using natural order on the types being represented.
     ///
     /// Currently, only applies to strictly-numeric Value kinds (U8, etc.)
-    fn compare_as_key(&self, other: &Self) -> std::cmp::Ordering;
+    ///
+    /// Returns an error if a `Numeric` key cannot be coerced to the type of the other key
+    /// (e.g. `-1` against a `U8`).
+    fn compare_as_key(&self, other: &Self) -> Result<std::cmp::Ordering, EvalError>;
 
     /// Tests equality over two values as keys, using natural equality on the types being represented.
     ///
     /// Currently, only applies to strictly-numeric Value kinds (U8, etc.), to mirror `compare_as_key`
     /// (even though more complex equalities can be established on value-kinds without natural ordering).
-    fn eq_key(&self, other: &Self) -> bool;
+    ///
+    /// Returns an error under the same conditions as `compare_as_key`.
+    fn eq_key(&self, other: &Self) -> Result<bool, EvalError>;
 }
 
 impl AsKey for Value {
-    fn compare_as_key(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
+    fn compare_as_key(&self, other: &Self) -> Result<std::cmp::Ordering, EvalError> {
+        let (this, that) =
+            Value::to_uniform_integer_pair(self, other).map_err(EvalError::NumericConvert)?;
+        Ok(match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a.cmp(b),
             (Value::U16(a), Value::U16(b)) => a.cmp(b),
             (Value::U32(a), Value::U32(b)) => a.cmp(b),
             (Value::U64(a), Value::U64(b)) => a.cmp(b),
+            (Value::Numeric(a), Value::Numeric(b)) => {
+                log::warn!("Value::compare_as_key called on numeric/numeric pair: ({a}, {b})");
+                Ord::cmp(a.as_raw_value(), b.as_raw_value())
+            }
             _ => panic!("Value::compare_as_key: Can't compare {self:?} and {other:?} as keys"),
-        }
+        })
     }
 
-    fn eq_key(&self, other: &Self) -> bool {
-        match (self, other) {
+    fn eq_key(&self, other: &Self) -> Result<bool, EvalError> {
+        let (this, that) =
+            Value::to_uniform_integer_pair(self, other).map_err(EvalError::NumericConvert)?;
+        Ok(match (this.as_ref(), that.as_ref()) {
             (Value::U8(a), Value::U8(b)) => a == b,
             (Value::U16(a), Value::U16(b)) => a == b,
             (Value::U32(a), Value::U32(b)) => a == b,
             (Value::U64(a), Value::U64(b)) => a == b,
+            (Value::Numeric(a), Value::Numeric(b)) => {
+                log::warn!("Value::eq_key called on numeric/numeric pair: ({a}, {b})");
+                a.eq_val(b)
+            }
             _ => panic!("Value::eq_key: can't compare {self:?} and {other:?} as keys"),
-        }
+        })
     }
 }
 
@@ -56,7 +74,7 @@ pub(crate) fn find_index_by_key_sorted<'a, V, V0, Eval>(
     query: &V,
     values: &SeqKind<V0>,
     evaluate: Eval,
-) -> Option<usize>
+) -> Result<Option<usize>, EvalError>
 where
     Eval: 'a + Fn(&Expr, &V0) -> V,
     V: AsKey,
@@ -65,7 +83,7 @@ where
     use std::cmp::Ordering;
     // If values is empty, search is trivial
     if values.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     let len = values.len();
@@ -79,13 +97,13 @@ where
     let lower_bound = get_key_at_index(0);
 
     // don't bother evaluating upper_bound if query <= lower-bound
-    match query.compare_as_key(lower_bound) {
-        Ordering::Less => return None,
-        Ordering::Equal => return Some(0),
+    match query.compare_as_key(lower_bound)? {
+        Ordering::Less => return Ok(None),
+        Ordering::Equal => return Ok(Some(0)),
         Ordering::Greater => {
             // skip computing 'upper bound' on singleton list
             if len <= 1 {
-                return None;
+                return Ok(None);
             }
         }
     }
@@ -94,13 +112,13 @@ where
     let last_ix = len - 1;
     let upper_bound = get_key_at_index(last_ix);
 
-    match query.compare_as_key(upper_bound) {
-        Ordering::Greater => return None,
-        Ordering::Equal => return Some(last_ix),
+    match query.compare_as_key(upper_bound)? {
+        Ordering::Greater => return Ok(None),
+        Ordering::Equal => return Ok(Some(last_ix)),
         Ordering::Less => {
             // skip entire loop when there are no middle values
             if len <= 2 {
-                return None;
+                return Ok(None);
             }
         }
     }
@@ -117,13 +135,13 @@ where
         let mid = (lower_bound_ix + upper_bound_ix) / 2;
 
         let mid_key = get_key_at_index(mid);
-        match query.compare_as_key(mid_key) {
+        match query.compare_as_key(mid_key)? {
             Ordering::Less => upper_bound_ix = mid - 1,
-            Ordering::Equal => return Some(mid),
+            Ordering::Equal => return Ok(Some(mid)),
             Ordering::Greater => lower_bound_ix = mid + 1,
         }
     }
-    None
+    Ok(None)
 }
 
 pub(crate) fn find_index_by_key_unsorted<'a, V, V0, Eval>(
@@ -131,7 +149,7 @@ pub(crate) fn find_index_by_key_unsorted<'a, V, V0, Eval>(
     query: &V,
     values: &SeqKind<V0>,
     evaluate: Eval,
-) -> Option<usize>
+) -> Result<Option<usize>, EvalError>
 where
     Eval: 'a + Fn(&Expr, &V0) -> V,
     V: AsKey,
@@ -139,9 +157,9 @@ where
 {
     for (ix, v) in values.iter().enumerate() {
         let key = evaluate(f_get_key, v);
-        if query.eq_key(&key) {
-            return Some(ix);
+        if query.eq_key(&key)? {
+            return Ok(Some(ix));
         }
     }
-    None
+    Ok(None)
 }

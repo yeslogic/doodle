@@ -4,6 +4,7 @@ pub mod prelude;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashSet},
+    num::NonZeroUsize,
     rc::Rc,
 };
 
@@ -36,7 +37,7 @@ pub enum GroundFormat {
     /// Matches if the end of the input has been reached
     EndOfInput,
     /// Skips bytes if necessary to align the current offset to a multiple of N
-    Align(usize),
+    Align(NonZeroUsize),
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Apply a dynamic format from a named variable in the scope
@@ -389,6 +390,21 @@ impl ValueTypeExt {
             | ValueTypeExt::ViewObj
             | ValueTypeExt::Seq(..)
             | ValueTypeExt::PhantomData(..) => false,
+        }
+    }
+
+    /// Returns `true` for unsigned machine-integer types and for `NumericHole` (Auto), but not for signed types.
+    ///
+    /// Mirrors [`ValueType::is_unsigned_or_auto`]; an `EngineSpecific` type qualifies if both of its models do.
+    pub fn is_unsigned_or_auto(&self) -> bool {
+        match self {
+            ValueTypeExt::Base(bt) => bt.is_numeric(),
+            ValueTypeExt::NumericHole => true,
+            ValueTypeExt::EngineSpecific {
+                base_model,
+                alt_model,
+            } => base_model.is_unsigned_or_auto() && alt_model.is_unsigned_or_auto(),
+            _ => false,
         }
     }
 
@@ -982,12 +998,12 @@ impl FormatModuleExt {
                     ident.check_type_ext(scope)?;
                     match vf {
                         ViewFormatExt::CaptureBytes(len) => {
-                            // confirm that length is of a numeric type
+                            // confirm that length is of an unsigned or auto type
                             match len.infer_type_ext(scope)? {
-                                t if t.is_numeric() => {}
+                                t if t.is_unsigned_or_auto() => {}
                                 other => {
                                     return Err(anyhow!(
-                                        "ReadOffsetLen: expected numeric len, found {other:?}"
+                                        "CaptureBytes: expected unsigned or auto len, found {other:?}"
                                     ));
                                 }
                             }
@@ -998,10 +1014,10 @@ impl FormatModuleExt {
                         }
                         ViewFormatExt::ReadArray(len, kind) => {
                             match len.infer_type_ext(scope)? {
-                                t if t.is_numeric() => {}
+                                t if t.is_unsigned_or_auto() => {}
                                 other => {
                                     return Err(anyhow!(
-                                        "ReadOffsetLen: expected numeric len, found {other:?}"
+                                        "ReadArray: expected unsigned or auto len, found {other:?}"
                                     ));
                                 }
                             }
@@ -1040,39 +1056,39 @@ impl FormatModuleExt {
                             Ok(ValueTypeExt::Seq(Box::new(t)))
                         }
                         MonoKind::RepeatCount(count) => match count.infer_type_ext(scope)? {
-                            ValueTypeExt::Base(b) if b.is_numeric() => {
-                                let t = self.infer_format_ext_type(scope, f)?;
-                                Ok(ValueTypeExt::Seq(Box::new(t)))
-                            }
                             ValueTypeExt::EngineSpecific { .. } => unreachable!(
                                 "RepeatCount: unexpected engine-specific type in numeric position"
                             ),
-                            other => Err(anyhow!(
-                                "RepeatCount first argument type should be numeric, found {other:?} instead"
-                            )),
-                        },
-                        MonoKind::RepeatBetween(min, max) => match min.infer_type_ext(scope)? {
-                            ref t0 @ ValueTypeExt::Base(b0) if b0.is_numeric() => {
-                                match max.infer_type_ext(scope)? {
-                                    ValueTypeExt::Base(b1) if b0 == b1 => {
-                                        let t = self.infer_format_ext_type(scope, f)?;
-                                        Ok(ValueTypeExt::Seq(Box::new(t)))
-                                    }
-                                    ValueTypeExt::EngineSpecific { .. } => unreachable!(
-                                        "RepeatBetween@1: unexpected engine-specific type in numeric position"
-                                    ),
-                                    other => Err(anyhow!(
-                                        "RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})"
-                                    )),
-                                }
+                            t if t.is_unsigned_or_auto() => {
+                                let t = self.infer_format_ext_type(scope, f)?;
+                                Ok(ValueTypeExt::Seq(Box::new(t)))
                             }
-                            ValueTypeExt::EngineSpecific { .. } => unreachable!(
-                                "RepeatBetween@0: unexpected engine-specific type in numeric position"
-                            ),
                             other => Err(anyhow!(
-                                "RepeatBetween first argument type should be numeric, found {other:?} instead"
+                                "RepeatCount first argument type should be unsigned or auto, found {other:?} instead"
                             )),
                         },
+                        MonoKind::RepeatBetween(min, max) => {
+                            let (t0, t1) = (min.infer_type_ext(scope)?, max.infer_type_ext(scope)?);
+                            if matches!(t0, ValueTypeExt::EngineSpecific { .. })
+                                || matches!(t1, ValueTypeExt::EngineSpecific { .. })
+                            {
+                                unreachable!(
+                                    "RepeatBetween: unexpected engine-specific type in numeric position"
+                                );
+                            }
+                            let Ok(t) = t0.unify(&t1) else {
+                                return Err(anyhow!(
+                                    "RepeatBetween bounds should have the same type, found {t0:?} and {t1:?}"
+                                ));
+                            };
+                            if !t.is_unsigned_or_auto() {
+                                return Err(anyhow!(
+                                    "RepeatBetween bounds should be unsigned or auto, found {t:?} instead"
+                                ));
+                            }
+                            let t = self.infer_format_ext_type(scope, f)?;
+                            Ok(ValueTypeExt::Seq(Box::new(t)))
+                        }
                         MonoKind::LetView(ident) => {
                             let mut child_scope = TypeScope::child(scope);
                             child_scope.push_view(ident.clone());
@@ -1197,14 +1213,22 @@ impl FormatModuleExt {
                         },
                         MonoKind::Peek => self.infer_format_ext_type(scope, f),
                         MonoKind::PeekNot => Ok(ValueTypeExt::UNIT),
-                        MonoKind::Slice(expr) => {
-                            debug_assert!(
-                                expr.infer_type_ext(scope).is_ok_and(|vt| vt.is_numeric())
-                            );
-                            self.infer_format_ext_type(scope, f)
-                        }
+                        MonoKind::Slice(len) => match len.infer_type_ext(scope)? {
+                            t if t.is_unsigned_or_auto() => self.infer_format_ext_type(scope, f),
+                            other => Err(anyhow!(
+                                "Slice length should be unsigned or auto, found {other:?} instead"
+                            )),
+                        },
                         MonoKind::Bits => self.infer_format_ext_type(scope, f),
-                        MonoKind::WithRelativeOffset(_base_addr, _offs) => {
+                        MonoKind::WithRelativeOffset(base_addr, offset) => {
+                            for (what, expr) in [("base address", base_addr), ("offset", offset)] {
+                                let t = expr.infer_type_ext(scope)?;
+                                if !t.is_unsigned_or_auto() {
+                                    return Err(anyhow!(
+                                        "WithRelativeOffset {what} should be unsigned or auto, found {t:?} instead"
+                                    ));
+                                }
+                            }
                             self.infer_format_ext_type(scope, f)
                         }
                         MonoKind::Map(expr) => {
@@ -1508,14 +1532,12 @@ mod __impls {
                 }
 
                 Expr::Arith(_arith, x, y) => {
-                    match (x.infer_type_ext(scope)?, y.infer_type_ext(scope)?) {
-                        (ValueTypeExt::Base(b1), ValueTypeExt::Base(b2))
-                            if b1 == b2 && b1.is_numeric() =>
-                        {
-                            Ok(ValueTypeExt::Base(b1))
-                        }
-                        (x, y) => Err(anyhow!(
-                            "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
+                    let (t1, t2) = (x.infer_type_ext(scope)?, y.infer_type_ext(scope)?);
+                    match t1.unify(&t2) {
+                        // NOTE - signed arithmetic is only supported within `Expr::Numeric`
+                        Ok(t0) if t0.is_unsigned_or_auto() => Ok(t0),
+                        _ => Err(anyhow!(
+                            "mismatched operand types for {_arith:?}: {t1:?}, {t2:?}"
                         )),
                     }
                 }
@@ -1525,7 +1547,7 @@ mod __impls {
                 },
                 Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => {
                     match x.infer_type_ext(scope)? {
-                        ValueTypeExt::Base(b) if b.is_numeric() => Ok(ValueTypeExt::Base(b)),
+                        t if t.is_unsigned_or_auto() => Ok(t),
                         x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
                     }
                 }
@@ -1552,10 +1574,9 @@ mod __impls {
                     }
                     x => Err(anyhow!("cannot convert {x:?} to U64")),
                 },
+                // NOTE - unlike AsU8..AsU64, signed operands are rejected; use `AsChar(AsU32(x))` instead
                 Expr::AsChar(x) => match x.infer_type_ext(scope)? {
-                    ValueTypeExt::Base(b) if b.is_numeric() => {
-                        Ok(ValueTypeExt::Base(BaseType::Char))
-                    }
+                    t if t.is_unsigned_or_auto() => Ok(ValueTypeExt::Base(BaseType::Char)),
                     x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
                 },
                 Expr::U16Be(bytes) => {
@@ -1774,15 +1795,20 @@ mod __impls {
                     let start_type = start.infer_type_ext(scope)?;
                     let end_type = end.infer_type_ext(scope)?;
 
-                    if !matches!(start_type, ValueTypeExt::Base(b) if b.is_numeric()) {
-                        return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
-                    } else if start_type != end_type {
+                    let Ok(t) = start_type.unify(&end_type) else {
                         return Err(anyhow!(
-                            "EnumFromTo: start and end do not agree: {start_type:?} != {end_type:?}"
+                            "EnumFromTo: start and end do not agree: {start_type:?} ∩ {end_type:?} = ∅"
+                        ));
+                    };
+
+                    // NOTE - checked after unification so that a signed bound cannot hide behind an Auto one
+                    if !t.is_unsigned_or_auto() {
+                        return Err(anyhow!(
+                            "EnumFromTo: bounds must be unsigned or auto, found {t:?}"
                         ));
                     }
 
-                    Ok(ValueTypeExt::Seq(Box::new(start_type)))
+                    Ok(ValueTypeExt::Seq(Box::new(t)))
                 }
                 Expr::Dup(count, expr) => {
                     if count.infer_type_ext(scope)? != ValueTypeExt::Base(BaseType::U32) {
@@ -2151,5 +2177,62 @@ mod __impls {
             let inner: ValueTypeExt = t.as_ref().clone().into();
             Self(Container::new(inner))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TypeScope;
+    use crate::byte_set::ByteSet;
+    use crate::helper::{add, compute, poly_zero};
+    use crate::numeric::core::TypedConst;
+    use crate::numeric::helper as num;
+
+    fn infer_ext(f: Format) -> AResult<ValueTypeExt> {
+        FormatModuleExt::new().infer_format_ext_type(&TypeScope::new(), &FormatExt::from(f))
+    }
+
+    /// Mirrors `registration_numeric_acceptance` (lib.rs) for the `_ext` inference: signed operands to native
+    /// arithmetic/casts/counts/lengths are rejected, Auto (`NumericHole`) is accepted, and pattern/type
+    /// mismatches are reported as errors rather than panics.
+    #[test]
+    fn ext_numeric_acceptance() {
+        let i16_one = || Expr::Numeric(Box::new(num::expr_const(TypedConst::from_i16(1))));
+        let byte = || Box::new(Format::Byte(ByteSet::full()));
+
+        // R1
+        assert!(infer_ext(compute(add(i16_one(), i16_one()))).is_err());
+        assert!(infer_ext(compute(add(poly_zero(), Expr::U8(1)))).is_ok());
+        assert!(infer_ext(compute(Expr::AsChar(Box::new(i16_one())))).is_err());
+        assert!(infer_ext(Format::RepeatCount(Box::new(poly_zero()), byte())).is_ok());
+        assert!(infer_ext(Format::RepeatCount(Box::new(i16_one()), byte())).is_err());
+        assert!(
+            infer_ext(Format::RepeatBetween(
+                Box::new(poly_zero()),
+                Box::new(Expr::U8(2)),
+                byte()
+            ))
+            .is_ok()
+        );
+
+        // R5
+        assert!(infer_ext(Format::Slice(Box::new(Expr::U64(1)), byte())).is_ok());
+        assert!(infer_ext(Format::Slice(Box::new(poly_zero()), byte())).is_ok());
+        assert!(infer_ext(Format::Slice(Box::new(i16_one()), byte())).is_err());
+        assert!(infer_ext(Format::Slice(Box::new(Expr::Bool(true)), byte())).is_err());
+
+        // R3
+        let match_u8 = |head| {
+            Format::Match(
+                Box::new(head),
+                vec![
+                    (Pattern::U8(0), (*byte()).clone()),
+                    (Pattern::Wildcard, (*byte()).clone()),
+                ],
+            )
+        };
+        assert!(infer_ext(match_u8(poly_zero())).is_ok());
+        assert!(infer_ext(match_u8(Expr::Bool(true))).is_err());
     }
 }

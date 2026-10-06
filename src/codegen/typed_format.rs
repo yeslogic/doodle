@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -234,7 +235,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     Fail,
     EndOfInput,
-    Align(usize),
+    Align(NonZeroUsize),
     Byte(ByteSet),
     Variant(TypeRep, Label, Box<TypedFormat<TypeRep>>),
     Union(TypeRep, Vec<TypedFormat<TypeRep>>),
@@ -336,7 +337,7 @@ impl TypedFormat<GenType> {
                 inner.lookahead_bounds()
             }
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
+            TypedFormat::Align(n) => Bounds::new(0, n.get() - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.lookahead_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -418,7 +419,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Pos(_)
             | TypedFormat::Fail => Bounds::exact(0),
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
+            TypedFormat::Align(n) => Bounds::new(0, n.get() - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.match_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -909,17 +910,14 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
     }
 }
 
-impl<TypeRep> TypedExpr<TypeRep> {
+impl<TypeRep: Clone> TypedExpr<TypeRep> {
+    /// Conservative bounds for unsigned numeric expressions.
+    ///
+    /// Computed by converting to `Expr` and calling [`Expr::bounds`], so that codegen and the interpreter
+    /// share one analysis (in particular, codegen accepts exactly the `RepeatBetween` bounds that registration
+    /// and the TypeChecker accept).
     pub(crate) fn bounds(&self) -> Bounds {
-        match self {
-            TypedExpr::U8(n) => Bounds::exact(usize::from(*n)),
-            TypedExpr::U16(n) => Bounds::exact(usize::from(*n)),
-            TypedExpr::U32(n) => Bounds::exact(*n as usize),
-            TypedExpr::U64(n) => Bounds::exact(*n as usize),
-            TypedExpr::Arith(_t, Arith::Add, a, b) => a.bounds() + b.bounds(),
-            TypedExpr::Arith(_t, Arith::Mul, a, b) => a.bounds() * b.bounds(),
-            _ => Bounds::any(),
-        }
+        crate::Expr::from(self.clone()).bounds()
     }
 }
 
