@@ -61,6 +61,16 @@ There is no native support for `Format`-level construction of Numerics, with one
 
 Though not directly an embedding of `TypedConst`, `ViewFormat::ReadArray` can carry a signed marker-type, though that does not directly result in Numerics being manifested in memory while parsing.
 
+### `Format`-specific `Expr` restrictions
+
+Certain `Format` variants enforce type-level or value-level constraints on the `Expr` arguments they directly embed,
+most notably in the case of `Repeat*` formats, `WithRelativeOffset`, and `Slice`.
+
+In order to ensure precise `MatchTree` construction over `Format::RepeatBetween`, guards are placed in various layers to prevent
+scope-dependent `Expr` (i.e. any `Expr` containing a variable reference, even variables bound to static values) from appearing
+in either argument slot (min-bound or max-bound). This restriction is enforced via `Expr::exact_repeat_bounds`, as well as
+by the `TypeChecker` and the decoder compiler.
+
 ## `Pattern`
 
 A `NumExpr` with an unsigned `MachineRep` can match against the corresponding `Pattern::U?` variant: `Pattern::U8` will match against `TypedConst(N, U8)`, and similarly for `U16`, `U32`, and `U64`.
@@ -88,7 +98,6 @@ type-solver, whereas `TypeChecker` does full bidirectional type-checking that ca
 
 `ValueType::is_unsigned_or_auto()` accepts a native unsigned type or `NumericHole`, rejecting `Signed`. It is the argument check for native `Arith`, `IntSucc`/`IntPred`, `AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes` and `ViewFormat::ReadArray` (lengths), `RepeatCount`, `RepeatBetween`, and the `Slice` length and `WithRelativeOffset` base and offset. Where two operands are involved, they are unified first, so a signed operand cannot hide behind an Auto one. Signed arithmetic belongs in `NumExpr`, and the idiom for converting a signed value to a char is `AsChar(AsU32(x))`.
 
-`RepeatBetween` additionally requires both bounds to be constant (`Expr::exact_repeat_bounds`), as do the `TypeChecker` and the decoder compiler.
 
 The 'key' field of `FindByKey` mandates `ValueType::Base(b)` guarded by `b.is_numeric()` (i.e. it rejects `Signed`).[^1]
 
@@ -135,11 +144,11 @@ If `U32` is excluded but more than one possible unsignedsolution remains, a unif
 - `_ := Format::Slice(Y, _)`
 - `_ := Format::WithRelativeOffset(Y, Z, _)` (the types of Y and Z are also required to unify)
 
-Despite the name, `UAny32` admits every unsigned width, including `U64`; the `32` is only the tiebreak default.
+(Despite the name, `UAny32` admits every unsigned width, including `U64`; the `32` in the name merely signifies that `U32` is the tiebreak default.)
 
 The following cases receive one-off UintSet constraints:
 
-- `X := DynFormat::Huffman(Y, Z)`: the projective array-elem-types of Y, Z are given `UintSet::SHORT8` (U8 or U16, preferring U8 to tiebreak), X is given `UintSet::any_default(Bits16)` (like UAny32, with U16 as the default)
+- `X := DynFormat::Huffman(Y, Z)`: the projective array-elem-types of Y, Z are given `UintSet::SHORT8` (U8 or U16, preferring U8 to tiebreak), X is given `UintSet::any_default(Bits16)` (any unsigned int, with U16 as the default)
 - `X := Format::Pos`: X is given `UintSet::any_default(Bits64)` (prefers U64 but accepts any other unsigned int-type).
 
 ### `IntSet::ZAny`
