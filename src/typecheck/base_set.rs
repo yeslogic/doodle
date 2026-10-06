@@ -96,6 +96,52 @@ impl BaseSet {
         }
     }
 
+    /// Low-level function for unifying two `BaseSets` into a uniquely-solvable `BaseSet`, or returning an error if the two sets are incompatible.
+    ///
+    /// If `cascade` is empty, behaves identically to `BaseSet::unify`.
+    ///
+    /// # Errors
+    ///
+    /// Any error returned by `BaseSet::unify` is returned by `cherrypick` under the exact same conditions; the only
+    /// difference between the two is the value of the `BaseSet` returned when the two sets are compatible but do not unify to
+    /// a set with a unique solution. In that case, `cherrypick` used `cascade` if non-empty to formally tie-break each co-ranked tier
+    /// of priority.
+    ///
+    /// # Notes
+    ///
+    /// For details on how the unique solution is determined and how `cascade` is used, see [`UintSet::intersection_cherrypick`].
+    pub fn cherrypick<const N: usize>(
+        self,
+        other: Self,
+        cascade: [BitWidth; N],
+    ) -> Result<Self, ConstraintError> {
+        match (self, other) {
+            (BaseSet::Single(b1), BaseSet::Single(b2)) => {
+                if b1 == b2 {
+                    Ok(self)
+                } else {
+                    Err(ConstraintError::Unsatisfiable(
+                        Constraint::Elem(self),
+                        Constraint::Elem(other),
+                    ))
+                }
+            }
+            (BaseSet::U(u), BaseSet::Single(b)) | (BaseSet::Single(b), BaseSet::U(u)) => {
+                if u.contains(b) {
+                    Ok(BaseSet::Single(b))
+                } else {
+                    Err(UnificationError::Unsatisfiable(
+                        self.to_constraint(),
+                        other.to_constraint(),
+                    ))
+                }
+            }
+            (BaseSet::U(u1), BaseSet::U(u2)) => {
+                Ok(BaseSet::U(u1.intersection_cherrypick(u2, cascade)))
+            }
+        }
+    }
+
     pub(crate) fn get_unique_solution(self, v: UVar) -> TCResult<BaseType> {
         match self {
             BaseSet::Single(b) => Ok(b),
@@ -445,6 +491,21 @@ impl UintSet {
         ret.normalize()
     }
 
+    /// Given two `UintSet`s and a cascade of `BitWidth`s, returns a new `UintSet` that preserves the
+    /// monotonic order of the true intersection, but splits co-equal ranks according to the order
+    /// of elements in `cascade`, resulting in a set with a clear tiebreaker.
+    ///
+    /// If any member is left out of `cascade`, it is not reranked, so the set may still have co-equal ranks if the cascade does not cover
+    /// all members of the intersection.
+    pub(crate) fn intersection_cherrypick<const N: usize>(
+        &self,
+        other: Self,
+        cascade: [BitWidth; N],
+    ) -> UintSet {
+        let ret = self.intersection(other);
+        ret.rerank_cascading(cascade)
+    }
+
     /// Given a `UintSet`, determines the unique solution it has, if any.
     ///
     /// If multiple solutions exist, but there is one solution with a higher-priority
@@ -480,6 +541,36 @@ impl UintSet {
         } else {
             None
         }
+    }
+
+    /// Splits each tier of co-ranked members according to their order of appearance in `cascade`,
+    /// without altering the relative priority of members in distinct tiers.
+    ///
+    /// Within a tier, members named in `cascade` take priority over those that are not, in the order
+    /// they first appear; members absent from `cascade` remain co-ranked with one another.
+    ///
+    /// The returned `UintSet` is normalized.
+    fn rerank_cascading<const N: usize>(&self, cascade: [BitWidth; N]) -> UintSet {
+        let this = self.normalize();
+        // Lexicographic sort-key (lower is higher-priority): original tier first, then position in `cascade`,
+        // with members absent from `cascade` sorting after every member that is present.
+        let keys: [Option<(u8, usize)>; 4] = std::array::from_fn(|ix| match this.ranks[ix] {
+            Rank::Excluded => None,
+            Rank::At(n) => {
+                let width = Self::IX_ORDER[ix].int_width();
+                let pos = cascade.iter().position(|w| *w == width).unwrap_or(N);
+                Some((n, pos))
+            }
+        });
+        // Same scheme as `normalize`: rank-value is the number of other members of equal or greater priority
+        let mut ret = Self::EMPTY;
+        for (ix, key) in keys.iter().enumerate() {
+            if let Some(k) = key {
+                let count_gte = keys.iter().flatten().filter(|k1| *k1 <= k).count() - 1;
+                ret.ranks[ix] = Rank::At(count_gte as u8);
+            }
+        }
+        ret
     }
 }
 // !SECTION
@@ -911,3 +1002,33 @@ mod __impl {
     }
 }
 pub(crate) use __impl::{TryFromBaseTypeError, TryFromPrimIntError};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reproducibility test to evidence the inherent conflict between UAny32 and Uintset::any_default(Bits64),
+    /// which would ideally be the respective constraints for `Expr::SeqLength`` and `Format::Pos`
+    #[test]
+    fn different_default_uany_unification_ambiguous() {
+        use crate::numeric::core::BitWidth::*;
+        let seqlen_set = BaseSet::UAny32;
+        let pos_set = BaseSet::U(UintSet::any_default(Bits64));
+
+        // this is the constraint that would result from any (x := Pos), (y := SeqLength), Type(x) ~ Type(y) unification
+        let unified = BaseSet::unify(seqlen_set, pos_set).unwrap();
+        assert!(unified.get_unique_solution(UVar(0)).is_err())
+    }
+
+    /// Test for a prospective solution for the soution-set ambiguity posed by `different_default_uany_unification_ambiguous`
+    #[test]
+    fn different_default_uany_unambiguous_with_tiebreaker_preference() {
+        use crate::numeric::core::BitWidth::*;
+        let seqlen_set = BaseSet::UAny32;
+        let pos_set = BaseSet::U(UintSet::any_default(Bits64));
+
+        // this is the constraint that would result from any (x := Pos), (y := SeqLength), Type(x) ~ Type(y) unification
+        let unified = BaseSet::cherrypick(seqlen_set, pos_set, [Bits64, Bits32]).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
+    }
+}

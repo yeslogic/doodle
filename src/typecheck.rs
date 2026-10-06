@@ -2522,8 +2522,8 @@ impl TypeChecker {
             Expr::SeqLength(seq_expr) => {
                 let newvar = self.get_new_uvar();
 
-                //  we have extracted the BaseSet as a local const to make it more visible,
-                // so it is easier for us to change the constraints we apply to SeqLen later.
+                // we have extracted the BaseSet as a local const to make it more visible,
+                // so it is easier for us to change the constraints we apply to SeqLength later.
                 const SEQ_LEN_BASESET: BaseSet = BaseSet::UAny32;
 
                 self.unify_var_baseset(newvar, SEQ_LEN_BASESET)?;
@@ -4571,7 +4571,14 @@ mod tests {
         }
     }
 
-    /// `Format::RepeatBetween` bounds that are not constant are a `TCError`.
+    /// `Format::RepeatBetween` bounds that are not constant results in a `TCError`.
+    ///
+    /// This is not a formal design-choice, but rather a load-bearing hack that acts
+    /// as a consistent, universal pre-CG guard against non-constant bounds in RepeatBetween,
+    /// which would otherwise fail with a panic downstream.
+    ///
+    /// Technically speaking, checking the constancy of the bounds of RepeeatBetween is outside of
+    /// the remit of typechecking, since it is a value-level constraint.
     #[test]
     fn test_repeat_between_non_constant_bounds() {
         use crate::helper::var;
