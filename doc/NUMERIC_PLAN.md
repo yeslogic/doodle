@@ -27,7 +27,7 @@ Terminology:
 | 2 | Signed operands to `IntRel` | Registration is right. TC widens `IntRel` operands from `UAny` to `IntSet::ZAny`; the two operands must still unify, so mixed-sign comparisons stay rejected. |
 | 3 | `AsChar` | TC is right (`UAny`). Registration must reject `Signed`; the idiom for a signed value is `AsChar(AsU32(x))`. `AsChar` deliberately differs from `AsU8`–`AsU64`, which use `ZAny`. |
 | 4 | Signed lengths, offsets and `EnumFromTo` bounds (`CaptureBytes`, `ReadArray` length, `Offset`, `EnumFromTo`) | TC is right. Registration must reject `Signed`. Signed ranges are left as possible future work. |
-| 5 | `SeqIx` / `SubSeq` / `SubSeqInflate` / `Dup` | **No change for now.** Deferred to the `seqlen-always-u32` project. TC is only looser than registration here, so nothing both accept fails downstream. |
+| 5 | `SeqIx` / `SubSeq` / `SubSeqInflate` / `Dup` | **No change for now.** Deferred to the `seqlen-always-u32` project. TC is only looser than registration here, so nothing both accept fails downstream. **Resolved by that project** (`doc/SEQLEN_PLAN.md`): registration now uses the "unsigned or Auto" rule at these sites, and `SeqLength` is Auto. |
 | 6 | `FindByKey` key | Registration is right. TC adds a `UAny` constraint on the key. Also, `Value::eq_key` must return an `EvalError` instead of panicking on an out-of-range Numeric key (`-1auto` against `U8`). |
 | 7 | Auto as `RepeatCount` / `RepeatBetween` counts | Registration must accept Auto, matching `CaptureBytes`, `ReadArray` and `Offset`. Registration's rule everywhere becomes "signed no, Auto yes". |
 | 8.1 | Pattern type mismatches in registration | `build_scope` returns errors instead of panicking. |

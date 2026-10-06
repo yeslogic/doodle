@@ -1,6 +1,6 @@
 # Plan: the `seqlen-always-u32` project
 
-Status: decisions D1–D4 are confirmed by the user; the step breakdown is proposed. Implemented: steps 1–4.
+Status: decisions D1–D4 are confirmed by the user; the step breakdown is proposed. All steps (1–5) are implemented.
 
 Follows `doc/NUMERIC_PLAN.md`, which deferred this work as its item 5, and its item 14 (`Format::Pos` evaluates to an Auto Numeric), whose approach this project reuses.
 
@@ -57,7 +57,7 @@ With `SeqLength` as Auto:
 2. **(Done.) Registration.** `SeqLength` → `NumericHole`; `SeqIx`, `SubSeq`, `SubSeqInflate` and `Dup` use `is_unsigned_or_auto` for their index/start/length/count arguments; remove `ValueType::SEQ_LEN_T`. Mirror in `src/alt.rs`.
 3. **(Done.) Interpreter.** `SeqLength` evaluates to an Auto Numeric (a shared constructor, like `Value::from_pos`), in both interpreters via `eval_generic`.
 4. **(Done.) Codegen.** Give `TypedExpr::SeqLength` its resolved type and emit `len() as <T>`; lower `Dup` per D3. Compile-check generated code for a non-`U32` `SeqLength` and `Dup` count, as was done for signed `IntRel`.
-5. **Cleanup.** Remove the `deflate` `as_u32` workarounds (D4) and regenerate `gencode.rs`; update the "not `U32` may fail" notes on `index_unchecked`/`index_checked` and the `seq_length` doc in `helper.rs`; resolve item 5 in `doc/NUMERIC_PLAN.md`; extend the numeric survey and update `doc/NUMERIC.md` and `NUMERIC_GUIDELINE.md`.
+5. **(Done.) Cleanup.** Remove the `deflate` `as_u32` workarounds (D4) and regenerate `gencode.rs`; update the "not `U32` may fail" notes on `index_unchecked`/`index_checked` and the `seq_length` doc in `helper.rs`; resolve item 5 in `doc/NUMERIC_PLAN.md`; extend the numeric survey and update `doc/NUMERIC.md` and `NUMERIC_GUIDELINE.md`.
 
 ## Open questions
 
@@ -86,4 +86,10 @@ With `SeqLength` as Auto:
   - The `as u32` in `dup_n((x as u32) as usize, ..)` comes from the format definitions, not codegen; `u8 → u32 → usize` is two lossless widenings, not a round trip.
     - In `deflate` (6 sites) the cast is applied after a `u8` addition (`(extra + 3u8) as u32`), so it guards nothing and only satisfied registration's old exact-`U32` rule; D4 removes it.
     - In `opentype`'s `glyf` flags (1 site) the cast precedes the addition (`(repeats as u32) + 1u32`, with `repeats: u8`), so it is a real widening that prevents `255 + 1` overflowing `u8`. It stays.
+- **Step 5.**
+  - `deflate`: the six `dup(as_u32(add(extra, U8(n))), ..)` casts (two tagged `FIXME[epic=dup32]`) are removed; `gencode.rs` now emits `dup_n((extra + 3u8) as usize, ..)`. No decode snapshot changed. The remaining `as_u32(add(hlit, hdist)) + U32(258)` in `deflate` is a real widening (258 doesn't fit `u8`) and stays, as does `glyf`'s.
+  - `helper.rs`: `seq_length`'s doc describes the Auto typing; the "not `U32` may fail" notes on `index_unchecked`/`index_checked` are replaced, and `index_unchecked`'s stale "runtime panic" note now says out-of-bounds is an evaluation error.
+  - `doc/NUMERIC_PLAN.md` item 5 is marked resolved; `doc/NUMERIC.md` and `NUMERIC_GUIDELINE.md` describe the new typing, evaluation and codegen of these exprs.
+  - Survey: three `SeqLength` standalone cases (`== U8(8)`, `+ U64(1)`, `SeqIx(seq, IntPred(SeqLength(seq)))`), all accepted by every layer. 289 cases, 43 inconsistent, no panics, no "codegen looser" rows; the remainder is the `doc/NUMERIC_PLAN.md` item 9 class and value-dependent errors.
+  - Q1 (other `U32` assumptions downstream of `SeqLength`): none surfaced in the test suite, decode snapshots, `generated` crate build or survey. `generated/api_helper/` and `output/tree.rs` were not read.
 
