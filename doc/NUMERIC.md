@@ -98,7 +98,6 @@ type-solver, whereas `TypeChecker` does full bidirectional type-checking that ca
 
 `ValueType::is_unsigned_or_auto()` accepts a native unsigned type or `NumericHole`, rejecting `Signed`. It is the argument check for native `Arith`, `IntSucc`/`IntPred`, `AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes` and `ViewFormat::ReadArray` (lengths), `RepeatCount`, `RepeatBetween`, and the `Slice` length and `WithRelativeOffset` base and offset. Where two operands are involved, they are unified first, so a signed operand cannot hide behind an Auto one. Signed arithmetic belongs in `NumExpr`, and the idiom for converting a signed value to a char is `AsChar(AsU32(x))`.
 
-
 The 'key' field of `FindByKey` mandates `ValueType::Base(b)` guarded by `b.is_numeric()` (i.e. it rejects `Signed`).[^1]
 
 [^1]: `FindByKey` is a special-case in that it combines (via ValueType unifcation) two
