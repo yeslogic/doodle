@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::num::NonZeroU32;
 
 use super::*;
 use crate::BaseType;
@@ -339,10 +340,90 @@ mod __impl_rank {
     }
 }
 
+/// Creation-order of a cast-hint, derived from the `UVar` of the cast-site that issued it.
+///
+/// Lower stamps were issued earlier in the (deterministic) traversal of the `TypeChecker`, and take priority.
+///
+/// The `UVar` index is offset by one so that `Option<HintStamp>` can use the niche of `NonZeroU32`.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HintStamp(NonZeroU32);
+
+impl HintStamp {
+    pub fn from_cast_site(v: UVar) -> Self {
+        let raw = u32::try_from(v.0 + 1).expect("UVar index exceeds u32 range");
+        // `+ 1` is never zero
+        HintStamp(NonZeroU32::new(raw).unwrap())
+    }
+
+    pub fn cast_site(self) -> UVar {
+        UVar(self.0.get() as usize - 1)
+    }
+}
+
+/// Tiebreak preferences recorded by `Expr::AsU8`..`AsU64` against their operand.
+///
+/// Holds, for each unsigned width (in `UintSet::IX_ORDER`, which is also the order of the
+/// unsigned prefix of `PRIM_INTS`), the earliest stamp of any cast to that width.
+///
+/// Consulted only after membership and `Rank`: among the members tied at the top rank,
+/// the one with the earliest hint wins. A hint can never select a member outside the top
+/// tier, so it never overrides a default such as `UAny32`'s.
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CastHints {
+    stamps: [Option<HintStamp>; 4],
+}
+
+impl CastHints {
+    pub const NONE: Self = Self { stamps: [None; 4] };
+
+    pub const fn is_empty(self) -> bool {
+        matches!(self.stamps, [None, None, None, None])
+    }
+
+    const fn width_index(width: BitWidth) -> usize {
+        match width {
+            BitWidth::Bits8 => 0,
+            BitWidth::Bits16 => 1,
+            BitWidth::Bits32 => 2,
+            BitWidth::Bits64 => 3,
+        }
+    }
+
+    pub fn single(width: BitWidth, stamp: HintStamp) -> Self {
+        let mut stamps = [None; 4];
+        stamps[Self::width_index(width)] = Some(stamp);
+        Self { stamps }
+    }
+
+    /// Union of two hint-sets, keeping the earliest stamp per width.
+    ///
+    /// Commutative and associative, so the result doesn't depend on which side of a
+    /// unification each hint arrived from, or which variable ends up canonical.
+    pub fn merge(self, other: Self) -> Self {
+        let stamps = std::array::from_fn(|ix| match (self.stamps[ix], other.stamps[ix]) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            // NOTE - not `Option::min`, under which `None` would win
+            (a, b) => a.or(b),
+        });
+        Self { stamps }
+    }
+
+    /// Among the indices in `0..4` for which `in_top_tier` holds, returns the one with the earliest stamp.
+    fn pick(self, in_top_tier: impl Fn(usize) -> bool) -> Option<usize> {
+        (0..4)
+            .filter(|&ix| in_top_tier(ix))
+            .filter_map(|ix| self.stamps[ix].map(|s| (s, ix)))
+            .min()
+            .map(|(_, ix)| ix)
+    }
+}
+
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UintSet {
     // Array with ranks for U8, U16, U32, U64 in that order
     pub(crate) ranks: [Rank; 4],
+    // Cast-hints used to tiebreak co-ranked members at the top rank
+    pub(crate) hints: CastHints,
 }
 
 // SECTION - UintSet global consts and constructors
@@ -356,17 +437,20 @@ impl UintSet {
     /// without any default tie-breaking if more than one assignment is possible.
     pub const ANY: Self = Self {
         ranks: [Rank::At(3); 4],
+        hints: CastHints::NONE,
     };
 
     /// UintSet with no members
     pub(crate) const EMPTY: Self = Self {
         ranks: [Rank::Excluded; 4],
+        hints: CastHints::NONE,
     };
 
     /// Set consisting only of  U8 and U16, with U8 as the default is neither
     /// is ruled out entirely.
     pub const SHORT8: Self = Self {
         ranks: [Rank::At(0), Rank::At(1), Rank::Excluded, Rank::Excluded],
+        hints: CastHints::NONE,
     };
 
     /// UintSet containing all unsigned integers, which defaults to `U32`
@@ -383,7 +467,10 @@ impl UintSet {
             BitWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(3)],
             BitWidth::Bits64 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(0)],
         };
-        UintSet { ranks }
+        UintSet {
+            ranks,
+            hints: CastHints::NONE,
+        }
     }
 
     /// Constructs a UintSet that only includes unsigned integers with at least the given `BitWidth`.
@@ -396,7 +483,10 @@ impl UintSet {
             BitWidth::Bits32 => [Rank::Excluded, Rank::Excluded, Rank::At(1), Rank::At(1)],
             BitWidth::Bits64 => [Rank::Excluded, Rank::Excluded, Rank::Excluded, Rank::At(0)],
         };
-        UintSet { ranks }
+        UintSet {
+            ranks,
+            hints: CastHints::NONE,
+        }
     }
 
     /// Converts a `UintSet` into the equivalent `PrimIntSet`, preserving the ranks
@@ -413,6 +503,7 @@ impl UintSet {
                 Rank::Excluded,
                 Rank::Excluded,
             ],
+            hints: self.hints,
         }
     }
 }
@@ -473,7 +564,10 @@ impl UintSet {
             let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
             *rank = Rank::At(count_gte);
         }
-        Self { ranks }
+        Self {
+            ranks,
+            hints: self.hints,
+        }
     }
 
     /// Returns a `UintSet` whose solution-set is the intersection of `self` and `other`,
@@ -488,6 +582,7 @@ impl UintSet {
                 ret.ranks[ix] = hi;
             }
         }
+        ret.hints = this.hints.merge(other.hints);
         ret.normalize()
     }
 
@@ -511,8 +606,11 @@ impl UintSet {
     /// If multiple solutions exist, but there is one solution with a higher-priority
     /// rank than all others, that solution is returned.
     ///
+    /// Otherwise, if several solutions share the highest-priority rank, the one among them with
+    /// the earliest cast-hint (see [`CastHints`]) is returned.
+    ///
     /// If no solutions exist (i.e. the set is empty), or if there is more than one
-    /// solution ascribed with the highest-priority rank, then `None` is returned.
+    /// solution ascribed with the highest-priority rank and none of them is hinted, then `None` is returned.
     // TODO - Two sets with different defaults (e.g. `UAny32` for `SeqLength` and
     // `any_default(Bits64)` for `Format::Pos`) intersect to a top tier holding both defaults,
     // which is ambiguous here (see NUMERIC_GUIDELINE.md). A possible narrow fix, applied here at
@@ -550,12 +648,14 @@ impl UintSet {
                 },
             }
         }
-        if let Some(ix) = candidate
-            && is_unique
-        {
-            Some(Self::IX_ORDER[ix])
-        } else {
-            None
+        match candidate {
+            Some(ix) if is_unique => Some(Self::IX_ORDER[ix]),
+            // tiebreak among the co-ranked top tier according to cast-hints, if any
+            Some(_) => this
+                .hints
+                .pick(|ix| this.ranks[ix] == max_rank)
+                .map(|ix| Self::IX_ORDER[ix]),
+            None => None,
         }
     }
 
@@ -580,6 +680,7 @@ impl UintSet {
         });
         // Same scheme as `normalize`: rank-value is the number of other members of equal or greater priority
         let mut ret = Self::EMPTY;
+        ret.hints = this.hints;
         for (ix, key) in keys.iter().enumerate() {
             if let Some(k) = key {
                 let count_gte = keys.iter().flatten().filter(|k1| *k1 <= k).count() - 1;
@@ -595,6 +696,8 @@ impl UintSet {
 pub struct PrimIntSet {
     // Array with ranks for PrimInt in the same order as PRIM_INTS
     pub(crate) ranks: [Rank; PRIM_INTS.len()],
+    // Cast-hints used to tiebreak co-ranked members at the top rank (unsigned members only)
+    pub(crate) hints: CastHints,
 }
 
 macro_rules! rank8 {
@@ -631,18 +734,22 @@ impl PrimIntSet {
     pub const ANY: Self = Self {
         // ranks are chosen to be identity under intersection
         ranks: [Rank::At(7); 8],
+        hints: CastHints::NONE,
     };
 
     pub const ANY_UNSIGNED: Self = Self {
         ranks: rank8!(+ : 7, 7, 7, 7),
+        hints: CastHints::NONE,
     };
 
     pub const ANY_SIGNED: Self = Self {
         ranks: rank8!(- : 7, 7, 7, 7),
+        hints: CastHints::NONE,
     };
 
     pub const EMPTY: Self = Self {
         ranks: [Rank::Excluded; 8],
+        hints: CastHints::NONE,
     };
 }
 // !SECTION
@@ -693,7 +800,21 @@ impl PrimIntSet {
     /// The UintSet returned by this method will be normalized, and may be empty.
     pub fn to_uint_set(self) -> UintSet {
         let ranks: [Rank; 4] = self.ranks[0..4].try_into().unwrap();
-        UintSet { ranks }.normalize()
+        UintSet {
+            ranks,
+            hints: self.hints,
+        }
+        .normalize()
+    }
+
+    /// Returns a copy of `self` with an added cast-hint toward the unsigned type of the given `width`,
+    /// stamped with the `UVar` of the cast-site that issued it.
+    pub fn with_hint(self, width: BitWidth, cast_site: UVar) -> Self {
+        let hint = CastHints::single(width, HintStamp::from_cast_site(cast_site));
+        Self {
+            ranks: self.ranks,
+            hints: self.hints.merge(hint),
+        }
     }
 
     /// Given a `PrimIntSet` and a [`PrimInt`] `p`, returns the set-difference
@@ -723,7 +844,10 @@ impl PrimIntSet {
             let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
             *rank = Rank::At(count_gte);
         }
-        Self { ranks }
+        Self {
+            ranks,
+            hints: self.hints,
+        }
     }
 
     /// Returns a `PrimIntSet` whose solution-set is the intersection of `self` and `other`,
@@ -738,6 +862,7 @@ impl PrimIntSet {
                 ret.ranks[ix] = hi;
             }
         }
+        ret.hints = this.hints.merge(other.hints);
         ret.normalize()
     }
 
@@ -746,8 +871,11 @@ impl PrimIntSet {
     /// If multiple solutions exist, but there is one solution with a higher-priority
     /// rank than all others, that solution is returned.
     ///
+    /// Otherwise, if several solutions share the highest-priority rank, the one among them with
+    /// the earliest cast-hint (see [`CastHints`]) is returned.
+    ///
     /// If no solutions exist (i.e. the set is empty), or if there is more than one
-    /// solution ascribed with the highest-priority rank, then `None` is returned.
+    /// solution ascribed with the highest-priority rank and none of them is hinted, then `None` is returned.
     pub fn get_unique_solution(self) -> Option<PrimInt> {
         let this = self.normalize();
         let mut candidate = None;
@@ -769,12 +897,15 @@ impl PrimIntSet {
                 },
             }
         }
-        if let Some(ix) = candidate
-            && is_unique
-        {
-            Some(PRIM_INTS[ix])
-        } else {
-            None
+        match candidate {
+            Some(ix) if is_unique => Some(PRIM_INTS[ix]),
+            // tiebreak among the co-ranked top tier according to cast-hints, if any
+            // (only ever selects an unsigned member, as `CastHints` only covers those)
+            Some(_) => this
+                .hints
+                .pick(|ix| this.ranks[ix] == max_rank)
+                .map(|ix| PRIM_INTS[ix]),
+            None => None,
         }
     }
 }
@@ -892,11 +1023,33 @@ mod __impl {
         }
     }
 
+    impl std::fmt::Debug for HintStamp {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "@{:?}", self.cast_site())
+        }
+    }
+
+    impl std::fmt::Debug for CastHints {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let labels = ["U8", "U16", "U32", "U64"];
+            let mut dbg = f.debug_map();
+            for (ix, stamp) in self.stamps.iter().enumerate() {
+                if let Some(stamp) = stamp {
+                    dbg.entry(&labels[ix], stamp);
+                }
+            }
+            dbg.finish()
+        }
+    }
+
     impl std::fmt::Debug for UintSet {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("RankedUintSet")
-                .field("ranks", &self.ranks)
-                .finish()
+            let mut dbg = f.debug_struct("RankedUintSet");
+            dbg.field("ranks", &self.ranks);
+            if !self.hints.is_empty() {
+                dbg.field("hints", &self.hints);
+            }
+            dbg.finish()
         }
     }
 
@@ -946,6 +1099,9 @@ mod __impl {
                     continue;
                 }
                 dbg.field(p.to_static_str(), &self.ranks[ix]);
+            }
+            if !self.hints.is_empty() {
+                dbg.field("hints", &self.hints);
             }
             dbg.finish()
         }
@@ -1075,6 +1231,65 @@ mod tests {
         assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
         let unified = at_least16.cherrypick(any, [Bits64, Bits32]).unwrap();
         assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U64);
+    }
+
+    fn hinted(width: BitWidth, cast_site: usize) -> BaseSet {
+        BaseSet::U(
+            PrimIntSet::ANY
+                .with_hint(width, UVar(cast_site))
+                .to_uint_set(),
+        )
+    }
+
+    /// A cast-hint breaks a tie that ranks leave open.
+    #[test]
+    fn cast_hint_breaks_tie() {
+        use crate::numeric::core::BitWidth::*;
+        let unified = BaseSet::UAny.unify(hinted(Bits32, 1)).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U32);
+    }
+
+    /// A cast-hint never overrides a rank-default, even toward another member of the set.
+    #[test]
+    fn cast_hint_does_not_override_default() {
+        use crate::numeric::core::BitWidth::*;
+        let unified = BaseSet::UAny32.unify(hinted(Bits8, 1)).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U32);
+    }
+
+    /// Among conflicting hints, the earliest stamp wins, regardless of unification order.
+    #[test]
+    fn cast_hint_earliest_wins() {
+        use crate::numeric::core::BitWidth::*;
+        let early = hinted(Bits16, 3);
+        let late = hinted(Bits64, 7);
+        for unified in [early.unify(late).unwrap(), late.unify(early).unwrap()] {
+            assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U16);
+        }
+    }
+
+    /// A hint toward a member outside the top tier is ignored, falling back to the next-earliest hint.
+    #[test]
+    fn cast_hint_outside_top_tier_ignored() {
+        use crate::numeric::core::BitWidth::*;
+        let hints = hinted(Bits8, 1).unify(hinted(Bits32, 2)).unwrap();
+        let unified = hints.unify(BaseSet::U(UintSet::at_least(Bits16))).unwrap();
+        assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U32);
+
+        // ...and with no hint left in the top tier, the tie stays ambiguous
+        let unified = hinted(Bits8, 1)
+            .unify(BaseSet::U(UintSet::at_least(Bits16)))
+            .unwrap();
+        assert!(unified.get_unique_solution(UVar(0)).is_err());
+    }
+
+    /// The `+ 1` offset of `HintStamp` round-trips, including for `UVar(0)`.
+    #[test]
+    fn hint_stamp_round_trips() {
+        for ix in [0, 1, 42] {
+            assert_eq!(HintStamp::from_cast_site(UVar(ix)).cast_site(), UVar(ix));
+        }
+        assert!(HintStamp::from_cast_site(UVar(0)) < HintStamp::from_cast_site(UVar(1)));
     }
 
     /// The cascade's tiebreak is baked into ranks that a later plain `unify` can override,
