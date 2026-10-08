@@ -1,12 +1,9 @@
 #![cfg(test)]
 
-use doodle::decoder::{
-    Compiler, Program, Value,
-    seq_kind::{SeqKind, ValueSeq},
-};
+use doodle::decoder::{Compiler, Value, seq_kind::SeqKind};
 use doodle::helper::*;
 use doodle::read::ReadCtxt;
-use doodle::{Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, FormatModule};
 use doodle_numexpr_macro::numexpr;
 
 #[test]
