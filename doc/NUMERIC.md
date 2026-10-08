@@ -160,6 +160,20 @@ The following `Expr` nodes are constrained with the broadest, Numeric-permissive
 - `_ := Expr::AsU64(X)`
 - `_ := Expr::IntRel(X, Y)` (the types of X and Y are also required to unify, so mixed-sign comparisons are rejected) [^2]
 
+For the `AsU8`–`AsU64` casts, the constraint on `X` also carries a cast-hint toward the cast's own width (see below).
+
+### Cast-hints
+
+`UintSet` and `PrimIntSet` carry, alongside their per-member `Rank`s, a set of `CastHints`: for each unsigned width,
+the earliest stamp of any `AsU8`–`AsU64` cast to that width whose operand was unified into the set. A stamp is the `UVar`
+of the issuing cast (offset by one, as a `NonZeroU32`), so earlier means earlier in the `TypeChecker`'s traversal.
+Hints merge under intersection (keeping the earliest stamp per width) and are dropped once a set collapses to a single type.
+
+`get_unique_solution` resolves a set by membership, then `Rank`, then hints: only when several members tie at the
+top rank does the earliest-hinted one among them win. A hint therefore never overrides a rank-default (e.g. `AsU8` over a
+`UAny32` value still resolves to `U32`), and a top-rank tie with no hinted member remains a "no unique solution" error.
+In effect, `AsU32(x)` over an otherwise-ambiguous `x` makes the cast a no-op.
+
 ### Dynamic
 
 The scrutinee for a pattern-match against the following patterns are constrained according to the following rules:

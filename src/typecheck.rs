@@ -2481,25 +2481,33 @@ impl TypeChecker {
             Expr::AsU8(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
+                // hint toward U8 to break any otherwise-unresolved tie, making the cast a no-op
+                let xset = PrimIntSet::ANY.with_hint(BitWidth::Bits8, newvar);
+                let _cx = self.unify_var_intset(xvar, IntSet::Z(xset))?;
                 newvar
             }
             Expr::AsU16(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
+                // hint toward U16 to break any otherwise-unresolved tie, making the cast a no-op
+                let xset = PrimIntSet::ANY.with_hint(BitWidth::Bits16, newvar);
+                let _cx = self.unify_var_intset(xvar, IntSet::Z(xset))?;
                 newvar
             }
             Expr::AsU32(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
+                // hint toward U32 to break any otherwise-unresolved tie, making the cast a no-op
+                let xset = PrimIntSet::ANY.with_hint(BitWidth::Bits32, newvar);
+                let _cx = self.unify_var_intset(xvar, IntSet::Z(xset))?;
                 newvar
             }
             Expr::AsU64(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
+                // hint toward U64 to break any otherwise-unresolved tie, making the cast a no-op
+                let xset = PrimIntSet::ANY.with_hint(BitWidth::Bits64, newvar);
+                let _cx = self.unify_var_intset(xvar, IntSet::Z(xset))?;
                 newvar
             }
             Expr::AsChar(x) => {
@@ -4788,7 +4796,6 @@ mod tests {
     ///
     /// E.g. `AsU32(SeqLength([]))` should unify without any ambiguity.
     #[test]
-    #[ignore = "Currently fails due to under-implemented Void-construction criterion"]
     fn expr_as_cast_over_uany_forces_type() -> TCResult<()> {
         use crate::helper::{as_u32, chain, compute, seq_empty, seq_length, var};
         let f = chain(
