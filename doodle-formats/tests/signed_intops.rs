@@ -5,10 +5,7 @@ use doodle::read::ReadCtxt;
 use doodle::{Expr, Format, FormatModule};
 use doodle::{
     codegen::{ToFragment, generate_code},
-    decoder::{
-        Compiler, Value,
-        seq_kind::{SeqKind, ValueSeq},
-    },
+    decoder::{Compiler, Value},
 };
 use doodle_numexpr_macro::numexpr;
 
