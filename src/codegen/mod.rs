@@ -5846,6 +5846,12 @@ impl<'a> Elaborator<'a> {
             // clean-up
             self.codegen.name_gen.ctxt.escape();
 
+            // Mirrors `TypeChecker::infer_module`'s recording of `level_vars` for levels unreachable from
+            // `top_format`, so that later `ItemVar` references to `next_level` hit the cache in both layers alike.
+            if self.t_formats.get(&next_level).is_none() {
+                self.t_formats
+                    .insert(next_level, Rc::new(local_root.clone()));
+            }
             extra.push(local_root);
             let all_seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();
             for just_seen in all_seen_levels.difference(&seen_levels) {
@@ -6452,6 +6458,30 @@ mod tests {
     fn phantom_rec_full_pipeline_repro() {
         let (module, f) = make_phantom_rec_module();
         let output = produce_string_gencode(&module, &f);
+        assert!(!output.is_empty());
+    }
+
+    /// Lockstep regression test for levels unreachable from the top-level format, where one such level is
+    /// referenced (via `ItemVar`) by a later one.
+    ///
+    /// `TypeChecker::infer_module` and `Elaborator::elaborate_module` must agree on whether that reference re-walks
+    /// the earlier level's body (allocating `UVar`s / incrementing `next_index`) or hits their level-keyed caches;
+    /// if only one side records the earlier level, every subsequent index is offset and elaboration reads the wrong
+    /// types.
+    #[test]
+    fn unreached_level_referenced_by_later_unreached_level() {
+        use crate::helper::tuple;
+        let mut module = FormatModule::new();
+        let inner = module.define_format(
+            "test.inner",
+            tuple([Format::ANY_BYTE, Format::Compute(Box::new(Expr::U32(1)))]),
+        );
+        let _outer = module.define_format(
+            "test.outer",
+            tuple([inner.call(), Format::Compute(Box::new(Expr::U64(2)))]),
+        );
+        let top = module.define_format("test.top", Format::ANY_BYTE);
+        let output = produce_string_gencode(&module, &top.call());
         assert!(!output.is_empty());
     }
 

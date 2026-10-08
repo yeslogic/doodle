@@ -3892,7 +3892,15 @@ impl TypeChecker {
             let Some(next_level) = unexplored.pop_first() else {
                 break;
             };
-            let _ = this.infer_var_format(module.get_format(next_level), ctxt)?;
+            let var = this.infer_var_format(module.get_format(next_level), ctxt)?;
+            // Record `next_level` (unreachable from `top_format`) as if it had been reached via `ItemVar`, so that
+            // later references to it hit the cache in `infer_var_format_level` rather than re-inferring its body, and
+            // so that `lookup_level_var` can find it. An entry may already exist if the body is self-referential
+            // (via `Phantom`), in which case it is kept.
+            //
+            // NOTE - `Elaborator::elaborate_module` must record `t_formats` identically, or `UVar` allocation and
+            // `Elaborator::next_index` will desynchronize.
+            this.level_vars.entry(next_level).or_insert(var);
             let all_seen_levels = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
             for just_seen in all_seen_levels.difference(&seen_levels) {
                 unexplored.remove(just_seen);
@@ -3925,11 +3933,7 @@ impl TypeChecker {
     }
 
     pub fn lookup_level_var(&self, level: usize) -> Option<UVar> {
-        if level == 0 {
-            Some(UVar(0))
-        } else {
-            Some(*self.level_vars.get(&level)?)
-        }
+        self.level_vars.get(&level).copied()
     }
 
     /// Attempt to fully solve a `UType` until all free meta-variables are replaced with concrete type-assignments
@@ -4923,16 +4927,10 @@ mod tests {
             .expect("unable to reify fail-union");
 
         match reified_fail {
-            AugValueType::Union(map) => match map.len() {
-                0 => (),
-                1 | 2 | 3 => {
-                    eprintln!(
-                        "inexhaustive judgment logic for empty-variant analysis over always-fail union"
-                    );
-                    eprintln!("{map:?}")
-                }
-                4.. => unreachable!(),
-            },
+            AugValueType::Union(map) => assert!(
+                map.is_empty(),
+                "inexhaustive judgment logic for empty-variant analysis over always-fail union: {map:?}"
+            ),
             other => panic!("unexpected fail-union reification {other:?}"),
         }
 
@@ -4955,6 +4953,29 @@ mod tests {
             },
             other => panic!("unexpected wrapper-adt reification {other:?}"),
         }
+    }
+
+    /// Regression test: `lookup_level_var` used to hard-code level 0 to `UVar(0)`, which is wrong whenever the
+    /// top-level format passed to `infer_module` is not itself the level-0 format.
+    #[test]
+    fn lookup_level_var_level_zero_not_top() -> TCResult<()> {
+        let mut module = FormatModule::new();
+        let first = module.define_format("test.first", Format::Fail);
+        let second = module.define_format("test.second", Format::ANY_BYTE);
+        let tc = TypeChecker::infer_module(&module, &second.call())?;
+
+        let first_var = tc.lookup_level_var(first.0).expect("missing level 0");
+        let second_var = tc.lookup_level_var(second.0).expect("missing level 1");
+        assert_ne!(
+            tc.get_canonical_uvar(first_var),
+            tc.get_canonical_uvar(second_var)
+        );
+        assert!(matches!(tc.expand_var(first_var), Expansion::Empty));
+        assert!(matches!(
+            tc.expand_var(second_var),
+            Expansion::Base(BaseType::U8)
+        ));
+        Ok(())
     }
 
     #[test]
