@@ -129,6 +129,10 @@ impl From<BaseNumType> for ValueType {
 /// In particular, when two sequences are unified, the lesser-valued of the two hints is retained
 /// for the type-outcome. Therefore, if a new hint is added, it should be defined after all hints that
 /// supercede it but before any hints that it itself supercedes.
+// TODO - refactor into a richer type of format-dictated sequence-properties, which (among other things) records
+// whether the producing format can yield `[]` (e.g. `Repeat`, `RepeatUntil*`) or must yield at least one element
+// (e.g. a fixed `seq([...])`, `Repeat1`). `TypeChecker::is_empty_var` currently treats every `Seq(Empty)` as void,
+// which is wrong for `Repeat(Fail)` (which yields `[]` without failing) and would allow it to prune live variants.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Serialize)]
 pub enum SeqBorrowHint {
     #[default]
