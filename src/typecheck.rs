@@ -2524,8 +2524,14 @@ impl TypeChecker {
 
                 // we have extracted the BaseSet as a local const to make it more visible,
                 // so it is easier for us to change the constraints we apply to SeqLength later.
-                const SEQ_LEN_BASESET: BaseSet = BaseSet::UAny32;
-
+                const SEQ_LEN_BASESET: BaseSet = cfg_select! {
+                    feature = "tc_seq_length_polymorphic" => {
+                        BaseSet::UAny
+                    },
+                    _ => {
+                        BaseSet::UAny32
+                    }
+                };
                 self.unify_var_baseset(newvar, SEQ_LEN_BASESET)?;
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
                 let elem_var = self.get_new_uvar();
@@ -2551,6 +2557,7 @@ impl TypeChecker {
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
 
+                // start_t and len_t must both be unsigned integers, but are not currently required to unify with each other
                 self.unify_utype_baseset(start_t, BaseSet::UAny32)?;
                 self.unify_utype_baseset(len_t, BaseSet::UAny32)?;
 
@@ -2568,6 +2575,7 @@ impl TypeChecker {
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
 
+                // start_t and len_t must both be unsigned integers, but are not currently required to unify with each other
                 self.unify_utype_baseset(start_t, BaseSet::UAny32)?;
                 self.unify_utype_baseset(len_t, BaseSet::UAny32)?;
 
@@ -2606,7 +2614,14 @@ impl TypeChecker {
                 newvar
             }
             Expr::FlatMapAccum(f_expr, acc_expr, acc_vt, seq_expr) => {
-                // NOTE - ((acc, x) -> (acc, [y])) -> acc -> Vt(acc) -> [x] -> [y]
+                /*
+                    FlatMapAccum
+                    :: ((acc, x) -> (acc, [y]))     (f_expr)
+                    -> acc                          (acc_expr)
+                    -> Vt(acc)                      (acc_vt)
+                    -> [x]                          (seq_expr)
+                    -> [y]                          ($ys_var)
+                */
                 let ys_var = self.get_new_uvar();
 
                 let (acc_x_var, acc_ys_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
@@ -2631,7 +2646,14 @@ impl TypeChecker {
                 ys_var
             }
             Expr::LeftFold(f_expr, acc_expr, acc_vt, seq_expr) => {
-                // NOTE - ((acc, x) -> acc) -> acc -> Vt(acc) -> [x] -> acc
+                /*
+                    LeftFold
+                    :: ((acc, x) -> acc)            (f_expr)
+                    -> acc                          (acc_expr)
+                    -> Vt(acc)                      (acc_vt)
+                    -> [x]                          (seq_expr)
+                    -> acc                          ($newvar)
+                */
                 let newvar = self.get_new_uvar();
 
                 let (acc_x_var, ret_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
@@ -2682,7 +2704,7 @@ impl TypeChecker {
                 self.unify_var_valuetype(y_var, ret_type.as_ref())?;
                 self.unify_var_pair(ys_var, tail_var)?;
 
-                // constrain the shape to be exactly the tuple we expect
+                // constrain the shape of the lambda head-var type (`init_x_var` from `f_expr`) to match the expected tuple-shape `([y], x)`
                 self.unify_var_utype(
                     init_x_var,
                     Rc::new(UType::Tuple(vec![ys_var.into(), x_var.into()])),
@@ -4001,6 +4023,7 @@ impl TypeChecker {
         for (label, ut) in vm.iter() {
             let variant_type = self.reify_rec(ut.clone(), visiting)?;
             // NOTE - only add a variant to the union-type if its inner type is inhabitable
+            // FIXME - check for inhabitability doesn't handle every Void-construction case properly
             if !matches!(variant_type, AugValueType::Empty) {
                 branches.insert(label.clone(), variant_type);
             }
@@ -4030,6 +4053,18 @@ impl WHNFSolution {
             _ => panic!("non-whnf utype encountered during coercion: {ty:?}"),
         }
     }
+
+    /// Co-recursive dual to [`Expansion::instantiates_void`], which bypasses laziness and performs DFS
+    /// to determine whether `self` contains an unconditional `Expansion::Empty` upon expansion.
+    pub(crate) fn instantiates_void(&self, tc: &TypeChecker) -> bool {
+        match self {
+            Self::Var(var) => {
+                let exp = tc.expand_var(*var);
+                exp.instantiates_void(tc)
+            }
+            Self::Base(..) | Self::Int(..) => false,
+        }
+    }
 }
 
 /// Output type for step-by-step expansion.
@@ -4047,6 +4082,28 @@ pub(crate) enum Expansion {
     Tuple(Vec<WHNFSolution>),
     ViewObj,
     PhantomData(WHNFSolution),
+}
+
+impl Expansion {
+    /// Given a fully-resolved [`TypeChecker`] returns `true` if and only if
+    /// a value whose type-expansion is `self` would have to contain a value
+    /// whose type-expansion is `Expansion::Empty`.
+    ///
+    /// A more rigorous heuristic than the one used by `TypeChecker::is_empty_var`.
+    pub(crate) fn instantiates_void(&self, tc: &TypeChecker) -> bool {
+        match self {
+            Self::Empty => true,
+            Self::Record(fields) => fields.iter().any(|(_, w)| w.instantiates_void(tc)),
+            Self::Tuple(elems) => elems.iter().any(|w| w.instantiates_void(tc)),
+            Self::Seq(w, _) => w.instantiates_void(tc),
+            Self::Union(map) => map.iter().all(|(_, w)| w.instantiates_void(tc)),
+            Self::Base(..)
+            | Self::Int(..)
+            | Self::ViewObj
+            | Self::PhantomData(..)
+            | Self::Option(..) => false,
+        }
+    }
 }
 
 // SECTION - specialized methods for elaboration and codegen purposes
@@ -4145,12 +4202,17 @@ impl TypeChecker {
         }
     }
 
-    fn is_empty_var(&self, var: WHNFSolution) -> bool {
-        let WHNFSolution::Var(var) = var else {
-            return false;
-        };
-        let var = self.get_canonical_uvar(var);
-        matches!(&self.constraints[var.0], Constraints::Invariant(con) if matches!(con, Constraint::Equiv(ut) if matches!(**ut, UType::Empty)))
+    /// Internal check to selectively prune dead-ended named-variants from an algebraic type-expansion.
+    ///
+    /// Given the [`WHNFSolution`] tied to the 'inner type' of a constructor-keyed entry in a VarMap,
+    /// returns `true` when `var := WHNFSolution(var0)` and `?var0 ~ UType::Empty`.
+    ///
+    /// This is the case for any linear-type whose instantiation would unconditionally require `Format::Fail` to return
+    /// a value.
+    ///
+    /// Currently, this test is exhaustive, but potentially expensive for deeply-nested types.
+    fn is_empty_var(&self, whnf: WHNFSolution) -> bool {
+        whnf.instantiates_void(self)
     }
 
     fn expand_union(&self, vmid: VMId) -> Expansion {
@@ -4568,6 +4630,172 @@ mod tests {
                 ),
                 "unexpected error: {e}"
             ),
+        }
+    }
+
+    /// Speculative test for a preferred behavior we don't know whether the TC engine currently exhibits.
+    ///
+    /// The idea is that, failing any context-hints about what type an `Auto`-rep numeric or `BaseSet::UAny` constrained variable should have,
+    /// an `Expr::AsU32` cast (or similar for other integer widths) should force the type which makes the cast a no-op.
+    ///
+    /// E.g. `AsU32(SeqLength([]))` should unify without any ambiguity.
+    #[test]
+    #[ignore = "Currently fails due to under-implemented Void-construction criterion"]
+    fn expr_as_cast_over_uany_forces_type() -> TCResult<()> {
+        use crate::helper::{as_u32, chain, compute, seq_empty, seq_length, var};
+        let f = chain(
+            // NOTE - SeqLength is currently UAny32, so this test isn't checking what it is meant to;
+            // changing it to be UAny exposes the behavior this test is designed to check, but because
+            // the underlying special-case isn't yet implemented, this test doesn't yet pass
+            compute(seq_length(seq_empty())),
+            "len",
+            compute(as_u32(var("len"))),
+        );
+        let module = FormatModule::new();
+        let uscope = UScope::new();
+        let ctxt = Ctxt::new(&module, &uscope);
+        let mut tc = TypeChecker::new();
+        let f_var = tc.infer_var_format(&f, ctxt)?;
+        tc.check_unique_solutions()?;
+        match tc.expand_var(f_var) {
+            Expansion::Base(BaseType::U32) => Ok(()),
+            other => unreachable!("unexpected expansion {other:?}"),
+        }
+    }
+
+    mod is_empty {
+        use super::*;
+        // assertion helper for testing `is_empty_var` in concert with `edge_case_is_empty_var_false_negative_on_union`
+        fn assert_is_empty(f: Format) -> TCResult<()> {
+            let mut module = FormatModule::new();
+
+            // capture `f` as a string before ownership is moved into `module`
+            let _f = format!("{f:?}");
+
+            let fref = module.define_format("f", f);
+            let tc = TypeChecker::infer_module(&module, &fref.call())?;
+
+            let Some(var) = tc.lookup_level_var(fref.0) else {
+                panic!("missing level for `f` ({})", fref.0)
+            };
+            let whnf = WHNFSolution::Var(var);
+            assert!(
+                tc.is_empty_var(whnf),
+                "metavariable bound to assumptive void-constructing format `{_f}` judged non-empty: {whnf:?}"
+            );
+            Ok(())
+        }
+
+        #[test]
+        fn bare_fail_is_empty() -> TCResult<()> {
+            let f = Format::Fail;
+            assert_is_empty(f)
+        }
+
+        #[test]
+        fn one_tuple_around_fail_is_empty() -> TCResult<()> {
+            let f = crate::helper::tuple([Format::Fail]);
+            assert_is_empty(f)
+        }
+
+        #[test]
+        fn seq_around_fail_is_empty() -> TCResult<()> {
+            let f = crate::helper::seq([Format::Fail]);
+            assert_is_empty(f)
+        }
+
+        #[test]
+        fn record_around_fail_is_empty() -> TCResult<()> {
+            let f = crate::helper::record([("fail", Format::Fail)]);
+            assert_is_empty(f)
+        }
+
+        #[test]
+        fn union_over_fail_is_empty() -> TCResult<()> {
+            use crate::helper::{alts_nondet, seq, tuple};
+            let f = alts_nondet([
+                ("every", Format::Fail),
+                ("branch", tuple([Format::Fail])),
+                ("fails", seq([Format::Fail])),
+            ]);
+            assert_is_empty(f)
+        }
+    }
+
+    /// Reproducibility test for an edge-case in `TypeChecker::is_empty_var` where ADT-bound variables
+    /// will never report they are empty, even when every branch in the union has an unskippable Fail
+    #[test]
+    fn edge_case_is_empty_var_false_negative_on_union() -> TCResult<()> {
+        use crate::helper::{alts_nondet, seq, tuple};
+
+        // Step 0: build an unconditionally-failing union to see how Expansion handles it
+        let fail_union = alts_nondet([
+            ("every", Format::Fail),
+            ("branch", tuple([Format::Fail])),
+            ("fails", seq([Format::Fail])),
+        ]);
+        let mut tc = TypeChecker::new();
+        let module = FormatModule::new();
+        let uscope = UScope::new();
+        let ctxt = Ctxt::new(&module, &uscope);
+        let fail_var = tc.infer_var_format(&fail_union, ctxt)?;
+        let exp = tc.expand_var(fail_var);
+        eprintln!("{exp:?}");
+        std::mem::drop(tc);
+
+        // Step 1: build a module to include fail-union and a union that constructs a variant around a `.call()` to it, and see what happens there.
+        let mut module = FormatModule::new();
+        let fail_level = module.define_format("test.fail-union", fail_union);
+        let wrapper_adt_level = module.define_format(
+            "test.wrapper-adt",
+            alts_nondet([("Void", fail_level.call()), ("Singleton", Format::ANY_BYTE)]),
+        );
+        let tc = TypeChecker::infer_module(&module, &wrapper_adt_level.call())?;
+
+        // metavariable bound to the level for fail_union
+        let Some(fail_var) = tc.lookup_level_var(fail_level.0) else {
+            panic!("missing level for fail-union")
+        };
+        let Some(wrapper_var) = tc.lookup_level_var(wrapper_adt_level.0) else {
+            panic!("missing level for wrapper-adt")
+        };
+
+        let reified_fail = tc
+            .reify(Rc::new(fail_var.into()))
+            .expect("unable to reify fail-union");
+
+        match reified_fail {
+            AugValueType::Union(map) => match map.len() {
+                0 => (),
+                1 | 2 | 3 => {
+                    eprintln!(
+                        "inexhaustive judgment logic for empty-variant analysis over always-fail union"
+                    );
+                    eprintln!("{map:?}")
+                }
+                4.. => unreachable!(),
+            },
+            other => panic!("unexpected fail-union reification {other:?}"),
+        }
+
+        let reified_adt = tc
+            .reify(Rc::new(wrapper_var.into()))
+            .expect("unable to reify wrapper-adt");
+
+        match reified_adt {
+            AugValueType::Union(map) => match map.len() {
+                0 => unreachable!("empty union found, expecting at least one member"),
+                1 => {
+                    eprintln!("{map:?}");
+                    return Ok(());
+                }
+                2 => {
+                    eprintln!("{map:?}");
+                    panic!("variant `Void` should be pruned due to vacuity, but it was left in")
+                }
+                _ => unreachable!(),
+            },
+            other => panic!("unexpected wrapper-adt reification {other:?}"),
         }
     }
 
