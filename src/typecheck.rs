@@ -1,4 +1,5 @@
 use std::{
+    cell::{Cell, OnceCell},
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     rc::Rc,
 };
@@ -721,6 +722,12 @@ pub struct TypeChecker {
     varmaps: VarMapMap,
     /// Association between ItemVar/FormatRef levels in the FormatModule and the UVar they are mapped to
     level_vars: HashMap<usize, UVar>,
+    /// Memoized void-judgements (see [`TypeChecker::is_empty_var`]), indexed by canonical `UVar`.
+    ///
+    /// Initialized on the first void-query, which (like every other `expand_*`/`reify*` call) is only made after
+    /// inference over the full module has completed. No upkeep is performed by the `infer_*`/`unify_*` methods,
+    /// so any mutation of the meta-context after the first query would leave this table stale.
+    void_table: OnceCell<Vec<Cell<VoidState>>>,
     // /// Scaffolding for compartmentalized external type inference in the arithmetic extension grammar
     // sub_extension: EmbeddedResolver,
 }
@@ -734,6 +741,7 @@ impl TypeChecker {
             aliases: Vec::new(),
             varmaps: VarMapMap::new(),
             level_vars: HashMap::new(),
+            void_table: OnceCell::new(),
             // sub_extension: EmbeddedResolver::new(),
         }
     }
@@ -4022,9 +4030,12 @@ impl TypeChecker {
         let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
             let variant_type = self.reify_rec(ut.clone(), visiting)?;
-            // NOTE - only add a variant to the union-type if its inner type is inhabitable
-            // FIXME - check for inhabitability doesn't handle every Void-construction case properly
-            if !matches!(variant_type, AugValueType::Empty) {
+            // NOTE - only add a variant to the union-type if its inner type is inhabitable, by the same judgement as `expand_union`
+            //
+            // `is_empty_var` panics (via `expand_var`) on Indefinite or ambiguous meta-variables, where `reify` would
+            // return `None`; it is only safe to call here because `reify_rec` has already succeeded on `ut`, and the
+            // void-judgement never visits anything that `reify_rec` did not.
+            if !self.is_empty_var(WHNFSolution::coerce(ut)) {
                 branches.insert(label.clone(), variant_type);
             }
         }
@@ -4054,17 +4065,25 @@ impl WHNFSolution {
         }
     }
 
-    /// Co-recursive dual to [`Expansion::instantiates_void`], which bypasses laziness and performs DFS
+    /// Co-recursive dual to [`Expansion::instantiates_void`], which bypasses laziness and performs (memoized) DFS
     /// to determine whether `self` contains an unconditional `Expansion::Empty` upon expansion.
     pub(crate) fn instantiates_void(&self, tc: &TypeChecker) -> bool {
         match self {
-            Self::Var(var) => {
-                let exp = tc.expand_var(*var);
-                exp.instantiates_void(tc)
-            }
+            Self::Var(var) => tc.var_instantiates_void(*var),
             Self::Base(..) | Self::Int(..) => false,
         }
     }
+}
+
+/// Per-`UVar` entry in the memo-table backing [`TypeChecker::is_empty_var`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum VoidState {
+    #[default]
+    Unvisited,
+    /// Judgement currently in progress further up the call-stack.
+    InProgress,
+    Void,
+    NonVoid,
 }
 
 /// Output type for step-by-step expansion.
@@ -4210,9 +4229,134 @@ impl TypeChecker {
     /// This is the case for any linear-type whose instantiation would unconditionally require `Format::Fail` to return
     /// a value.
     ///
-    /// Currently, this test is exhaustive, but potentially expensive for deeply-nested types.
+    /// Judgements are memoized per canonical `UVar` (see [`TypeChecker::var_instantiates_void`]), so each
+    /// meta-variable is expanded at most once across all queries.
     fn is_empty_var(&self, whnf: WHNFSolution) -> bool {
         whnf.instantiates_void(self)
+    }
+
+    /// Memoized void-judgement for a single meta-variable, backing [`WHNFSolution::instantiates_void`].
+    ///
+    /// The memo-table is initialized on first call; this is sound only because void-queries are made exclusively
+    /// after full-module inference, so the meta-context is frozen by then (see `void_table`).
+    ///
+    /// # Cycles
+    ///
+    /// A meta-variable reached again while its own judgement is in progress is optimistically judged non-void.
+    /// Because a variable can only become void by way of `UType::Empty` (i.e. `Format::Fail`), every assumption
+    /// of this kind can only under-report voidness, so this method never prunes a constructible variant, even
+    /// if results computed under such an assumption are memoized.
+    ///
+    /// On this branch, cycles only arise through `PhantomData` (which is never void anyway), so the judgement
+    /// is exact. Under true recursion, it is still sound but incomplete: a productive recursion whose only base
+    /// case is `Fail` (e.g. `V := Stop(Fail) | More(u8, V)`) is judged non-void.
+    /// [`TypeChecker::compute_void_table`] is exact in that case, and should be preferred if that matters.
+    fn var_instantiates_void(&self, var: UVar) -> bool {
+        let v = self.get_canonical_uvar(var);
+        let table = self
+            .void_table
+            .get_or_init(|| vec![Cell::new(VoidState::Unvisited); self.constraints.len()]);
+        debug_assert_eq!(
+            table.len(),
+            self.constraints.len(),
+            "void_table is stale: meta-context was modified after the first void-query"
+        );
+        let cell = &table[v.0];
+        match cell.get() {
+            VoidState::Void => return true,
+            VoidState::NonVoid | VoidState::InProgress => return false,
+            VoidState::Unvisited => cell.set(VoidState::InProgress),
+        }
+        let is_void = self.expand_var(v).instantiates_void(self);
+        cell.set(if is_void {
+            VoidState::Void
+        } else {
+            VoidState::NonVoid
+        });
+        is_void
+    }
+
+    /// Computes the exact void-judgement for every meta-variable in the (fully-inferred) meta-context at once,
+    /// as a greatest fixpoint over the whole constraint-graph, indexed by `UVar` (non-canonical entries mirror
+    /// their canonical representative).
+    ///
+    /// Agrees with [`TypeChecker::is_empty_var`] on acyclic constraint-graphs, but unlike it, is exact under
+    /// true (non-`PhantomData`) recursion, regardless of traversal order (see `var_instantiates_void`).
+    /// It is computed as the complement of the least fixpoint of inhabitation: every variable starts out
+    /// uninhabited, and is marked inhabited once its constraint can be satisfied by the current marking,
+    /// until no further variables change. Each pass is linear in the size of the meta-context, and the number
+    /// of passes is bounded by the length of the longest dependency-chain; if that proves too slow, a worklist
+    /// driven by reverse-dependency edges brings it down to linear overall.
+    ///
+    /// Unlike `is_empty_var`, never panics on `Indefinite` or ambiguous meta-variables: those are judged
+    /// inhabited (non-void), which is the conservative choice for pruning.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn compute_void_table(&self) -> Vec<bool> {
+        let n = self.constraints.len();
+        let mut inhabited = vec![false; n];
+        loop {
+            let mut changed = false;
+            for ix in 0..n {
+                let v = UVar(ix);
+                if self.get_canonical_uvar(v) != v || inhabited[ix] {
+                    continue;
+                }
+                if self.var_inhabited_step(v, &inhabited) {
+                    inhabited[ix] = true;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        (0..n)
+            .map(|ix| !inhabited[self.get_canonical_uvar(UVar(ix)).0])
+            .collect()
+    }
+
+    /// One step of [`TypeChecker::compute_void_table`]: whether canonical `v` is inhabited, given the current marking.
+    fn var_inhabited_step(&self, v: UVar, inhabited: &[bool]) -> bool {
+        let var_inhabited = |w: &UVar| inhabited[self.get_canonical_uvar(*w).0];
+        match &self.constraints[v.0] {
+            Constraints::Indefinite => true,
+            Constraints::Variant(vmid) => self
+                .varmaps
+                .get_varmap(*vmid)
+                .iter()
+                .any(|(_, ut)| self.utype_inhabited_step(ut, inhabited)),
+            Constraints::Invariant(constraint) => match constraint {
+                Constraint::Equiv(ut) => self.utype_inhabited_step(ut, inhabited),
+                Constraint::Elem(..) | Constraint::NumTree(..) => true,
+                Constraint::Proj(proj_shape) => match proj_shape {
+                    ProjShape::TupleWith(ix_vars) => ix_vars.values().all(var_inhabited),
+                    ProjShape::RecordWith(fld_vars) => fld_vars.values().all(var_inhabited),
+                    ProjShape::SeqOf(elem) => var_inhabited(elem),
+                    ProjShape::OptOf(..) => true,
+                },
+            },
+        }
+    }
+
+    /// Helper for [`TypeChecker::var_inhabited_step`] over an arbitrarily-nested `UType`.
+    ///
+    /// Mirrors [`Expansion::instantiates_void`] (negated), including its treatment of `Seq(Empty)` as void.
+    fn utype_inhabited_step(&self, ut: &UType, inhabited: &[bool]) -> bool {
+        match ut {
+            UType::Empty => false,
+            UType::Var(w) => inhabited[self.get_canonical_uvar(*w).0],
+            UType::Tuple(ts) => ts.iter().all(|t| self.utype_inhabited_step(t, inhabited)),
+            UType::Record(fs) => fs
+                .iter()
+                .all(|(_, t)| self.utype_inhabited_step(t, inhabited)),
+            UType::Seq(t, _) => self.utype_inhabited_step(t, inhabited),
+            UType::Hole
+            | UType::ViewObj
+            | UType::Int(..)
+            | UType::Base(..)
+            | UType::Option(..)
+            | UType::PhantomData(..) => true,
+        }
     }
 
     fn expand_union(&self, vmid: VMId) -> Expansion {
@@ -4683,7 +4827,21 @@ mod tests {
                 tc.is_empty_var(whnf),
                 "metavariable bound to assumptive void-constructing format `{_f}` judged non-empty: {whnf:?}"
             );
+            assert_tables_agree(&tc);
             Ok(())
+        }
+
+        // cross-checks `compute_void_table` against the memoized `is_empty_var` over every meta-variable
+        pub(super) fn assert_tables_agree(tc: &TypeChecker) {
+            let table = tc.compute_void_table();
+            for (ix, &is_void) in table.iter().enumerate() {
+                let whnf = WHNFSolution::Var(UVar(ix));
+                assert_eq!(
+                    tc.is_empty_var(whnf),
+                    is_void,
+                    "is_empty_var and compute_void_table disagree on {whnf:?}"
+                );
+            }
         }
 
         #[test]
@@ -4797,6 +4955,35 @@ mod tests {
             },
             other => panic!("unexpected wrapper-adt reification {other:?}"),
         }
+    }
+
+    #[test]
+    fn void_tables_agree_on_wrapper_adt() -> TCResult<()> {
+        use crate::helper::{alts_nondet, record, seq, tuple};
+
+        let mut module = FormatModule::new();
+        let fail_level = module.define_format(
+            "test.fail-union",
+            alts_nondet([
+                ("every", Format::Fail),
+                ("branch", tuple([Format::Fail])),
+                ("fails", seq([Format::Fail])),
+            ]),
+        );
+        let wrapper_adt_level = module.define_format(
+            "test.wrapper-adt",
+            alts_nondet([
+                ("Void", fail_level.call()),
+                (
+                    "Nested",
+                    record([("x", Format::ANY_BYTE), ("v", fail_level.call())]),
+                ),
+                ("Singleton", Format::ANY_BYTE),
+            ]),
+        );
+        let tc = TypeChecker::infer_module(&module, &wrapper_adt_level.call())?;
+        is_empty::assert_tables_agree(&tc);
+        Ok(())
     }
 
     /// `Format::RepeatBetween` bounds that are not constant results in a `TCError`.
