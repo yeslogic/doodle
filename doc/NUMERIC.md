@@ -37,7 +37,7 @@ Terms like `Expr::Var(..)` carry no associated type-information. Because `Expr::
 that any non-constant numeric operation (comparison or arithmetic) can only be valid if one knows the type of any opaquely-typed terms within them.
 
 In order to add 1 to a variable `x`, in other words, one needs to know the exact `ValueType` bound to "x" in the exact scope where the expression would be evaluated.
-This becomes additionally more complicated with holdover type-ascriptions like `Expr::SeqLen` always being `U32`, which isn't visible anywhere except in the `doodle`
+This becomes additionally more complicated with historically hard-coded type-ascriptions like `Expr::SeqLength` always being `U32` (pending the `seqlen-always-u32` project change-plan `doc/SEQLEN_PLAN.md`), which wasn't visible anywhere except in the `doodle`
 source-code itself.
 
 In such cases, even a simple operation like `x + 2` requires knowledge of what `Expr` constructor to wrap around `2` to yield a well-typed expression.
@@ -60,6 +60,16 @@ The only Expr that can *directly* embed a Numeric value is `Expr::Numeric`, whic
 There is no native support for `Format`-level construction of Numerics, with one exception: `Format::Pos` evaluates to an Auto Numeric holding the current buffer offset, matching its `NumericHole` typing in registration. Otherwise, all Numerics are generated at the `Expr` layer through `Format::Map` or `Format::Compute` and similar.
 
 Though not directly an embedding of `TypedConst`, `ViewFormat::ReadArray` can carry a signed marker-type, though that does not directly result in Numerics being manifested in memory while parsing.
+
+### `Format`-specific `Expr` restrictions
+
+Certain `Format` variants enforce type-level or value-level constraints on the `Expr` arguments they directly embed,
+most notably in the case of `Repeat*` formats, `WithRelativeOffset`, and `Slice`.
+
+In order to ensure precise `MatchTree` construction over `Format::RepeatBetween`, guards are placed in various layers to prevent
+scope-dependent `Expr` (i.e. any `Expr` containing a variable reference, even variables bound to static values) from appearing
+in either argument slot (min-bound or max-bound). This restriction is enforced via `Expr::exact_repeat_bounds`, as well as
+by the `TypeChecker` and the decoder compiler.
 
 ## `Pattern`
 
@@ -88,8 +98,6 @@ type-solver, whereas `TypeChecker` does full bidirectional type-checking that ca
 
 `ValueType::is_unsigned_or_auto()` accepts a native unsigned type or `NumericHole`, rejecting `Signed`. It is the argument check for native `Arith`, `IntSucc`/`IntPred`, `AsChar`, `EnumFromTo`, `ViewExpr::Offset`, `ViewFormat::CaptureBytes` and `ViewFormat::ReadArray` (lengths), `RepeatCount`, `RepeatBetween`, and the `Slice` length and `WithRelativeOffset` base and offset. Where two operands are involved, they are unified first, so a signed operand cannot hide behind an Auto one. Signed arithmetic belongs in `NumExpr`, and the idiom for converting a signed value to a char is `AsChar(AsU32(x))`.
 
-`RepeatBetween` additionally requires both bounds to be constant (`Expr::exact_repeat_bounds`), as do the `TypeChecker` and the decoder compiler.
-
 The 'key' field of `FindByKey` mandates `ValueType::Base(b)` guarded by `b.is_numeric()` (i.e. it rejects `Signed`).[^1]
 
 [^1]: `FindByKey` is a special-case in that it combines (via ValueType unifcation) two
@@ -100,7 +108,7 @@ in the array being searched. This means, in practice, that a query-key with an `
 may be accepted by `infer_type` as long as the lambda returns values of a concrete unsigned
 numeric type.
 
-At this point in time `SeqIx` requires its argument to be typed as `ValueType::U32`, as do other `Expr` with implied 'sequence index' or 'sequence length' semantics: `SubSeq`, `SubSeqInflate`, `Dup`.
+`Expr::SeqLength` is typed `ValueType::NumericHole`, like `Format::Pos`, and evaluates to an Auto Numeric. The `Expr`s with implied 'sequence index' or 'sequence length' arguments (`SeqIx`, `SubSeq`, `SubSeqInflate`, `Dup`) accept any unsigned type or `NumericHole` there, via `is_unsigned_or_auto` (see `doc/SEQLEN_PLAN.md`).
 
 ## [`TypeChecker`](/src/typecheck.rs)
 
@@ -135,11 +143,11 @@ If `U32` is excluded but more than one possible unsignedsolution remains, a unif
 - `_ := Format::Slice(Y, _)`
 - `_ := Format::WithRelativeOffset(Y, Z, _)` (the types of Y and Z are also required to unify)
 
-Despite the name, `UAny32` admits every unsigned width, including `U64`; the `32` is only the tiebreak default.
+(Despite the name, `UAny32` admits every unsigned width, including `U64`; the `32` in the name merely signifies that `U32` is the tiebreak default.)
 
 The following cases receive one-off UintSet constraints:
 
-- `X := DynFormat::Huffman(Y, Z)`: the projective array-elem-types of Y, Z are given `UintSet::SHORT8` (U8 or U16, preferring U8 to tiebreak), X is given `UintSet::any_default(Bits16)` (like UAny32, with U16 as the default)
+- `X := DynFormat::Huffman(Y, Z)`: the projective array-elem-types of Y, Z are given `UintSet::SHORT8` (U8 or U16, preferring U8 to tiebreak), X is given `UintSet::any_default(Bits16)` (any unsigned int, with U16 as the default)
 - `X := Format::Pos`: X is given `UintSet::any_default(Bits64)` (prefers U64 but accepts any other unsigned int-type).
 
 ### `IntSet::ZAny`
@@ -151,6 +159,20 @@ The following `Expr` nodes are constrained with the broadest, Numeric-permissive
 - `_ := Expr::AsU32(X)`
 - `_ := Expr::AsU64(X)`
 - `_ := Expr::IntRel(X, Y)` (the types of X and Y are also required to unify, so mixed-sign comparisons are rejected) [^2]
+
+For the `AsU8`–`AsU64` casts, the constraint on `X` also carries a cast-hint toward the cast's own width (see below).
+
+### Cast-hints
+
+`UintSet` and `PrimIntSet` carry, alongside their per-member `Rank`s, a set of `CastHints`: for each unsigned width,
+the earliest stamp of any `AsU8`–`AsU64` cast to that width whose operand was unified into the set. A stamp is the `UVar`
+of the issuing cast (offset by one, as a `NonZeroU32`), so earlier means earlier in the `TypeChecker`'s traversal.
+Hints merge under intersection (keeping the earliest stamp per width) and are dropped once a set collapses to a single type.
+
+`get_unique_solution` resolves a set by membership, then `Rank`, then hints: only when several members tie at the
+top rank does the earliest-hinted one among them win. A hint therefore never overrides a rank-default (e.g. `AsU8` over a
+`UAny32` value still resolves to `U32`), and a top-rank tie with no hinted member remains a "no unique solution" error.
+In effect, `AsU32(x)` over an otherwise-ambiguous `x` makes the cast a no-op.
 
 ### Dynamic
 

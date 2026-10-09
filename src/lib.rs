@@ -436,65 +436,45 @@ impl Expr {
                     _ => Err(anyhow!("unsound byte-level type cast U64Le(_ : {_t:?})")),
                 }
             }
+            // NOTE - typed like `Format::Pos`: the interpreter yields an Auto Numeric, which takes the type of
+            // whatever native operand it meets
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
-                // FIXME[epic=seqlen-always-u32] - this ought to be NumericHole, but there are several Expr/Format-level hardcoded U32 type-assumptions on Expr args that would also need to be fixed in tandem
-                ValueType::Seq(_t) => Ok(ValueType::SEQ_LEN_T),
+                ValueType::Seq(_t) => Ok(ValueType::NumericHole),
                 other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
             },
             Expr::SeqIx(seq, index) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let index_type = index.infer_type(scope)?;
-                    match index_type {
-                        // FIXME[epic=seqlen-always-u32] - because SeqLength is currently hardcoded to U32-typing, we at least need SeqIx to accept U32; anything beyond that requires a deeper consideration
-                        ValueType::U32 => (),
-                        other => {
-                            return Err(anyhow!(
-                                "SeqIx `index` param: expected U32, found {other:?}"
-                            ));
-                        }
+                    if !index_type.is_unsigned_or_auto() {
+                        return Err(anyhow!(
+                            "SeqIx `index` param: expected unsigned or auto, found {index_type:?}"
+                        ));
                     }
                     Ok(ValueType::clone(&t))
                 }
                 other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
             },
-            // FIXME[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
-            Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
-                ValueType::Seq(t) => {
-                    let start_type = start.infer_type(scope)?;
-                    let length_type = length.infer_type(scope)?;
-                    if start_type != ValueType::U32 {
-                        return Err(anyhow!(
-                            "SubSeq `start` param: expected U32, found {start_type:?}"
-                        ));
+            Expr::SubSeq(seq, start, length) | Expr::SubSeqInflate(seq, start, length) => {
+                let op = if matches!(self, Expr::SubSeq(..)) {
+                    "SubSeq"
+                } else {
+                    "SubSeqInflate"
+                };
+                match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        for (what, expr) in [("start", start), ("length", length)] {
+                            let t = expr.infer_type(scope)?;
+                            if !t.is_unsigned_or_auto() {
+                                return Err(anyhow!(
+                                    "{op} `{what}` param: expected unsigned or auto, found {t:?}"
+                                ));
+                            }
+                        }
+                        Ok(ValueType::Seq(t))
                     }
-                    if length_type != ValueType::U32 {
-                        return Err(anyhow!(
-                            "SubSeq length must be numeric, found {length_type:?}"
-                        ));
-                    }
-                    Ok(ValueType::Seq(t))
+                    other => Err(anyhow!("{op}: expected Seq, found {other:?}")),
                 }
-                other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
-            },
-            // FIXME[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
-            Expr::SubSeqInflate(seq, start, length) => match seq.infer_type(scope)? {
-                ValueType::Seq(t) => {
-                    let start_type = start.infer_type(scope)?;
-                    let length_type = length.infer_type(scope)?;
-                    if start_type != ValueType::U32 {
-                        return Err(anyhow!(
-                            "SubSeqInflate `start` param: expected U32, found {start_type:?}"
-                        ));
-                    }
-                    if length_type != ValueType::U32 {
-                        return Err(anyhow!(
-                            "SubSeqInflate length must be numeric, found {length_type:?}"
-                        ));
-                    }
-                    Ok(ValueType::Seq(t))
-                }
-                other => Err(anyhow!("SubSeqInflate: expected Seq, found {other:?}")),
-            },
+            }
             Expr::FlatMap(expr, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
@@ -601,10 +581,12 @@ impl Expr {
 
                 Ok(ValueType::Seq(Box::new(t)))
             }
-            // REVIEW[epic=dup32] - is there a better way to handle this?
             Expr::Dup(count, expr) => {
-                if count.infer_type(scope)? != ValueType::U32 {
-                    return Err(anyhow!("Dup: count is not U32: {count:?}"));
+                let count_type = count.infer_type(scope)?;
+                if !count_type.is_unsigned_or_auto() {
+                    return Err(anyhow!(
+                        "Dup: count should be unsigned or auto, found {count_type:?}"
+                    ));
                 }
                 let t = expr.infer_type(scope)?;
                 Ok(ValueType::Seq(Box::new(t)))

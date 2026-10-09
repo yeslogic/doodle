@@ -129,6 +129,10 @@ impl From<BaseNumType> for ValueType {
 /// In particular, when two sequences are unified, the lesser-valued of the two hints is retained
 /// for the type-outcome. Therefore, if a new hint is added, it should be defined after all hints that
 /// supercede it but before any hints that it itself supercedes.
+// TODO - refactor into a richer type of format-dictated sequence-properties, which (among other things) records
+// whether the producing format can yield `[]` (e.g. `Repeat`, `RepeatUntil*`) or must yield at least one element
+// (e.g. a fixed `seq([...])`, `Repeat1`). `TypeChecker::is_empty_var` currently treats every `Seq(Empty)` as void,
+// which is wrong for `Repeat(Fail)` (which yields `[]` without failing) and would allow it to prune live variants.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Serialize)]
 pub enum SeqBorrowHint {
     #[default]
@@ -257,12 +261,6 @@ impl ValueType {
     pub const I16: ValueType = ValueType::Signed(SignedIntType::I16);
     pub const I32: ValueType = ValueType::Signed(SignedIntType::I32);
     pub const I64: ValueType = ValueType::Signed(SignedIntType::I64);
-
-    /// Formalization of the hard-coded `u32` type for sequence lengths to avoid hardcoding U32 directly over multiple modules.
-    ///
-    /// This can be freely changed in the future to uniformly re-type all instances of `SeqLength` to the same type-judgment without
-    /// leaving anything unchanged or touching the type-judgments of other AST nodes.
-    pub const SEQ_LEN_T: ValueType = ValueType::Base(BaseType::U32);
 
     /// Helper function for constructing `ValueType::Option`.
     pub fn option(ty: Self) -> ValueType {

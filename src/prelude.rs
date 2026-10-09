@@ -265,10 +265,9 @@ pub fn u64be(input: (u8, u8, u8, u8, u8, u8, u8, u8)) -> u64 {
 
 /// Constructs a new vector containing `value` repeated `count` times.
 ///
-/// For compatibility reasons with the code-generator layer, `count` is a `u32`
-/// to avoid having to cast it to `usize` in advance.
-pub fn dup32<T: Clone>(count: u32, value: T) -> Vec<T> {
-    Vec::from_iter(std::iter::repeat_n(value, count as usize))
+/// The code-generator casts the count to `usize` at the call site, whatever its unsigned type.
+pub fn dup_n<T: Clone>(count: usize, value: T) -> Vec<T> {
+    Vec::from_iter(std::iter::repeat_n(value, count))
 }
 
 /// Parses a DEFLATE-style huffman code-length table, with optional code-value table to reconsider the lengths

@@ -5,10 +5,7 @@ use doodle::read::ReadCtxt;
 use doodle::{Expr, Format, FormatModule};
 use doodle::{
     codegen::{ToFragment, generate_code},
-    decoder::{
-        Compiler, Value,
-        seq_kind::{SeqKind, ValueSeq},
-    },
+    decoder::{Compiler, Value},
 };
 use doodle_numexpr_macro::numexpr;
 
@@ -334,6 +331,21 @@ mod survey {
                 "RepeatBetween(U8(1), u8()=2, u8)",
                 chain(u8(), "x", repeat_between(Expr::U8(1), var("x"), u8())),
                 with_pad(&[2]),
+            ),
+            (
+                "SeqLength(seq) == U8(8)",
+                compute(expr_eq(seq_length(seq8()), Expr::U8(8))),
+                with_pad(&[]),
+            ),
+            (
+                "SeqLength(seq) + U64(1)",
+                compute(add(seq_length(seq8()), Expr::U64(1))),
+                with_pad(&[]),
+            ),
+            (
+                "SeqIx(seq, IntPred(SeqLength(seq)))",
+                compute(index_unchecked(seq8(), pred(seq_length(seq8())))),
+                with_pad(&[]),
             ),
             (
                 "u8()=5 ~ ZConst(5) | ZRange(0..=255) (no wildcard)",

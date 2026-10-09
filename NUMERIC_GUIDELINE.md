@@ -27,14 +27,19 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
   - `RepeatCount` and `RepeatBetween` counts;
   - the `Slice` length and the `WithRelativeOffset` base and offset.
 - **Registration sites that keep `is_numeric()`** (which also accepts `Signed`): `IntRel` (the operands must still unify, so mixed-sign comparisons are rejected) and `AsU8`–`AsU64`.
-- **Other registration sites**: the `FindByKey` key must unify to a native unsigned `Base` type (so `Signed` is rejected and an Auto query key is accepted only if the key lambda pins it). `SeqIx`, `SubSeq`, `SubSeqInflate` and `Dup` require exactly `U32`, which is deferred to the `seqlen-always-u32` project.
+- **Other registration sites**: the `FindByKey` key must unify to a native unsigned `Base` type (so `Signed` is rejected and an Auto query key is accepted only if the key lambda pins it). `SeqLength` is typed `NumericHole`, like `Pos`, and the `SeqIx` index, `SubSeq`/`SubSeqInflate` start and length, and `Dup` count follow the "unsigned or Auto" rule (`doc/SEQLEN_PLAN.md`).
 - **`RepeatBetween` bounds must be constant** in registration, the `TypeChecker` and the decoder compiler alike. All three use `Expr::exact_repeat_bounds`, which evaluates closed Numerics.
 - **`TypeChecker`** (codegen path) constrains:
   - `BaseSet::UAny` (any unsigned type): `Arith`, `IntSucc`/`IntPred`, `AsChar`, `RepeatCount`, `RepeatBetween`, the `FindByKey` key, `CaptureBytes` length and `ViewExpr::Offset`.
-  - `UAny32` (any unsigned type, with `U32` as the tiebreak default; it does **not** exclude `U64`): `SeqIx`, `EnumFromTo`, `SeqLength`, `Slice`, `WithRelativeOffset`. `SubSeq`'s start and `Dup`'s count behave the same way, so the `TypeChecker` is looser than registration's exact-`U32` rule at those sites.
+  - `UAny32` (any unsigned type, with `U32` as the tiebreak default; it does **not** exclude `U64`): `SeqIx`, `EnumFromTo`, `SeqLength`, `Slice`, `WithRelativeOffset`. `SubSeq`/`SubSeqInflate`'s start and length and `Dup`'s count behave the same way.
+  - `UintSet::any_default(Bits64)` (any unsigned type, with `U64` as the tiebreak default): `Format::Pos`.
   - `UintSet::ANY`: `ReadArray` length.
   - `IntSet::ZAny` (signed allowed): `AsU8`–`AsU64` and `IntRel`.
 - **Unresolved Auto in the `TypeChecker`**: with nothing to pin it, an Auto const is ambiguous and `infer_module` returns a `TCError` ("no unique solution"); a negative Auto at an unsigned-only site gives "no valid solutions". Both go through `generate_code`'s "Failed to infer module-wide type annotations:" path. No default types are applied. Registration stays looser here: it accepts a bare Auto, and the interpreter handles it by value.
+- **Two different tiebreak defaults are ambiguous when they meet.** `UintSet::intersection` keeps the higher-priority rank of each member, so whatever either side preferred ends up in the top tier. `UAny32 ∩ any_default(Bits64)` therefore ties `U32` with `U64`, and `get_unique_solution` reports "no unique solution" unless something else pins the width. In practice, an unannotated `pos` that flows into any `UAny32` site (a `SeqLength` comparison, a `SeqIx` index, a `Slice` size, a `WithRelativeOffset` offset, etc.) fails in the `TypeChecker`; registration and the interpreter accept it. The workaround is an explicit `as_u32`/`as_u64`, or an operand of concrete type.
+  - No choice of rank constants fixes this: under per-member max, any two distinct defaults always tie.
+  - `BaseSet::cherrypick` (a caller-supplied cascade that splits co-ranked tiers) is not a practical fix. The `Elem`/`Elem` and `Elem`/`NumTree` unification sites in `typecheck.rs` don't know which expression each constraint came from, so any cascade is effectively global. A global `[Bits64, Bits32]` cascade also resolves sets that are meant to stay ambiguous (`ANY ∩ ANY`, `at_least(Bits16) ∩ ANY` → `U64`), and its tiebreak is overridden by any later plain `unify`. The tests in `base_set.rs` pin all three behaviours.
+  - A possible narrow fix is a widest-wins tiebreak at solve time, sketched as a TODO on `UintSet::get_unique_solution`. It is not implemented, because the benefit (unannotated `pos` at `UAny32` sites) is marginal.
 - **Pattern typing (registration)**: `build_scope` returns an error, never panics, on a pattern/type mismatch. `ZConst`/`ZRange` need a numeric scrutinee (signed OK). `U8`–`U64` and `Int` need the matching native unsigned type or a `NumericHole` scrutinee.
 - **Pattern typing (`TypeChecker`)**: `ZConst`/`ZRange` restrict the scrutinee to primitive ints whose range contains the constant or bounds, so `ZConst(-1)` excludes every unsigned type. `Pattern::Int` restricts to `UintSet`, i.e. unsigned only.
 
@@ -47,7 +52,8 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
   - **`arith`, Numeric vs Numeric**: the same concrete unsigned rep computes natively. **Auto with Auto computes by value and stays Auto** (division by zero and shifts outside `0..64` are errors). Mismatched concrete reps and signed reps still panic; registration rejects them, so these are type-checker-invariant panics.
   - **`unary` (`IntSucc`/`IntPred`)**: dispatches on the Numeric's own rep. Concrete `U8`–`U64` compute natively; **Auto is ±1 by value and stays Auto**; signed panics (rejected by registration).
   - **`AsU8`–`AsU64`/`AsChar`**: `as_native`, value-only and rep-agnostic; errors if the value doesn't fit.
-  - **`as_usize` sites** (lengths, counts, offsets, `EnumFromTo` bounds): value-only; negative or oversized values error.
+  - **`as_usize` sites** (lengths, counts, offsets, `EnumFromTo` bounds, sequence indices): value-only; negative or oversized values error.
+- **`SeqLength` and `Format::Pos`** evaluate to Auto Numerics (`Value::from_seq_len`, `Value::from_pos`), so they take the type of whatever native operand they meet. A length is exact; its width is checked where it next meets a concrete type (e.g. `pred(seq_length(..))` on an empty sequence is `-1`, and errors where it is used as an index).
   - **`FindByKey` key (`AsKey`)**: Numeric vs `U8`–`U64` is coerced with `get_as_unsigned`; **an out-of-range key (e.g. `-1auto` against `U8`) returns `EvalError::NumericConvert`.**
 - **Pattern matching on `Value::Numeric`** (`Value::matches_numeric_literal`, shared by the main interpreter and `loc_decoder`):
   - `U8(n)`–`U64(n)`: a concrete rep must be exactly that width; **Auto is compared by value**.
@@ -63,6 +69,7 @@ Terminology follows `doc/NUMERIC.md`: "Numeric" = `TypedConst` / `numeric::core:
 - Embedded trees are elaborated to `TypedNumExpr` and emitted via `numeric::codegen::synthesize`. Operations classified `HomLossy`/`HetLossy` fall back to `eval_fallback` instead of boilerplated backend functions (`numeric/codegen.rs`).
 - `ZConst`/`ZRange` are emitted as untyped `SomeInt` literals and ranges, relying on Rust's type inference against the scrutinee.
 - `IntRel` is emitted as a plain infix comparison, which is also correct for signed operands.
+- `SeqLength` is emitted as `len() as <T>`, where `T` is the type the `TypeChecker` resolved for it; `Dup` as `dup_n(<count> as usize, ..)`; `SeqIx`/`SubSeq`/`SubSeqInflate` cast their arguments `as usize`. So any unsigned width works at all these sites.
 - **Match exhaustiveness** (`refutability_check` in `codegen/mod.rs`):
   - A signed scrutinee is always treated as `Refutable`, so a fallback arm is always emitted.
   - For an unsigned scrutinee, `IntCoverage` counts `U8`–`U64`, `Int`, and `ZConst`/`ZRange` arms (the latter clamped to the unsigned domain).

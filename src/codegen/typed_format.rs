@@ -718,7 +718,8 @@ where
     U64Be(Box<TypedExpr<TypeRep, VarId>>),
     U64Le(Box<TypedExpr<TypeRep, VarId>>),
 
-    SeqLength(Box<TypedExpr<TypeRep, VarId>>),
+    /// Carries its own type, which the `TypeChecker` resolves from context (any unsigned width, `U32` by default).
+    SeqLength(TypeRep, Box<TypedExpr<TypeRep, VarId>>),
     SeqIx(
         TypeRep,
         Box<TypedExpr<TypeRep, VarId>>,
@@ -859,7 +860,7 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             | TypedExpr::U32Le(inner)
             | TypedExpr::U64Be(inner)
             | TypedExpr::U64Le(inner)
-            | TypedExpr::SeqLength(inner) => inner.hash(state),
+            | TypedExpr::SeqLength(_, inner) => inner.hash(state),
             TypedExpr::SeqIx(_, sq, ix) => {
                 sq.hash(state);
                 ix.hash(state);
@@ -934,12 +935,9 @@ impl TypedExpr<GenType> {
             TypedExpr::U16Le(_) | TypedExpr::U16Be(_) | TypedExpr::AsU16(_) | TypedExpr::U16(_) => {
                 Some(Cow::Owned(GenType::from(PrimType::U16)))
             }
-            TypedExpr::U32Be(_)
-            | TypedExpr::U32Le(_)
-            | TypedExpr::AsU32(_)
-            | TypedExpr::U32(_)
-            // FIXME[epic=seqlen-always-u32]: consider revising this hardcoded type-association
-            | TypedExpr::SeqLength(_) => Some(Cow::Owned(GenType::from(PrimType::U32))),
+            TypedExpr::U32Be(_) | TypedExpr::U32Le(_) | TypedExpr::AsU32(_) | TypedExpr::U32(_) => {
+                Some(Cow::Owned(GenType::from(PrimType::U32)))
+            }
             TypedExpr::U64Be(_) | TypedExpr::U64Le(_) | TypedExpr::AsU64(_) | TypedExpr::U64(_) => {
                 Some(Cow::Owned(GenType::from(PrimType::U64)))
             }
@@ -953,6 +951,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::RecordProj(gt, ..)
             | TypedExpr::Variant(gt, ..)
             | TypedExpr::Seq(gt, ..)
+            | TypedExpr::SeqLength(gt, ..)
             | TypedExpr::SeqIx(gt, ..)
             | TypedExpr::Match(gt, ..)
             | TypedExpr::Destructure(gt, ..)
@@ -1146,7 +1145,7 @@ mod __impls {
                 TypedExpr::U32Le(x) => Expr::U32Le(rebox(x)),
                 TypedExpr::U64Be(x) => Expr::U64Be(rebox(x)),
                 TypedExpr::U64Le(x) => Expr::U64Le(rebox(x)),
-                TypedExpr::SeqLength(x) => Expr::SeqLength(rebox(x)),
+                TypedExpr::SeqLength(_, x) => Expr::SeqLength(rebox(x)),
                 TypedExpr::SeqIx(_, seq, index) => Expr::SeqIx(rebox(seq), rebox(index)),
                 TypedExpr::SubSeq(_, seq, start, len) => {
                     Expr::SubSeq(rebox(seq), rebox(start), rebox(len))
