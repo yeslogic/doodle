@@ -1,6 +1,6 @@
 # Plan: the `seqlen-always-u32` project
 
-Status: decisions D1–D4 are confirmed by the user; the step breakdown is proposed. All steps (1–5) are implemented.
+Status: complete. Decisions D1–D4 were confirmed by the user, and all steps (1–5) are implemented. Both open questions are resolved.
 
 Follows `doc/NUMERIC_PLAN.md`, which deferred this work as its item 5, and its item 14 (`Format::Pos` evaluates to an Auto Numeric), whose approach this project reuses.
 
@@ -61,8 +61,8 @@ With `SeqLength` as Auto:
 
 ## Open questions
 
-- **Q1. Other `U32` assumptions downstream of `SeqLength`.** Step 1's tests and the survey should reveal whether anything else (e.g. `api_helper` code in `generated/`, or codegen's handling of a `SeqLength` bound to a variable) relies on `SeqLength` being a native `U32`. Not yet checked: `generated/api_helper/`, `output/tree.rs`.
-- **Q2. `gencode.rs` churn.** With D2, every live `SeqLength` should still resolve to `U32` by tiebreak, so `cargo cg` output is expected to be unchanged until step 5's `deflate` cleanup. To be confirmed in step 4.
+- **Q1. Other `U32` assumptions downstream of `SeqLength`.** Step 1's tests and the survey should reveal whether anything else (e.g. `api_helper` code in `generated/`, or codegen's handling of a `SeqLength` bound to a variable) relies on `SeqLength` being a native `U32`. **Resolved: none.** See the step 5 notes.
+- **Q2. `gencode.rs` churn.** With D2, every live `SeqLength` should still resolve to `U32` by tiebreak, so `cargo cg` output is expected to be unchanged until step 5's `deflate` cleanup. **Resolved in step 4:** no `SeqLength` churn; only the `Dup` call sites changed.
 
 ## Progress notes
 
@@ -91,5 +91,7 @@ With `SeqLength` as Auto:
   - `helper.rs`: `seq_length`'s doc describes the Auto typing; the "not `U32` may fail" notes on `index_unchecked`/`index_checked` are replaced, and `index_unchecked`'s stale "runtime panic" note now says out-of-bounds is an evaluation error.
   - `doc/NUMERIC_PLAN.md` item 5 is marked resolved; `doc/NUMERIC.md` and `NUMERIC_GUIDELINE.md` describe the new typing, evaluation and codegen of these exprs.
   - Survey: three `SeqLength` standalone cases (`== U8(8)`, `+ U64(1)`, `SeqIx(seq, IntPred(SeqLength(seq)))`), all accepted by every layer. 289 cases, 43 inconsistent, no panics, no "codegen looser" rows; the remainder is the `doc/NUMERIC_PLAN.md` item 9 class and value-dependent errors.
-  - Q1 (other `U32` assumptions downstream of `SeqLength`): none surfaced in the test suite, decode snapshots, `generated` crate build or survey. `generated/api_helper/` and `output/tree.rs` were not read.
+  - Q1 (other `U32` assumptions downstream of `SeqLength`): none surfaced in the test suite, decode snapshots, `generated` crate build or survey.
+    - `output/tree.rs` mentions `Expr::SeqLength` only in the expression printer, and displays `Value::Numeric` generically (as a `DisplayAtom`, atomic like the native integers), so an Auto `SeqLength` value needs no special handling.
+    - `generated/api_helper/` and the `generated` bins only consume generated types, whose `SeqLength` widths are unchanged (all still `u32` by tiebreak), and nothing in `generated/` refers to `dup32`. `cargo check -p doodle_gencode --all-targets` passes.
 
