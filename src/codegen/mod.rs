@@ -1424,22 +1424,10 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 }
             }
         }
-        TypedExpr::AsU8(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr_nat(x)),
-            PrimType::U8.into(),
-        )),
-        TypedExpr::AsU16(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr_nat(x)),
-            PrimType::U16.into(),
-        )),
-        TypedExpr::AsU32(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr_nat(x)),
-            PrimType::U32.into(),
-        )),
-        TypedExpr::AsU64(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr_nat(x)),
-            PrimType::U64.into(),
-        )),
+        TypedExpr::AsU8(x) => embed_as_cast(x, PrimType::U8),
+        TypedExpr::AsU16(x) => embed_as_cast(x, PrimType::U16),
+        TypedExpr::AsU32(x) => embed_as_cast(x, PrimType::U32),
+        TypedExpr::AsU64(x) => embed_as_cast(x, PrimType::U64),
         TypedExpr::U16Be(be_bytes) => {
             RustExpr::local("u16be").call_with([embed_expr_nat(be_bytes)])
         }
@@ -1722,6 +1710,19 @@ fn try_as_matches_macro_cases(
 /// Shorthand for embedding an expression with `ExprInfo::Natural`
 fn embed_expr_nat(expr: &TypedExpr<GenType>) -> RustExpr {
     embed_expr(expr, ExprInfo::Natural)
+}
+
+/// Embeds an explicit `AsU*` cast of `x` to `target`.
+///
+/// If the `GenType` of `x` is already exactly `target`, the cast would be a no-op, so `x` is embedded as-is
+/// (e.g. `AsU32(SeqLength(..))` emits `(x.len()) as u32` rather than `((x.len()) as u32) as u32`).
+fn embed_as_cast(x: &TypedExpr<GenType>, target: PrimType) -> RustExpr {
+    let inner = embed_expr_nat(x);
+    if x.get_type().as_deref() == Some(&GenType::from(target)) {
+        inner
+    } else {
+        RustExpr::Operation(RustOp::AsCast(Box::new(inner), target.into()))
+    }
 }
 
 /// Shorthand for embedding an expression with `ExprInfo::EmbedOwned`
