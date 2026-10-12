@@ -14,9 +14,21 @@ fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
     generate_code(module, f).to_fragment().to_string()
 }
 
+/// Unit-tests related to the `Elaborator` implementation, mostly concerned with ensuring metavariable traversal
+/// is plausibly drift-free.
 mod elaboration {
     use super::*;
 
+    /// Runs full-module inference on `module` starting from top-level format `f` using `TypeChecker`,
+    /// as well as full-module elaboration using the finalized `TypeChecker` artifact, and makes the
+    /// assertion that the two have the exact same 'population count' (largest-index UVar in TypeChecker should
+    /// equal the final traversal-index in Elaboration).
+    ///
+    /// Also ensures that the Elaborator returned a TypedFormat that roundtrips back to an equivalent format
+    /// to `f`.
+    ///
+    /// Optionally takes a string `label` to include in the panic message if the `assert_eq!` for
+    /// population-count fails.
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
         let tc = TypeChecker::infer_module(module, f).unwrap();
         let tc_pop = tc.size();
@@ -50,14 +62,17 @@ mod elaboration {
         );
     }
 
+    /// Batcher that takes an array of labelled formats and loops over them,
+    /// registering and running `population_check` over each in turn.
     fn run_headcount(fs: &[(&'static str, Format)]) {
         let mut module = FormatModule::new();
         for (name, f) in fs.iter() {
             module.define_format(*name, f.clone());
-            population_check(&module, f, None);
+            population_check(&module, f, Some(*name));
         }
     }
 
+    /// Base-case headcount test for an assortment of leaf-node formats
     #[test]
     fn test_headcount_simple() {
         let formats = vec![
@@ -69,6 +84,7 @@ mod elaboration {
         run_headcount(&formats);
     }
 
+    /// Headcount test for a record-format consisting of only leaf-node field-formats
     #[test]
     fn test_headcount_record_simple() {
         let f = Format::record(vec![
@@ -80,6 +96,7 @@ mod elaboration {
         run_headcount(&[("record_simple", f)]);
     }
 
+    /// Headcount test for a simple tagged-union definition.
     #[test]
     fn test_headcount_adt_simple() {
         let f = Format::Union(vec![
@@ -90,6 +107,7 @@ mod elaboration {
         run_headcount(&[("adt_simple", f)]);
     }
 
+    /// Headcount test for a top-level format that uses `Format::ItemVar` (without any arguments)
     #[test]
     fn test_headcount_item_var() {
         let sub_f = Format::Byte(ByteSet::full());
@@ -100,6 +118,7 @@ mod elaboration {
         population_check(&module, &f, None);
     }
 
+    /// Headcount test for Expr embedded using `Format::Compute`
     #[test]
     fn test_headcount_compute_simple() {
         let x = Format::Byte(ByteSet::full());
@@ -114,6 +133,8 @@ mod elaboration {
         run_headcount(&[("test.compute_simple", f)]);
     }
 
+    /// Headcount test for a format with complex embedded `Expr`s, including lambdas
+    /// (`Format::RepeatUntilLast`, `Expr::FlatMapAccum`)
     #[test]
     fn test_headcount_compute_complex() {
         let is_null = Expr::Lambda(
@@ -179,6 +200,8 @@ mod elaboration {
     }
 }
 
+/// Regression tests for formats defined via `FormatModule::define_format_phantom_rec`, mostly concerned with
+/// cycle-safe caching across the pipeline and lifetime inference for self-referential types.
 mod phantom_rec {
     use super::*;
 
@@ -330,6 +353,7 @@ mod phantom_rec {
     }
 }
 
+/// Codegen tests for `Expr::Numeric` trees, including property-based tests over arbitrary numeric expressions.
 mod numeric {
     use super::*;
 
@@ -422,6 +446,7 @@ mod numeric {
     }
 }
 
+/// Codegen tests for `ReadArray` over fixed-shape record formats.
 mod read_array {
     use super::*;
 
@@ -450,6 +475,7 @@ mod read_array {
     }
 }
 
+/// Smoke tests running small formats through the full codegen pipeline, with minimal assertions on the output.
 mod smoke {
     use super::*;
 
@@ -482,8 +508,38 @@ mod smoke {
         let output = produce_string_gencode(&module, &outer.call());
         println!("{}", output);
     }
+
+    #[test]
+    fn test_expr_cast_noop_codegen() {
+        use crate::helper::{as_u32, compute, record, repeat, seq_length, var};
+
+        let mut module = FormatModule::new();
+        let format = record([
+            ("x", repeat(Format::ANY_BYTE)),
+            ("len", compute(as_u32(seq_length(var("x"))))),
+        ]);
+        let fref = module.define_format("test", format);
+        let output = produce_string_gencode(&module, &fref.call());
+        let anti_pattern = "as u32) as u32";
+        let hits: Vec<String> = output
+            .lines()
+            .enumerate()
+            .filter(|(_, line)| line.contains(anti_pattern))
+            .map(|(ix, line)| format!("{:>5}| {}", ix + 1, line.trim()))
+            .collect();
+        if !hits.is_empty() {
+            panic!(
+                "redundant cast `{anti_pattern}` emitted for AsU32 over a u32 operand ({} hit(s)):\n{}",
+                hits.len(),
+                hits.join("\n")
+            );
+        } else {
+            println!("{}", output);
+        }
+    }
 }
 
+/// Generators for the standalone codegen fixtures under `tests/` (`runtime_repeat`, `permit_state_error`).
 mod fixture_gen {
     use std::{fs::File, io::Write};
 
