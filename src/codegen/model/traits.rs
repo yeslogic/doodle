@@ -581,3 +581,67 @@ pub fn impl_standalone_read_unchecked(
     Vec::from_iter(impl_blocks.into_iter().map(RustDecl::TraitImpl))
 }
 // !SECTION
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FormatModule;
+    use crate::codegen::{model, typed_format};
+    use std::rc::Rc;
+
+    #[test]
+    fn test_read_unchecked_generate_impl() {
+        use crate::helper::{base::u16be, record};
+        use intmap::IntMap;
+        use model::traits::smallsorts::{FixedFormatInfo, ReadUnchecked};
+
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+
+        let mut targets = IntMap::new();
+        targets.insert(0usize, point);
+        // `point`'s fields are both `Raw`, so `t_formats`/`defined_types` are never actually
+        // consulted here -- left empty rather than threading a real `Elaborator` through.
+        let t_formats: std::collections::BTreeMap<
+            usize,
+            Rc<typed_format::TypedFormat<typed_format::GenType>>,
+        > = std::collections::BTreeMap::new();
+        let defined_types: Vec<RustTypeDecl> = Vec::new();
+        let info = FixedFormatInfo {
+            module: &module,
+            targets: &targets,
+            t_formats: &t_formats,
+            defined_types: &defined_types,
+        };
+
+        let on_type = Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+            0,
+            Label::from("Point"),
+            None,
+        ))));
+
+        let impl_block = ReadUnchecked::generate_impls(on_type, info);
+        let output = impl_block
+            .iter()
+            .map(|imp| imp.to_fragment().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        println!("{output}");
+        assert!(
+            output.contains("impl ReadUnchecked for Point"),
+            "expected an `impl ReadUnchecked for Point` block:\n{output}"
+        );
+        assert!(
+            output.contains("unsafe fn read_unchecked"),
+            "expected `read_unchecked` to be declared `unsafe fn`:\n{output}"
+        );
+        assert!(
+            output.contains("U16Be::read_unchecked(ctxt)"),
+            "expected per-field reads via the `U16Be` marker type:\n{output}"
+        );
+        assert!(
+            output.contains("const SIZE: usize = 4"),
+            "expected SIZE to be the sum of per-field widths (2 + 2):\n{output}"
+        );
+    }
+}
