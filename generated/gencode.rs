@@ -16542,7 +16542,7 @@ deflate_fixed_huffman_codes { code, extra }
 {
 let tmp_cond = {
 let x = &next_elem;
-(x.code as u16) == 256u16
+x.code == 256u16
 };
 if tmp_cond {
 accum.push(next_elem);
@@ -16958,7 +16958,7 @@ deflate_dynamic_huffman_codes { code, extra }
 {
 let tmp_cond = {
 let x = &next_elem;
-(x.code as u16) == 256u16
+x.code == 256u16
 };
 if tmp_cond {
 accum.push(next_elem);
@@ -25877,7 +25877,7 @@ b
 return Err(ParseError::ExcludedBranch(10046433636842398056u64));
 }
 };
-try_sub!(bit as u8, 48u8, 757122060916971772u64)
+try_sub!(bit, 48u8, 757122060916971772u64)
 };
 let _o9 = {
 let bit = {
@@ -25888,7 +25888,7 @@ b
 return Err(ParseError::ExcludedBranch(5986772336072340665u64));
 }
 };
-try_sub!(bit as u8, 48u8, 10645729856418057640u64)
+try_sub!(bit, 48u8, 10645729856418057640u64)
 };
 let _o8 = {
 let bit = {
@@ -25899,7 +25899,7 @@ b
 return Err(ParseError::ExcludedBranch(2908689796368760670u64));
 }
 };
-try_sub!(bit as u8, 48u8, 13311790038092155306u64)
+try_sub!(bit, 48u8, 13311790038092155306u64)
 };
 let _o7 = {
 let bit = {
@@ -25910,7 +25910,7 @@ b
 return Err(ParseError::ExcludedBranch(4598583460226006268u64));
 }
 };
-try_sub!(bit as u8, 48u8, 11490274700962832028u64)
+try_sub!(bit, 48u8, 11490274700962832028u64)
 };
 let _o6 = {
 let bit = {
@@ -25921,7 +25921,7 @@ b
 return Err(ParseError::ExcludedBranch(15680765559661576738u64));
 }
 };
-try_sub!(bit as u8, 48u8, 11297314001547702431u64)
+try_sub!(bit, 48u8, 11297314001547702431u64)
 };
 let _o5 = {
 let bit = {
@@ -25932,7 +25932,7 @@ b
 return Err(ParseError::ExcludedBranch(18399269270080151498u64));
 }
 };
-try_sub!(bit as u8, 48u8, 9791114990321288281u64)
+try_sub!(bit, 48u8, 9791114990321288281u64)
 };
 let _o4 = {
 let bit = {
@@ -25943,7 +25943,7 @@ b
 return Err(ParseError::ExcludedBranch(1595897747104696027u64));
 }
 };
-try_sub!(bit as u8, 48u8, 15702070659753069395u64)
+try_sub!(bit, 48u8, 15702070659753069395u64)
 };
 let _o3 = {
 let bit = {
@@ -25954,7 +25954,7 @@ b
 return Err(ParseError::ExcludedBranch(4338497647520366709u64));
 }
 };
-try_sub!(bit as u8, 48u8, 460669108121189046u64)
+try_sub!(bit, 48u8, 460669108121189046u64)
 };
 let _o2 = {
 let bit = {
@@ -25965,7 +25965,7 @@ b
 return Err(ParseError::ExcludedBranch(8971553008180040990u64));
 }
 };
-try_sub!(bit as u8, 48u8, 11225936372640404826u64)
+try_sub!(bit, 48u8, 11225936372640404826u64)
 };
 let _o1 = {
 let bit = {
@@ -25976,7 +25976,7 @@ b
 return Err(ParseError::ExcludedBranch(1029952099207838423u64));
 }
 };
-try_sub!(bit as u8, 48u8, 14652068248613900169u64)
+try_sub!(bit, 48u8, 14652068248613900169u64)
 };
 let _o0 = {
 let bit = {
@@ -25987,7 +25987,7 @@ b
 return Err(ParseError::ExcludedBranch(3089242474000390105u64));
 }
 };
-try_sub!(bit as u8, 48u8, 14646838598150249928u64)
+try_sub!(bit, 48u8, 14646838598150249928u64)
 };
 (Decoder290(input))?;
 let value = (((0u8 as u32) << 3u32 | (_oA as u32)) << 6u32 | (_o9 as u32) << 3u32 | (_o8 as u32)) << 24u32 | (((_o7 as u32) << 3u32 | (_o6 as u32)) << 6u32 | (_o5 as u32) << 3u32 | (_o4 as u32)) << 12u32 | ((_o3 as u32) << 3u32 | (_o2 as u32)) << 6u32 | (_o1 as u32) << 3u32 | (_o0 as u32);
