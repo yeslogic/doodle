@@ -3593,16 +3593,8 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::seq(inner_t)))?;
                 Ok(newvar)
             }
-            Format::RepeatBetween(min, max, inner) => {
-                if Expr::exact_repeat_bounds(min, max).is_none() {
-                    return Err(TCErrorKind::NonConstantRepeatBounds.into());
-                }
+            Format::RepeatBetween(_range, inner) => {
                 let newvar = self.get_new_uvar();
-                let min_var = self.infer_var_expr(min, ctxt.scope)?;
-                let max_var = self.infer_var_expr(max, ctxt.scope)?;
-                let _constraint =
-                    self.unify_utype_baseset(Rc::new(UType::Var(min_var)), BaseSet::UAny)?;
-                self.unify_var_pair(min_var, max_var)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(newvar, Rc::new(UType::seq(inner_t)))?;
                 Ok(newvar)
@@ -4566,30 +4558,6 @@ mod tests {
                     e.err.as_ref(),
                     TCErrorKind::MultipleSolutions(..) | TCErrorKind::MultipleIntSolutions(..)
                 ),
-                "unexpected error: {e}"
-            ),
-        }
-    }
-
-    /// `Format::RepeatBetween` bounds that are not constant are a `TCError`.
-    #[test]
-    fn test_repeat_between_non_constant_bounds() {
-        use crate::helper::var;
-
-        let f = Format::Let(
-            "n".into(),
-            Box::new(Expr::U8(2)),
-            Box::new(Format::RepeatBetween(
-                Box::new(Expr::U8(1)),
-                Box::new(var("n")),
-                Box::new(Format::Byte(ByteSet::full())),
-            )),
-        );
-        let module = FormatModule::new();
-        match TypeChecker::infer_module(&module, &f) {
-            Ok(_) => panic!("unexpected success for non-constant RepeatBetween bounds"),
-            Err(e) => assert!(
-                matches!(e.err.as_ref(), TCErrorKind::NonConstantRepeatBounds),
                 "unexpected error: {e}"
             ),
         }

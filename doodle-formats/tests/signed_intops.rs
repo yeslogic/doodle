@@ -309,9 +309,6 @@ mod survey {
             ("if _ then {a} else {b}", |a, b| {
                 compute(expr_if_else(Expr::Bool(true), a, b))
             }),
-            ("RepeatBetween({a}, {b}, u8)", |a, b| {
-                repeat_between(a, b, u8())
-            }),
         ]
     }
 
@@ -329,11 +326,6 @@ mod survey {
                 "IntSucc(5auto) == U8(6)",
                 compute(expr_eq(succ(auto5()), Expr::U8(6))),
                 with_pad(&[]),
-            ),
-            (
-                "RepeatBetween(U8(1), u8()=2, u8)",
-                chain(u8(), "x", repeat_between(Expr::U8(1), var("x"), u8())),
-                with_pad(&[2]),
             ),
             (
                 "u8()=5 ~ ZConst(5) | ZRange(0..=255) (no wildcard)",
@@ -410,7 +402,7 @@ mod survey {
             "AsU8" | "AsU32" | "AsChar" => "casts",
             "SeqIx" | "SubSeq" | "Dup" => "sequence index/length arguments",
             "FindByKey" => "FindByKey keys",
-            "RepeatCount" | "RepeatBetween" => "repetition counts",
+            "RepeatCount" => "repetition counts",
             "CaptureBytes" | "ReadArray" | "Offset" => "view lengths/offsets",
             "EnumFromTo" => "EnumFromTo bounds",
             _ if template.contains(" ~ ") => "pattern matching",

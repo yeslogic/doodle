@@ -154,7 +154,7 @@ fn check_covered(
         Format::Repeat(format)
         | Format::Repeat1(format)
         | Format::RepeatCount(_, format)
-        | Format::RepeatBetween(_, _, format)
+        | Format::RepeatBetween(_, format)
         | Format::ForEach(_, _, format)
         | Format::RepeatUntilLast(_, format)
         | Format::RepeatUntilSeq(_, format)
@@ -287,7 +287,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             | Format::Repeat1(format)
             | Format::ForEach(_, _, format)
             | Format::RepeatCount(_, format)
-            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatBetween(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => {

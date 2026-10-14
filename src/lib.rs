@@ -1,7 +1,6 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::iter::repeat_n;
 use std::num::NonZeroUsize;
@@ -711,15 +710,6 @@ impl Expr {
         }
     }
 
-    /// Returns the exact values of the `min` and `max` bounds of a `Format::RepeatBetween`,
-    /// or `None` if either one is not a constant.
-    ///
-    /// Shared by registration, the TypeChecker and the decoder compiler, so that they all
-    /// accept the same set of `RepeatBetween` bounds.
-    pub(crate) fn exact_repeat_bounds(min: &Expr, max: &Expr) -> Option<(usize, usize)> {
-        Some((min.bounds().as_exact()?, max.bounds().as_exact()?))
-    }
-
     /// Conservative bounds for unsigned numeric expressions
     fn bounds(&self) -> Bounds {
         match self {
@@ -891,7 +881,7 @@ pub(crate) mod record_fmt;
 pub(crate) use record_fmt::{OwnedRecordFormat, RecordBuilder};
 
 pub mod format;
-pub use format::Format;
+pub use format::{Format, RepeatRange};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct FormatRef(usize);
@@ -1232,23 +1222,7 @@ impl FormatModule {
                 }
                 Ok(ValueType::Seq(Box::new(elem_t)))
             }
-            Format::RepeatBetween(min, max, a) => {
-                let (t0, t1) = (min.infer_type(scope)?, max.infer_type(scope)?);
-                let Ok(t) = t0.unify(&t1) else {
-                    return Err(anyhow!(
-                        "RepeatBetween bounds should have the same type, found {t0:?} and {t1:?}"
-                    ));
-                };
-                if !t.is_unsigned_or_auto() {
-                    return Err(anyhow!(
-                        "RepeatBetween bounds should be unsigned or auto, found {t:?} instead"
-                    ));
-                }
-                if Expr::exact_repeat_bounds(min, max).is_none() {
-                    return Err(anyhow!(
-                        "RepeatBetween bounds should be constant, found {min:?} and {max:?}"
-                    ));
-                }
+            Format::RepeatBetween(_range, a) => {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
@@ -2021,59 +1995,35 @@ impl<'a> MatchTreeStep<'a> {
                     }
                 }
             }
-            TypedFormat::RepeatBetween(_, xmin, xmax, a) => {
-                let min_bounds = xmin.bounds();
-                let max_bounds = xmax.bounds();
-                match (min_bounds.as_exact(), max_bounds.as_exact()) {
-                    (Some(min), Some(max)) => match min.cmp(&max) {
-                        Ordering::Less => {
-                            if min > 0 {
-                                Self::from_gt_format(
-                                    module,
-                                    a,
-                                    Rc::new(Next::RepeatBetween(
-                                        min - 1,
-                                        max - 1,
-                                        MaybeTyped::Typed(&**a),
-                                        next,
-                                    )),
-                                )
-                            } else {
-                                Self::from_next(
-                                    module,
-                                    Rc::new(Next::RepeatMax(
-                                        max,
-                                        MaybeTyped::Typed(&**a),
-                                        next.clone(),
-                                    )),
-                                )
-                            }
-                        }
-                        Ordering::Equal => {
-                            let next = next.clone();
-                            if min > 0 {
-                                Self::from_gt_format(
-                                    module,
-                                    a,
-                                    Rc::new(Next::RepeatCount(
-                                        min - 1,
-                                        MaybeTyped::Typed(&**a),
-                                        next,
-                                    )),
-                                )
-                            } else {
-                                Self::from_next(module, next)
-                            }
-                        }
-                        Ordering::Greater => {
-                            panic!("incoherent repeat-between: min {min} > max {max}")
-                        }
-                    },
-                    _ => {
-                        unreachable!(
-                            "inexact repeat-between bounds (not technically a problem but not what the combinator was designed for..."
-                        );
+            TypedFormat::RepeatBetween(_, range, a) => {
+                let (min, max) = (range.min(), range.max());
+                if min == max {
+                    let next = next.clone();
+                    if min > 0 {
+                        Self::from_gt_format(
+                            module,
+                            a,
+                            Rc::new(Next::RepeatCount(min - 1, MaybeTyped::Typed(&**a), next)),
+                        )
+                    } else {
+                        Self::from_next(module, next)
                     }
+                } else if min > 0 {
+                    Self::from_gt_format(
+                        module,
+                        a,
+                        Rc::new(Next::RepeatBetween(
+                            min - 1,
+                            max - 1,
+                            MaybeTyped::Typed(&**a),
+                            next,
+                        )),
+                    )
+                } else {
+                    Self::from_next(
+                        module,
+                        Rc::new(Next::RepeatMax(max, MaybeTyped::Typed(&**a), next.clone())),
+                    )
                 }
             }
             TypedFormat::RepeatUntilLast(_, _expr, _a) => {
@@ -2223,26 +2173,8 @@ impl<'a> MatchTreeStep<'a> {
                     Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
                 }
             }
-            Format::RepeatBetween(xmin, xmax, a) => {
-                let min_bounds = xmin.bounds();
-                let max_bounds = xmax.bounds();
-                match (min_bounds.as_exact(), max_bounds.as_exact()) {
-                    (Some(min), Some(max)) => match min.cmp(&max) {
-                        Ordering::Less => {
-                            Self::from_repeat_between(module, (min, max), a, next.clone())
-                        }
-                        Ordering::Equal => Self::from_repeat_count(module, min, a, next.clone()),
-                        Ordering::Greater => {
-                            panic!("incoherent repeat-between: min {min} > max {max}")
-                        }
-                    },
-                    _ => {
-                        // FIXME: if there is a cleaner way to address this case, attempt to apply it
-                        unreachable!(
-                            "inexact repeat-between bounds (not technically a problem but not what the combinator was designed for..."
-                        );
-                    }
-                }
+            Format::RepeatBetween(range, a) => {
+                Self::from_repeat_between(module, (range.min(), range.max()), a, next.clone())
             }
             Format::RepeatUntilLast(_expr, _a) => {
                 Self::accept() // FIXME
@@ -2564,11 +2496,11 @@ mod test {
     }
 
     /// Registration rejects signed operands to native arithmetic/casts/counts/lengths but accepts Auto (`NumericHole`);
-    /// `RepeatBetween` bounds must be constant; and pattern/type mismatches are reported as errors rather than panics.
+    /// `RepeatBetween` bounds are well-formed; and pattern/type mismatches are reported as errors rather than panics.
     #[test]
     fn registration_numeric_acceptance() {
         use crate::byte_set::ByteSet;
-        use crate::helper::{add, poly_zero, var};
+        use crate::helper::{add, poly_zero};
         use crate::numeric::core::TypedConst;
         use crate::numeric::helper as num;
 
@@ -2588,16 +2520,14 @@ mod test {
         assert!(registration(&Format::RepeatCount(Box::new(poly_zero()), byte())).is_ok());
         assert!(registration(&Format::RepeatCount(Box::new(i16_one()), byte())).is_err());
 
-        // R4
-        let between = |min, max| Format::RepeatBetween(Box::new(min), Box::new(max), byte());
-        assert!(registration(&between(Expr::U8(1), Expr::U8(2))).is_ok());
+        // R4 - non-constant bounds are unrepresentable, and `min > max` is rejected by `RepeatRange::new`
+        assert!(RepeatRange::new(2, 1).is_none());
         assert!(
-            registration(&Format::Let(
-                "n".into(),
-                Box::new(Expr::U8(2)),
-                Box::new(between(Expr::U8(1), var("n"))),
+            registration(&Format::RepeatBetween(
+                RepeatRange::new(1, 2).unwrap(),
+                byte()
             ))
-            .is_err()
+            .is_ok()
         );
 
         // R5

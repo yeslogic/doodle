@@ -10,7 +10,8 @@ use trace::get_and_increment_seed;
 
 use crate::{
     Arith, BaseType, CommonOp, DynFormat, Expr, FixedReadKind, Format, FormatModule, FormatRef,
-    IntRel, IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
+    IntRel, IntoLabel, Label, MatchTree, Pattern, RepeatRange, StyleHint, UnaryOp, ViewExpr,
+    ViewFormat,
     bounds::Bounds,
     byte_set::ByteSet,
     codegen::typed_format::TypedFixedReadKind,
@@ -713,11 +714,10 @@ impl CodeGen {
                     Box::new(self.translate(single.get_dec())),
                 ))
             }
-            TypedDecoder::RepeatBetween(_gt, tree, expr_min, expr_max, single) => {
+            TypedDecoder::RepeatBetween(_gt, tree, range, single) => {
                 CaseLogic::Repeat(RepeatLogic::BetweenCounts(
                     tree.clone(),
-                    Box::new(embed_expr_nat(expr_min)),
-                    Box::new(embed_expr_nat(expr_max)),
+                    *range,
                     Box::new(self.translate(single.get_dec())),
                 ))
             }
@@ -3402,8 +3402,7 @@ enum RepeatLogic<ExprT> {
     /// Repeats between N and M times
     BetweenCounts(
         MatchTree, // MatchTree, constructed so that the matching index is how many unprocessed repetitions are still available in the current LL(k) window
-        Box<RustExpr>, // Min (N)
-        Box<RustExpr>, // Max (M)
+        RepeatRange, // N..=M
         Box<CaseLogic<ExprT>>,
     ),
     /// Repetition stops after a predicate for 'terminal element' is satisfied
@@ -3486,7 +3485,7 @@ where
                 stmts.push(ctrl.into());
                 GenBlock::from_parts(stmts, Some(RustExpr::local(model::R1BOM_ACCUM).into()))
             }
-            RepeatLogic::BetweenCounts(reps_left_tree, expr_min, expr_max, elt) => {
+            RepeatLogic::BetweenCounts(reps_left_tree, range, elt) => {
                 let mut stmts = Vec::new();
 
                 stmts.push(model::let_mut_vec_new(model::BETWEEN_ACCUM).into());
@@ -3498,8 +3497,8 @@ where
                     let cond = {
                         let out_of_reps = model::eq0(RustExpr::local(model::BETWEEN_REPS_LEFT));
                         let len_expr = RustExpr::local(model::BETWEEN_ACCUM).vec_len();
-                        let min_expr = expr_min.clone().cast_as_usize();
-                        let max_expr = expr_max.clone().cast_as_usize();
+                        let min_expr = RustExpr::num_lit(range.min());
+                        let max_expr = RustExpr::num_lit(range.max());
                         model::repeat_between_finished(out_of_reps, len_expr, min_expr, max_expr)
                     };
                     let b_continue = {
@@ -5049,18 +5048,11 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatCount(gt, Box::new(t_expr), Box::new(t_inner))
             }
-            Format::RepeatBetween(min_expr, max_expr, inner) => {
+            Format::RepeatBetween(range, inner) => {
                 let index = self.get_and_increment_index();
-                let t_min_expr = self.elaborate_expr(min_expr);
-                let t_max_expr = self.elaborate_expr(max_expr);
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::RepeatBetween(
-                    gt,
-                    Box::new(t_min_expr),
-                    Box::new(t_max_expr),
-                    Box::new(t_inner),
-                )
+                TypedFormat::RepeatBetween(gt, *range, Box::new(t_inner))
             }
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();
