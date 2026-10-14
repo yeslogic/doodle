@@ -334,6 +334,16 @@ pub enum DecodeErrorKind<V: Clone = Value> {
         /// Offset in the buffer at which the invalid branch was encountered
         offset: usize,
     },
+    /// [`Decoder::RepeatBetween`](crate::decoder::Decoder::RepeatBetween) lookahead signalled
+    /// end-of-repetition before the minimum number of repeats had been parsed.
+    InsufficientRepeats {
+        /// Minimum number of repeats required
+        min: usize,
+        /// Number of repeats parsed before the lookahead signalled termination
+        found: usize,
+        /// Offset in the buffer at which the repetition was terminated
+        offset: usize,
+    },
     /// Expression evaluated to a value that did not match any of the provided patterns in a [`Decoder::Match`](crate::decoder::Decoder::Match).
     RefutedPatternMatch {
         /// List of patterns that the value was matched against
@@ -416,6 +426,12 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeErrorKind<V> {
                 write!(
                     f,
                     "no valid branch found for content starting at offset {offset}"
+                )
+            }
+            Self::InsufficientRepeats { min, found, offset } => {
+                write!(
+                    f,
+                    "repetition terminated at offset {offset} after {found} repeats (expected at least {min})"
                 )
             }
             Self::RefutedPatternMatch { value, cases } => {

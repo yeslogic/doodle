@@ -931,18 +931,22 @@ impl Decoder {
                     .trace_eval(|| ("RepeatBetween(max)", format!("{max:?}")))?;
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    let v = &res.as_ref().0;
-                    // REVIEW - does the order of the conditions in the OR matter?
-                    if reps_left_tree.matches(input).ok_or(
+                    // NOTE - lookahead must be performed from the current position, not the start of the repetition
+                    let (v, cur_input) = res.as_ref();
+                    let reps_left = reps_left_tree.matches(*cur_input).ok_or(
                         DecodeErrorKind::NoValidBranch {
-                            offset: input.offset,
+                            offset: cur_input.offset,
                         }
                         .with_trace(v.len()),
-                    )? == 0
-                        || v.len() == max
-                    {
+                    )?;
+                    if reps_left == 0 || v.len() == max {
                         if v.len() < min {
-                            unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
+                            return Err(DecodeErrorKind::InsufficientRepeats {
+                                min,
+                                found: v.len(),
+                                offset: cur_input.offset,
+                            }
+                            .with_trace("RepeatBetween"));
                         }
                         break;
                     }
@@ -2244,6 +2248,32 @@ mod tests {
         let trailer = is_byte(1);
         let f = Format::Tuple(vec![repeat_between, trailer]);
         assert!(Compiler::compile_one(&f).is_ok());
+    }
+
+    /// Regression test: lookahead for `RepeatBetween` must be evaluated at the current position on each
+    /// iteration (not the start of the repetition), and short repetitions must be errors rather than panics.
+    #[test]
+    fn repeat_between_counts() {
+        let f = Format::Tuple(vec![
+            repeat_between(Expr::U32(4), Expr::U32(8), is_byte(b'a')),
+            is_byte(b'b'),
+        ]);
+        let d = Compiler::compile_one(&f).unwrap();
+        for n in 4..=8 {
+            let mut input = vec![b'a'; n];
+            input.push(b'b');
+            input.push(b'c');
+            let expect = Value::Tuple(vec![
+                Value::Seq(vec![Value::U8(b'a'); n].into()),
+                Value::U8(b'b'),
+            ]);
+            accepts(&d, &input, b"c", expect);
+        }
+        for n in [0, 1, 3, 9] {
+            let mut input = vec![b'a'; n];
+            input.push(b'b');
+            rejects(&d, &input);
+        }
     }
 
     #[test]
