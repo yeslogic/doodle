@@ -35,6 +35,7 @@ Below are the places where the survey disagrees with or adds to `NUMERIC_GUIDELI
 - Codegen panics with #67 `not implemented: RepeatBetween on inexact bounds-expr` even for closed bounds such as `RepeatBetween(5u8, U8(5), u8)`. Legacy and the interpreter accept that case.
 - This suggests codegen's bounds analysis doesn't use the closed-Numeric exact path described in guideline:55.
 - Legacy also panics (not an error) at registration for a non-closed bound (`u8()=5`, #67).
+- **Resolved (superseded):** `RepeatBetween` bounds are no longer `Expr`s. They are a `RepeatRange` of constant `u32`s with `min <= max` enforced on construction, so Numeric, Auto and variable bounds can't be expressed at all, and neither the type checkers nor codegen have to handle them.
 
 **A7. Unresolved Auto constraints panic instead of producing a type error** (the `UAny`/`ZAny` sections imply ambiguity but don't say what happens)
 - With no sibling to pin its type, an Auto const fails with "no unique solution" in these cases:
@@ -52,13 +53,13 @@ Below are the places where the survey disagrees with or adds to `NUMERIC_GUIDELI
 3. **Line 46**, `as_usize` sites: add `EnumFromTo` (#65).
 4. **Line 50**, Auto never matching `U8(n)`: the survey can't confirm this, because registration panics before the interpreter runs (A4).
 5. **Line 66**, `IntCoverage::add` hitting `unreachable!`: *not tested by the survey.* Every pattern case is built by `match_bool` (`doodle-formats/tests/signed_intops.rs:238`), which always appends a `Pattern::Wildcard` fallback arm. So `U8(5) ~ ZConst(5)` passing `generate_code` neither confirms nor contradicts the claim, which is about matches with *no* irrefutable arm. The guideline line should stay as-is (unverified by survey).
-6. **Add** the new `FindByKey` behaviour from A1/A2, and the `RepeatBetween` panics from A6.
+6. **Add** the new `FindByKey` behaviour from A1/A2, and the `RepeatBetween` panics from A6. (The A6 part no longer applies: see the resolution note there.)
 
 ## Confirmed as recorded
 
 These match the survey:
 - the legacy `is_numeric` acceptance list;
-- `RepeatCount`/`RepeatBetween` rejecting `Signed`/`Hole`;
+- `RepeatCount`/`RepeatBetween` rejecting `Signed`/`Hole` (`RepeatBetween` bounds have since become constant `u32`s; see A6);
 - `SeqIx`/`SubSeq`/`Dup` requiring exactly `U32` in legacy;
 - the TypeChecker's unsigned sets rejecting `i8` everywhere except `AsUN`;
 - `ZConst(-1)` excluding unsigned scrutinees;
