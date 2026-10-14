@@ -13,7 +13,9 @@ use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::numeric::core::{Bounds as NumBounds, VOID};
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
 use crate::validation::TypedCondition;
-use crate::{Arith, BaseKind, Endian, FormatRef, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::{
+    Arith, BaseKind, Endian, FormatRef, IntRel, Label, RepeatRange, StyleHint, TypeHint, UnaryOp,
+};
 
 pub(crate) mod variables;
 
@@ -126,9 +128,8 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 lbl.hash(state);
                 inner.hash(state);
             }
-            TypedFormat::RepeatBetween(_, lo, hi, inner) => {
-                lo.hash(state);
-                hi.hash(state);
+            TypedFormat::RepeatBetween(_, range, inner) => {
+                range.hash(state);
                 inner.hash(state);
             }
             TypedFormat::RepeatUntilLast(_, f, inner)
@@ -245,12 +246,7 @@ pub enum TypedFormat<TypeRep> {
     Repeat(TypeRep, Box<TypedFormat<TypeRep>>),
     Repeat1(TypeRep, Box<TypedFormat<TypeRep>>),
     RepeatCount(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
-    RepeatBetween(
-        TypeRep,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedFormat<TypeRep>>,
-    ),
+    RepeatBetween(TypeRep, RepeatRange, Box<TypedFormat<TypeRep>>),
     RepeatUntilLast(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     RepeatUntilSeq(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     Maybe(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
@@ -352,9 +348,7 @@ impl TypedFormat<GenType> {
                 .reduce(<Bounds as Add>::add)
                 .unwrap_or(Bounds::exact(0)),
             TypedFormat::RepeatCount(_, t_exp, f) => f.lookahead_bounds() * t_exp.bounds(),
-            TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
-                f.lookahead_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
-            }
+            TypedFormat::RepeatBetween(_, range, f) => f.lookahead_bounds() * range.bounds(),
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
                 f.lookahead_bounds() * Bounds::at_least(1)
@@ -433,9 +427,7 @@ impl TypedFormat<GenType> {
                 .reduce(<Bounds as Add>::add)
                 .unwrap_or(Bounds::exact(0)),
             TypedFormat::RepeatCount(_, t_exp, f) => f.match_bounds() * t_exp.bounds(),
-            TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
-                f.match_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
-            }
+            TypedFormat::RepeatBetween(_, range, f) => f.match_bounds() * range.bounds(),
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
                 f.match_bounds() * Bounds::at_least(1)
@@ -1270,8 +1262,8 @@ mod __impls {
                 TypedFormat::RepeatCount(_, count, inner) => {
                     Format::RepeatCount(rebox(count), rebox(inner))
                 }
-                TypedFormat::RepeatBetween(_, min, max, inner) => {
-                    Format::RepeatBetween(rebox(min), rebox(max), rebox(inner))
+                TypedFormat::RepeatBetween(_, range, inner) => {
+                    Format::RepeatBetween(range, rebox(inner))
                 }
                 TypedFormat::RepeatUntilLast(_, lambda, inner) => {
                     Format::RepeatUntilLast(rebox(lambda), rebox(inner))

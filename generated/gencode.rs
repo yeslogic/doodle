@@ -29135,7 +29135,7 @@ input.close_peek_context()?;
 ret
 }
 };
-if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
+if (repeat_between_finished(reps_left == 0, accum.len(), 1, 79))? {
 break
 } else {
 let next_elem = {
@@ -30112,7 +30112,7 @@ input.close_peek_context()?;
 ret
 }
 };
-if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
+if (repeat_between_finished(reps_left == 0, accum.len(), 1, 79))? {
 break
 } else {
 let next_elem = {
@@ -31134,7 +31134,7 @@ input.close_peek_context()?;
 ret
 }
 };
-if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
+if (repeat_between_finished(reps_left == 0, accum.len(), 1, 79))? {
 break
 } else {
 let next_elem = {
@@ -32111,7 +32111,7 @@ input.close_peek_context()?;
 ret
 }
 };
-if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
+if (repeat_between_finished(reps_left == 0, accum.len(), 1, 79))? {
 break
 } else {
 let next_elem = {
@@ -33332,7 +33332,7 @@ input.close_peek_context()?;
 ret
 }
 };
-if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
+if (repeat_between_finished(reps_left == 0, accum.len(), 1, 79))? {
 break
 } else {
 let next_elem = {
@@ -41749,7 +41749,7 @@ input.close_peek_context()?;
 ret
 }
 };
-if (repeat_between_finished(reps_left == 0, accum.len(), 0u16 as usize, 9u16 as usize))? {
+if (repeat_between_finished(reps_left == 0, accum.len(), 0, 9))? {
 break
 } else {
 let next_elem = {
