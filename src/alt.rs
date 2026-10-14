@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::{
     BaseType, ByteSet, DynFormat, Expr, FixedReadKind, Format, FormatModule, FormatRef, IntoLabel,
-    IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
+    IxHeap, Label, Pattern, RepeatRange, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
     typecheck::error::UnificationError,
     validation::Condition,
     valuetype::{BaseNumType, Container, SignedIntType},
@@ -59,7 +59,7 @@ pub enum MonoKind {
     Repeat,
     Repeat1,
     RepeatCount(Box<Expr>),
-    RepeatBetween(Box<Expr>, Box<Expr>),
+    RepeatBetween(RepeatRange),
     RepeatUntilLast(Box<Expr>),
     RepeatUntilSeq(Box<Expr>),
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHintExt),
@@ -1067,25 +1067,7 @@ impl FormatModuleExt {
                                 "RepeatCount first argument type should be unsigned or auto, found {other:?} instead"
                             )),
                         },
-                        MonoKind::RepeatBetween(min, max) => {
-                            let (t0, t1) = (min.infer_type_ext(scope)?, max.infer_type_ext(scope)?);
-                            if matches!(t0, ValueTypeExt::EngineSpecific { .. })
-                                || matches!(t1, ValueTypeExt::EngineSpecific { .. })
-                            {
-                                unreachable!(
-                                    "RepeatBetween: unexpected engine-specific type in numeric position"
-                                );
-                            }
-                            let Ok(t) = t0.unify(&t1) else {
-                                return Err(anyhow!(
-                                    "RepeatBetween bounds should have the same type, found {t0:?} and {t1:?}"
-                                ));
-                            };
-                            if !t.is_unsigned_or_auto() {
-                                return Err(anyhow!(
-                                    "RepeatBetween bounds should be unsigned or auto, found {t:?} instead"
-                                ));
-                            }
+                        MonoKind::RepeatBetween(_range) => {
                             let t = self.infer_format_ext_type(scope, f)?;
                             Ok(ValueTypeExt::Seq(Box::new(t)))
                         }
@@ -1892,8 +1874,8 @@ mod __impls {
                     MonoKind::RepeatCount(expr),
                     Box::new(FormatExt::from(*format)),
                 )),
-                Format::RepeatBetween(expr, expr1, format) => FormatExt::Epi(EpiFormat::Mono(
-                    MonoKind::RepeatBetween(expr, expr1),
+                Format::RepeatBetween(range, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::RepeatBetween(range),
                     Box::new(FormatExt::from(*format)),
                 )),
                 Format::RepeatUntilLast(expr, format) => FormatExt::Epi(EpiFormat::Mono(
@@ -2064,7 +2046,7 @@ mod __impls {
                 MonoKind::Repeat => Format::Repeat(inner),
                 MonoKind::Repeat1 => Format::Repeat1(inner),
                 MonoKind::RepeatCount(expr) => Format::RepeatCount(expr, inner),
-                MonoKind::RepeatBetween(expr, expr1) => Format::RepeatBetween(expr, expr1, inner),
+                MonoKind::RepeatBetween(range) => Format::RepeatBetween(range, inner),
                 MonoKind::RepeatUntilLast(expr) => Format::RepeatUntilLast(expr, inner),
                 MonoKind::RepeatUntilSeq(expr) => Format::RepeatUntilSeq(expr, inner),
                 MonoKind::AccumUntil(expr, expr1, expr2, type_hint) => {
@@ -2195,14 +2177,6 @@ mod tests {
         assert!(infer_ext(compute(Expr::AsChar(Box::new(i16_one())))).is_err());
         assert!(infer_ext(Format::RepeatCount(Box::new(poly_zero()), byte())).is_ok());
         assert!(infer_ext(Format::RepeatCount(Box::new(i16_one()), byte())).is_err());
-        assert!(
-            infer_ext(Format::RepeatBetween(
-                Box::new(poly_zero()),
-                Box::new(Expr::U8(2)),
-                byte()
-            ))
-            .is_ok()
-        );
 
         // R5
         assert!(infer_ext(Format::Slice(Box::new(Expr::U64(1)), byte())).is_ok());

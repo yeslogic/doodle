@@ -1,6 +1,6 @@
 use crate::byte_set::ByteSet;
 use crate::validation::TypedCondition;
-use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
+use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, RepeatRange, StyleHint};
 use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -144,8 +144,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     RepeatBetween(
         TypeRep,
         MatchTree,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        RepeatRange,
         Box<TypedDecoderExt<TypeRep>>,
     ),
     RepeatUntilLast(
@@ -538,15 +537,8 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatCount(gt.clone(), expr.clone(), da))
             }
-            TypedFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
-                // NOTE - non-constant bounds are rejected by the TypeChecker (`TCErrorKind::NonConstantRepeatBounds`)
-                let (Some(min), Some(max)) =
-                    (min_expr.bounds().as_exact(), max_expr.bounds().as_exact())
-                else {
-                    unreachable!(
-                        "RepeatBetween on non-constant bounds should be rejected by the TypeChecker"
-                    )
-                };
+            TypedFormat::RepeatBetween(gt, range, a) => {
+                let (min, max) = (range.min(), range.max());
 
                 let da = self.compile_gt_format(
                     a,
@@ -581,8 +573,7 @@ impl<'a> GTCompiler<'a> {
                 Ok(TypedDecoder::RepeatBetween(
                     gt.clone(),
                     reps_left_tree,
-                    min_expr.clone(),
-                    max_expr.clone(),
+                    *range,
                     Box::new(da),
                 ))
             }

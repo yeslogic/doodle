@@ -902,9 +902,8 @@ impl Decoder {
                     (ParsedValue::new_seq(v, start_offset, total_len), input)
                 }))
             }
-            Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
-                let min = min.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatBetween(min)", format!("{min:?}")))?;
-                let max = max.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatBetween(max)", format!("{max:?}")))?;
+            Decoder::RepeatBetween(reps_left_tree, range, a) => {
+                let (min, max) = (range.min(), range.max());
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
                     // NOTE - lookahead must be performed from the current position, not the start of the repetition
