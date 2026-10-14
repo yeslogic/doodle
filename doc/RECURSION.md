@@ -1,14 +1,24 @@
-# Recursion in doodle
+# Recursive Formats in `doodle`
 
-This document is the authoritative reference for how genuinely self-referential formats — ones
-that actually get decoded, as opposed to [`Format::Phantom`](#phantom-is-a-different-thing) — are
-supported across `doodle`'s three passes (`MatchTree` lookahead construction, the bidirectional
-type-checker, and code generation) and the interpreter. It is a living document: update it whenever
-the recursion model itself changes, not just when a bug in it is fixed.
+This is a descriptive overview of the currently-experimental support for defining auto-recursive and
+mutually-recursive formats in `doodle`.
 
-This is distinct from `experiments/doodle-rec/PLAN.md`, which is a *migration aid* — a phase-by-phase
-execution log for the specific work of porting a design worked out in the `experiments/doodle-rec`
-sandbox into `src/`. PLAN.md will eventually be irrelevant once that port is finished and merged;
+As many of the core features of the `doodle` grammar, and the machinery surrounding it (e.g. `MatchTree`),
+were designed in a purely non-recursive format context, there will be numerous gaps and considerations
+not yet discovered or descibed in this document.
+
+Recursive self-references, whether direct (auto-recursion) or cyclic (mutual recursion), are given
+provisional support across `doodle`'s three passes (`MatchTree` lookahead construction, bidirectional TC, and code generation),
+as well as in the interpreter; ones
+where embedded self-references are actually parsed, as opposed to self-referential types using
+[`Format::Phantom`](#phantom-is-different)
+
+Details will frequently change, and understanding will develop as support for recursion is ironed out,
+so this doc will be updated regularly, not just when descriptive bugs are fixed.
+
+This is distinct from `experiments/doodle-rec/PLAN.md`, which is a *migration aid* for porting
+design choices and implementation details of the `experiments/doodle-rec`
+sandbox into `src/` (`doodle` proper). PLAN.md will eventually be irrelevant once that port is finished and merged;
 this document is meant to outlive it, recording the settled design, not the process of arriving at it.
 
 ## Mental model
@@ -25,7 +35,7 @@ of processing. All four independently follow the same shape: open a level, recur
 same level is reached again while still open, stop and either substitute a deferred/cyclic reference
 (safe) or fail loudly (a genuine grammar defect, not a decidable recursive shape).
 
-### `Format::Phantom` is a different thing
+### `Format::Phantom` is a different thing {#phantom-is-different}
 
 `Format::Phantom` is doodle's other self-referential construct, and predates all of the above. It is
 deliberately designed to **never be decoded** — its contents are include in the format tree only for
@@ -71,10 +81,63 @@ There is no lower-level public constructor for a genuinely self-referential, non
 would occupy exists, so an out-of-bounds self-reference is rejected outright by design.
 `define_format_rec_batch` is the one sanctioned entry point.
 
-## The four mechanisms
+## The five mechanisms
 
 Each of these runs on *every* format, recursive or not, and each is additive/permissive for the new
 recursive case while leaving non-recursive formats' behavior unchanged.
+
+### 0. Reachable-base-case check at batch registration
+
+**Where**: `FormatModule::check_batch_has_base_case` (`src/lib.rs`), called from both
+`define_format_rec_batch` and `define_format_recursive` right after a batch's bodies are installed
+(and, for `define_format_rec_batch`, after `Format::substitute_rec_var` has rewritten every
+`RecVar` to a real `ItemVar`), before `infer_batch_types` runs. Backed by
+`Format::has_reachable_base_case` (`src/format.rs`) and `RecursiveBounds::is_min_unresolved`
+(`src/recursion.rs`).
+
+None of the other four mechanisms reject `F := 'a' F` (a batch member that is *unconditionally*,
+mandatorily self-referential, with no non-recursive alternative anywhere on its cycle): it makes
+byte progress on every step, so the `MatchTree` cycle guard (mechanism 1 below) treats it as
+"guarded" and happily terminates construction; it isn't left-recursive, so nothing about it is
+undisambiguable; and `infer_format_type`'s `ItemVar` arm never recurses into a referenced level's
+body at all (see `infer_batch_types`'s own doc comment), so there is no occurs-check-shaped
+opportunity to notice it either. Left unchecked, such a format reaches `MatchTree`/codegen and
+recurses at decode time via a plain, uncounted call stack in both backends (the interpreter's
+`Decoder::Call` and each generated per-level Rust function) - it can never actually complete on any
+finite input (a decoder for it only ever stops because the input ran out), and an
+attacker-controlled input of adequate length can exhaust the stack before that happens. This is a
+real, previously-unaddressed gap: the `RUST_MIN_STACK=8388608` set project-wide (see root
+`CLAUDE.md`) exists for deep *construction-time* `Format` trees in debug builds, not as a
+mitigation for this.
+
+The fix piggybacks on the *existing* `match_bounds`/`lookahead_bounds` machinery
+(`RecursiveBounds`/`OpenSet`, `src/recursion.rs`) rather than adding a new traversal:
+`Format::has_reachable_base_case` runs `match_bounds_recursive` and asks whether the result is
+still `min_unresolved` once the whole traversal finishes. A `Format::ItemVar` re-entering an
+already-open level already reports `RecursiveBounds::unresolved()`, and `RecursiveBounds::union`
+(used by every `Union`/`Match` arm) already knows how to let one resolved sibling "rescue" an
+unresolved one - exactly the existence-of-*some*-terminating-derivation semantics this check needs,
+for free. `check_batch_has_base_case` calls this once per batch member (on that member's own,
+already-installed body) and panics naming every member with no reachable base case, mirroring the
+"Panics if any constructed format fails to type-check" convention both registration functions
+already document.
+
+This is a genuinely different, narrower failure than genuine left recursion (mechanism 1's `bad :=
+bad | 'Z'`): a format can have a perfectly reachable base case and still be left-recursive (progress
+is not reachability - `'Z'` is a real escape, it's simply reachable via the same zero-progress
+position `MatchTree` can't disambiguate), and a format can make byte progress on every single step
+and still have no base case at all (reachability is not progress - `F := 'a' F` is exactly this).
+Neither check subsumes the other, and both remain necessary; this one simply runs much earlier
+(eagerly, at registration time, for *both* backends at once, since both compile from the same
+`FormatModule`) rather than only once something tries to build a `MatchTree`.
+
+One consequence worth calling out: the bare-`Tuple`/`Seq`/`Option` anti-pattern (mechanism 3's
+codegen `unreachable!`, below) is, by construction, *always* also a no-reachable-base-case cycle - a
+`Tuple`'s sequencing has no analog of `Union`'s "pick a different branch" escape, so a directly
+self-referential bare `Tuple` can never have one. This check now catches that shape earlier, at
+registration, before a `FormatRef` to it can ever reach codegen - see
+`phase3_final_check_pure_tuple_cycle_rejects_cleanly`'s updated expectations under
+[mechanism 3](#3-box-placement-in-codegen).
 
 ### 1. `MatchTree` cycle guard
 
@@ -315,17 +378,31 @@ module lookup should be needed. Two distinct hazards had to be closed before tha
 
 - **A bare `Tuple`/`Seq`/`Option` batch member that is *directly* self-referential, with no
   `Record`/`Union` boundary anywhere on its cycle** (e.g. two batch members that are each just
-  `Tuple[Byte, ItemVar(other)]`, referencing each other with nothing else in between). This is
-  rejected loudly and immediately by codegen with `unreachable!("Expansion::Tuple(UVar) is directly
+  `Tuple[Byte, ItemVar(other)]`, referencing each other with nothing else in between). Such a cycle
+  is, by construction, always *also* a cycle with no reachable base case (a `Tuple`'s sequencing has
+  no analog of `Union`'s "pick a different branch" escape), so in practice this is now rejected even
+  earlier, at `define_format_rec_batch`/`define_format_recursive` registration time, by
+  [mechanism 0](#0-reachable-base-case-check-at-batch-registration)'s
+  `no reachable base case for: ...` panic - before a `FormatRef` to it can ever reach codegen. The
+  original, codegen-specific guard (`unreachable!("Expansion::Tuple(UVar) is directly
   self-referential (an anonymous tuple whose own element type is itself, with no Record/Union
-  boundary in between) - not yet supported by codegen")`, rather than hanging or producing broken
-  output. This is a real, load-bearing distinction from the pattern above: `pong` (a bare `Tuple`) is
-  fine specifically *because* its own cycle routes through `ping`'s `Union` before ever coming back to
-  `pong`'s own tuple type — the guard only fires when a `Tuple`'s own `UVar` would need to resolve
+  boundary in between) - not yet supported by codegen")`) is kept as a defensive backstop - since
+  `define_format_rec_batch`/`define_format_recursive` are documented as the only sanctioned entry
+  points for real recursion, nothing in the public API can currently reach it, but it costs little to
+  leave in place against a future construction path this reasoning doesn't anticipate. This is a
+  real, load-bearing distinction from the pattern above: `pong` (a bare `Tuple`) is fine specifically
+  *because* its own cycle routes through `ping`'s `Union` before ever coming back to `pong`'s own
+  tuple type — the (now backstop) guard only fires when a `Tuple`'s own `UVar` would need to resolve
   directly back to itself while still `in_progress`, not merely "a `Tuple` participates in a
   recursive cycle somewhere." If a real format ever needs this shape, it should be worked out against
   that concrete case (likely: extending `elaborate`-style promotion-to-nominal-struct for a bare
   `Tuple`) rather than assumed to already work.
+- **A recursive batch member with no reachable base case at all** (e.g. `F := 'a' F`, with no
+  non-recursive alternative anywhere on its cycle - see [mechanism 0](#0-reachable-base-case-check-at-batch-registration)).
+  Unlike left recursion below, this makes byte progress on every step, so nothing about `MatchTree`
+  or the occurs-check would otherwise catch it; rejected immediately at
+  `define_format_rec_batch`/`define_format_recursive` registration time instead, naming every
+  offending batch member.
 - **Genuine left recursion** — a self-reference reached with zero possible byte-consuming progress
   (`bad := bad | 'Z'`). Rejected at `MatchTree`-build time (see [mechanism 1](#1-matchtree-cycle-guard)
   above), not a stack overflow or hang. `define_format_rec_batch` itself does **not** check for this
@@ -362,10 +439,16 @@ module lookup should be needed. Two distinct hazards had to be closed before tha
 
 - `src/lib.rs`'s `mod test` — `define_format_rec_batch_*`: self-recursive peano and mutually-recursive
   ping/pong through the real public API and the plain interpreter, a left-recursion-rejection case,
-  and a record-shaped mutual-recursion case (exercising the `LetFormat`/`MonadSeq` fix specifically).
+  a record-shaped mutual-recursion case (exercising the `LetFormat`/`MonadSeq` fix specifically), and
+  `define_format_rec_batch_no_base_case_rejected_at_registration`/
+  `define_format_rec_batch_mutual_no_base_case_rejected_at_registration` (mechanism 0: `F := 'a' F`
+  self- and mutually-recursive shapes, confirmed to panic naming every offending member, at
+  registration time rather than reaching `MatchTree`/codegen at all).
 - `src/codegen/mod.rs`'s `mod tests` — `phase3_final_check_peano_and_ping_pong` (Box placement,
   string-level check), `phase3_final_check_pure_tuple_cycle_rejects_cleanly` (the bare-`Tuple`
-  anti-pattern, confirmed to panic with the expected message),
+  anti-pattern; now confirmed to panic with mechanism 0's earlier, registration-time message rather
+  than reaching the codegen-level backstop it originally targeted — see
+  [Anti-patterns](#anti-patterns--things-that-are-rejected-or-unsupported)),
   `recursive_format_through_record_field_generates_no_dead_decoder` (the codegen-path counterpart to
   the `LetFormat`/`MonadSeq` fix), `regenerate_recursion_fixture` (an `#[ignore]`d generator for
   the `tests/recursion/` fixture below — run it after changing that fixture's format definitions),

@@ -108,6 +108,19 @@ impl RecursiveBounds {
     pub(crate) fn into_bounds(self) -> Bounds {
         self.bounds
     }
+
+    /// Whether the traversal that produced this value found no non-recursive resolution anywhere -
+    /// i.e. every path it explored eventually depended on re-entering a level that was still open.
+    ///
+    /// For a *top-level*, fully-finished traversal (as opposed to an intermediate value still
+    /// being combined by an enclosing `union`/`+`), this is exactly "does this format have a
+    /// reachable base case" - see `Format::has_reachable_base_case`, which is what
+    /// `FormatModule::define_format_rec_batch`/`define_format_recursive` call to reject a batch
+    /// member whose every derivation is mandatorily self-referential (e.g. `F := 'a' F` with no
+    /// non-recursive alternative) before it can ever reach `MatchTree`/codegen.
+    pub(crate) fn is_min_unresolved(&self) -> bool {
+        self.min_unresolved
+    }
 }
 
 impl std::ops::Add for RecursiveBounds {
