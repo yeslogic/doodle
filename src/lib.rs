@@ -1128,10 +1128,19 @@ impl FormatModule {
     /// reference - the exact friction that motivated this constructor (see `doc/RECURSION.md`'s
     /// "mental model" section for the underlying `ItemVar`/level model this still builds on).
     ///
-    /// Each builder also receives `&mut FormatModule`, so it may register its own auxiliary,
-    /// non-recursive sub-formats along the way, exactly as it could when called ahead of a plain
-    /// [`Self::define_format_rec_batch`] (e.g. a batch member that itself dispatches on a tagged
-    /// union of many sub-formats, each worth naming independently).
+    /// Builders do *not* receive `&mut FormatModule` - unlike every other `define_format_*`
+    /// helper, a batch member's own body is built *after* all `N` levels are reserved, so any
+    /// auxiliary sub-format a builder registered mid-build would land at a level *above* the
+    /// batch it logically belongs under, the one place in the module where the usual "a format
+    /// can only be referenced by a later one" ordering would silently fail to hold. A builder
+    /// that needs its own named auxiliary sub-formats (e.g. one that dispatches on a tagged union
+    /// of many sub-formats worth naming independently) registers them *before* this call instead,
+    /// in an ordinary function taking `&mut FormatModule` that returns the residual
+    /// `Box<dyn FnOnce(&[FormatRef; N]) -> Format>` - e.g. `bson.rs`'s `element`, which takes
+    /// `&mut FormatModule` and two sibling `FormatRef`s, registers its sixteen
+    /// `bson.element.*` tag-dispatch sub-formats, and returns the boxed closure that finishes the
+    /// job once `refs` exists. The caller applies it eagerly (`element(module, cstring, string)`)
+    /// and passes the resulting `Box` into `formats` like any other member.
     ///
     /// Builders are invoked in `formats` order, and the same order-dependent type-inference
     /// behavior documented on [`Self::define_format_rec_batch`] applies here too: a member
@@ -1157,13 +1166,13 @@ impl FormatModule {
     pub fn define_format_recursive<L: IntoLabel, const N: usize>(
         &mut self,
         names: [L; N],
-        formats: [Box<dyn FnOnce(&mut FormatModule, &[FormatRef; N]) -> Format>; N],
+        formats: [Box<dyn FnOnce(&[FormatRef; N]) -> Format>; N],
     ) -> [FormatRef; N] {
         let start = self.reserve_batch_levels(names.into_iter().map(Into::into));
         let refs: [FormatRef; N] = std::array::from_fn(|ix| FormatRef(start + ix));
 
         for (ix, build) in formats.into_iter().enumerate() {
-            let body = build(self, &refs);
+            let body = build(&refs);
             self.formats[start + ix] = body;
         }
         self.check_batch_has_base_case(start, N);
