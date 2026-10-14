@@ -404,8 +404,23 @@ mod elaboration {
         }
     }
 
+    /// `pair_a`/`pair_b` is a directly self-referential bare `Tuple` cycle with no `Record`/`Union`
+    /// boundary anywhere on it - originally written to confirm this anti-pattern is rejected
+    /// cleanly by codegen's box-placement `unreachable!("Expansion::Tuple(UVar) is directly
+    /// self-referential ... not yet supported by codegen")` rather than hanging or mis-generating.
+    ///
+    /// A bare-`Tuple`-only cycle like this is, by construction, *also* always a cycle with no
+    /// reachable base case (a `Tuple`'s own sequencing has no analog of `Union`'s "pick a different
+    /// branch" escape, and nothing here wraps the recursive field in a `Repeat` to give it one) - so
+    /// `FormatModule::check_batch_has_base_case` now rejects this exact shape earlier, at
+    /// `define_format_rec_batch` registration time, before a `FormatRef` to it can ever reach
+    /// `produce_string_gencode` (or the interpreter) to hit the older codegen-specific guard at all.
+    /// The codegen `unreachable!` is kept as a defensive backstop - see `doc/RECURSION.md`'s
+    /// Anti-patterns section - since `define_format_rec_batch`/`define_format_recursive` are
+    /// documented as the only sanctioned entry points for real recursion, so nothing in the public
+    /// API can currently construct a batch member that reaches it.
     #[test]
-    #[should_panic(expected = "not yet supported")]
+    #[should_panic(expected = "no reachable base case for: pair_a, pair_b")]
     fn phase3_final_check_pure_tuple_cycle_rejects_cleanly() {
         let pair_a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
         let pair_b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);

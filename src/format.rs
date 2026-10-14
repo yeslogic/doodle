@@ -358,6 +358,33 @@ impl Format {
             .into_bounds()
     }
 
+    /// Returns `true` if there is some finite derivation of this format that never depends on
+    /// resolving a still-open recursive reference - i.e. the format has a reachable, non-recursive
+    /// base case.
+    ///
+    /// Piggybacks on `match_bounds_recursive`'s existing `open`-set cycle tracking rather than
+    /// running a separate traversal: a `Format::ItemVar` re-entering an already-open level reports
+    /// [`RecursiveBounds::unresolved`], and [`RecursiveBounds::union`] (used by every `Union`/
+    /// `Match` arm) already knows how to let one resolved alternative "rescue" a sibling that
+    /// isn't - exactly the semantics an existence-of-a-base-case check needs. A format with no
+    /// recursion at all (the overwhelmingly common case) trivially returns `true`, since nothing
+    /// in its traversal can ever re-open a level.
+    ///
+    /// Called by `FormatModule::define_format_rec_batch`/`define_format_recursive` on each new
+    /// batch member's installed body, so a mandatorily-infinite recursive definition (e.g.
+    /// `F := 'a' F`, with no non-recursive alternative anywhere on its cycle) is rejected loudly at
+    /// registration time - before it could ever reach `MatchTree`/codegen and recurse without bound
+    /// at decode time. This is a different, narrower failure than genuine left recursion (`bad :=
+    /// bad | 'Z'`, still only caught later at `MatchTree`-build time, see
+    /// `FormatModule::define_format_rec_batch`'s own doc comment): a format can have a perfectly
+    /// reachable base case and still be left-recursive, and vice versa a format can make byte
+    /// progress on every step and still never have a base case.
+    pub(crate) fn has_reachable_base_case(&self, module: &FormatModule) -> bool {
+        !self
+            .match_bounds_recursive(module, &mut HashSet::new())
+            .is_min_unresolved()
+    }
+
     /// Internal helper for `match_bounds` that avoids infinite recursion for recursive formats.
     ///
     /// Takes an extra parameter, `open`, an open-set that is used to track which `ItemVar` levels
