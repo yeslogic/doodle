@@ -188,18 +188,21 @@ const BSON_TAG_INT64: i8 = 0x12;
 const BSON_TAG_MAXKEY: i8 = 0x7F;
 const BSON_TAG_MINKEY: i8 = -1;
 
-/// Factory function for the format of a single BSON `element`
+/// Factory function for the format of a single BSON `element`.
 ///
-/// Takes references to `cstring`/`string`/`document`/`array`, the latter two being the recursive
-/// `bson.document`/`bson.array` batch members. `document` is called twice (once for the plain
-/// `document` arm, once for `code_w_scope`'s embedded scope) since `FormatRef` is `Copy`.
+/// Takes `&mut FormatModule` and `cstring`/`string` as ordinary eager parameters, registering its
+/// sixteen `bson.element.*` tag-dispatch sub-formats immediately - so they land at levels below
+/// the `bson.element`/`bson.document`/`bson.array` recursive batch, same as any other auxiliary
+/// sub-format, rather than above it. The recursive `document`/`array` batch members don't exist
+/// yet at that point, so the final dispatch is returned as a residual closure that extracts them
+/// from `refs` once `define_format_recursive` has reserved the batch's levels; `document` is
+/// called twice within it (once for the plain `document` arm, once for `code_w_scope`'s embedded
+/// scope) since `FormatRef` is `Copy`.
 fn element(
     module: &mut FormatModule,
     cstring: FormatRef,
     string: FormatRef,
-    document: FormatRef,
-    array: FormatRef,
-) -> Format {
+) -> Box<dyn FnOnce(&[FormatRef; 3]) -> Format> {
     let e_double = module.define_format(
         "bson.element.double",
         mk_element(BSON_TAG_DOUBLE, cstring, double()),
@@ -264,37 +267,41 @@ fn element(
         "bson.element.minkey",
         mk_element(BSON_TAG_MINKEY, cstring, Format::EMPTY),
     );
-    alts([
-        ("double", e_double.call()),
-        ("string", e_string.call()),
-        (
-            "document",
-            mk_element(BSON_TAG_DOCUMENT, cstring, document.call()),
-        ),
-        ("array", mk_element(BSON_TAG_ARRAY, cstring, array.call())),
-        ("binary", e_binary.call()),
-        ("objectid", e_objectid.call()),
-        ("bool", e_bool.call()),
-        ("datetime", e_datetime.call()),
-        ("null", e_null.call()),
-        ("regex", e_regex.call()),
-        ("dbpointer", e_dbpointer.call()),
-        ("code", e_code.call()),
-        ("symbol", e_symbol.call()),
-        (
-            "code_w_scope",
-            mk_element(
-                BSON_TAG_CODE_W_SCOPE,
-                cstring,
-                code_w_scope(string, document.call()),
+    Box::new(move |refs: &[FormatRef; 3]| {
+        let document = refs[1];
+        let array = refs[2];
+        alts([
+            ("double", e_double.call()),
+            ("string", e_string.call()),
+            (
+                "document",
+                mk_element(BSON_TAG_DOCUMENT, cstring, document.call()),
             ),
-        ),
-        ("int32", e_int32.call()),
-        ("timestamp", e_timestamp.call()),
-        ("int64", e_int64.call()),
-        ("maxkey", e_maxkey.call()),
-        ("minkey", e_minkey.call()),
-    ])
+            ("array", mk_element(BSON_TAG_ARRAY, cstring, array.call())),
+            ("binary", e_binary.call()),
+            ("objectid", e_objectid.call()),
+            ("bool", e_bool.call()),
+            ("datetime", e_datetime.call()),
+            ("null", e_null.call()),
+            ("regex", e_regex.call()),
+            ("dbpointer", e_dbpointer.call()),
+            ("code", e_code.call()),
+            ("symbol", e_symbol.call()),
+            (
+                "code_w_scope",
+                mk_element(
+                    BSON_TAG_CODE_W_SCOPE,
+                    cstring,
+                    code_w_scope(string, document.call()),
+                ),
+            ),
+            ("int32", e_int32.call()),
+            ("timestamp", e_timestamp.call()),
+            ("int64", e_int64.call()),
+            ("maxkey", e_maxkey.call()),
+            ("minkey", e_minkey.call()),
+        ])
+    })
 }
 
 /// Factory function for the format of a BSON `document`
@@ -329,14 +336,13 @@ fn array(element: FormatRef) -> Format {
 pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
     let string = string(module, utf8_nz);
+    let element_residual = element(module, cstring, string);
     let [_element, document, _array] = module.define_format_recursive(
         ["bson.element", "bson.document", "bson.array"],
         [
-            Box::new(move |module: &mut FormatModule, refs: &[FormatRef; 3]| {
-                element(module, cstring, string, refs[1], refs[2])
-            }),
-            Box::new(|_module: &mut FormatModule, refs: &[FormatRef; 3]| document(refs[0])),
-            Box::new(|_module: &mut FormatModule, refs: &[FormatRef; 3]| array(refs[0])),
+            element_residual,
+            Box::new(|refs: &[FormatRef; 3]| document(refs[0])),
+            Box::new(|refs: &[FormatRef; 3]| array(refs[0])),
         ],
     );
     module.define_format("bson.main", record([("document", document.call())]))
