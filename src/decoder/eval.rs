@@ -33,9 +33,9 @@ pub(crate) trait EvalValue: Sized + Clone + std::fmt::Debug + From<Value> + 'sta
     /// Wraps a fully-evaluated, plain [`Value`] as `Self`.
     fn from_evaluated(v: Value) -> Self;
 
-    /// Wraps a `Vec<Self>` (e.g. produced by `SubSeq`/`SubSeqInflate`/`Append`) as a `Self`-typed
+    /// Wraps a `SeqKind<Self>` (e.g. produced by `SubSeq`/`SubSeqInflate`/`Append`) as a `Self`-typed
     /// sequence.
-    fn from_evaluated_seq(vs: Vec<Self>) -> Self;
+    fn from_evaluated_seq(vs: SeqKind<Self>) -> Self;
 
     /// Converts (cloning as needed) to a plain [`Value`], discarding any location info.
     fn clone_into_value(&self) -> Value;
@@ -87,14 +87,20 @@ impl Expr {
         StrictValue: for<'x> TryFrom<&'x V, Error = CoerceValueError>,
     {
         Ok(match self {
-            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name).unwrap()),
+            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)?),
             Expr::Bool(b) => Cow::Owned(V::from_evaluated(Value::Bool(*b))),
             Expr::U8(i) => Cow::Owned(V::from_evaluated(Value::U8(*i))),
             Expr::U16(i) => Cow::Owned(V::from_evaluated(Value::U16(*i))),
             Expr::U32(i) => Cow::Owned(V::from_evaluated(Value::U32(*i))),
             Expr::U64(i) => Cow::Owned(V::from_evaluated(Value::U64(*i))),
-            // REVIEW - should we use `n.eval_strict(scope)` instead?
-            Expr::Numeric(n) => Cow::Owned(V::from_evaluated(Value::from(n.eval(scope)?))),
+            Expr::Numeric(n) => Cow::Owned(V::from_evaluated(cfg_select! {
+                    feature = "expr_eval_strict_numeric" => {
+                        super::value::strict_to_value(n, n.eval_strict(scope)?)?
+                    }
+                    _ => {
+                        Value::from(n.eval(scope)?)
+                    }
+            })),
             Expr::Tuple(exprs) => Cow::Owned(V::from_evaluated(Value::Tuple(
                 exprs
                     .iter()
@@ -259,9 +265,7 @@ impl Expr {
                         let length = length.eval_value_generic(scope)?.try_as_usize()?;
                         match values {
                             ValueSeq::ValueSeq(values) => Cow::Owned(V::from_evaluated_seq(
-                                values
-                                    .sub_seq(SeqBoundsOp::SubSeq, start, length)?
-                                    .into_vec(),
+                                values.sub_seq(SeqBoundsOp::SubSeq, start, length)?,
                             )),
                             ValueSeq::IntRange(range, tag) => {
                                 Cow::Owned(V::from_evaluated(Value::EnumFromTo(
@@ -283,9 +287,9 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value_generic(scope)?.try_as_usize()?;
                         let length = length.eval_value_generic(scope)?.try_as_usize()?;
-                        Cow::Owned(V::from_evaluated_seq(sub_seq_inflate(
-                            values, start, length,
-                        )?))
+                        Cow::Owned(V::from_evaluated_seq(
+                            sub_seq_inflate(values, start, length)?.into(),
+                        ))
                     }
                     _ => panic!("SubSeqInflate: expected Seq"),
                 }
@@ -310,7 +314,7 @@ impl Expr {
                 } else if val_seq1.is_empty() {
                     return Ok(Cow::Owned(val0.into_inner().clone()));
                 }
-                Cow::Owned(V::from_evaluated_seq(val_seq0.append(val_seq1).into_vec()))
+                Cow::Owned(V::from_evaluated_seq(val_seq0.append(val_seq1)))
             }
             Expr::FlatMap(expr, seq) => {
                 match seq

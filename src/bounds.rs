@@ -5,6 +5,8 @@ use std::{
     ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub},
 };
 
+use crate::Arith;
+
 /// Returns the number of significant bits in `x`
 ///
 /// If `x` is `0`, returns `0`.
@@ -61,6 +63,23 @@ impl std::fmt::Display for Bounds {
             write!(f, "({}..={})", self.min, max)
         } else {
             write!(f, "({}..)", self.min)
+        }
+    }
+}
+
+impl Bounds {
+    pub(crate) fn arith(arith: Arith, lhs: Bounds, rhs: Bounds) -> Bounds {
+        match arith {
+            Arith::Add => lhs + rhs,
+            Arith::Sub => lhs - rhs,
+            Arith::Mul => lhs * rhs,
+            Arith::Div => lhs / rhs,
+            Arith::BitOr => lhs | rhs,
+            Arith::BitAnd => lhs & rhs,
+            Arith::Shl => lhs << rhs,
+            Arith::Shr => lhs >> rhs,
+            Arith::Rem => Bounds::rem(lhs, rhs),
+            Arith::BoolOr | Arith::BoolAnd => Bounds::any(),
         }
     }
 }

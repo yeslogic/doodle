@@ -1,5 +1,11 @@
 use std::collections::BTreeMap as Map;
 
+/// Convenience function for mapping `Box<T>` to `Box<U>` using `U::from(T)`.
+#[allow(clippy::boxed_local)]
+pub(crate) fn rebox<T, U: From<T>>(b: Box<T>) -> Box<U> {
+    Box::new(U::from(*b))
+}
+
 /// Helper trait for marking container-types that can be considered "null"
 pub trait IsNull {
     /// Returns `true` if the container is empty.

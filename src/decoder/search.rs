@@ -31,7 +31,7 @@ impl AsKey for Value {
             (Value::U32(a), Value::U32(b)) => a.cmp(b),
             (Value::U64(a), Value::U64(b)) => a.cmp(b),
             (Value::Numeric(a), Value::Numeric(b)) => {
-                log::warn!("Value::compare_as_key called on numeric/numeric pair: ({a}, {b})");
+                log::debug!("Value::compare_as_key called on numeric/numeric pair: ({a}, {b})");
                 Ord::cmp(a.as_raw_value(), b.as_raw_value())
             }
             _ => panic!("Value::compare_as_key: Can't compare {self:?} and {other:?} as keys"),
@@ -47,7 +47,7 @@ impl AsKey for Value {
             (Value::U32(a), Value::U32(b)) => a == b,
             (Value::U64(a), Value::U64(b)) => a == b,
             (Value::Numeric(a), Value::Numeric(b)) => {
-                log::warn!("Value::eq_key called on numeric/numeric pair: ({a}, {b})");
+                log::debug!("Value::eq_key called on numeric/numeric pair: ({a}, {b})");
                 a.eq_val(b)
             }
             _ => panic!("Value::eq_key: can't compare {self:?} and {other:?} as keys"),

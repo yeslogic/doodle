@@ -5,8 +5,6 @@ use crate::numeric::core::EvalError as NumExprError;
 use crate::read::{BufferKind, ReadCtxt};
 use crate::{Expr, Label, Pattern};
 
-// FIXME - LocDecoder has yet to be re-implemented to use `DecodeError` instead of `DecodeErrorKind`, but until we do that, we need to keep the `DecodeErrorKind` type around for the time being.
-
 #[derive(Debug)]
 pub struct UnknownVarError(pub(crate) Label);
 
@@ -24,6 +22,8 @@ impl std::error::Error for UnknownVarError {}
 /// that the type-checker is responsible for (e.g. applying `AsChar` to a `Seq`) remain panics.
 #[derive(Debug)]
 pub enum EvalError {
+    /// Referenced variable does not exist in provided scope
+    UnknownVar(UnknownVarError),
     /// Checked integer arithmetic underflowed, overflowed, or divided by zero.
     Arith(ArithError),
     /// Evaluation of an embedded [`NumExpr`](crate::numeric::core::NumExpr) failed.
@@ -52,6 +52,7 @@ pub enum EvalError {
 impl std::fmt::Display for EvalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::UnknownVar(err) => err.fmt(f),
             Self::Arith(err) => err.fmt(f),
             Self::Numeric(err) => write!(f, "numeric expression evaluation failed: {err}"),
             Self::IntCast(err) => write!(f, "integer conversion failed: {err}"),
@@ -71,6 +72,7 @@ impl std::fmt::Display for EvalError {
 impl std::error::Error for EvalError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::UnknownVar(err) => Some(err),
             Self::Arith(err) => Some(err),
             Self::Numeric(err) => Some(err),
             Self::IntCast(err) => Some(err),
@@ -103,6 +105,12 @@ impl<T> EvalResultExt<T> for Result<T, EvalError> {
     {
         use crate::util::ErrTrace as _;
         self.map_err(|err| DecodeError::<V>::from(err).with_trace(ctx()))
+    }
+}
+
+impl From<UnknownVarError> for EvalError {
+    fn from(err: UnknownVarError) -> Self {
+        Self::UnknownVar(err)
     }
 }
 

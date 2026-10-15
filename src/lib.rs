@@ -745,18 +745,11 @@ impl Expr {
                 .clamp(0, u64::MAX as usize)
                 .unwrap_or(Bounds::any()),
 
-            Expr::Arith(arith, a, b) => match arith {
-                Arith::Add => a.bounds() + b.bounds(),
-                Arith::Sub => a.bounds() - b.bounds(),
-                Arith::Mul => a.bounds() * b.bounds(),
-                Arith::Div => a.bounds() / b.bounds(),
-                Arith::BitOr => a.bounds() | b.bounds(),
-                Arith::BitAnd => a.bounds() & b.bounds(),
-                Arith::Shl => a.bounds() << b.bounds(),
-                Arith::Shr => a.bounds() >> b.bounds(),
-                Arith::Rem => Bounds::rem(a.bounds(), b.bounds()),
-                Arith::BoolOr | Arith::BoolAnd => Bounds::any(),
-            },
+            Expr::Arith(arith, a, b) => {
+                let a_bounds = a.bounds();
+                let b_bounds = b.bounds();
+                Bounds::arith(*arith, a_bounds, b_bounds)
+            }
 
             Expr::Unary(op, a) => match op {
                 UnaryOp::BoolNot => Bounds::any(),
@@ -772,7 +765,7 @@ impl Expr {
                 {
                     Bounds::exact(n)
                 } else {
-                    // NOTE - this case doesn't distinguish between temporary overflow/underflow, negative results, and positive results larger than usize::MAX
+                    // NOTE - this case doesn't distinguish between variable-dependent num-exprs, temporary overflow/underflow, negative results, and positive results larger than usize::MAX
                     Bounds::any()
                 }
             }
