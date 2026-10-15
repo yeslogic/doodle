@@ -1,11 +1,14 @@
 use std::borrow::Cow;
 use std::rc::Rc;
 
+use anyhow::{Result as AResult, anyhow};
 use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::error::EvalError;
-use crate::numeric::core::{MachineRep, NumRep, TypedConst, Value as NumValue};
+use crate::numeric::core::{
+    Expr as NumExpr, MachineRep, NumRep, Strict, TypedConst, Value as NumValue,
+};
 use crate::{Arith, IntRel, IntoLabel, Label, Pattern, UnaryOp};
 
 use super::eval::EvalValue;
@@ -19,6 +22,17 @@ impl From<NumValue> for Value {
         let NumValue::Const(c) = value;
         Value::Numeric(Rc::new(c))
     }
+}
+
+/// Maps `core::numeric::StrictValue` to `Value`, returning an error if the value is flagged
+/// as having temporarily overflowed/underflowed its instantaneous NumRep.
+#[cfg_attr(not(feature = "expr_eval_strict_numeric"), expect(dead_code))]
+pub(crate) fn strict_to_value(src: &NumExpr, value: Strict<NumValue>) -> AResult<Value> {
+    Ok(Value::from(value.get_strict_or_else(|v| {
+        Err(anyhow!(
+            "numeric evaluation produced unrepresentable value: {src} -> {v}"
+        ))
+    })?))
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -587,8 +601,8 @@ impl EvalValue for Value {
         v
     }
 
-    fn from_evaluated_seq(vs: Vec<Self>) -> Self {
-        Value::Seq(SeqKind::Strict(vs))
+    fn from_evaluated_seq(vs: SeqKind<Self>) -> Self {
+        Value::Seq(vs)
     }
 
     fn clone_into_value(&self) -> Value {
@@ -879,22 +893,48 @@ pub enum ArithOp {
 
 /// Error produced when checked integer arithmetic underflows, overflows, or divides by zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ArithError {
-    pub op: ArithOp,
-    pub type_name: &'static str,
+pub enum ArithError {
+    Arith {
+        op: ArithOp,
+        type_name: &'static str,
+    },
+    FailedConvert(std::num::TryFromIntError),
+}
+
+impl From<std::convert::Infallible> for ArithError {
+    fn from(err: std::convert::Infallible) -> Self {
+        match err {}
+    }
+}
+
+impl From<std::num::TryFromIntError> for ArithError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        ArithError::FailedConvert(err)
+    }
 }
 
 impl std::fmt::Display for ArithError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "arithmetic error: {:?} on {} underflowed, overflowed, or divided by zero",
-            self.op, self.type_name
-        )
+        match self {
+            Self::Arith { op, type_name } => {
+                write!(
+                    f,
+                    "arithmetic error: {op:?} on {type_name} underflowed, overflowed, or divided by zero"
+                )
+            }
+            Self::FailedConvert(err) => err.fmt(f),
+        }
     }
 }
 
-impl std::error::Error for ArithError {}
+impl std::error::Error for ArithError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ArithError::Arith { .. } => None,
+            ArithError::FailedConvert(err) => Some(err),
+        }
+    }
+}
 
 fn __arith<T>(arith: Arith, left: T, right: T) -> Result<T, ArithError>
 where
@@ -905,11 +945,12 @@ where
     T: num_traits::CheckedRem,
     T: num_traits::CheckedShl,
     T: num_traits::CheckedShr,
-    T: num_traits::AsPrimitive<u32>,
+    T: TryInto<u32>,
+    ArithError: From<<T as TryInto<u32>>::Error>,
     T: std::ops::BitOr<Output = T>,
     T: std::ops::BitAnd<Output = T>,
 {
-    let err = || ArithError {
+    let err = || ArithError::Arith {
         op: ArithOp::Binary(arith),
         type_name: std::any::type_name::<T>(),
     };
@@ -919,8 +960,8 @@ where
         Arith::Mul => left.checked_mul(&right).ok_or_else(err),
         Arith::Div => left.checked_div(&right).ok_or_else(err),
         Arith::Rem => left.checked_rem(&right).ok_or_else(err),
-        Arith::Shl => left.checked_shl(right.as_()).ok_or_else(err),
-        Arith::Shr => left.checked_shr(right.as_()).ok_or_else(err),
+        Arith::Shl => left.checked_shl(right.try_into()?).ok_or_else(err),
+        Arith::Shr => left.checked_shr(right.try_into()?).ok_or_else(err),
         Arith::BitOr => Ok(left | right),
         Arith::BitAnd => Ok(left & right),
         Arith::BoolOr | Arith::BoolAnd => unreachable!("bool ops should be handled separately"),
@@ -933,7 +974,7 @@ where
     T: num_traits::CheckedSub,
     T: num_traits::One,
 {
-    let err = || ArithError {
+    let err = || ArithError::Arith {
         op: ArithOp::Unary(op),
         type_name: std::any::type_name::<T>(),
     };
@@ -952,7 +993,7 @@ where
 fn __arith_auto(arith: Arith, left: &BigInt, right: &BigInt) -> Result<BigInt, ArithError> {
     use num_traits::Zero;
 
-    let err = || ArithError {
+    let err = || ArithError::Arith {
         op: ArithOp::Binary(arith),
         type_name: "auto",
     };

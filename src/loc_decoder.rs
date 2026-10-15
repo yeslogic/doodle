@@ -565,7 +565,7 @@ impl crate::decoder::eval::EvalValue for ParsedValue {
         ParsedValue::from_evaluated(v)
     }
 
-    fn from_evaluated_seq(vs: Vec<Self>) -> Self {
+    fn from_evaluated_seq(vs: SeqKind<Self>) -> Self {
         ParsedValue::from_evaluated_seq(vs)
     }
 
@@ -673,7 +673,7 @@ impl Decoder {
             Decoder::Call(n, es, vs) => {
                 let mut new_scope = LocMultiScope::with_capacity(&LocScope::Empty, es.len());
                 for (name, e) in es {
-                    let v = e.eval_with_loc(scope).trace_eval(|| ("Call(e)", format!("{e:?}")))?.as_ref().clone();
+                    let v = e.eval_with_loc(scope).trace_eval(|| ("Call(e)", format!("{e:?}")))?.into_owned();
                     new_scope.push_owned(name.clone(), v);
                 }
                 for (name, vv) in vs {
@@ -1123,11 +1123,11 @@ impl Decoder {
                     })
             }
             Decoder::Compute(expr) => {
-                let v = expr.eval_with_loc(scope).trace_eval(|| ("Compute(expr)", format!("{expr:?}")))?;
-                Ok(WithErr::new((v.as_ref().clone(), input)))
+                let v = expr.eval_with_loc(scope).trace_eval(|| ("Compute(expr)", format!("{expr:?}")))?.into_owned();
+                Ok(WithErr::new((v, input)))
             }
             Decoder::Let(name, expr, d) => {
-                let v = expr.eval_with_loc(scope).trace_eval(|| ("Let(expr)", format!("{expr:?}")))?.as_ref().clone();
+                let v = expr.eval_with_loc(scope).trace_eval(|| ("Let(expr)", format!("{expr:?}")))?.into_owned();
                 let let_scope = LocSingleScope::new(scope, name, &v);
                 Ok(
                     try_with!(d.parse_with_loc(program, &LocScope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),

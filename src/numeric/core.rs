@@ -73,7 +73,6 @@ impl std::fmt::Display for BasicUnaryOp {
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
-#[repr(u8)]
 pub enum BitWidth {
     Bits8,
     Bits16,
@@ -203,11 +202,7 @@ impl MachineRep {
     }
 
     pub const fn const_eq(self, other: MachineRep) -> bool {
-        self.is_signed == other.is_signed
-            && unsafe {
-                std::mem::transmute::<_, u8>(self.bit_width)
-                    == std::mem::transmute::<_, u8>(other.bit_width)
-            }
+        self.is_signed == other.is_signed && (self.bit_width as u8) == (other.bit_width as u8)
     }
 }
 
@@ -514,9 +509,10 @@ impl TypedConst {
     /// type-constraints as long as the result-type is unambiguous. This allows both `Auto`, as well
     /// as positive-valued Signed-rep to be compared against or native-cast into `U8`/`U16`/`U32`/`U64`.
     ///
-    /// This is in contrast to the convention adopted for pattern-matching, in which the declared
+    /// This is in contrast to the convention adopted for matching against static-typed `Pattern`s, in which the declared
     /// type/rep must be nominally compatible with the pattern being matched on (auto, or the analogous NumRep for a
-    /// given `Pattern::U*`). For such purposes
+    /// given `Pattern::U*`). For such purposes, [`Self::get_as_unsigned`] is preferable, as it ensures that
+    /// the nominal typing of the pattern and scrutinee-value agree.
     pub fn as_native<U>(&self) -> Result<U, anyhow::Error>
     where
         for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
@@ -1100,12 +1096,21 @@ impl std::fmt::Debug for Expr {
     }
 }
 
+// SECTION - errors that can happen during `NumExpr::eval{,_strict}`
+
+/// Error-type returned by [`Expr::eval`] and [`Expr::eval_strict`]
 #[derive(Debug)]
 pub enum EvalError {
+    /// Evaluating an expression involving division-by-zero
     DivideByZero,
+    /// Evaluating an expression where a remainder modulus was either a negative value, or zero
     RemainderNonPositive,
+    /// Untagged binary operator called over LHS and RHS with clashing `NumRep`s
+    // FIXME - Auto is precluded at the value-level so we can replace NumRep -> MachineRep freely
     Ambiguous(NumRep, NumRep),
+    /// Referenced variable does not exist in scope
     UnknownVar(UnknownVarError),
+    /// Referenced variable bound in-scope, but to a non-numeric value
     BadVariable(CoerceValueError),
 }
 
@@ -1120,6 +1125,38 @@ impl From<CoerceValueError> for EvalError {
         EvalError::BadVariable(value)
     }
 }
+
+impl std::fmt::Display for EvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvalError::DivideByZero => write!(f, "attempted division by zero"),
+            EvalError::RemainderNonPositive => write!(f, "remainder rhs must be positive"),
+            EvalError::Ambiguous(rep0, rep1) => {
+                write!(
+                    f,
+                    "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated"
+                )
+            }
+            EvalError::UnknownVar(var_err) => write!(f, "{var_err}"),
+            EvalError::BadVariable(val_err) => write!(f, "{val_err}"),
+        }
+    }
+}
+
+impl std::error::Error for EvalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            EvalError::UnknownVar(err) => Some(err),
+            EvalError::BadVariable(err) => Some(err),
+            EvalError::DivideByZero
+            | EvalError::RemainderNonPositive
+            | EvalError::Ambiguous(..) => None,
+        }
+    }
+}
+// !SECTION
+
+// SECTION - conversions from doodle-native `Value` types to numeric-core `Value`
 
 /// Error returned when a variable identifier used within [`Expr::NumVar`] is scope-bound
 /// to a `Value` that is not numeric.
@@ -1194,35 +1231,11 @@ impl<'a> TryFrom<&'a crate::loc_decoder::ParsedValue> for StrictValue {
         }
     }
 }
+// !SECTION
 
-impl std::fmt::Display for EvalError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EvalError::DivideByZero => write!(f, "attempted division by zero"),
-            EvalError::RemainderNonPositive => write!(f, "remainder rhs must be positive"),
-            EvalError::Ambiguous(rep0, rep1) => {
-                write!(
-                    f,
-                    "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated"
-                )
-            }
-            EvalError::UnknownVar(var_err) => write!(f, "{var_err}"),
-            EvalError::BadVariable(val_err) => write!(f, "{val_err}"),
-        }
-    }
-}
+// SECTION - errors when converting `StrictValue` to `crate::decoder::Value`
 
-impl std::error::Error for EvalError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            EvalError::UnknownVar(err) => Some(err),
-            EvalError::BadVariable(err) => Some(err),
-            EvalError::DivideByZero
-            | EvalError::RemainderNonPositive
-            | EvalError::Ambiguous(..) => None,
-        }
-    }
-}
+// !SECTION
 
 #[derive(Debug, Clone)]
 pub struct Strict<T> {
@@ -1236,7 +1249,7 @@ impl<'a> TryFrom<&'a std::convert::Infallible> for StrictValue {
     type Error = CoerceValueError;
 
     fn try_from(_value: &'a std::convert::Infallible) -> Result<Self, Self::Error> {
-        unreachable!("StrictValue cannot be constructed from Infallible")
+        match *_value {}
     }
 }
 
@@ -1268,6 +1281,17 @@ impl StrictValue {
         let value = f(self.value, other.value)?;
         let is_valid = self.is_valid && other.is_valid && value.is_representable();
         Ok(Strict { value, is_valid })
+    }
+
+    pub fn get_strict_or_else<E>(
+        self,
+        fallback: impl FnOnce(Value) -> Result<Value, E>,
+    ) -> Result<Value, E> {
+        if self.is_valid {
+            Ok(self.value)
+        } else {
+            fallback(self.value)
+        }
     }
 }
 

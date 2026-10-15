@@ -47,20 +47,33 @@ impl std::fmt::Display for SeqBoundsError {
 
 impl std::error::Error for SeqBoundsError {}
 
-/// Represents a sequence of values, which is either explicitly constructed
-/// or yielded through an array-generator term (i.e. [`crate::Expr::Dup`]).
-#[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
-#[serde(tag = "tag", content = "data")]
-// NOTE - T must be clone in order for `Dup` to be well-founded, as non-Clone values cannot be duped
-pub enum SeqKind<T: Clone> {
-    Strict(Vec<T>),
-    Dup(usize, Box<T>),
+/// Performs a virtual 'slice' operation on a [`Range<usize>`](std::ops::Range) as if it were an array/slice holding those values,
+/// mirroring the intended behavior of [`Expr::SubSeq`] when applied to a sequence-value backed by `ValueSeq::IntRange`.
+///
+/// Checks its own bounds and returns `Err` rather than panicking: `start + len == range.len()`
+/// is the valid full-range case (e.g. `start=0, len=range.len()`), so the check is `<=`, not `<`.
+pub(crate) fn sub_range(
+    op: SeqBoundsOp,
+    range: std::ops::Range<usize>,
+    start: usize,
+    len: usize,
+) -> Result<std::ops::Range<usize>, SeqBoundsError> {
+    let range_len = range.len();
+    match start.checked_add(len) {
+        Some(end) if end <= range_len => Ok(range.start + start..range.start + start + len),
+        _ => Err(SeqBoundsError {
+            op,
+            index: start,
+            len: range_len,
+        }),
+    }
 }
 
 /// Abstraction over Value-like constructs that can be iterated over
-/// to yield members of type `V`, where `V` is either `Value` or `ParsedValue`.
+/// to yield members of type `V`, where `V` is either [`crate::decoder::Value`] or [`crate::loc_decoder::ParsedValue`].
 ///
-/// Used to allow for `IntRange` to be represented without allocating a `Vec` of `Value`/`ParsedValue`.
+/// This type is designed to allow [`Expr::EnumFromTo`] to yield an iterable value-container
+/// that behaves like a proper sequence, without needing to allocate a `Vec` of `Value`/`ParsedValue`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSeq<'a, V: Clone = super::Value> {
     ValueSeq(&'a SeqKind<V>),
@@ -105,28 +118,6 @@ impl<'a, V: Clone> ValueSeq<'a, V> {
     }
 }
 
-/// Performs a virtual 'slice' operation on a [`Range<usize>`](std::ops::Range) as if it were an array/slice holding those values,
-/// mirroring the intended behavior of [`Expr::SubSeq`] when applied to a sequence-value backed by `ValueSeq::IntRange`.
-///
-/// Checks its own bounds and returns `Err` rather than panicking: `start + len == range.len()`
-/// is the valid full-range case (e.g. `start=0, len=range.len()`), so the check is `<=`, not `<`.
-pub(crate) fn sub_range(
-    op: SeqBoundsOp,
-    range: std::ops::Range<usize>,
-    start: usize,
-    len: usize,
-) -> Result<std::ops::Range<usize>, SeqBoundsError> {
-    let range_len = range.len();
-    match start.checked_add(len) {
-        Some(end) if end <= range_len => Ok(range.start + start..range.start + start + len),
-        _ => Err(SeqBoundsError {
-            op,
-            index: start,
-            len: range_len,
-        }),
-    }
-}
-
 pub enum ValueIter<'a, V: Clone = super::Value> {
     ValueIter(Iter<'a, V>),
     IntRange(std::ops::Range<usize>, IntTag),
@@ -162,12 +153,27 @@ where
     }
 }
 
+/// Represents a sequence of values (generic over `Value`/`ParsedValue`) in the interpreter-mode
+/// evaluation of an `Expr`.
+///
+/// For sequences constructed using [`crate::Expr::Dup`], stores the actual value only once (along with
+/// its duplication-count) and preserves this lazy representation for as long as is possible.
+#[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
+#[serde(tag = "tag", content = "data")]
+// NOTE - T must be clone in order for `Dup` to be well-founded, as non-Clone values cannot be duped
+pub enum SeqKind<T: Clone> {
+    Strict(Vec<T>),
+    Dup(usize, Box<T>),
+}
+
 impl<T: Clone> SeqKind<T> {
     /// Constructs an empty (strict) `SeqKind` value.
     pub const fn new() -> Self {
         SeqKind::Strict(Vec::new())
     }
 
+    /// Returns the number of elements in `self`, which is exactly equivalent to
+    /// what [`Vec::len`] would return if called over `self.into_vec()`.
     pub fn len(&self) -> usize {
         match self {
             SeqKind::Strict(vs) => vs.len(),
@@ -195,8 +201,8 @@ impl<T: Clone> SeqKind<T> {
         }
     }
 
-    /// Return a reference to the value at index `ix` in the sequence, if it is in-bounds, or
-    /// `None` if it is out-of-bounds.
+    /// Return a reference to the value at index `ix` in the sequence, if it is in-bounds;
+    /// otherwise, returns `None` if `ix` is out-of-bounds.
     pub fn get(&self, ix: usize) -> Option<&T> {
         match self {
             SeqKind::Strict(vs) => vs.get(ix),
@@ -207,6 +213,10 @@ impl<T: Clone> SeqKind<T> {
     /// Specialized method for getting a sub-sequence starting at index `start` and with length
     /// `len`, that preserves laziness. Checks its own bounds and returns `Err` rather than
     /// panicking.
+    ///
+    /// # Notes
+    ///
+    /// Even when `len == 0`, an out-of-bounds `start` value will result in an error being returned.
     pub fn sub_seq(
         &self,
         op: SeqBoundsOp,
@@ -223,6 +233,7 @@ impl<T: Clone> SeqKind<T> {
         }
         Ok(match self {
             SeqKind::Strict(vs) => SeqKind::Strict(vs[start..start + len].to_vec()),
+            // NOTE - the bounds-check we perform before this match ensures that `len < _n`, so we don't need to guard against that here
             SeqKind::Dup(_n, v) => SeqKind::Dup(len, v.clone()),
         })
     }
