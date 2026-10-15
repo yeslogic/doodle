@@ -4,6 +4,7 @@ use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint}
 use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 
 use crate::codegen::typed_format::{GenType, TypedFixedReadKind, TypedPattern, TypedViewExpr};
@@ -125,7 +126,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     Fail,
     EndOfInput,
-    Align(usize),
+    Align(NonZeroUsize),
     Byte(ByteSet),
     Variant(TypeRep, Label, Box<TypedDecoderExt<TypeRep>>),
     Parallel(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
@@ -538,12 +539,13 @@ impl<'a> GTCompiler<'a> {
                 Ok(TypedDecoder::RepeatCount(gt.clone(), expr.clone(), da))
             }
             TypedFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
-                // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = min_expr.bounds().as_exact() else {
-                    unimplemented!("RepeatBetween on inexact bounds-expr")
-                };
-                let Some(max) = max_expr.bounds().as_exact() else {
-                    unimplemented!("RepeatBetween on inexact bounds-expr")
+                // NOTE - non-constant bounds are rejected by the TypeChecker (`TCErrorKind::NonConstantRepeatBounds`)
+                let (Some(min), Some(max)) =
+                    (min_expr.bounds().as_exact(), max_expr.bounds().as_exact())
+                else {
+                    unreachable!(
+                        "RepeatBetween on non-constant bounds should be rejected by the TypeChecker"
+                    )
                 };
 
                 let da = self.compile_gt_format(

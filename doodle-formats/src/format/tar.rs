@@ -156,7 +156,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 "file",
                 repeat_count(record_proj(var("header"), "size"), u8()),
             ),
-            ("__padding", Format::Align(512)),
+            ("__padding", Format::align(512)),
         ]),
     );
 

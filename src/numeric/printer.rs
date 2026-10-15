@@ -174,6 +174,12 @@ pub(crate) fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
     }
 }
 
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", compile_expr(self, Precedence::Top))
+    }
+}
+
 pub(crate) fn show_expr(expr: &Expr) -> String {
     format!("{}", compile_expr(expr, Precedence::TOP))
 }

@@ -27,8 +27,8 @@ test = true
 default = []
 alt = []
 format_enforce = []
-pattern_matches_auto_rep = []
 __unify_mixed_to_int = []
+expr_eval_strict_numeric = []
 
 [[bin]]
 name = "doodle"

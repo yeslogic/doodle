@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::ops::Add as _;
 use std::rc::Rc;
 
@@ -64,7 +65,12 @@ pub enum Format {
     /// Matches if the end of the input has been reached
     EndOfInput,
     /// Skips bytes if necessary to align the current offset to a multiple of N
-    Align(usize),
+    ///
+    /// `N` is `NonZeroUsize` rather than `usize` so that "align to a multiple of 0" (which has no
+    /// valid interpretation) is unrepresentable, rather than a panic/error to be caught downstream.
+    /// Construct via [`Format::align`] to convert from a plain `usize` at the single point where
+    /// that (necessarily fallible) conversion has to happen.
+    Align(NonZeroUsize),
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Wraps the value from the inner format in a variant
@@ -258,6 +264,20 @@ impl Format {
 }
 
 impl Format {
+    /// Constructs a [`Format::Align`] from a plain `n`, the single point where the fallible
+    /// `usize -> NonZeroUsize` conversion happens.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `n == 0` — alignment to a modulus of 0 has no valid interpretation. This is
+    /// always a format-definition bug (never something that can be triggered by parsed data), so
+    /// it's caught here, immediately and clearly, at format-construction time.
+    pub fn align(n: usize) -> Format {
+        Format::Align(
+            NonZeroUsize::new(n).expect("Format::align: alignment modulus must be nonzero"),
+        )
+    }
+
     /// Conservative bounds for number of byte-positions advanced after a format is matched (i.e. parsed)
     pub(crate) fn match_bounds(&self, module: &FormatModule) -> Bounds {
         match self {
@@ -265,8 +285,7 @@ impl Format {
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
             Format::SkipRemainder => Bounds::any(),
-            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
-            Format::Align(n) => Bounds::new(0, n - 1),
+            Format::Align(n) => Bounds::new(0, n.get() - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
             Format::Union(branches) | Format::UnionNondet(branches) => branches
@@ -348,8 +367,7 @@ impl Format {
             Format::EndOfInput => Bounds::exact(0),
             // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
             Format::SkipRemainder => Bounds::any(),
-            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
-            Format::Align(n) => Bounds::new(0, n - 1),
+            Format::Align(n) => Bounds::new(0, n.get() - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.lookahead_bounds(module),
             Format::Union(branches) | Format::UnionNondet(branches) => branches

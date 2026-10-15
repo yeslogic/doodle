@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -9,7 +10,7 @@ use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
-use crate::numeric::core::Bounds as NumBounds;
+use crate::numeric::core::{Bounds as NumBounds, VOID};
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
 use crate::validation::TypedCondition;
 use crate::{Arith, BaseKind, Endian, FormatRef, IntRel, Label, StyleHint, TypeHint, UnaryOp};
@@ -234,7 +235,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     Fail,
     EndOfInput,
-    Align(usize),
+    Align(NonZeroUsize),
     Byte(ByteSet),
     Variant(TypeRep, Label, Box<TypedFormat<TypeRep>>),
     Union(TypeRep, Vec<TypedFormat<TypeRep>>),
@@ -336,7 +337,7 @@ impl TypedFormat<GenType> {
                 inner.lookahead_bounds()
             }
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
+            TypedFormat::Align(n) => Bounds::new(0, n.get() - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.lookahead_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -418,7 +419,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Pos(_)
             | TypedFormat::Fail => Bounds::exact(0),
 
-            TypedFormat::Align(n) => Bounds::new(0, n - 1),
+            TypedFormat::Align(n) => Bounds::new(0, n.get() - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.match_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -909,15 +910,64 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
     }
 }
 
-impl<TypeRep> TypedExpr<TypeRep> {
+impl<TypeRep: Clone> TypedExpr<TypeRep> {
+    /// Performs the same computation as [`Expr::bounds`] over a borrowed [`TypedExpr`] with arbitrary type-rep value.
+    ///
+    /// Avoids deep cloning and descends purely by reference, but the logic has to be duplicated and kept up-to-date with
+    /// the implementation of [`Expr::bounds`] itself.
+    ///
+    /// # Notes
+    ///
+    /// Care should be taken to ensure that the implementation does not diverge from what [`Expr::bounds`] would return
+    /// over the analogous `Expr` tree (e.g. cloning, mapping via `Expr::from`, and calling `.bounds()` on the resulting value).
     pub(crate) fn bounds(&self) -> Bounds {
         match self {
             TypedExpr::U8(n) => Bounds::exact(usize::from(*n)),
             TypedExpr::U16(n) => Bounds::exact(usize::from(*n)),
             TypedExpr::U32(n) => Bounds::exact(*n as usize),
             TypedExpr::U64(n) => Bounds::exact(*n as usize),
-            TypedExpr::Arith(_t, Arith::Add, a, b) => a.bounds() + b.bounds(),
-            TypedExpr::Arith(_t, Arith::Mul, a, b) => a.bounds() * b.bounds(),
+
+            TypedExpr::AsU8(x) => x
+                .bounds()
+                .clamp(0, u8::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            TypedExpr::AsU16(x) => x
+                .bounds()
+                .clamp(0, u16::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            TypedExpr::AsU32(x) => x
+                .bounds()
+                .clamp(0, u32::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            TypedExpr::AsU64(x) => x
+                .bounds()
+                .clamp(0, u64::MAX as usize)
+                .unwrap_or(Bounds::any()),
+
+            TypedExpr::Arith(_t, arith, a, b) => {
+                let lhs = a.bounds();
+                let rhs = b.bounds();
+                Bounds::arith(*arith, lhs, rhs)
+            }
+            TypedExpr::Unary(_, op, a) => match op {
+                UnaryOp::BoolNot => Bounds::any(),
+                UnaryOp::IntPred => a.bounds() - Bounds::exact(1),
+                UnaryOp::IntSucc => a.bounds() + Bounds::exact(1),
+            },
+            TypedExpr::Numeric(_, n) => {
+                let n = crate::numeric::core::Expr::from((**n).clone());
+                let tmp = n.eval_strict(VOID);
+                if let Ok(sv) = tmp
+                    && sv.is_valid()
+                    && let Some(n) = sv.value.as_usize()
+                {
+                    Bounds::exact(n)
+                } else {
+                    // NOTE - no distinction is made between num-exprs carrying variables, ones with temporary underflow/overflow, final values outside of their nominal type range, values exceeding usize::MAX, and bad arithemtic (e.g. division by zero)
+                    Bounds::any()
+                }
+            }
+
             _ => Bounds::any(),
         }
     }
@@ -1049,6 +1099,7 @@ mod __impls {
     use crate::FixedReadKind;
     use crate::codegen::typed_format::TypedFixedReadKind;
     use crate::numeric::elaborator::IntType as ExtIntType;
+    use crate::util::rebox;
     use crate::{
         DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
         codegen::{
@@ -1104,11 +1155,6 @@ mod __impls {
         v.into_iter()
             .map(|(a, b)| (X::from(a), Y::from(b)))
             .collect()
-    }
-
-    #[allow(clippy::boxed_local)]
-    fn rebox<T, U: From<T>>(b: Box<T>) -> Box<U> {
-        Box::new(U::from(*b))
     }
 
     impl<TypeRep> From<TypedExpr<TypeRep>> for Expr {

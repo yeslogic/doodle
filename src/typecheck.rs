@@ -1028,7 +1028,7 @@ impl TypeChecker {
             ViewFormat::CaptureBytes(len) => {
                 let newvar = self.get_new_uvar();
                 let len_var = self.infer_var_expr(len, ctxt.scope)?;
-                self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
+                self.unify_var_baseset(len_var, BaseSet::UAny)?;
                 // REVIEW - should we have a special UType for captured View-window reads?
                 self.unify_var_utype(
                     newvar,
@@ -1146,7 +1146,7 @@ impl TypeChecker {
             ViewExpr::Offset(base, offs) => {
                 self.traverse_view_expr(base.as_ref(), ctxt)?;
                 let v_offs = self.infer_var_expr(offs, ctxt.scope)?;
-                self.unify_var_baseset(v_offs, BaseSet::U(UintSet::ANY))?;
+                self.unify_var_baseset(v_offs, BaseSet::UAny)?;
                 Ok(())
             }
         }
@@ -2456,11 +2456,12 @@ impl TypeChecker {
             Expr::IntRel(_rel, x, y) => {
                 let zvar = self.get_new_uvar();
 
+                // NOTE - signed operands are allowed, but both operands must still have the same type
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
 
                 let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let _cy = self.unify_var_baseset(yvar, BaseSet::UAny)?;
+                let _cy = self.unify_var_intset(yvar, IntSet::ZAny)?;
 
                 let _cxy = self.unify_var_pair(xvar, yvar)?;
 
@@ -2655,6 +2656,7 @@ impl TypeChecker {
 
                 let (elem_var, ret_var) = self.infer_vars_expr_lambda(f_get_key, scope)?;
                 let key_var = self.infer_var_expr(query_key, scope)?;
+                self.unify_var_baseset(key_var, BaseSet::UAny)?;
                 let xs_var = self.infer_var_expr(seq_expr, scope)?;
 
                 let x_var = self.get_new_uvar();
@@ -3592,6 +3594,9 @@ impl TypeChecker {
                 Ok(newvar)
             }
             Format::RepeatBetween(min, max, inner) => {
+                if Expr::exact_repeat_bounds(min, max).is_none() {
+                    return Err(TCErrorKind::NonConstantRepeatBounds.into());
+                }
                 let newvar = self.get_new_uvar();
                 let min_var = self.infer_var_expr(min, ctxt.scope)?;
                 let max_var = self.infer_var_expr(max, ctxt.scope)?;
@@ -3864,7 +3869,29 @@ impl TypeChecker {
             }
             seen_levels = all_seen_levels;
         }
+        this.check_unique_solutions()?;
         Ok(this)
+    }
+
+    /// Checks that every canonical variable with an `Elem` or `NumTree` constraint has a unique solution,
+    /// so that [`TypeChecker::expand_var`] cannot fail on them during elaboration.
+    fn check_unique_solutions(&self) -> TCResult<()> {
+        for (ix, constraints) in self.constraints.iter().enumerate() {
+            let v = UVar(ix);
+            if self.get_canonical_uvar(v) != v {
+                continue;
+            }
+            match constraints {
+                Constraints::Invariant(Constraint::Elem(bs)) => {
+                    bs.get_unique_solution(v)?;
+                }
+                Constraints::Invariant(Constraint::NumTree(is)) => {
+                    is.get_unique_solution(v)?;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     pub fn lookup_level_var(&self, level: usize) -> Option<UVar> {
@@ -4033,11 +4060,11 @@ impl TypeChecker {
                 Constraint::Equiv(utype) => self.expand_type(utype.clone()),
                 Constraint::Elem(bs) => match bs.get_unique_solution(v) {
                     Ok(b) => Expansion::Base(b),
-                    Err(e) => panic!("{e}"),
+                    Err(e) => unreachable!("{e} (should be caught by check_unique_solutions)"),
                 },
                 Constraint::NumTree(is) => match is.get_unique_solution(v) {
                     Ok(i) => Expansion::Int(i),
-                    Err(e) => panic!("{e}"),
+                    Err(e) => unreachable!("{e} (should be caught by check_unique_solutions)"),
                 },
                 Constraint::Proj(proj_shape) => match proj_shape {
                     ProjShape::TupleWith(ix_vars) => {
@@ -4497,6 +4524,10 @@ mod tests {
         Ok(())
     }
 
+    /// Standalone test that checks that even when a given node is ascribed auto with no default
+    /// resolution, if a variable bound to that node is later used in a context that is only soundly typed
+    /// for a specific Rep, the inference will succeed and the unique solution will be back-patched into
+    /// the original node being referenced-by-variable.
     #[test]
     fn test_standalone_auto_arith_inference() -> TCResult<()> {
         use crate::helper::{add, compute, poly_zero, record, var};
@@ -4518,5 +4549,73 @@ mod tests {
         ]);
         assert_eq!(output, expected);
         Ok(())
+    }
+
+    /// Checks that an auto-ascribed node that is never pinned to a specific Rep causes `infer_module`
+    /// to return an error, rather than succeeding and leaving elaboration to panic.
+    #[test]
+    fn test_unpinned_auto_is_tc_error() {
+        use crate::helper::{compute, poly_zero};
+
+        let f: Format = compute(poly_zero());
+        let module = FormatModule::new();
+        match TypeChecker::infer_module(&module, &f) {
+            Ok(_) => panic!("unexpected success for unpinned auto"),
+            Err(e) => assert!(
+                matches!(
+                    e.err.as_ref(),
+                    TCErrorKind::MultipleSolutions(..) | TCErrorKind::MultipleIntSolutions(..)
+                ),
+                "unexpected error: {e}"
+            ),
+        }
+    }
+
+    /// `Format::RepeatBetween` bounds that are not constant are a `TCError`.
+    #[test]
+    fn test_repeat_between_non_constant_bounds() {
+        use crate::helper::var;
+
+        let f = Format::Let(
+            "n".into(),
+            Box::new(Expr::U8(2)),
+            Box::new(Format::RepeatBetween(
+                Box::new(Expr::U8(1)),
+                Box::new(var("n")),
+                Box::new(Format::Byte(ByteSet::full())),
+            )),
+        );
+        let module = FormatModule::new();
+        match TypeChecker::infer_module(&module, &f) {
+            Ok(_) => panic!("unexpected success for non-constant RepeatBetween bounds"),
+            Err(e) => assert!(
+                matches!(e.err.as_ref(), TCErrorKind::NonConstantRepeatBounds),
+                "unexpected error: {e}"
+            ),
+        }
+    }
+
+    /// `Expr::IntRel` accepts signed operands (its operands are constrained to `IntSet::ZAny`),
+    /// but the two operands must still have the same type, so mixed-sign comparisons are rejected.
+    #[test]
+    fn test_intrel_on_signed() {
+        use crate::helper::*;
+        use crate::numeric::core::TypedConst;
+        use crate::numeric::helper as num;
+
+        let i16_zero = || numeric(num::expr_const(TypedConst::from_i16(0)));
+
+        let mut tc = TypeChecker::new();
+        let same_sign = expr_eq(i16_zero(), poly_zero());
+        if let Err(e) = tc.infer_var_expr(&same_sign, &UScope::new()) {
+            panic!("signed IntRel should be accepted: {e}");
+        }
+
+        let mut tc = TypeChecker::new();
+        let mixed_sign = expr_eq(i16_zero(), Expr::U8(0));
+        assert!(
+            tc.infer_var_expr(&mixed_sign, &UScope::new()).is_err(),
+            "mixed-sign IntRel should be rejected"
+        );
     }
 }

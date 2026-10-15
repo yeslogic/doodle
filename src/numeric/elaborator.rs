@@ -328,11 +328,7 @@ pub(crate) trait MapType: Sized {
 
 mod __impls {
     use super::*;
-
-    #[allow(clippy::boxed_local)]
-    fn rebox<T, U: From<T>>(b: Box<T>) -> Box<U> {
-        Box::new(U::from(*b))
-    }
+    use crate::util::rebox;
 
     impl<TypeRep> From<TypedBinOp<TypeRep>> for BinOp {
         fn from(value: TypedBinOp<TypeRep>) -> Self {

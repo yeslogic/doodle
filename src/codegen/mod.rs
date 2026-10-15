@@ -524,7 +524,7 @@ impl CodeGen {
             }
             TypedDecoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
-            TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
+            TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(n.get())),
             TypedDecoder::Pos(nt) => CaseLogic::Simple(SimpleLogic::YieldCurrentOffsetAs(*nt)),
             TypedDecoder::SkipRemainder => CaseLogic::Simple(SimpleLogic::SkipRemainder),
             TypedDecoder::Phantom => CaseLogic::Simple(SimpleLogic::PhantomData),
@@ -6212,7 +6212,7 @@ mod tests {
         let formats = vec![
             ("test.fail", Format::Fail),
             ("test.eoi", Format::EndOfInput),
-            ("test.align64", Format::Align(64)),
+            ("test.align64", Format::align(64)),
             ("test.any_byte", Format::Byte(ByteSet::full())),
         ];
         run_headcount(&formats);
@@ -6222,7 +6222,7 @@ mod tests {
     fn test_headcount_record_simple() {
         let f = Format::record(vec![
             ("any_byte", Format::Byte(ByteSet::full())),
-            ("align64", Format::Align(64)),
+            ("align64", Format::align(64)),
             ("eoi", Format::EndOfInput),
         ]);
 

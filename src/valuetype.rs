@@ -259,6 +259,9 @@ impl ValueType {
     pub const I64: ValueType = ValueType::Signed(SignedIntType::I64);
 
     /// Formalization of the hard-coded `u32` type for sequence lengths to avoid hardcoding U32 directly over multiple modules.
+    ///
+    /// This can be freely changed in the future to uniformly re-type all instances of `SeqLength` to the same type-judgment without
+    /// leaving anything unchanged or touching the type-judgments of other AST nodes.
     pub const SEQ_LEN_T: ValueType = ValueType::Base(BaseType::U32);
 
     /// Helper function for constructing `ValueType::Option`.
@@ -399,6 +402,18 @@ impl ValueType {
         match self {
             ValueType::Base(b) => b.is_numeric(),
             ValueType::NumericHole | ValueType::Signed(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` for unsigned machine-integer types and for `NumericHole` (Auto), but not for signed types.
+    ///
+    /// This is the registration-side counterpart of the TypeChecker's `BaseSet::UAny` and `BaseSet::UAny32`
+    /// (which differ only in their default width when no unique solution is otherwise determined).
+    pub(crate) fn is_unsigned_or_auto(&self) -> bool {
+        match self {
+            ValueType::Base(b) => b.is_numeric(),
+            ValueType::NumericHole => true,
             _ => false,
         }
     }
