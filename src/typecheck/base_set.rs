@@ -550,9 +550,27 @@ impl UintSet {
     ///
     /// If no solutions exist (i.e. the set is empty), or if there is more than one
     /// solution ascribed with the highest-priority rank and none of them is hinted, then `None` is returned.
+    ///
+    /// # Cast-hints
+    ///
+    /// Hints are consulted strictly after membership and `Rank`, and only among the members tied at the
+    /// top rank, so that:
+    ///
+    /// - a hint never overrides a rank-default: `AsU8(x)` with `x: UAny32` resolves to `U32`, not `U8`
+    ///   (the cast is then a narrowing, as it would be without the hint);
+    /// - a hint toward a member outside the top tier is ignored, and the next-earliest hint within the
+    ///   tier (if any) is used instead;
+    /// - among several hinted top-tier members, the earliest stamp wins, where a stamp is the `UVar` of
+    ///   the issuing cast, so "earliest" means "first in `TypeChecker` traversal order". Since hints merge
+    ///   by keeping the earliest stamp per width, the outcome does not depend on unification order.
+    ///
+    /// In effect, an `AsU*` cast over an operand whose type is otherwise ambiguous makes the cast a
+    /// no-op, which is how an otherwise-unconstrained `AsU32(x)` avoids a "no unique solution" error.
     // TODO - Two sets with different defaults (e.g. `UAny32` for `SeqLength` and
     // `any_default(Bits64)` for `Format::Pos`) intersect to a top tier holding both defaults,
-    // which is ambiguous here (see NUMERIC_GUIDELINE.md). A possible narrow fix, applied here at
+    // which is ambiguous here unless a cast-hint toward one of them breaks the tie (e.g. a `pos`
+    // bound to a variable that is used both at a `UAny32` site and as the operand of `as_u32`);
+    // see NUMERIC_GUIDELINE.md. A possible narrow fix for the unhinted case, applied here at
     // solve time rather than during unification:
     //   if the top tier has more than one member AND at least one member sits in a strictly
     //   lower tier (taken as evidence that defaults collided), return the widest top-tier member.
@@ -784,6 +802,15 @@ impl PrimIntSet {
     ///
     /// If no solutions exist (i.e. the set is empty), or if there is more than one
     /// solution ascribed with the highest-priority rank and none of them is hinted, then `None` is returned.
+    ///
+    /// # Cast-hints
+    ///
+    /// Hints follow the same precedence as in [`UintSet::get_unique_solution`] (after membership and `Rank`,
+    /// top tier only, earliest stamp wins). As [`CastHints`] only records unsigned widths, a hint can only
+    /// ever select an unsigned member; a top-tier tie among signed members alone stays ambiguous.
+    ///
+    /// This is the path taken by an `Auto`-rep numeric constant under an `AsU*` cast: its set ranks all
+    /// eight `PrimInt`s equally, so without the cast's hint it has no unique solution.
     pub fn get_unique_solution(self) -> Option<PrimInt> {
         let this = self.normalize();
         let mut candidate = None;
@@ -1114,6 +1141,22 @@ mod tests {
         use crate::numeric::core::BitWidth::*;
         let unified = BaseSet::UAny.unify(hinted(Bits32, 1)).unwrap();
         assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), BaseType::U32);
+    }
+
+    /// A cast-hint toward either side of a default-clash resolves it (see `different_default_uany_unification_ambiguous`).
+    #[test]
+    fn cast_hint_breaks_default_clash() {
+        use crate::numeric::core::BitWidth::*;
+        let seqlen_set = BaseSet::UAny32;
+        let pos_set = BaseSet::U(UintSet::any_default(Bits64));
+        let clash = seqlen_set.unify(pos_set).unwrap();
+        for (width, expected) in [(Bits32, BaseType::U32), (Bits64, BaseType::U64)] {
+            let unified = clash.unify(hinted(width, 1)).unwrap();
+            assert_eq!(unified.get_unique_solution(UVar(0)).unwrap(), expected);
+        }
+        // ...but a hint toward a member outside the clashing tier does not
+        let unified = clash.unify(hinted(Bits8, 1)).unwrap();
+        assert!(unified.get_unique_solution(UVar(0)).is_err());
     }
 
     /// A cast-hint never overrides a rank-default, even toward another member of the set.
