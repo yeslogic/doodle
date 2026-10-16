@@ -14,7 +14,7 @@ use crate::util::{ErrTrace as _, try_downgrade_error_with};
 use crate::validation::Condition;
 use crate::{
     BaseKind, DynFormat, Endian, Expr, Format, FormatModule, Label, MatchTree, MaybeTyped, Next,
-    Pattern, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
+    Pattern, RepeatRange, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
 };
 use crate::{FixedReadKind, try_with};
 
@@ -232,7 +232,7 @@ pub enum Decoder {
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
     /// RepeatBetween: the MatchTree is an N-ary decision-tree where the matching index corresponds to the number of unparsed repetitions left in the limited LL(k) window.
-    RepeatBetween(MatchTree, Box<Expr>, Box<Expr>, Box<Decoder>),
+    RepeatBetween(MatchTree, RepeatRange, Box<Decoder>),
     ForEach(Box<Expr>, Label, Box<Decoder>),
     SkipRemainder,
     DecodeBytes(Box<Expr>, Box<Decoder>),
@@ -481,14 +481,8 @@ impl<'a> Compiler<'a> {
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
-            Format::RepeatBetween(xmin, xmax, a) => {
-                // NOTE - only constant bounds are supported (and accepted by registration and the TypeChecker)
-                let Some((min, max)) = Expr::exact_repeat_bounds(xmin, xmax) else {
-                    return Err(anyhow!(
-                        "RepeatBetween bounds should be constant, found {xmin:?} and {xmax:?}"
-                    ));
-                };
-
+            Format::RepeatBetween(range, a) => {
+                let (min, max) = (range.min(), range.max());
                 let da = self.compile_format(
                     a,
                     Rc::new(Next::RepeatBetween(
@@ -508,16 +502,11 @@ impl<'a> Compiler<'a> {
                         branches.push(f_count);
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        panic!("cannot build match tree for {format:?}")
+                        return Err(anyhow!("cannot build match tree for {format:?}"));
                     };
                     tree
                 };
-                Ok(Decoder::RepeatBetween(
-                    tree,
-                    xmin.clone(),
-                    xmax.clone(),
-                    Box::new(da),
-                ))
+                Ok(Decoder::RepeatBetween(tree, *range, Box::new(da)))
             }
             Format::RepeatUntilLast(expr, a) => {
                 let next = Self::__repeat_next(a, next);
@@ -920,29 +909,26 @@ impl Decoder {
                 )?
                 .map(|(v, input)| (Value::Seq(v.into()), input)))
             }
-            Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
-                let min = min
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("RepeatBetween(min)", format!("{min:?}")))?;
-                let max = max
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("RepeatBetween(max)", format!("{max:?}")))?;
+            Decoder::RepeatBetween(reps_left_tree, range, a) => {
+                let (min, max) = (range.min(), range.max());
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    let v = &res.as_ref().0;
-                    // REVIEW - does the order of the conditions in the OR matter?
-                    if reps_left_tree.matches(input).ok_or(
+                    // NOTE - lookahead must be performed from the current position, not the start of the repetition
+                    let (v, cur_input) = res.as_ref();
+                    let reps_left = reps_left_tree.matches(*cur_input).ok_or(
                         DecodeErrorKind::NoValidBranch {
-                            offset: input.offset,
+                            offset: cur_input.offset,
                         }
                         .with_trace(v.len()),
-                    )? == 0
-                        || v.len() == max
-                    {
+                    )?;
+                    if reps_left == 0 || v.len() == max {
                         if v.len() < min {
-                            unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
+                            return Err(DecodeErrorKind::InsufficientRepeats {
+                                min,
+                                found: v.len(),
+                                offset: cur_input.offset,
+                            }
+                            .with_trace("RepeatBetween"));
                         }
                         break;
                     }
@@ -2236,14 +2222,33 @@ mod tests {
 
     #[test]
     fn compile_repeat_between() {
-        let repeat_between = Format::RepeatBetween(
-            Box::new(Expr::U16(0u16)),
-            Box::new(Expr::U16(2u16)),
-            Box::new(is_byte(0)),
-        );
+        let repeat_between = repeat_between(0, 2, is_byte(0));
         let trailer = is_byte(1);
         let f = Format::Tuple(vec![repeat_between, trailer]);
         assert!(Compiler::compile_one(&f).is_ok());
+    }
+
+    /// Regression test: lookahead for `RepeatBetween` must be evaluated at the current position on each
+    /// iteration (not the start of the repetition), and short repetitions must be errors rather than panics.
+    #[test]
+    fn repeat_between_counts() {
+        let f = Format::Tuple(vec![repeat_between(4, 8, is_byte(b'a')), is_byte(b'b')]);
+        let d = Compiler::compile_one(&f).unwrap();
+        for n in 4..=8 {
+            let mut input = vec![b'a'; n];
+            input.push(b'b');
+            input.push(b'c');
+            let expect = Value::Tuple(vec![
+                Value::Seq(vec![Value::U8(b'a'); n].into()),
+                Value::U8(b'b'),
+            ]);
+            accepts(&d, &input, b"c", expect);
+        }
+        for n in [0, 1, 3, 9] {
+            let mut input = vec![b'a'; n];
+            input.push(b'b');
+            rejects(&d, &input);
+        }
     }
 
     #[test]

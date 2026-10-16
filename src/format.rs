@@ -90,7 +90,9 @@ pub enum Format {
     /// Repeat a format an exact number of times
     RepeatCount(Box<Expr>, Box<Format>),
     /// Repeat a format at least N and at most M times
-    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
+    ///
+    /// The bounds are held in a [`RepeatRange`], which guarantees `N <= M` by construction.
+    RepeatBetween(RepeatRange, Box<Format>),
     /// Repeat a format until a condition is satisfied by its last item (condition is only checked post-append)
     RepeatUntilLast(Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence (condition is only checked post-append)
@@ -156,6 +158,52 @@ pub enum Format {
     Enforce(Box<Format>),
     /// Parse a format but downgrade any errors it produces to warnings, evaluating the provided expr to produce a fallback value if it has already failed
     Permit(Box<Format>, Box<Expr>),
+}
+
+/// Inclusive bounds `min..=max` on the number of repetitions in a [`Format::RepeatBetween`].
+///
+/// The bounds are required to be constant so that `MatchTree` construction can compute exact
+/// lookahead patterns for the repetition, and `min <= max` is upheld by construction (see
+/// [`RepeatRange::new`]), rather than being checked (or panicking) downstream.
+///
+/// The fields are private so that the representation can change later (e.g. to admit
+/// non-constant bounds) without disturbing consumers that only use the accessor methods.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize)]
+pub struct RepeatRange {
+    min: u32,
+    max: u32,
+}
+
+impl RepeatRange {
+    /// Returns a `RepeatRange` for `min..=max`, or `None` if `min > max`.
+    pub const fn new(min: u32, max: u32) -> Option<Self> {
+        if min <= max {
+            Some(Self { min, max })
+        } else {
+            None
+        }
+    }
+
+    /// Minimum number of repetitions (inclusive)
+    pub const fn min(&self) -> usize {
+        self.min as usize
+    }
+
+    /// Maximum number of repetitions (inclusive)
+    pub const fn max(&self) -> usize {
+        self.max as usize
+    }
+
+    /// Bounds on the number of repetitions
+    pub(crate) fn bounds(&self) -> Bounds {
+        Bounds::new(self.min(), self.max())
+    }
+}
+
+impl std::fmt::Display for RepeatRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}..={}", self.min, self.max)
+    }
 }
 
 impl Format {
@@ -301,9 +349,7 @@ impl Format {
             Format::Repeat(_) => Bounds::any(),
             Format::Repeat1(f) => f.match_bounds(module) * Bounds::at_least(1),
             Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => {
-                f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds()))
-            }
+            Format::RepeatBetween(range, f) => f.match_bounds(module) * range.bounds(),
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::at_least(1),
             Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
             Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.match_bounds(module)),
@@ -385,9 +431,7 @@ impl Format {
             Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
             Format::Repeat1(f) => f.lookahead_bounds(module) * Bounds::at_least(1),
             Format::RepeatCount(expr, f) => f.lookahead_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => {
-                f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds())
-            }
+            Format::RepeatBetween(range, f) => f.lookahead_bounds(module) * range.bounds(),
             Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::at_least(1),
             Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
             Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds(module)),
@@ -535,7 +579,7 @@ impl Format {
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
-            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatBetween(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => format.is_ascii_char_format(module),
             Format::Let(.., f) | Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {

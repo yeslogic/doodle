@@ -2,6 +2,8 @@
 
 Status: all decisions below are confirmed by the user. Implemented: T3 (b43ee516); R1, R3, R4, R5, T1, T2, T4 (step 2, 81aea425); I1, I2, I3 (step 3, 8be98724); C1, C2, C3 (step 4, 5aa40bc3); R6; step 5. Q2 (`Pos`) is resolved as item 14. Everything is implemented.
 
+Later change: the `RepeatBetween` parts of items 7 and 11, R1, R4, R6, T4 and C1 are superseded. `Format::RepeatBetween` now holds a `RepeatRange` of constant `u32` bounds with `min <= max` enforced on construction, rather than two `Expr`s. Numeric, Auto and variable bounds can no longer be expressed, so `Expr::exact_repeat_bounds`, `TCErrorKind::NonConstantRepeatBounds` and the bound type rules are gone. See "Superseded: `RepeatBetween` bounds" at the end.
+
 Note: `BaseSet::UAny32` admits every unsigned type including `U64`; the `32` is only the default width used to break ties when several solutions are sound. Registration's counterpart to both `UAny` and `UAny32` is therefore the same "unsigned or Auto" rule.
 
 Inputs: `NUMERIC_GUIDELINE.md`, `NUMERIC_SURVEY_RESULTS.md`, `DIVERGENCE.md`, `doc/NUMERIC.md`.
@@ -155,3 +157,10 @@ All three are resolved, as items 12, 13 and 14.
   - The `doodle` binary fails to build with `--features alt` (`opentype.rs:621`, type annotations needed). This predates this work (it also fails at 5aa40bc3); the library builds.
 - **Step 5.** The survey gained the operand pair `(Auto, NumU8)` and a set of standalone cases: `(5auto + 5auto) == U8(10)`, `IntSucc(5auto) == U8(6)`, `RepeatBetween` with a variable bound, and a no-wildcard `ZConst`/`ZRange` match. All are consistent across the three layers. 286 cases, 55 inconsistent, none panicking; the remainder are item 5, item 9 and value-dependent interpreter errors. `doc/NUMERIC.md` (including footnotes 2–4) and `NUMERIC_GUIDELINE.md` are updated, and stale `Value::Usize` references in the rewritten sections are removed.
 
+## Superseded: `RepeatBetween` bounds
+
+After this plan was completed, `Format::RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>)` became `Format::RepeatBetween(RepeatRange, Box<Format>)` (branch `archaephyrryx/repeat-between-fixes`). Every consumer already required constant bounds, so the `Expr` signature only admitted formats that were then rejected late, and nothing checked `min <= max`.
+
+- `RepeatRange` holds constant `u32` bounds. `RepeatRange::new` returns `None` when `min > max`, and `helper::repeat_between(min: u32, max: u32, f)` panics in that case.
+- R4/T4 (the constant-bounds checks), the "unsigned or Auto" rule for these bounds (R1, R6) and C1's role for `RepeatBetween` no longer apply: Numeric, Auto and variable bounds can't be expressed. `Expr::exact_repeat_bounds` and `TCErrorKind::NonConstantRepeatBounds` are removed.
+- The `RepeatBetween` survey rows (the operand grid and the variable-bound standalone case) are removed from `signed_intops.rs`, as are the R4 cases in `registration_numeric_acceptance` and the `RepeatBetween` case in `alt::tests::ext_numeric_acceptance`.

@@ -902,23 +902,26 @@ impl Decoder {
                     (ParsedValue::new_seq(v, start_offset, total_len), input)
                 }))
             }
-            Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
-                let min = min.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatBetween(min)", format!("{min:?}")))?;
-                let max = max.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("RepeatBetween(max)", format!("{max:?}")))?;
+            Decoder::RepeatBetween(reps_left_tree, range, a) => {
+                let (min, max) = (range.min(), range.max());
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    let v = &res.as_ref().0;
-                    // REVIEW - does the order of the conditions in the OR matter?
-                    if reps_left_tree
-                        .matches(input)
-                        .ok_or(DecodeErrorKind::NoValidBranch {
-                            offset: input.offset,
-                        }.with_trace(v.len()),
-                    )? == 0
-                        || v.len() == max
-                    {
+                    // NOTE - lookahead must be performed from the current position, not the start of the repetition
+                    let (v, cur_input) = res.as_ref();
+                    let reps_left = reps_left_tree.matches(*cur_input).ok_or(
+                        DecodeErrorKind::NoValidBranch {
+                            offset: cur_input.offset,
+                        }
+                        .with_trace(v.len()),
+                    )?;
+                    if reps_left == 0 || v.len() == max {
                         if v.len() < min {
-                            unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
+                            return Err(DecodeErrorKind::InsufficientRepeats {
+                                min,
+                                found: v.len(),
+                                offset: cur_input.offset,
+                            }
+                            .with_trace("RepeatBetween"));
                         }
                         break;
                     }

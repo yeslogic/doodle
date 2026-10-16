@@ -8,7 +8,8 @@ pub use crate::marker::BaseKind;
 use crate::validation::{Condition, Severity};
 use crate::{
     Arith, BaseType, Expr, FixedReadKind, Format, IntRel, IntoLabel, Label, OwnedRecordFormat,
-    Pattern, RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
+    Pattern, RecordBuilder, RepeatRange, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr,
+    ViewFormat,
 };
 
 use crate::numeric::core::Expr as NumExpr;
@@ -634,19 +635,24 @@ pub fn repeat_count(len: Expr, format: Format) -> Format {
 
 /// Helper-function for [`Format::RepeatBetween`].
 ///
+/// Repeats `format` at least `min` and at most `max` times (inclusive).
+///
+/// # Panics
+///
+/// Panics if `min > max`. Use [`RepeatRange::new`] directly to handle that case without panicking.
+///
 /// # Notes
 ///
-/// Will result in downstream panic or error if `min` is found to exceed `max` at runtime.
+/// If `min` is equal to `max`, prefer [`repeat_count`].
 ///
-/// If `min` is statically guaranteed to be equal to `max`, use [`repeat_count`] instead.
-///
-/// As currently implemented, the only `Expr`s that are accepted in the `min` and `max` positions
-/// are those that can be evaluated independent of Scope (i.e. contain no variable expressions).
-/// This is to ensure that `min <= max` can be checked in a context-free manner. This is not an inherent
-/// requirement of the primitive, but rather an imposed limitation of the implementation designed
-/// to keep the logic simple.
-pub fn repeat_between(min: Expr, max: Expr, format: Format) -> Format {
-    Format::RepeatBetween(Box::new(min), Box::new(max), Box::new(format))
+/// The bounds are constants rather than `Expr`s, so that `MatchTree` construction can compute
+/// exact lookahead patterns for the repetition. This is not an inherent requirement of the primitive,
+/// but rather an imposed limitation of the implementation designed to keep the logic simple.
+pub fn repeat_between(min: u32, max: u32, format: Format) -> Format {
+    let Some(range) = RepeatRange::new(min, max) else {
+        panic!("repeat_between: min ({min}) exceeds max ({max})")
+    };
+    Format::RepeatBetween(range, Box::new(format))
 }
 
 /// Helper-function for [`Format::RepeatUntilLast`].

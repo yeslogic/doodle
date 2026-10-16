@@ -142,7 +142,7 @@ impl<'module> TreePrinter<'module> {
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
             | Format::RepeatUntilSeq(_, format)
-            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatBetween(_, format)
             | Format::RepeatUntilLast(_, format) => self.is_implied_value_format(format),
             Format::Slice(_, format) => self.is_implied_value_format(format),
             // REVIEW - vvv these cases were previously covered by catch-all false vvv
@@ -516,7 +516,7 @@ impl<'module> TreePrinter<'module> {
             | Format::Repeat1(format)
             | Format::ForEach(_, _, format)
             | Format::RepeatCount(_, format)
-            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatBetween(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
                 ParsedValue::Seq(values) => {
@@ -755,7 +755,7 @@ impl<'module> TreePrinter<'module> {
             | Format::Repeat1(format)
             | Format::ForEach(_, _, format)
             | Format::RepeatCount(_, format)
-            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatBetween(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => {
@@ -2250,11 +2250,8 @@ impl<'module> TreePrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
-            Format::RepeatBetween(min, max, format) => {
-                let expr_frag = Self::compile_expr(
-                    &Expr::Tuple(vec![*min.clone(), *max.clone()]),
-                    Precedence::ATOM,
-                );
+            Format::RepeatBetween(range, format) => {
+                let expr_frag = Fragment::String(range.to_string().into());
                 cond_paren(
                     self.compile_nested_format("repeat-between", Some(&[expr_frag]), format, prec),
                     prec,

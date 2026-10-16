@@ -48,8 +48,8 @@ pub fn main(
         // TODO - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
         // REVIEW - should we wrap this in mk_ascii_str (?)
         repeat_between(
-            Expr::U32(1),
-            Expr::U32(79),
+            1,
+            79,
             byte_in(ByteSet::from(32..=126).union(&ByteSet::from(161..=255))),
         ),
     );
