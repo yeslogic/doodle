@@ -2540,14 +2540,7 @@ impl TypeChecker {
 
                 // we have extracted the BaseSet as a local const to make it more visible,
                 // so it is easier for us to change the constraints we apply to SeqLength later.
-                const SEQ_LEN_BASESET: BaseSet = cfg_select! {
-                    feature = "tc_seq_length_polymorphic" => {
-                        BaseSet::UAny
-                    },
-                    _ => {
-                        BaseSet::UAny32
-                    }
-                };
+                const SEQ_LEN_BASESET: BaseSet = BaseSet::UAny32;
                 self.unify_var_baseset(newvar, SEQ_LEN_BASESET)?;
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
                 let elem_var = self.get_new_uvar();
@@ -4789,22 +4782,20 @@ mod tests {
         }
     }
 
-    /// Speculative test for a preferred behavior we don't know whether the TC engine currently exhibits.
+    /// Failing any context-hints about what type an `Auto`-rep numeric (or other variable with no tiebreak default)
+    /// should have, an `Expr::AsU32` cast (or similar for other integer widths) forces the type which makes the
+    /// cast a no-op, via its cast-hint (see `CastHints`).
     ///
-    /// The idea is that, failing any context-hints about what type an `Auto`-rep numeric or `BaseSet::UAny` constrained variable should have,
-    /// an `Expr::AsU32` cast (or similar for other integer widths) should force the type which makes the cast a no-op.
-    ///
-    /// E.g. `AsU32(SeqLength([]))` should unify without any ambiguity.
+    /// E.g. `AsU32(<Auto const>)` should unify without any ambiguity.
     #[test]
     fn expr_as_cast_over_uany_forces_type() -> TCResult<()> {
-        use crate::helper::{as_u32, chain, compute, seq_empty, seq_length, var};
+        use crate::helper::{as_u32, chain, compute, poly_zero, var};
         let f = chain(
-            // NOTE - SeqLength is currently UAny32, so this test isn't checking what it is meant to;
-            // changing it to be UAny exposes the behavior this test is designed to check, but because
-            // the underlying special-case isn't yet implemented, this test doesn't yet pass
-            compute(seq_length(seq_empty())),
-            "len",
-            compute(as_u32(var("len"))),
+            // NOTE - an Auto const has no rank-default, so without the cast-hint `x` is ambiguous;
+            // a source with a default (e.g. SeqLength's `UAny32`) would resolve by rank alone and not test the hint
+            compute(poly_zero()),
+            "x",
+            compute(as_u32(var("x"))),
         );
         let module = FormatModule::new();
         let uscope = UScope::new();
