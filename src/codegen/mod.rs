@@ -139,6 +139,13 @@ pub struct CodeGen {
     /// would also incorrectly fire for `Format::Phantom`'s own, pre-existing self-reference case
     /// (`doodle-formats/src/format/opentype/colr.rs`'s `paint`), changing its generated output.
     in_phantom_context: bool,
+    /// The subset of `in_progress` vars that were already in-progress when the current
+    /// `Expansion::Seq` element type began resolving. A reference back to one of these from inside
+    /// the element type is already heap-indirected by the enclosing `Vec<..>` (or borrowed slice),
+    /// so it needs no `RecBox` to close the cycle - and adding one would only yield a redundant
+    /// `Vec<Box<T>>`. Vars that become in-progress *inside* the element type are not included,
+    /// as a self-reference closing a cycle entirely within one element still needs a `Box`.
+    seq_indirected: std::collections::HashSet<UVar>,
 }
 
 impl CodeGen {
@@ -155,6 +162,7 @@ impl CodeGen {
             recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
             fixed_format_defs,
             in_phantom_context: false,
+            seq_indirected: std::collections::HashSet::new(),
         }
     }
 
@@ -242,6 +250,16 @@ impl CodeGen {
         AtomType::from(int_t).into()
     }
 
+    /// Whether a reference to the (canonical) var `canonical` closes a recursive cycle that must be
+    /// broken by `RecBox`: it must be an in-progress ancestor, reached through neither
+    /// `Format::Phantom` (see `in_phantom_context`) nor an intervening sequence (see
+    /// `seq_indirected`).
+    fn needs_rec_box(&self, canonical: UVar) -> bool {
+        !self.in_phantom_context
+            && self.in_progress.contains_key(&canonical)
+            && !self.seq_indirected.contains(&canonical)
+    }
+
     /// Takes a [`WHNFSolution`] from a solved TypeChecker and lifts it to the corresponding `RustType`.
     fn lift_whnf_solution(&mut self, tc: &TypeChecker, sol: WHNFSolution, lt: &RustLt) -> RustType {
         match sol {
@@ -249,8 +267,7 @@ impl CodeGen {
             WHNFSolution::Int(it) => Self::lift_int(it),
             WHNFSolution::Var(var) => {
                 let canonical = tc.get_canonical_uvar(var);
-                let needs_rec_box =
-                    !self.in_phantom_context && self.in_progress.contains_key(&canonical);
+                let needs_rec_box = self.needs_rec_box(canonical);
                 let rt = self.lift_uvar(tc, var, lt).to_rust_type();
                 if needs_rec_box {
                     RustType::from(CompType::RecBox(Box::new(rt)))
@@ -435,8 +452,7 @@ impl CodeGen {
                                 },
                                 _ => {
                                     let canonical = tc.get_canonical_uvar(*branch_v);
-                                    let needs_rec_box = !self.in_phantom_context
-                                        && self.in_progress.contains_key(&canonical);
+                                    let needs_rec_box = self.needs_rec_box(canonical);
                                     let inner = {
                                         let raw = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
                                         if needs_rec_box {
@@ -488,10 +504,11 @@ impl CodeGen {
                 GenType::Def((ix, tname), rt_decl)
             }
             Expansion::Seq(sol, hint) => {
-                // `Vec<..>` is always heap-indirected, so a reference to an *ancestor* var
-                // reached via `sol` needs no special handling here at all - `lift_whnf_solution`
-                // (the reference site) already boxes it if needed, and the ancestor's own
-                // Record/Union/Tuple frame is what's actually marked `in_progress` for that case.
+                // `Vec<..>` is always heap-indirected (as is every other sequence representation
+                // below, being a borrow), so a reference to an *ancestor* var reached via `sol`
+                // needs no `RecBox` - every var already in-progress at this point is recorded in
+                // `seq_indirected` for the duration of `sol`'s resolution, which suppresses the
+                // `RecBox` that `lift_whnf_solution` (the reference site) would otherwise insert.
                 // The only thing this guards against is `var` (this Seq's own identity) being
                 // reached again from within its own element type - a `Vec<..>` that would need to
                 // recursively contain itself with no Tuple/Record/Union boundary in between. That
@@ -507,9 +524,19 @@ impl CodeGen {
                          - not yet supported by codegen"
                     );
                 }
+                let newly_indirected: Vec<UVar> = self
+                    .in_progress
+                    .keys()
+                    .copied()
+                    .filter(|v| !self.seq_indirected.contains(v))
+                    .collect();
+                self.seq_indirected.extend(newly_indirected.iter().copied());
                 self.in_progress.insert(var, None);
                 let inner = self.lift_whnf_solution(tc, sol, lt);
                 self.in_progress.remove(&var);
+                for v in newly_indirected.iter() {
+                    self.seq_indirected.remove(v);
+                }
                 match hint {
                     SeqBorrowHint::ReadArray => {
                         if let Some(p) = inner.try_as_prim()
@@ -4599,6 +4626,9 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             .unwrap()
     }));
     type_decls.sort_by_key(|(_, (ix, _))| ix);
+    // a committed reservation aliased to an identical decl (see `NameGen::commit_reservation`)
+    // leaves a duplicate slot in `defined_types` that resolves to the same `rev_map` entry
+    type_decls.dedup_by_key(|(_, (ix, _))| *ix);
     const HEAP_STRATEGY: HeapStrategy =
         HeapStrategy::new().variant_cutoff(128)
         // .absolute_cutoff(128)

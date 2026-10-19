@@ -12,6 +12,9 @@ pub struct NameGen {
     pub(super) rev_map: StableMap<RustTypeDecl, (usize, PathLabel), FxHash>,
     // Reassociation table for converting first-pass name selections into their ideal seed-PathLabel
     pub(super) name_remap: StableMap<Label, PathLabel, FxHash>,
+    // First-pass names of committed reservations whose decl turned out to be identical to one already recorded,
+    // mapped to that original decl's first-pass name (so that both resolve to the same final name)
+    aliases: StableMap<Label, Label, FxHash>,
 }
 
 impl NameGen {
@@ -21,6 +24,7 @@ impl NameGen {
             ctr: 0,
             rev_map: Default::default(),
             name_remap: Default::default(),
+            aliases: Default::default(),
         }
     }
 
@@ -35,6 +39,10 @@ impl NameGen {
                 eprintln!("[RENAME]: {k} -> {v:?} ~ {rename}");
             }
             ret.insert(k.clone(), rename);
+        }
+        for (alias, orig) in self.aliases.iter() {
+            let rename = ret[orig].clone();
+            ret.insert(alias.clone(), rename);
         }
         ret
     }
@@ -127,6 +135,12 @@ impl NameGen {
     /// Associates a previously-[`Self::reserve_name`]'d `(ix, name, path)` with its now-known
     /// `decl`, completing exactly what [`Self::get_name`]'s "not yet recorded" branch would have
     /// done in one step, had `decl` been available from the start.
+    ///
+    /// If an identical `decl` was already recorded in the meantime (e.g. a structurally-identical
+    /// type resolved while this one was still under construction), the reservation is instead
+    /// made an alias of that existing entry, mirroring [`Self::get_name`]'s deduplication: the
+    /// reserved `name` resolves to the same final name, and `ix` is left as a duplicate slot that
+    /// is skipped at emission-time.
     pub fn commit_reservation(
         &mut self,
         ix: usize,
@@ -134,6 +148,18 @@ impl NameGen {
         path: PathLabel,
         decl: RustTypeDecl,
     ) {
+        if let Some((_, orig_path)) = self.rev_map.get(&decl) {
+            let orig_name = self.ctxt.find_name_for(orig_path).unwrap();
+            // as in `get_name`, keep whichever of the two paths would yield a better final name
+            self.name_remap
+                .entry(orig_name.clone())
+                .and_modify(|prior: &mut PathLabel| {
+                    let _ = self.ctxt.refine_path(prior, path.clone());
+                })
+                .or_insert(path);
+            self.aliases.insert(name, orig_name);
+            return;
+        }
         self.rev_map.insert(decl, (ix, path.clone()));
         // ensure deduplication happens by forcing a no-op rename by default, exactly as `get_name` does
         self.name_remap.insert(name, path);
