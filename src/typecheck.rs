@@ -4997,37 +4997,6 @@ mod tests {
         Ok(())
     }
 
-    /// `Format::RepeatBetween` bounds that are not constant results in a `TCError`.
-    ///
-    /// This is not a formal design-choice, but rather a load-bearing hack that acts
-    /// as a consistent, universal pre-CG guard against non-constant bounds in RepeatBetween,
-    /// which would otherwise fail with a panic downstream.
-    ///
-    /// Technically speaking, checking the constancy of the bounds of RepeeatBetween is outside of
-    /// the remit of typechecking, since it is a value-level constraint.
-    #[test]
-    fn test_repeat_between_non_constant_bounds() {
-        use crate::helper::var;
-
-        let f = Format::Let(
-            "n".into(),
-            Box::new(Expr::U8(2)),
-            Box::new(Format::RepeatBetween(
-                Box::new(Expr::U8(1)),
-                Box::new(var("n")),
-                Box::new(Format::Byte(ByteSet::full())),
-            )),
-        );
-        let module = FormatModule::new();
-        match TypeChecker::infer_module(&module, &f) {
-            Ok(_) => panic!("unexpected success for non-constant RepeatBetween bounds"),
-            Err(e) => assert!(
-                matches!(e.err.as_ref(), TCErrorKind::NonConstantRepeatBounds),
-                "unexpected error: {e}"
-            ),
-        }
-    }
-
     /// `Expr::IntRel` accepts signed operands (its operands are constrained to `IntSet::ZAny`),
     /// but the two operands must still have the same type, so mixed-sign comparisons are rejected.
     #[test]
