@@ -122,6 +122,9 @@ fn check_covered(
                 path.pop();
             }
         }
+        Format::RecVar(_) => unreachable!(
+            "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+        ),
         Format::Phantom(inner) => {
             check_covered(module, path, inner)?;
         }
@@ -231,6 +234,9 @@ impl<'module, W: io::Write> Context<'module, W> {
                     self.write_flat(value, self.module.get_format(*level))
                 }
             }
+            Format::RecVar(_) => unreachable!(
+                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
+            ),
             Format::Phantom(..) => Ok(()),
             Format::Fail => Ok(()),
             Format::EndOfInput => Ok(()),

@@ -11,12 +11,11 @@ lalrpop_mod!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use analytic_engine::printer::show_expr;
 
     #[test]
     fn parse() {
         let expr = expr::TreeParser::new().parse("1 + 2").unwrap();
-        assert_eq!(&show_expr(&expr), "(1? + 2?)");
+        assert_eq!(&format!("{}", expr), "(1? + 2?)");
     }
 }
 

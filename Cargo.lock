@@ -28,7 +28,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util 0.21.0",
  "linefeed",
- "num-bigint 0.4.8",
+ "num-bigint",
 ]
 
 [[package]]
@@ -593,7 +593,7 @@ dependencies = [
  "expect-test",
  "intmap",
  "log",
- "num-bigint 0.5.1",
+ "num-bigint",
  "num-traits",
  "proptest",
  "range-set",
@@ -629,6 +629,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "doodle-rec"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "doodle",
+ "linked_hash_set",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1109,6 +1121,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linked_hash_set"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "984fb35d06508d1e69fc91050cceba9c0b748f983e6739fa2c7a9237154c52c8"
+dependencies = [
+ "linked-hash-map",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1182,16 +1209,6 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "num-bigint"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
-dependencies = [
- "num-integer",
- "num-traits",
 ]
 
 [[package]]
