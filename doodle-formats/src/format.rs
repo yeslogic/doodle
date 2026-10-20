@@ -100,7 +100,6 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("opentype", opentype.call()),
                     ("numbers", numbers.call()),
                     ("rle", rle.call()),
-                    // FIXME - as defined, BSON rejects nothing so the "text" case is blocked until BSON is refined
                     ("bson", bson.call()),
                     ("text", text.call()),
                 ]),
