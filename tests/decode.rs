@@ -259,14 +259,14 @@ mod bson {
 
     #[test]
     fn test_decode_document_empty() {
-        let output = decode_bson("test_document_empty.bson");
+        let output = decode_bson("test_bson/test_document_empty.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_empty.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_string() {
-        let output = decode_bson("test_document_string.bson");
+        let output = decode_bson("test_bson/test_document_string.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_string.bson.stdout");
         check_output(output, expected)
@@ -274,7 +274,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_string_embedded_null() {
-        let output = decode_bson("test_document_string_embedded_null.bson");
+        let output = decode_bson("test_bson/test_document_string_embedded_null.bson");
         let expected = expect_test::expect_file!(
             "expected/decode/test_document_string_embedded_null.bson.stdout"
         );
@@ -283,14 +283,14 @@ mod bson {
 
     #[test]
     fn test_decode_document_null() {
-        let output = decode_bson("test_document_null.bson");
+        let output = decode_bson("test_bson/test_document_null.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_null.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_minkey() {
-        let output = decode_bson("test_document_minkey.bson");
+        let output = decode_bson("test_bson/test_document_minkey.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_minkey.bson.stdout");
         check_output(output, expected)
@@ -298,7 +298,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_maxkey() {
-        let output = decode_bson("test_document_maxkey.bson");
+        let output = decode_bson("test_bson/test_document_maxkey.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_maxkey.bson.stdout");
         check_output(output, expected)
@@ -306,28 +306,28 @@ mod bson {
 
     #[test]
     fn test_decode_document_bool() {
-        let output = decode_bson("test_document_bool.bson");
+        let output = decode_bson("test_bson/test_document_bool.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_bool.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_int32() {
-        let output = decode_bson("test_document_int32.bson");
+        let output = decode_bson("test_bson/test_document_int32.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_int32.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_int64() {
-        let output = decode_bson("test_document_int64.bson");
+        let output = decode_bson("test_bson/test_document_int64.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_int64.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_datetime() {
-        let output = decode_bson("test_document_datetime.bson");
+        let output = decode_bson("test_bson/test_document_datetime.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_datetime.bson.stdout");
         check_output(output, expected)
@@ -335,7 +335,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_timestamp() {
-        let output = decode_bson("test_document_timestamp.bson");
+        let output = decode_bson("test_bson/test_document_timestamp.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_timestamp.bson.stdout");
         check_output(output, expected)
@@ -343,7 +343,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_binary() {
-        let output = decode_bson("test_document_binary.bson");
+        let output = decode_bson("test_bson/test_document_binary.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_binary.bson.stdout");
         check_output(output, expected)
@@ -351,7 +351,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_binary_old() {
-        let output = decode_bson("test_document_binary_old.bson");
+        let output = decode_bson("test_bson/test_document_binary_old.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_binary_old.bson.stdout");
         check_output(output, expected)
@@ -359,14 +359,14 @@ mod bson {
 
     #[test]
     fn test_decode_document_regex() {
-        let output = decode_bson("test_document_regex.bson");
+        let output = decode_bson("test_bson/test_document_regex.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_regex.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_dbpointer() {
-        let output = decode_bson("test_document_dbpointer.bson");
+        let output = decode_bson("test_bson/test_document_dbpointer.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_dbpointer.bson.stdout");
         check_output(output, expected)
@@ -374,14 +374,14 @@ mod bson {
 
     #[test]
     fn test_decode_document_code() {
-        let output = decode_bson("test_document_code.bson");
+        let output = decode_bson("test_bson/test_document_code.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_code.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_symbol() {
-        let output = decode_bson("test_document_symbol.bson");
+        let output = decode_bson("test_bson/test_document_symbol.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_symbol.bson.stdout");
         check_output(output, expected)
@@ -389,7 +389,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_objectid() {
-        let output = decode_bson("test_document_objectid.bson");
+        let output = decode_bson("test_bson/test_document_objectid.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_objectid.bson.stdout");
         check_output(output, expected)
@@ -397,7 +397,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_double() {
-        let output = decode_bson("test_document_double.bson");
+        let output = decode_bson("test_bson/test_document_double.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_double.bson.stdout");
         check_output(output, expected)
@@ -405,14 +405,14 @@ mod bson {
 
     #[test]
     fn test_decode_document_mixed() {
-        let output = decode_bson("test_document_mixed.bson");
+        let output = decode_bson("test_bson/test_document_mixed.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_mixed.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_nested() {
-        let output = decode_bson("test_document_nested.bson");
+        let output = decode_bson("test_bson/test_document_nested.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_nested.bson.stdout");
         check_output(output, expected)
@@ -420,7 +420,7 @@ mod bson {
 
     #[test]
     fn test_decode_document_nested_deep() {
-        let output = decode_bson("test_document_nested_deep.bson");
+        let output = decode_bson("test_bson/test_document_nested_deep.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_nested_deep.bson.stdout");
         check_output(output, expected)
@@ -428,14 +428,14 @@ mod bson {
 
     #[test]
     fn test_decode_document_array() {
-        let output = decode_bson("test_document_array.bson");
+        let output = decode_bson("test_bson/test_document_array.bson");
         let expected = expect_test::expect_file!("expected/decode/test_document_array.bson.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_document_code_w_scope() {
-        let output = decode_bson("test_document_code_w_scope.bson");
+        let output = decode_bson("test_bson/test_document_code_w_scope.bson");
         let expected =
             expect_test::expect_file!("expected/decode/test_document_code_w_scope.bson.stdout");
         check_output(output, expected)
