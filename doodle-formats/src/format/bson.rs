@@ -168,6 +168,7 @@ fn mk_element(tag: i8, cstring: FormatRef, content: Format) -> Format {
     ])
 }
 
+// SECTION - one-byte tags used for discriminant of `bson.element`
 const BSON_TAG_DOUBLE: i8 = 0x01;
 const BSON_TAG_STRING: i8 = 0x02;
 const BSON_TAG_DOCUMENT: i8 = 0x03;
@@ -187,6 +188,7 @@ const BSON_TAG_TIMESTAMP: i8 = 0x11;
 const BSON_TAG_INT64: i8 = 0x12;
 const BSON_TAG_MAXKEY: i8 = 0x7F;
 const BSON_TAG_MINKEY: i8 = -1;
+// !SECTION
 
 /// Factory function for the format of a single BSON `element`.
 ///
@@ -309,7 +311,7 @@ fn element(
 /// Takes the `FormatRef` to use for `bson.element` (the recursive batch member repeated here).
 fn document(element: FormatRef) -> Format {
     chain(
-        // NOTE - guard against underflow (len < 4)
+        // NOTE - this where-guard is not strictly necessary, but it results in more legible errors being returned (interp and gencode)
         where_within_z(i32le(), 4i32..),
         "len",
         slice(
