@@ -409,3 +409,79 @@ mod test_files {
         Ok(())
     }
 }
+
+mod bson {
+    use super::*;
+
+    /// Summary statistics gathered by walking a decoded BSON document tree.
+    #[derive(Debug, Default, PartialEq, Eq)]
+    struct Stats {
+        /// Maximum nesting depth of `document`/`array`/scope bodies (top-level = 1).
+        max_depth: usize,
+        /// Sum of every `int32` value at any depth.
+        int32_sum: i64,
+        /// Number of `code_w_scope` elements at any depth.
+        scopes: usize,
+    }
+
+    fn walk(doc: &bson_document, depth: usize, stats: &mut Stats) {
+        stats.max_depth = stats.max_depth.max(depth);
+        for elem in doc.elements.iter() {
+            match elem {
+                bson_element::int32(x) => stats.int32_sum += x.value as i64,
+                bson_element::document(x) => walk(&x.value, depth + 1, stats),
+                bson_element::array(x) => walk(&x.value, depth + 1, stats),
+                bson_element::code_w_scope(x) => {
+                    stats.scopes += 1;
+                    walk(&x.value.scope, depth + 1, stats)
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn check_bson(filename: &str, expected: Stats) -> TestResult {
+        let buffer = std::fs::read(testpath(&format!("test_bson/{filename}")))?;
+        let mut input = Parser::new(&buffer);
+        let parsed_data = Decoder1(&mut input)?.data;
+        match parsed_data {
+            Top::bson(dat) => {
+                let mut stats = Stats::default();
+                walk(&dat.document, 1, &mut stats);
+                assert_eq!(stats, expected, "{filename}");
+            }
+            other => unreachable!("expected bson, found {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_decoder_bson_mixed_nesting() -> TestResult {
+        let expected = Stats {
+            max_depth: 6,
+            int32_sum: 61,
+            scopes: 1,
+        };
+        check_bson("test_document_mixed_nesting.bson", expected)
+    }
+
+    #[test]
+    fn test_decoder_bson_array_nested() -> TestResult {
+        let expected = Stats {
+            max_depth: 5,
+            int32_sum: 15,
+            scopes: 0,
+        };
+        check_bson("test_document_array_nested.bson", expected)
+    }
+
+    #[test]
+    fn test_decoder_bson_scope_nested() -> TestResult {
+        let expected = Stats {
+            max_depth: 4,
+            int32_sum: 9,
+            scopes: 2,
+        };
+        check_bson("test_document_scope_nested.bson", expected)
+    }
+}
