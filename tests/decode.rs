@@ -440,4 +440,28 @@ mod bson {
             expect_test::expect_file!("expected/decode/test_document_code_w_scope.bson.stdout");
         check_output(output, expected)
     }
+
+    #[test]
+    fn test_decode_document_mixed_nesting() {
+        let output = decode_bson("test_bson/test_document_mixed_nesting.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_mixed_nesting.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_array_nested() {
+        let output = decode_bson("test_bson/test_document_array_nested.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_array_nested.bson.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_document_scope_nested() {
+        let output = decode_bson("test_bson/test_document_scope_nested.bson");
+        let expected =
+            expect_test::expect_file!("expected/decode/test_document_scope_nested.bson.stdout");
+        check_output(output, expected)
+    }
 }

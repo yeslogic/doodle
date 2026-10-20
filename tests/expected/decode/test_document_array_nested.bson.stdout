@@ -1,0 +1,57 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── array <- { ... } :=
+                ├── key <- bson.cstring := { valid := "grid" }
+                └── value <- bson.array :=
+                    └── elements <- repeat bson.element :=
+                        ├── 0 <- bson.element :=
+                        │   └── array <- { ... } :=
+                        │       ├── key <- bson.cstring := { valid := "0" }
+                        │       └── value <- bson.array :=
+                        │           └── elements <- repeat bson.element :=
+                        │               ├── 0 <- bson.element :=
+                        │               │   └── int32 <- bson.element.int32 :=
+                        │               │       ├── key <- bson.cstring := { valid := "0" }
+                        │               │       └── value <- ReadI32Le := 1i32
+                        │               └── 1 <- bson.element :=
+                        │                   └── int32 <- bson.element.int32 :=
+                        │                       ├── key <- bson.cstring := { valid := "1" }
+                        │                       └── value <- ReadI32Le := 2i32
+                        ├── 1 <- bson.element :=
+                        │   └── array <- { ... } :=
+                        │       ├── key <- bson.cstring := { valid := "1" }
+                        │       └── value <- bson.array :=
+                        │           └── elements <- repeat bson.element :=
+                        │               ├── 0 <- bson.element :=
+                        │               │   └── int32 <- bson.element.int32 :=
+                        │               │       ├── key <- bson.cstring := { valid := "0" }
+                        │               │       └── value <- ReadI32Le := 3i32
+                        │               └── 1 <- bson.element :=
+                        │                   └── array <- { ... } :=
+                        │                       ├── key <- bson.cstring := { valid := "1" }
+                        │                       └── value <- bson.array :=
+                        │                           └── elements <- repeat bson.element :=
+                        │                               ├── 0 <- bson.element :=
+                        │                               │   └── int32 <- bson.element.int32 :=
+                        │                               │       ├── key <- bson.cstring := { valid := "0" }
+                        │                               │       └── value <- ReadI32Le := 4i32
+                        │                               └── 1 <- bson.element :=
+                        │                                   └── document <- { ... } :=
+                        │                                       ├── key <- bson.cstring := { valid := "1" }
+                        │                                       └── value <- bson.document :=
+                        │                                           └── elements <- repeat bson.element :=
+                        │                                               └── 0 <- bson.element :=
+                        │                                                   └── int32 <- bson.element.int32 :=
+                        │                                                       ├── key <- bson.cstring := { valid := "deep" }
+                        │                                                       └── value <- ReadI32Le := 5i32
+                        └── 2 <- bson.element :=
+                            └── document <- { ... } :=
+                                ├── key <- bson.cstring := { valid := "2" }
+                                └── value <- bson.document :=
+                                    └── elements <- repeat bson.element :=
+                                        └── 0 <- bson.element :=
+                                            └── array <- { ... } :=
+                                                ├── key <- bson.cstring := { valid := "empty" }
+                                                └── value <- bson.array :=
+                                                    └── elements <- repeat bson.element := []
