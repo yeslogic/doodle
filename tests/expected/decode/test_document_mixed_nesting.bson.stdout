@@ -1,0 +1,53 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring := { valid := "top" }
+        │       └── value <- ReadI32Le := 1i32
+        └── 1 <- bson.element :=
+            └── array <- { ... } :=
+                ├── key <- bson.cstring := { valid := "list" }
+                └── value <- bson.array :=
+                    └── elements <- repeat bson.element :=
+                        ├── 0 <- bson.element :=
+                        │   └── int32 <- bson.element.int32 :=
+                        │       ├── key <- bson.cstring := { valid := "0" }
+                        │       └── value <- ReadI32Le := 10i32
+                        └── 1 <- bson.element :=
+                            └── document <- { ... } :=
+                                ├── key <- bson.cstring := { valid := "1" }
+                                └── value <- bson.document :=
+                                    └── elements <- repeat bson.element :=
+                                        ├── 0 <- bson.element :=
+                                        │   └── string <- bson.element.string :=
+                                        │       ├── key <- bson.cstring := { valid := "tag" }
+                                        │       └── value <- bson.string := { valid := "inner" }
+                                        └── 1 <- bson.element :=
+                                            └── code_w_scope <- { ... } :=
+                                                ├── key <- bson.cstring := { valid := "fn" }
+                                                └── value <- let-format len (require (x -> match x { ... }) ReadI32Le) (slice (len -u32 4?) { ... }) :=
+                                                    ├── code <- bson.string := { valid := "function(){}" }
+                                                    └── scope <- bson.document :=
+                                                        └── elements <- repeat bson.element :=
+                                                            ├── 0 <- bson.element :=
+                                                            │   └── int32 <- bson.element.int32 :=
+                                                            │       ├── key <- bson.cstring := { valid := "x" }
+                                                            │       └── value <- ReadI32Le := 42i32
+                                                            └── 1 <- bson.element :=
+                                                                └── array <- { ... } :=
+                                                                    ├── key <- bson.cstring := { valid := "xs" }
+                                                                    └── value <- bson.array :=
+                                                                        └── elements <- repeat bson.element :=
+                                                                            ├── 0 <- bson.element :=
+                                                                            │   └── int32 <- bson.element.int32 :=
+                                                                            │       ├── key <- bson.cstring := { valid := "0" }
+                                                                            │       └── value <- ReadI32Le := 1i32
+                                                                            └── 1 <- bson.element :=
+                                                                                └── document <- { ... } :=
+                                                                                    ├── key <- bson.cstring := { valid := "1" }
+                                                                                    └── value <- bson.document :=
+                                                                                        └── elements <- repeat bson.element :=
+                                                                                            └── 0 <- bson.element :=
+                                                                                                └── int32 <- bson.element.int32 :=
+                                                                                                    ├── key <- bson.cstring := { valid := "leaf" }
+                                                                                                    └── value <- ReadI32Le := 7i32
