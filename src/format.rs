@@ -338,14 +338,16 @@ impl Format {
 }
 
 impl Format {
-    /// Constructs a [`Format::Align`] from a plain `n`, the single point where the fallible
-    /// `usize -> NonZeroUsize` conversion happens.
+    /// Constructs a [`Format::Align`] from a plain `n`.
+    ///
+    /// This function is the only site where the fallible `usize`-to-`NonZeroUsize` conversion happens.
     ///
     /// # Panics
     ///
-    /// Panics if `n == 0` — alignment to a modulus of 0 has no valid interpretation. This is
-    /// always a format-definition bug (never something that can be triggered by parsed data), so
-    /// it's caught here, immediately and clearly, at format-construction time.
+    /// Panics if `n == 0`. `Format::Align(0)` has no valid interpretation and it can only be constructed
+    /// at time of format registration, as the format itself takes a compile-time constant value for
+    /// its argument (as opposed to an `Expr`). Encountering this panic will always be a symptom of an
+    /// implementation bug and never an accidental operation over non-conformant binary data at runtime.
     pub fn align(n: usize) -> Format {
         Format::Align(
             NonZeroUsize::new(n).expect("Format::align: alignment modulus must be nonzero"),
@@ -358,27 +360,30 @@ impl Format {
             .into_bounds()
     }
 
-    /// Returns `true` if there is some finite derivation of this format that never depends on
-    /// resolving a still-open recursive reference - i.e. the format has a reachable, non-recursive
-    /// base case.
+    /// Returns `true` if `self` has a non-recursive base-case that can be reached after processing
+    /// a finite number of input bytes.
     ///
-    /// Piggybacks on `match_bounds_recursive`'s existing `open`-set cycle tracking rather than
-    /// running a separate traversal: a `Format::ItemVar` re-entering an already-open level reports
-    /// [`RecursiveBounds::unresolved`], and [`RecursiveBounds::union`] (used by every `Union`/
-    /// `Match` arm) already knows how to let one resolved alternative "rescue" a sibling that
-    /// isn't - exactly the semantics an existence-of-a-base-case check needs. A format with no
-    /// recursion at all (the overwhelmingly common case) trivially returns `true`, since nothing
-    /// in its traversal can ever re-open a level.
+    /// Uses the `open`-set tracking of [`Format::match_bounds_recursive`] to avoid the need to perform a separate traversal;
+    /// If that call returns a [`RecursiveBounds`] whose min is 'unresolved' (i.e. all derivations end up stuck in a recursive-format
+    /// cycle), this method returns `false`.
     ///
-    /// Called by `FormatModule::define_format_rec_batch`/`define_format_recursive` on each new
-    /// batch member's installed body, so a mandatorily-infinite recursive definition (e.g.
-    /// `F := 'a' F`, with no non-recursive alternative anywhere on its cycle) is rejected loudly at
-    /// registration time - before it could ever reach `MatchTree`/codegen and recurse without bound
-    /// at decode time. This is a different, narrower failure than genuine left recursion (`bad :=
-    /// bad | 'Z'`, still only caught later at `MatchTree`-build time, see
-    /// `FormatModule::define_format_rec_batch`'s own doc comment): a format can have a perfectly
-    /// reachable base case and still be left-recursive, and vice versa a format can make byte
-    /// progress on every step and still never have a base case.
+    /// Otherwise, it returns `true`, indicating that the format is either non-recursive, or is a well-formed recursive definition
+    /// with a reachable base-case.
+    ///
+    /// # Notes
+    ///
+    /// Called by [`define_format_rec_batch`](FormatModule::define_format_rec_batch)/[`define_format_recursive`](FormatModule::define_format_recursive) over every format
+    /// in the recursive batch, to prevent silent acceptance of any format definition that can never terminate
+    /// over finite-length input. If any definition within the batch fails this predicate, the registration
+    /// method will panic.
+    ///
+    /// This check helps ensure that downstream `Format`-processing machinery
+    /// (`MatchTree`/codegen) do not end up recursing indefinitely over a malformed recursive format that
+    /// can never terminate.
+    ///
+    /// Indefinite-recursion and left-recursion are independent forms of invalidity, and the registration-time
+    /// guard that requires this predicate to hold for all formats in a batch, does not replace
+    /// the left-recursion guards that are enforced during `MatchTree` construction.
     pub(crate) fn has_reachable_base_case(&self, module: &FormatModule) -> bool {
         !self
             .match_bounds_recursive(module, &mut HashSet::new())

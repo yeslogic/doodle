@@ -1119,6 +1119,24 @@ where
     where_lambda(format, "x", is_within(var("x"), range.into()))
 }
 
+/// Numeric validation helper that ensures the value parsed with the given format falls within
+/// the full-integer range ([`NumBounds`]).
+///
+/// The type `R` of `range` can be any type supporting `Into<NumBounds>`:
+/// any machine-integer, signed or unsigned, up to 64 bits;
+/// or a `RangeInclusive`/`RangeFrom`/`RangeToInclusive` over one.
+///
+/// # Notes
+///
+/// When converting to `NumBounds` using the `From` trait implementation, the elided endpoint of a half-open range
+/// is inferred as a type-sensitive value. Specifically, `RangeFrom<X>` uses `X::MAX` as the max-bound (inclusive),
+/// and `RangeToInclusive<X>` uses `X::MIN` as the min-bound (inclusive). In order for the compiler to determine
+/// the type-param of an inline range-expressions, numeric literals should be given with the appropriate type-suffix.
+/// The type-suffix to use will almost always be the one corresponding to the machine-type of `format``:
+/// for `where_within_z(i32be(), <range>)` the `range` should be type-suffixed with `i32`, and so forth.
+///
+/// This function is designed to support ergonomic range-constrants over signed-integer parses. For unsigned integer parses,
+/// [`where_within`] should be used instead.
 pub fn where_within_z<R>(format: Format, range: R) -> Format
 where
     R: Into<NumBounds>,
@@ -1169,6 +1187,7 @@ pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: For
     Format::record(iter)
 }
 
+/// Marker trait used for generic construction of zero-valued `Expr`s for a specific base-type
 pub trait ZeroMarker {
     fn mk_zero() -> Expr;
 }
@@ -1204,17 +1223,22 @@ pub fn is_nonzero<T: ZeroMarker>(expr: Expr) -> Expr {
     expr_ne(expr, T::mk_zero())
 }
 
+/// Specialized [`is_nonzero`] for `U8`-typed `expr`.
 pub fn is_nonzero_u8(expr: Expr) -> Expr {
     expr_gt(expr, Expr::U8(0))
 }
 
+/// Specialized [`is_nonzero`] for `U16`-typed `expr`.
 pub fn is_nonzero_u16(expr: Expr) -> Expr {
     expr_gt(expr, Expr::U16(0))
 }
 
+/// Specialized [`is_nonzero`] for `U32`-typed `expr`.
 pub fn is_nonzero_u32(expr: Expr) -> Expr {
     expr_gt(expr, Expr::U32(0))
 }
+
+// STUB - missing is_nonzero_u64
 
 /// Helper for constructing `Option::None` within the Expr model-language.
 pub const fn expr_none() -> Expr {
