@@ -307,8 +307,16 @@ macro_rules! into_bounds {
 
             impl From<std::ops::RangeFrom<$t>> for Bounds {
                 fn from(x: std::ops::RangeFrom<$t>) -> Self {
-                    let min = x.start as usize;
+                    let min = x.start;
                     let max = <$t>::MAX;
+                    Bounds { min: BigInt::from(min), max: BigInt::from(max) }
+                }
+            }
+
+            impl From<std::ops::RangeToInclusive<$t>> for Bounds {
+                fn from(x: std::ops::RangeToInclusive<$t>) -> Self {
+                    let min = <$t>::MIN;
+                    let max = x.end;
                     Bounds { min: BigInt::from(min), max: BigInt::from(max) }
                 }
             }
