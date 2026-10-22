@@ -727,111 +727,140 @@ impl Format {
     /// batch member's body (written using batch-relative `RecVar` indices) into the real, absolute
     /// `ItemVar` references every other pass over `Format` expects to see - see `Format::RecVar`'s
     /// own doc comment.
-    pub(crate) fn substitute_rec_var(self, start: usize) -> Format {
+    ///
+    /// # Panics
+    ///
+    /// Panics if any `RecVar(ix)` has `ix >= len`, where `len` is the number of batch members:
+    /// such an index would otherwise point past the batch, either out of bounds or at whatever
+    /// unrelated format is registered at that level later. `len == 0` rejects every `RecVar`,
+    /// which is how `FormatModule::define_format_recursive` checks its builders' output.
+    pub(crate) fn substitute_rec_var(self, start: usize, len: usize) -> Format {
         match self {
-            Format::RecVar(ix) => Format::ItemVar(start + ix, Vec::new(), Vec::new()),
+            Format::RecVar(ix) if len == 0 => panic!(
+                "Format::RecVar({ix}) is only valid in the body of a `define_format_rec_batch` member \
+                 (in a `define_format_recursive` builder, use the provided `FormatRef`s instead)"
+            ),
+            Format::RecVar(ix) => {
+                assert!(
+                    ix < len,
+                    "Format::RecVar({ix}) is out of range for a recursive batch of {len} member(s)"
+                );
+                Format::ItemVar(start + ix, Vec::new(), Vec::new())
+            }
             Format::ItemVar(level, args, views) => Format::ItemVar(level, args, views),
             Format::Fail => Format::Fail,
             Format::EndOfInput => Format::EndOfInput,
             Format::Align(n) => Format::Align(n),
             Format::Byte(bs) => Format::Byte(bs),
             Format::Variant(label, f) => {
-                Format::Variant(label, Box::new(f.substitute_rec_var(start)))
+                Format::Variant(label, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::Union(fs) => Format::Union(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
             Format::UnionNondet(fs) => Format::UnionNondet(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
             Format::Tuple(fs) => Format::Tuple(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
             Format::Sequence(fs) => Format::Sequence(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
-            Format::Repeat(f) => Format::Repeat(Box::new(f.substitute_rec_var(start))),
-            Format::Repeat1(f) => Format::Repeat1(Box::new(f.substitute_rec_var(start))),
+            Format::Repeat(f) => Format::Repeat(Box::new(f.substitute_rec_var(start, len))),
+            Format::Repeat1(f) => Format::Repeat1(Box::new(f.substitute_rec_var(start, len))),
             Format::RepeatCount(expr, f) => {
-                Format::RepeatCount(expr, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatCount(expr, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::RepeatBetween(range, f) => {
-                Format::RepeatBetween(range, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatBetween(range, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::RepeatUntilLast(cond, f) => {
-                Format::RepeatUntilLast(cond, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatUntilLast(cond, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::RepeatUntilSeq(cond, f) => {
-                Format::RepeatUntilSeq(cond, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatUntilSeq(cond, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::AccumUntil(cond, acc, init, vt, f) => {
-                Format::AccumUntil(cond, acc, init, vt, Box::new(f.substitute_rec_var(start)))
-            }
+            Format::AccumUntil(cond, acc, init, vt, f) => Format::AccumUntil(
+                cond,
+                acc,
+                init,
+                vt,
+                Box::new(f.substitute_rec_var(start, len)),
+            ),
             Format::ForEach(expr, lbl, f) => {
-                Format::ForEach(expr, lbl, Box::new(f.substitute_rec_var(start)))
+                Format::ForEach(expr, lbl, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::Maybe(expr, f) => Format::Maybe(expr, Box::new(f.substitute_rec_var(start))),
-            Format::Peek(f) => Format::Peek(Box::new(f.substitute_rec_var(start))),
-            Format::PeekNot(f) => Format::PeekNot(Box::new(f.substitute_rec_var(start))),
-            Format::Slice(expr, f) => Format::Slice(expr, Box::new(f.substitute_rec_var(start))),
-            Format::Bits(f) => Format::Bits(Box::new(f.substitute_rec_var(start))),
+            Format::Maybe(expr, f) => {
+                Format::Maybe(expr, Box::new(f.substitute_rec_var(start, len)))
+            }
+            Format::Peek(f) => Format::Peek(Box::new(f.substitute_rec_var(start, len))),
+            Format::PeekNot(f) => Format::PeekNot(Box::new(f.substitute_rec_var(start, len))),
+            Format::Slice(expr, f) => {
+                Format::Slice(expr, Box::new(f.substitute_rec_var(start, len)))
+            }
+            Format::Bits(f) => Format::Bits(Box::new(f.substitute_rec_var(start, len))),
             Format::WithRelativeOffset(base, off, f) => {
-                Format::WithRelativeOffset(base, off, Box::new(f.substitute_rec_var(start)))
+                Format::WithRelativeOffset(base, off, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::Map(f, expr) => Format::Map(Box::new(f.substitute_rec_var(start)), expr),
-            Format::Where(f, cond) => Format::Where(Box::new(f.substitute_rec_var(start)), cond),
+            Format::Map(f, expr) => Format::Map(Box::new(f.substitute_rec_var(start, len)), expr),
+            Format::Where(f, cond) => {
+                Format::Where(Box::new(f.substitute_rec_var(start, len)), cond)
+            }
             Format::Compute(expr) => Format::Compute(expr),
             Format::Let(name, expr, f) => {
-                Format::Let(name, expr, Box::new(f.substitute_rec_var(start)))
+                Format::Let(name, expr, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::Match(expr, branches) => Format::Match(
                 expr,
                 branches
                     .into_iter()
-                    .map(|(pat, f)| (pat, f.substitute_rec_var(start)))
+                    .map(|(pat, f)| (pat, f.substitute_rec_var(start, len)))
                     .collect(),
             ),
             Format::Dynamic(name, dynf, f) => {
-                Format::Dynamic(name, dynf, Box::new(f.substitute_rec_var(start)))
+                Format::Dynamic(name, dynf, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::Apply(name) => Format::Apply(name),
             Format::Pos => Format::Pos,
             Format::SkipRemainder => Format::SkipRemainder,
             Format::DecodeBytes(expr, f) => {
-                Format::DecodeBytes(expr, Box::new(f.substitute_rec_var(start)))
+                Format::DecodeBytes(expr, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::LetFormat(f0, name, f1) => Format::LetFormat(
-                Box::new(f0.substitute_rec_var(start)),
+                Box::new(f0.substitute_rec_var(start, len)),
                 name,
-                Box::new(f1.substitute_rec_var(start)),
+                Box::new(f1.substitute_rec_var(start, len)),
             ),
             Format::MonadSeq(f0, f1) => Format::MonadSeq(
-                Box::new(f0.substitute_rec_var(start)),
-                Box::new(f1.substitute_rec_var(start)),
+                Box::new(f0.substitute_rec_var(start, len)),
+                Box::new(f1.substitute_rec_var(start, len)),
             ),
-            Format::Hint(hint, f) => Format::Hint(hint, Box::new(f.substitute_rec_var(start))),
+            Format::Hint(hint, f) => Format::Hint(hint, Box::new(f.substitute_rec_var(start, len))),
             Format::LiftedOption(opt) => {
-                Format::LiftedOption(opt.map(|f| Box::new(f.substitute_rec_var(start))))
+                Format::LiftedOption(opt.map(|f| Box::new(f.substitute_rec_var(start, len))))
             }
             Format::LetView(name, f) => {
-                Format::LetView(name, Box::new(f.substitute_rec_var(start)))
+                Format::LetView(name, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::WithView(vexpr, vf) => Format::WithView(vexpr, vf),
             Format::ParseFromView(vexpr, f) => {
-                Format::ParseFromView(vexpr, Box::new(f.substitute_rec_var(start)))
+                Format::ParseFromView(vexpr, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::Phantom(f) => Format::Phantom(Box::new(f.substitute_rec_var(start))),
+            Format::Phantom(f) => Format::Phantom(Box::new(f.substitute_rec_var(start, len))),
             #[cfg(feature = "format_enforce")]
-            Format::Enforce(f) => Format::Enforce(Box::new(f.substitute_rec_var(start))),
-            Format::Permit(f, expr) => Format::Permit(Box::new(f.substitute_rec_var(start)), expr),
+            Format::Enforce(f) => Format::Enforce(Box::new(f.substitute_rec_var(start, len))),
+            Format::Permit(f, expr) => {
+                Format::Permit(Box::new(f.substitute_rec_var(start, len)), expr)
+            }
         }
     }
 }
