@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::repeat_n;
 use std::num::NonZeroUsize;
 use std::rc::Rc;
@@ -1810,6 +1810,15 @@ pub struct MatchTree {
 /// A level is added to `open_levels` immediately before recursing into [`MatchTreeStep::from_format`]
 /// on `module.get_format(level)`, and is removed just after that call returns.
 ///
+/// The walk of a level's body only ever reaches the continuation it was opened with (`exit`) once
+/// the body itself has been fully matched, so whenever [`MatchTreeStep::from_next`] is called on
+/// exactly that continuation, the level is closed for the duration of that call (see
+/// [`Self::leave`]). A later reference to the same level from within that continuation - e.g. the
+/// second `B` in `B ~ B ~ 'x'` with a nullable `B` - is then a sibling, not a re-entry. Exits are
+/// matched by `Rc` pointer identity: the continuation stays alive for as long as its level is open,
+/// so no other live `Next` can share its address, and a structurally equal but separately
+/// allocated continuation is simply not recognized as an exit (conservative, never unsound).
+///
 /// If a level would be added to `open_levels` for the second time, then there must be a zero-progress cycle
 /// (provided that a fresh `CycleGuard` is instantiated for each separate pass within [`MatchTreeLevel::try_grow`]).
 /// When this happens, `has_cycle` is set to true (and `cycle_level` to the re-entered level), and the
@@ -1818,7 +1827,8 @@ pub struct MatchTree {
 /// [`MatchTreeError::Cycle`] is returned.
 #[derive(Default)]
 struct CycleGuard {
-    open_levels: HashSet<usize>,
+    /// Each open level, mapped to the address of the continuation (`exit`) it was opened with.
+    open_levels: HashMap<usize, usize>,
     has_cycle: bool,
     /// The first level found to be re-entered, if any.
     cycle_level: Option<usize>,
@@ -1829,16 +1839,49 @@ impl CycleGuard {
         Self::default()
     }
 
-    /// Inserts `level` into the open-set, updating `has_cycle` based on whether the insertion was novel
-    /// (i.e. setting it to `true` if the `level` was already open).
+    /// The address identifying `next` as some open level's `exit`.
+    fn exit_addr(next: &Rc<Next<'_>>) -> usize {
+        Rc::as_ptr(next) as *const () as usize
+    }
+
+    /// Inserts `level` into the open-set, with `exit` the continuation its body is walked under,
+    /// updating `has_cycle` based on whether the insertion was novel (i.e. setting it to `true`
+    /// if the `level` was already open).
     ///
     /// Returns the value of `self.has_cycle`.
-    fn open(&mut self, level: usize) -> bool {
-        if !self.open_levels.insert(level) {
+    fn open(&mut self, level: usize, exit: &Rc<Next<'_>>) -> bool {
+        if self.open_levels.contains_key(&level) {
             self.has_cycle = true;
             self.cycle_level.get_or_insert(level);
+        } else {
+            self.open_levels.insert(level, Self::exit_addr(exit));
         }
         self.has_cycle
+    }
+
+    /// Closes, and returns, every open level whose `exit` is `next`: the walk is leaving those
+    /// levels' bodies. [`Self::reenter`] must be called with the result once the walk of `next`
+    /// returns, since other paths through those bodies may still be explored afterwards.
+    fn leave(&mut self, next: &Rc<Next<'_>>) -> Vec<(usize, usize)> {
+        if self.open_levels.is_empty() {
+            return Vec::new();
+        }
+        let addr = Self::exit_addr(next);
+        let left: Vec<(usize, usize)> = self
+            .open_levels
+            .iter()
+            .filter(|(_, exit)| **exit == addr)
+            .map(|(level, exit)| (*level, *exit))
+            .collect();
+        for (level, _) in &left {
+            self.open_levels.remove(level);
+        }
+        left
+    }
+
+    /// Reopens the levels returned by [`Self::leave`].
+    fn reenter(&mut self, left: Vec<(usize, usize)>) {
+        self.open_levels.extend(left);
     }
 
     /// Marks `level` as closed, removing it from the open-set.
@@ -2070,6 +2113,18 @@ impl<'a> MatchTreeStep<'a> {
         next: Rc<Next<'a>>,
         guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
+        let left = guard.leave(&next);
+        let step = Self::from_next_inner(module, next, guard);
+        guard.reenter(left);
+        step
+    }
+
+    /// The body of [`Self::from_next`], once any levels exited by `next` have been closed.
+    fn from_next_inner(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
+    ) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
@@ -2194,11 +2249,11 @@ impl<'a> MatchTreeStep<'a> {
     ///
     /// Inserts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
     /// its value after marking `level` as closed.
-    fn guarded<F>(level: usize, guard: &mut CycleGuard, f: F) -> Self
+    fn guarded<F>(level: usize, exit: &Rc<Next<'a>>, guard: &mut CycleGuard, f: F) -> Self
     where
         F: FnOnce(&mut CycleGuard) -> Self,
     {
-        if guard.open(level) {
+        if guard.open(level, exit) {
             return Self::reject();
         }
         let step = f(guard);
@@ -2213,9 +2268,11 @@ impl<'a> MatchTreeStep<'a> {
         guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match f {
-            TypedFormat::FormatCall(_, level, ..) => Self::guarded(*level, guard, move |guard| {
-                Self::from_format(module, module.get_format(*level), next, guard)
-            }),
+            TypedFormat::FormatCall(_, level, ..) => {
+                Self::guarded(*level, &next.clone(), guard, move |guard| {
+                    Self::from_format(module, module.get_format(*level), next, guard)
+                })
+            }
             TypedFormat::Fail => Self::reject(),
             TypedFormat::EndOfInput => Self::accept(),
             TypedFormat::Align(_) => {
@@ -2437,7 +2494,7 @@ impl<'a> MatchTreeStep<'a> {
         match f {
             Format::ItemVar(level, _args, _views) => {
                 let level = *level;
-                Self::guarded(level, guard, move |guard| {
+                Self::guarded(level, &next.clone(), guard, move |guard| {
                     Self::from_format(module, module.get_format(level), next, guard)
                 })
             }
@@ -3197,18 +3254,36 @@ mod test {
         assert_eq!(res.err(), Some(MatchTreeError::DepthExhausted));
     }
 
-    /// Repro for a failure being attributed to the wrong cause, not a wrong overall result.
+    /// Closing a level on leaving its body must not hide real left recursion through a nullable
+    /// prefix: `A := B ~ A | 'z'` with zero-width `B` is `A := A | 'z'` in disguise. Leaving `B`
+    /// closes only `B`; `A`'s continuation is different, so `A` is still open when it is reached.
+    #[test]
+    fn matchtree_left_recursion_through_nullable_prefix_is_a_cycle() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let b = module.define_format("test.zero", Format::Compute(Box::new(Expr::U8(0))));
+        let a = reserve_recursive_level(&mut module);
+        module.formats[a] = Format::Union(vec![
+            Format::Tuple(vec![b.call(), Format::ItemVar(a, Vec::new(), Vec::new())]),
+            is_byte(b'z'),
+        ]);
+        let branches = vec![Format::ItemVar(a, Vec::new(), Vec::new()), is_byte(b'y')];
+        let res = MatchTree::try_build(&module, &branches, Rc::new(Next::Empty));
+        assert_eq!(res.err(), Some(MatchTreeError::Cycle { level: a }));
+    }
+
+    /// A failure must be attributed to the right cause.
     ///
     /// `branch0 := B ~ B ~ 'x'` with `B := ' '*` is not recursive, but it is ambiguous: an input
     /// with `N` spaces before the `'x'` has `N + 1` ways to split them between the two `B`s. So
-    /// compilation failing is correct, but it should fail at `B`'s own `Repeat`, whose match tree
+    /// compilation failing is correct, but it must fail at `B`'s own `Repeat`, whose match tree
     /// cannot decide when to stop. The union `[branch0, 'y']` itself is decidable (`' '`/`'x'`
-    /// versus `'y'`), as it is when `B` is inlined. Instead, the first `B` matches zero bytes and
-    /// the walk continues into `next` with `B` still open in the `CycleGuard`, so the second
-    /// (sibling) `B` is taken for a re-entry, and the union build fails with
-    /// [`MatchTreeError::Cycle`] (logging the zero-progress-cycle error).
+    /// versus `'y'`), as it is when `B` is inlined. Before the `CycleGuard` closed a level on
+    /// leaving its body, the first `B` matched zero bytes and the walk continued into `next` with
+    /// `B` still open, so the second (sibling) `B` was taken for a re-entry and the union build
+    /// failed with [`MatchTreeError::Cycle`].
     #[test]
-    #[ignore = "repro: an ambiguous non-recursive format is currently reported as a zero-progress cycle"]
     fn matchtree_ambiguous_repeated_nullable_item_not_reported_as_cycle() {
         use crate::helper::is_byte;
 
