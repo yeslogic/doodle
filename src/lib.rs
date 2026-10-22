@@ -3700,6 +3700,44 @@ mod test {
         );
     }
 
+    /// Batch registration types a member's references to itself (and to later siblings) as the
+    /// `ValueType::Any` placeholder, and `ValueType::unify` accepts `Any`, so comparing peano's
+    /// recursive field against a `u8` passes registration even though the full `TypeChecker`
+    /// rejects it. The interpreter then panics while decoding (`cannot apply int-rel Eq`). Either
+    /// registration must reject the format, or decoding must fail without panicking.
+    #[test]
+    fn ill_typed_use_of_recursive_field_is_rejected_or_decodes_without_panic() {
+        use crate::helper::{expr_eq, is_byte, var, where_lambda};
+        use std::panic::{AssertUnwindSafe, catch_unwind};
+
+        let body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'S'),
+                    where_lambda(Format::RecVar(0), "x", expr_eq(var("x"), Expr::U8(0))),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let Ok(refs) = catch_unwind(AssertUnwindSafe(|| {
+            module.define_format_rec_batch(vec![("test.peano_ill_typed", body)])
+        })) else {
+            return; // rejected at registration
+        };
+        let Ok(prog) = super::decoder::Compiler::compile_program(&module, &refs[0].call()) else {
+            return; // rejected at compile time
+        };
+        let decoded = catch_unwind(AssertUnwindSafe(|| {
+            let _ = prog.run(ReadCtxt::new(b"SZ"));
+        }));
+        assert!(
+            decoded.is_ok(),
+            "an ill-typed use of a recursive field passed registration and panicked while decoding"
+        );
+    }
+
     /// The specific gap `check_batch_has_base_case` closes: `F := 'a' F`, with no non-recursive
     /// alternative anywhere on its cycle, makes byte progress on every step (unlike
     /// `define_format_rec_batch_left_recursion_still_rejected_at_compile_time`'s `bad` above), so
