@@ -331,6 +331,12 @@ mod elaboration {
             erased.is_nonproductive(module),
             "TypedFormat::is_nonproductive disagreed with erase-then-Format::is_nonproductive for {tf:?}"
         );
+        // `Next::cat`/`Next::sequence` decide on this, for typed and untyped decoders alike
+        assert_eq!(
+            tf.lookahead_effect(),
+            erased.lookahead_effect(),
+            "TypedFormat::lookahead_effect disagreed with erase-then-Format::lookahead_effect for {tf:?}"
+        );
         for child in typed_format_children(tf) {
             check_is_nonproductive_agrees(&child, module, seen);
         }
