@@ -66,7 +66,7 @@ pub enum Format {
     ///
     /// Construction-time sugar only: written literally by a caller of `FormatModule::define_format_rec_batch`
     /// to allow formats to refer to one another even before they are assigned `ItemVar` levels;
-    /// during this registratio, `RecVar` is invariably converted to the proper `ItemVar` before
+    /// during this registration, `RecVar` is invariably converted to the proper `ItemVar` before
     /// it  is stored in the module, so it should never appear in a `Format` after that point.
     ///
     /// This Format has no individual semantics and it should be treated as an unsupported value
@@ -218,6 +218,33 @@ impl std::fmt::Display for RepeatRange {
     }
 }
 
+/// How a format, as the head of a `Next::Cat(format, next)` continuation, affects the `MatchTree`
+/// walk of that continuation. Used by `Next::cat`/`Next::sequence` to drop wrappers that add
+/// nothing, so equivalent continuations share `decoder_map`'s `(level, next)` cache key.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum LookaheadEffect {
+    /// The walk reduces to walking `next`: no bytes consumed, no constraint on what follows.
+    Transparent,
+    /// The walk accepts without consulting `next` (`EndOfInput`, `Phantom`), so it is the same as
+    /// walking `Next::Empty`.
+    Terminal,
+    /// Anything else, including zero-width formats that constrain lookahead (`Peek`, `PeekNot`,
+    /// `Fail`).
+    Opaque,
+}
+
+impl LookaheadEffect {
+    /// The effect of a sequence of formats, given each element's effect in order: the first
+    /// element that isn't transparent decides, and an empty or all-transparent sequence is
+    /// transparent.
+    pub(crate) fn of_sequence(effects: impl IntoIterator<Item = LookaheadEffect>) -> Self {
+        effects
+            .into_iter()
+            .find(|e| *e != LookaheadEffect::Transparent)
+            .unwrap_or(LookaheadEffect::Transparent)
+    }
+}
+
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
@@ -331,9 +358,49 @@ impl Format {
     /// Returns `true` if the format will always match zero bytes, i.e. it is non-productive.
     ///
     /// This is a conservative approximation: some formats that can match zero bytes in some cases but not others may return `false` here.
+    ///
+    /// Test-only since `Next::cat` switched to [`Self::lookahead_effect`].
+    #[cfg(test)]
     pub(crate) fn is_nonproductive(&self, module: &FormatModule) -> bool {
         // NOTE - this is a placeholder but the logic itself is sound; we only need to reimplement if we want more precision
         self.match_bounds(module).as_exact() == Some(0)
+    }
+
+    /// How `self`, as the head of a `Next::Cat(self, next)` continuation, affects the `MatchTree`
+    /// walk of that continuation; see [`LookaheadEffect`].
+    ///
+    /// Merely matching zero bytes is not enough to be transparent: `Peek`, `PeekNot` and `Fail`
+    /// match zero bytes but constrain lookahead. Conservative: `ItemVar` is not descended into, so
+    /// a named zero-width format is [`LookaheadEffect::Opaque`]. Stops at the first node that
+    /// isn't transparent.
+    pub(crate) fn lookahead_effect(&self) -> LookaheadEffect {
+        match self {
+            Format::Compute(_)
+            | Format::Pos
+            | Format::DecodeBytes(..)
+            | Format::ParseFromView(..)
+            | Format::WithView(..)
+            | Format::LiftedOption(None) => LookaheadEffect::Transparent,
+            Format::EndOfInput | Format::Phantom(_) => LookaheadEffect::Terminal,
+            Format::Variant(_, f)
+            | Format::Map(f, _)
+            | Format::Where(f, _)
+            | Format::Let(_, _, f)
+            | Format::LetView(_, f)
+            | Format::Permit(f, _)
+            | Format::Dynamic(_, _, f)
+            | Format::Hint(_, f)
+            | Format::LiftedOption(Some(f)) => f.lookahead_effect(),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(f) => f.lookahead_effect(),
+            Format::Tuple(fs) | Format::Sequence(fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(Format::lookahead_effect))
+            }
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => {
+                LookaheadEffect::of_sequence([f0.lookahead_effect(), f.lookahead_effect()])
+            }
+            _ => LookaheadEffect::Opaque,
+        }
     }
 }
 
@@ -582,9 +649,10 @@ impl Format {
             Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds_recursive(module, open),
             Format::Apply(_) => RecursiveBounds::at_least(1),
             Format::DecodeBytes(_bytes, _f) => RecursiveBounds::exact(0),
-            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => f
+            // `f0` may read up to its own lookahead, or `f` may read up to its lookahead after `f0`'s match
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => f0
                 .lookahead_bounds_recursive(module, open)
-                .union(f0.lookahead_bounds_recursive(module, open) + f0.match_bounds(module)),
+                .union(f.lookahead_bounds_recursive(module, open) + f0.match_bounds(module)),
             Format::Permit(f, _expr) => f.lookahead_bounds_recursive(module, open),
             #[cfg(feature = "format_enforce")]
             Format::Enforce(f) => f.lookahead_bounds_recursive(module, open),
@@ -623,7 +691,7 @@ impl Format {
         self.depends_on_next_open(module, &mut HashSet::new())
     }
 
-    /// See [`Self::match_bounds_open`]'s docs for `open`'s general role. Here, re-entering an
+    /// See [`Self::match_bounds_recursive`]'s docs for `open`'s general role. Here, re-entering an
     /// already-open level conservatively returns `true` (the safe default: answering `false`
     /// incorrectly could make the compiled decoder use `Next::Empty` when it actually needed the
     /// real continuation - a soundness bug - whereas `true` only costs a missed decoder-sharing
@@ -727,111 +795,140 @@ impl Format {
     /// batch member's body (written using batch-relative `RecVar` indices) into the real, absolute
     /// `ItemVar` references every other pass over `Format` expects to see - see `Format::RecVar`'s
     /// own doc comment.
-    pub(crate) fn substitute_rec_var(self, start: usize) -> Format {
+    ///
+    /// # Panics
+    ///
+    /// Panics if any `RecVar(ix)` has `ix >= len`, where `len` is the number of batch members:
+    /// such an index would otherwise point past the batch, either out of bounds or at whatever
+    /// unrelated format is registered at that level later. `len == 0` rejects every `RecVar`,
+    /// which is how `FormatModule::define_format_recursive` checks its builders' output.
+    pub(crate) fn substitute_rec_var(self, start: usize, len: usize) -> Format {
         match self {
-            Format::RecVar(ix) => Format::ItemVar(start + ix, Vec::new(), Vec::new()),
+            Format::RecVar(ix) if len == 0 => panic!(
+                "Format::RecVar({ix}) is only valid in the body of a `define_format_rec_batch` member \
+                 (in a `define_format_recursive` builder, use the provided `FormatRef`s instead)"
+            ),
+            Format::RecVar(ix) => {
+                assert!(
+                    ix < len,
+                    "Format::RecVar({ix}) is out of range for a recursive batch of {len} member(s)"
+                );
+                Format::ItemVar(start + ix, Vec::new(), Vec::new())
+            }
             Format::ItemVar(level, args, views) => Format::ItemVar(level, args, views),
             Format::Fail => Format::Fail,
             Format::EndOfInput => Format::EndOfInput,
             Format::Align(n) => Format::Align(n),
             Format::Byte(bs) => Format::Byte(bs),
             Format::Variant(label, f) => {
-                Format::Variant(label, Box::new(f.substitute_rec_var(start)))
+                Format::Variant(label, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::Union(fs) => Format::Union(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
             Format::UnionNondet(fs) => Format::UnionNondet(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
             Format::Tuple(fs) => Format::Tuple(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
             Format::Sequence(fs) => Format::Sequence(
                 fs.into_iter()
-                    .map(|f| f.substitute_rec_var(start))
+                    .map(|f| f.substitute_rec_var(start, len))
                     .collect(),
             ),
-            Format::Repeat(f) => Format::Repeat(Box::new(f.substitute_rec_var(start))),
-            Format::Repeat1(f) => Format::Repeat1(Box::new(f.substitute_rec_var(start))),
+            Format::Repeat(f) => Format::Repeat(Box::new(f.substitute_rec_var(start, len))),
+            Format::Repeat1(f) => Format::Repeat1(Box::new(f.substitute_rec_var(start, len))),
             Format::RepeatCount(expr, f) => {
-                Format::RepeatCount(expr, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatCount(expr, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::RepeatBetween(range, f) => {
-                Format::RepeatBetween(range, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatBetween(range, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::RepeatUntilLast(cond, f) => {
-                Format::RepeatUntilLast(cond, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatUntilLast(cond, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::RepeatUntilSeq(cond, f) => {
-                Format::RepeatUntilSeq(cond, Box::new(f.substitute_rec_var(start)))
+                Format::RepeatUntilSeq(cond, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::AccumUntil(cond, acc, init, vt, f) => {
-                Format::AccumUntil(cond, acc, init, vt, Box::new(f.substitute_rec_var(start)))
-            }
+            Format::AccumUntil(cond, acc, init, vt, f) => Format::AccumUntil(
+                cond,
+                acc,
+                init,
+                vt,
+                Box::new(f.substitute_rec_var(start, len)),
+            ),
             Format::ForEach(expr, lbl, f) => {
-                Format::ForEach(expr, lbl, Box::new(f.substitute_rec_var(start)))
+                Format::ForEach(expr, lbl, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::Maybe(expr, f) => Format::Maybe(expr, Box::new(f.substitute_rec_var(start))),
-            Format::Peek(f) => Format::Peek(Box::new(f.substitute_rec_var(start))),
-            Format::PeekNot(f) => Format::PeekNot(Box::new(f.substitute_rec_var(start))),
-            Format::Slice(expr, f) => Format::Slice(expr, Box::new(f.substitute_rec_var(start))),
-            Format::Bits(f) => Format::Bits(Box::new(f.substitute_rec_var(start))),
+            Format::Maybe(expr, f) => {
+                Format::Maybe(expr, Box::new(f.substitute_rec_var(start, len)))
+            }
+            Format::Peek(f) => Format::Peek(Box::new(f.substitute_rec_var(start, len))),
+            Format::PeekNot(f) => Format::PeekNot(Box::new(f.substitute_rec_var(start, len))),
+            Format::Slice(expr, f) => {
+                Format::Slice(expr, Box::new(f.substitute_rec_var(start, len)))
+            }
+            Format::Bits(f) => Format::Bits(Box::new(f.substitute_rec_var(start, len))),
             Format::WithRelativeOffset(base, off, f) => {
-                Format::WithRelativeOffset(base, off, Box::new(f.substitute_rec_var(start)))
+                Format::WithRelativeOffset(base, off, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::Map(f, expr) => Format::Map(Box::new(f.substitute_rec_var(start)), expr),
-            Format::Where(f, cond) => Format::Where(Box::new(f.substitute_rec_var(start)), cond),
+            Format::Map(f, expr) => Format::Map(Box::new(f.substitute_rec_var(start, len)), expr),
+            Format::Where(f, cond) => {
+                Format::Where(Box::new(f.substitute_rec_var(start, len)), cond)
+            }
             Format::Compute(expr) => Format::Compute(expr),
             Format::Let(name, expr, f) => {
-                Format::Let(name, expr, Box::new(f.substitute_rec_var(start)))
+                Format::Let(name, expr, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::Match(expr, branches) => Format::Match(
                 expr,
                 branches
                     .into_iter()
-                    .map(|(pat, f)| (pat, f.substitute_rec_var(start)))
+                    .map(|(pat, f)| (pat, f.substitute_rec_var(start, len)))
                     .collect(),
             ),
             Format::Dynamic(name, dynf, f) => {
-                Format::Dynamic(name, dynf, Box::new(f.substitute_rec_var(start)))
+                Format::Dynamic(name, dynf, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::Apply(name) => Format::Apply(name),
             Format::Pos => Format::Pos,
             Format::SkipRemainder => Format::SkipRemainder,
             Format::DecodeBytes(expr, f) => {
-                Format::DecodeBytes(expr, Box::new(f.substitute_rec_var(start)))
+                Format::DecodeBytes(expr, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::LetFormat(f0, name, f1) => Format::LetFormat(
-                Box::new(f0.substitute_rec_var(start)),
+                Box::new(f0.substitute_rec_var(start, len)),
                 name,
-                Box::new(f1.substitute_rec_var(start)),
+                Box::new(f1.substitute_rec_var(start, len)),
             ),
             Format::MonadSeq(f0, f1) => Format::MonadSeq(
-                Box::new(f0.substitute_rec_var(start)),
-                Box::new(f1.substitute_rec_var(start)),
+                Box::new(f0.substitute_rec_var(start, len)),
+                Box::new(f1.substitute_rec_var(start, len)),
             ),
-            Format::Hint(hint, f) => Format::Hint(hint, Box::new(f.substitute_rec_var(start))),
+            Format::Hint(hint, f) => Format::Hint(hint, Box::new(f.substitute_rec_var(start, len))),
             Format::LiftedOption(opt) => {
-                Format::LiftedOption(opt.map(|f| Box::new(f.substitute_rec_var(start))))
+                Format::LiftedOption(opt.map(|f| Box::new(f.substitute_rec_var(start, len))))
             }
             Format::LetView(name, f) => {
-                Format::LetView(name, Box::new(f.substitute_rec_var(start)))
+                Format::LetView(name, Box::new(f.substitute_rec_var(start, len)))
             }
             Format::WithView(vexpr, vf) => Format::WithView(vexpr, vf),
             Format::ParseFromView(vexpr, f) => {
-                Format::ParseFromView(vexpr, Box::new(f.substitute_rec_var(start)))
+                Format::ParseFromView(vexpr, Box::new(f.substitute_rec_var(start, len)))
             }
-            Format::Phantom(f) => Format::Phantom(Box::new(f.substitute_rec_var(start))),
+            Format::Phantom(f) => Format::Phantom(Box::new(f.substitute_rec_var(start, len))),
             #[cfg(feature = "format_enforce")]
-            Format::Enforce(f) => Format::Enforce(Box::new(f.substitute_rec_var(start))),
-            Format::Permit(f, expr) => Format::Permit(Box::new(f.substitute_rec_var(start)), expr),
+            Format::Enforce(f) => Format::Enforce(Box::new(f.substitute_rec_var(start, len))),
+            Format::Permit(f, expr) => {
+                Format::Permit(Box::new(f.substitute_rec_var(start, len)), expr)
+            }
         }
     }
 }
@@ -989,6 +1086,56 @@ mod tests {
     use super::*;
     use crate::helper::*;
 
+    /// `lookahead_effect` must only call a format transparent when skipping it in a `Next` cannot
+    /// change any `MatchTree`: zero-width formats that constrain lookahead are opaque, and the
+    /// first non-transparent element of a sequence decides.
+    #[test]
+    fn lookahead_effect_classification() {
+        use LookaheadEffect::*;
+
+        let cases = [
+            (compute(Expr::U8(0)), Transparent),
+            (Format::Pos, Transparent),
+            (Format::EMPTY, Transparent),
+            (Format::EndOfInput, Terminal),
+            (Format::Peek(Box::new(is_byte(0))), Opaque),
+            (Format::PeekNot(Box::new(is_byte(0))), Opaque),
+            (Format::Fail, Opaque),
+            (is_byte(0), Opaque),
+            (Format::ItemVar(0, vec![], vec![]), Opaque),
+            (tuple([compute(Expr::U8(0)), Format::Fail]), Opaque),
+            (
+                tuple([compute(Expr::U8(0)), Format::EndOfInput, Format::Fail]),
+                Terminal,
+            ),
+            (monad_seq(Format::Pos, compute(Expr::U8(0))), Transparent),
+        ];
+        for (f, expected) in cases {
+            assert_eq!(f.lookahead_effect(), expected, "for {f:?}");
+        }
+    }
+
+    /// `MonadSeq(f0, f)`/`LetFormat(f0, _, f)` may read up to `f0.lookahead` bytes while parsing
+    /// `f0`, or up to `f0.match + f.lookahead` bytes once `f` starts after it. With a 1-byte `f0`
+    /// and a 3-byte `f`, the maximum lookahead is 4. With the operands swapped
+    /// (`f.lookahead ∪ (f0.lookahead + f0.match)`) it comes out as 3.
+    #[test]
+    fn lookahead_bounds_monad_seq_counts_f0_match_before_f() {
+        let module = FormatModule::new();
+        let f0 = || is_byte(0x01);
+        let f = || byte_seq(&[0x02, 0x03, 0x04]);
+        for (name, fmt) in [
+            ("MonadSeq", monad_seq(f0(), f())),
+            ("LetFormat", chain(f0(), "x", f())),
+        ] {
+            assert_eq!(
+                fmt.lookahead_bounds(&module).max(),
+                Some(4),
+                "{name}: max lookahead must include f0's match before f's lookahead"
+            );
+        }
+    }
+
     /// Tests that `match_bounds` correctly estimates the minimum bytes consumed when processing
     /// a recursive `Union`.
     ///
@@ -1040,7 +1187,7 @@ mod tests {
         assert_eq!(
             bounds.min(),
             8,
-            "mutual-recursion incorrectly discounted shorter recursive path in favor of non-recursive path when comuting match_bounds"
+            "mutual-recursion incorrectly discounted shorter recursive path in favor of non-recursive path when computing match_bounds"
         );
         assert_eq!(
             bounds.max(),

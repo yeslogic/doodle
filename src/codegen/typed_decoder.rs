@@ -469,11 +469,8 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let field_next = Next::sequence(
-                        self.module,
-                        MaybeTyped::Typed(fields.as_slice()),
-                        next.clone(),
-                    );
+                    let field_next =
+                        Next::sequence(MaybeTyped::Typed(fields.as_slice()), next.clone());
                     let df = self.compile_gt_format(f, None, field_next)?;
                     dfields.push(df);
                 }
@@ -483,11 +480,8 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let field_next = Next::sequence(
-                        self.module,
-                        MaybeTyped::Typed(fields.as_slice()),
-                        next.clone(),
-                    );
+                    let field_next =
+                        Next::sequence(MaybeTyped::Typed(fields.as_slice()), next.clone());
                     let df = self.compile_gt_format(f, None, field_next)?;
                     dfields.push(df);
                 }
@@ -716,13 +710,13 @@ impl<'a> GTCompiler<'a> {
                 // arm (Phase 4's "Finding B"): skip the `Next::Cat` wrapping when `f` can only
                 // ever match zero bytes, so a self-referential `f0` sees the same `next` here as
                 // it would compiled directly, letting `decoder_map` actually memoize it.
-                let a_next = Next::cat(self.module, MaybeTyped::Typed(f.as_ref()), next.clone());
+                let a_next = Next::cat(MaybeTyped::Typed(f.as_ref()), next.clone());
                 let d0 = Box::new(self.compile_gt_format(f0, None, a_next)?);
                 let d = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::LetFormat(gt.clone(), d0, name.clone(), d))
             }
             TypedFormat::MonadSeq(gt, f0, f) => {
-                let a_next = Next::cat(self.module, MaybeTyped::Typed(f.as_ref()), next.clone());
+                let a_next = Next::cat(MaybeTyped::Typed(f.as_ref()), next.clone());
                 let d0 = Box::new(self.compile_gt_format(f0, None, a_next)?);
                 let d = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::MonadSeq(gt.clone(), d0, d))

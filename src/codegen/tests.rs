@@ -19,6 +19,91 @@ fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
 mod elaboration {
     use super::*;
 
+    /// The occurs-check treats `Tuple` positions as an indirection boundary, but codegen can only
+    /// break a recursive cycle with a `Box` at a `Record`/`Variant` construction site, and hits an
+    /// `unreachable!` on a tuple that contains itself. For `(tag, Maybe(tag == 'C', self))`, of
+    /// type `(u8, Option<self>)`, the two must agree: either the typechecker rejects the format, or
+    /// codegen handles it.
+    #[test]
+    fn typecheck_accepting_tuple_self_reference_implies_codegen_succeeds() {
+        use crate::helper::{byte_in, chain, compute, expr_eq, var};
+
+        let body = chain(
+            byte_in([b'C', b'E']),
+            "tag",
+            Format::Tuple(vec![
+                compute(var("tag")),
+                Format::Maybe(
+                    Box::new(expr_eq(var("tag"), Expr::U8(b'C'))),
+                    Box::new(Format::RecVar(0)),
+                ),
+            ]),
+        );
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tchain"), body)]);
+        let top = refs[0].call();
+        if TypeChecker::infer_module(&module, &top).is_ok() {
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                produce_string_gencode(&module, &top)
+            }));
+            assert!(
+                res.is_ok(),
+                "the typechecker accepted a tuple self-reference that codegen cannot generate"
+            );
+        }
+    }
+
+    /// `tree := 'L' | 'N' ~ tree* ~ 'E'` is well-formed (every `tree` starts with a byte, and `'E'`
+    /// ends the repetition), but codegen recurses without bound on it and overflows the stack,
+    /// which aborts the whole test process; on #332 it instead panicked with "cannot repeat
+    /// nullable format".
+    #[test]
+    #[ignore = "repro: codegen overflows the stack (aborting the test process) on Repeat of a recursive item"]
+    fn codegen_repeat_of_recursive_item_terminates() {
+        use crate::helper::{is_byte, repeat};
+
+        let tree = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Leaf"), Box::new(is_byte(b'L'))),
+            Format::Variant(
+                Label::Borrowed("Node"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'N'),
+                    repeat(Format::RecVar(0)),
+                    is_byte(b'E'),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tree"), tree)]);
+        let src = produce_string_gencode(&module, &refs[0].call());
+        assert!(src.contains("Vec<"), "source was:\n{src}");
+    }
+
+    /// Typed counterpart of `format::tests::lookahead_bounds_monad_seq_counts_f0_match_before_f`:
+    /// `TypedFormat::lookahead_bounds` for `MonadSeq`/`LetFormat` with a 1-byte `f0` and a 3-byte
+    /// `f` must report a maximum lookahead of 4.
+    #[test]
+    fn typed_lookahead_bounds_monad_seq_counts_f0_match_before_f() {
+        use crate::helper::{byte_seq, chain, is_byte, monad_seq};
+
+        let f0 = || is_byte(0x01);
+        let f = || byte_seq(&[0x02, 0x03, 0x04]);
+        for (name, fmt) in [
+            ("MonadSeq", monad_seq(f0(), f())),
+            ("LetFormat", chain(f0(), "x", f())),
+        ] {
+            let module = FormatModule::new();
+            let tc = TypeChecker::infer_module(&module, &fmt).unwrap();
+            let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+            let (typed, _extra) = elaborator.elaborate_module(&module, &fmt);
+            assert_eq!(
+                typed.lookahead_bounds().max(),
+                Some(4),
+                "{name}: max lookahead must include f0's match before f's lookahead"
+            );
+        }
+    }
+
     /// Runs full-module inference on `module` starting from top-level format `f` using `TypeChecker`,
     /// as well as full-module elaboration using the finalized `TypeChecker` artifact, and makes the
     /// assertion that the two have the exact same 'population count' (largest-index UVar in TypeChecker should
@@ -245,6 +330,12 @@ mod elaboration {
             tf.is_nonproductive(),
             erased.is_nonproductive(module),
             "TypedFormat::is_nonproductive disagreed with erase-then-Format::is_nonproductive for {tf:?}"
+        );
+        // `Next::cat`/`Next::sequence` decide on this, for typed and untyped decoders alike
+        assert_eq!(
+            tf.lookahead_effect(),
+            erased.lookahead_effect(),
+            "TypedFormat::lookahead_effect disagreed with erase-then-Format::lookahead_effect for {tf:?}"
         );
         for child in typed_format_children(tf) {
             check_is_nonproductive_agrees(&child, module, seen);
@@ -913,6 +1004,54 @@ mod fixture_gen {
         let top = outer.call();
         let frag = generate_code(&module, &top).to_fragment();
         const TEST_PATH: &str = "tests/runtime_repeat/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
+    }
+
+    /// A self-reference in element position of a `RepeatCount` (`Node`'s children) needs no `Box`,
+    /// since `Vec` already provides the indirection; the generated field type and the values the
+    /// `Repeat` decoder pushes must agree, or `tests/recursive_repeat/mod.rs` fails to compile.
+    #[test]
+    fn recursive_repeat_behavior_test() {
+        let tree = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Leaf"), Box::new(is_byte(b'L'))),
+            Format::Variant(
+                Label::Borrowed("Node"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'N'),
+                    repeat_count(Expr::U32(2), Format::RecVar(0)),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tree"), tree)]);
+        let top = refs[0].call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/recursive_repeat/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
+    }
+
+    /// A self-reference under a conditional `Maybe` (`next`) does need a `Box`, since
+    /// `Option<T>` alone is no indirection; the generated field type and the value the `Maybe`
+    /// decoder builds must agree, or `tests/recursive_maybe/mod.rs` fails to compile.
+    #[test]
+    fn recursive_maybe_behavior_test() {
+        let chain = record([
+            ("tag", byte_in([b'C', b'E'])),
+            (
+                "next",
+                Format::Maybe(
+                    Box::new(expr_eq(var("tag"), Expr::U8(b'C'))),
+                    Box::new(Format::RecVar(0)),
+                ),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.chain"), chain)]);
+        let top = refs[0].call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/recursive_maybe/mod.rs";
         let mut f = File::create(TEST_PATH).unwrap();
         write!(f, "{}", frag).unwrap();
     }

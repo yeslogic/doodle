@@ -16,6 +16,7 @@ use crate::recursion::{OpenSet, RecursiveBounds, guarded_bounds};
 use crate::validation::TypedCondition;
 use crate::{
     Arith, BaseKind, Endian, FormatRef, IntRel, Label, RepeatRange, StyleHint, TypeHint, UnaryOp,
+    format::LookaheadEffect,
 };
 
 pub(crate) mod variables;
@@ -484,9 +485,10 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Apply(_, _, _) => RecursiveBounds::at_least(1),
-            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => f
+            // `f0` may read up to its own lookahead, or `f` may read up to its lookahead after `f0`'s match
+            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => f0
                 .lookahead_bounds_recursive(open)
-                .union(f0.lookahead_bounds_recursive(open) + f0.match_bounds()),
+                .union(f.lookahead_bounds_recursive(open) + f0.match_bounds()),
             #[cfg(feature = "format_enforce")]
             TypedFormat::Enforce(.., inner) => inner.lookahead_bounds_recursive(open),
             TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
@@ -504,9 +506,44 @@ impl TypedFormat<GenType> {
     /// Returns `true` if the format will always match zero bytes, i.e. it is non-productive.
     ///
     /// This is a conservative approximation: some formats that can match zero bytes in some cases but not others may return `false` here.
+    ///
+    /// Test-only since `Next::cat` switched to [`Self::lookahead_effect`].
+    #[cfg(test)]
     pub(crate) fn is_nonproductive(&self) -> bool {
         // NOTE - this is a placeholder but the logic itself is sound; we only need to reimplement if we want more precision
         self.match_bounds().as_exact() == Some(0)
+    }
+
+    /// One-to-one analogue for [`crate::Format::lookahead_effect`]; `FormatCall` is not descended into,
+    /// mirroring `ItemVar` there.
+    pub(crate) fn lookahead_effect(&self) -> LookaheadEffect {
+        match self {
+            TypedFormat::Compute(..)
+            | TypedFormat::Pos(_)
+            | TypedFormat::DecodeBytes(..)
+            | TypedFormat::ParseFromView(..)
+            | TypedFormat::WithView(..)
+            | TypedFormat::LiftedOption(_, None) => LookaheadEffect::Transparent,
+            TypedFormat::EndOfInput | TypedFormat::Phantom(..) => LookaheadEffect::Terminal,
+            TypedFormat::Variant(_, _, f)
+            | TypedFormat::Map(_, f, _)
+            | TypedFormat::Where(_, f, _)
+            | TypedFormat::Let(_, _, _, f)
+            | TypedFormat::LetView(_, _, f)
+            | TypedFormat::Permit(_, f, _)
+            | TypedFormat::Dynamic(_, _, _, f)
+            | TypedFormat::Hint(_, _, f) => f.lookahead_effect(),
+            TypedFormat::LiftedOption(_, Some(f)) => f.lookahead_effect(),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(_, f) => f.lookahead_effect(),
+            TypedFormat::Tuple(_, fs) | TypedFormat::Sequence(_, fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(TypedFormat::lookahead_effect))
+            }
+            TypedFormat::MonadSeq(_, f0, f) | TypedFormat::LetFormat(_, f0, _, f) => {
+                LookaheadEffect::of_sequence([f0.lookahead_effect(), f.lookahead_effect()])
+            }
+            _ => LookaheadEffect::Opaque,
+        }
     }
 
     /// One-to-one analogue for [`Format::match_bounds`] that can be called referentially

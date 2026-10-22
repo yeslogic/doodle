@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::repeat_n;
 use std::num::NonZeroUsize;
 use std::rc::Rc;
@@ -859,6 +859,7 @@ pub(crate) mod record_fmt;
 pub(crate) use record_fmt::{OwnedRecordFormat, RecordBuilder};
 
 pub mod format;
+use format::LookaheadEffect;
 pub use format::{Format, RepeatRange};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
@@ -1109,7 +1110,7 @@ impl FormatModule {
 
         let start = self.reserve_batch_levels(names);
         for (ix, format) in bodies.into_iter().enumerate() {
-            self.formats[start + ix] = format.substitute_rec_var(start);
+            self.formats[start + ix] = format.substitute_rec_var(start, n);
         }
         self.check_batch_has_base_case(start, n);
         self.infer_batch_types(start, n);
@@ -1172,7 +1173,9 @@ impl FormatModule {
         let refs: [FormatRef; N] = std::array::from_fn(|ix| FormatRef(start + ix));
 
         for (ix, build) in formats.into_iter().enumerate() {
-            let body = build(&refs);
+            // A batch length of 0 rejects any `RecVar` a builder returned, before the base-case
+            // check below can trip over it.
+            let body = build(&refs).substitute_rec_var(start, 0);
             self.formats[start + ix] = body;
         }
         self.check_batch_has_base_case(start, N);
@@ -1331,9 +1334,13 @@ impl FormatModule {
                 }
                 Ok(self.get_format_type(*level).clone())
             }
-            Format::RecVar(_) => unreachable!(
-                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
-            ),
+            // `define_format_rec_batch` rewrites every `RecVar` before inferring types, so one
+            // reaching here was passed to some other registration path (e.g. `define_format`, or
+            // returned from a `define_format_recursive` builder).
+            Format::RecVar(ix) => Err(anyhow!(
+                "Format::RecVar({ix}) is only valid in the body of a `define_format_rec_batch` member \
+                 (in a `define_format_recursive` builder, use the provided `FormatRef`s instead)"
+            )),
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
                 match bytes_type {
@@ -1728,41 +1735,45 @@ enum Next<'a> {
 }
 
 impl<'a> Next<'a> {
-    /// Smart constructor for [`Next::Cat`]: when `content` is guaranteed to match zero bytes (e.g.
-    /// a trailing `Format::Compute`), wrapping it around `next` adds no real information but *does*
-    /// add a structurally distinct `Next` layer - which, for a self-referential reference compiled
-    /// under it, can miss `decoder_map`'s `(level, next)` cache and queue a doomed duplicate compile
-    /// (see `doc/RECURSION.md`'s mechanism 4). Skips the wrapper in that case and returns `next`
-    /// directly instead.
-    fn cat(module: &FormatModule, content: MTFormatRef<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
-        let nonproductive = match content {
-            MaybeTyped::Untyped(f) => f.is_nonproductive(module),
-            MaybeTyped::Typed(f) => f.is_nonproductive(),
+    /// Smart constructor for [`Next::Cat`]. When `content` is transparent to lookahead (it neither
+    /// consumes bytes nor constrains what may follow, e.g. a trailing `Format::Compute`), wrapping
+    /// it around `next` adds no real information but *does* add a structurally distinct `Next`
+    /// layer - which, for a self-referential reference compiled under it, can miss `decoder_map`'s
+    /// `(level, next)` cache and queue a doomed duplicate compile (see `doc/RECURSION.md`'s
+    /// mechanism 4). Returns `next` directly in that case, and `Next::Empty` when `content` accepts
+    /// without consulting `next` at all (see [`LookaheadEffect`]).
+    ///
+    /// Merely matching zero bytes is not enough: a zero-width `Peek`/`PeekNot`/`Fail` still
+    /// constrains the lookahead of whatever precedes it.
+    fn cat(content: MTFormatRef<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        let effect = match content {
+            MaybeTyped::Untyped(f) => f.lookahead_effect(),
+            MaybeTyped::Typed(f) => f.lookahead_effect(),
         };
-        if nonproductive {
-            next
-        } else {
-            Rc::new(Next::Cat(content, next))
+        match effect {
+            LookaheadEffect::Transparent => next,
+            LookaheadEffect::Terminal => Rc::new(Next::Empty),
+            LookaheadEffect::Opaque => Rc::new(Next::Cat(content, next)),
         }
     }
 
     /// Smart constructor for [`Next::Sequence`]: analogous to [`Self::cat`], but for a `Tuple`/
-    /// `Sequence`'s trailing field-suffix as a whole - skips the wrapper when every element of
-    /// `content` is nonproductive, which is vacuously true for an empty slice (the previously
+    /// `Sequence`'s trailing field-suffix as a whole, whose effect is that of its first element
+    /// that isn't transparent; an empty or all-transparent suffix is transparent (the previously
     /// special-cased `remaining == []` case falls out of this for free).
-    fn sequence(
-        module: &FormatModule,
-        content: MTFormatSlice<'a>,
-        next: Rc<Next<'a>>,
-    ) -> Rc<Next<'a>> {
-        let nonproductive = match content {
-            MaybeTyped::Untyped(fs) => fs.iter().all(|f| f.is_nonproductive(module)),
-            MaybeTyped::Typed(fs) => fs.iter().all(|f| f.is_nonproductive()),
+    fn sequence(content: MTFormatSlice<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        let effect = match content {
+            MaybeTyped::Untyped(fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(Format::lookahead_effect))
+            }
+            MaybeTyped::Typed(fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(TypedFormat::lookahead_effect))
+            }
         };
-        if nonproductive {
-            next
-        } else {
-            Rc::new(Next::Sequence(content, next))
+        match effect {
+            LookaheadEffect::Transparent => next,
+            LookaheadEffect::Terminal => Rc::new(Next::Empty),
+            LookaheadEffect::Opaque => Rc::new(Next::Sequence(content, next)),
         }
     }
 }
@@ -1791,23 +1802,39 @@ pub struct MatchTree {
     branches: Vec<(ByteSet, MatchTree)>,
 }
 
+/// Alias used for semantic transparency of the `usize` value used to identify `Rc<Next>`-values within [`CycleGuard`]
+type NextPtrAddr = usize;
+
 /// Tracks which `Format::ItemVar`/`TypedFormat::FormatCall` levels are currently being eagerly
 /// expanded within a single top-level [`MatchTreeStep`] construction (one iteration of
-/// [`MatchTreeLevel::grow`]'s per-index loop), so that construction terminates instead of
+/// [`MatchTreeLevel::try_grow`]'s per-index loop), so that construction terminates instead of
 /// recursing forever on a self-referential format.
 ///
 /// A level is added to `open_levels` immediately before recursing into [`MatchTreeStep::from_format`]
 /// on `module.get_format(level)`, and is removed just after that call returns.
 ///
+/// The walk of a level's body only ever reaches the continuation it was opened with (`exit`) once
+/// the body itself has been fully matched, so whenever [`MatchTreeStep::from_next`] is called on
+/// exactly that continuation, the level is closed for the duration of that call (see
+/// [`Self::leave`]). A later reference to the same level from within that continuation - e.g. the
+/// second `B` in `B ~ B ~ 'x'` with a nullable `B` - is then a sibling, not a re-entry. Exits are
+/// matched by `Rc` pointer identity: the continuation stays alive for as long as its level is open,
+/// so no other live `Next` can share its address, and a structurally equal but separately
+/// allocated continuation is simply not recognized as an exit (conservative, never unsound).
+///
 /// If a level would be added to `open_levels` for the second time, then there must be a zero-progress cycle
-/// (provided that a fresh `CycleGuard` is instantiated for each separate pass within [`MatchTreeLevel::grow`]).
-/// When this happens, `has_cycle` is set to true, and the return value can be arbitrarily chosen as
-/// `MatchTreeStep::reject()`; the calling `MatchTreeLevel::grow` is responsible for checking `has_cycle`,
-/// and if it is set, then an exceptional value of `None` is returned.
+/// (provided that a fresh `CycleGuard` is instantiated for each separate pass within [`MatchTreeLevel::try_grow`]).
+/// When this happens, `has_cycle` is set to true (and `cycle_level` to the re-entered level), and the
+/// return value can be arbitrarily chosen as `MatchTreeStep::reject()`; the calling
+/// `MatchTreeLevel::try_grow` is responsible for checking `has_cycle`, and if it is set, then
+/// [`MatchTreeError::Cycle`] is returned.
 #[derive(Default)]
 struct CycleGuard {
-    open_levels: HashSet<usize>,
+    /// Each open level, mapped to the address of the continuation (`exit`) it was opened with.
+    open_levels: HashMap<usize, NextPtrAddr>,
     has_cycle: bool,
+    /// The first level found to be re-entered, if any.
+    cycle_level: Option<usize>,
 }
 
 impl CycleGuard {
@@ -1815,15 +1842,49 @@ impl CycleGuard {
         Self::default()
     }
 
-    /// Inserts `level` into the open-set, updating `has_cycle` based on whether the insertion was novel
-    /// (i.e. setting it to `true` if the `level` was already open).
+    /// The address identifying `next` as some open level's `exit`.
+    fn exit_addr(next: &Rc<Next<'_>>) -> NextPtrAddr {
+        Rc::as_ptr(next) as *const () as usize
+    }
+
+    /// Inserts `level` into the open-set, with `exit` the continuation its body is walked under,
+    /// updating `has_cycle` based on whether the insertion was novel (i.e. setting it to `true`
+    /// if the `level` was already open).
     ///
     /// Returns the value of `self.has_cycle`.
-    fn open(&mut self, level: usize) -> bool {
-        if !self.open_levels.insert(level) {
+    fn open(&mut self, level: usize, exit: &Rc<Next<'_>>) -> bool {
+        if self.open_levels.contains_key(&level) {
             self.has_cycle = true;
+            self.cycle_level.get_or_insert(level);
+        } else {
+            self.open_levels.insert(level, Self::exit_addr(exit));
         }
         self.has_cycle
+    }
+
+    /// Closes, and returns, every open level whose `exit` is `next`: the walk is leaving those
+    /// levels' bodies. [`Self::reenter`] must be called with the result once the walk of `next`
+    /// returns, since other paths through those bodies may still be explored afterwards.
+    fn leave(&mut self, next: &Rc<Next<'_>>) -> Vec<(usize, NextPtrAddr)> {
+        if self.open_levels.is_empty() {
+            return Vec::new();
+        }
+        let addr = Self::exit_addr(next);
+        let left: Vec<(usize, NextPtrAddr)> = self
+            .open_levels
+            .iter()
+            .filter(|(_, exit)| **exit == addr)
+            .map(|(level, exit)| (*level, *exit))
+            .collect();
+        for (level, _) in &left {
+            self.open_levels.remove(level);
+        }
+        left
+    }
+
+    /// Reopens the levels returned by [`Self::leave`].
+    fn reenter(&mut self, left: Vec<(usize, NextPtrAddr)>) {
+        self.open_levels.extend(left);
     }
 
     /// Marks `level` as closed, removing it from the open-set.
@@ -2055,6 +2116,18 @@ impl<'a> MatchTreeStep<'a> {
         next: Rc<Next<'a>>,
         guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
+        let left = guard.leave(&next);
+        let step = Self::from_next_inner(module, next, guard);
+        guard.reenter(left);
+        step
+    }
+
+    /// The body of [`Self::from_next`], once any levels exited by `next` have been closed.
+    fn from_next_inner(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
+    ) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
@@ -2177,13 +2250,27 @@ impl<'a> MatchTreeStep<'a> {
 
     /// Internal helper to dedup and simplify the common ItemVar/FormatCall handling between `from_format` and `from_gt_format`
     ///
-    /// Insterts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
-    /// its value after marking `level` as closed.
-    fn guarded<F>(level: usize, guard: &mut CycleGuard, f: F) -> Self
+    /// Opens `level` in `guard`, returning `Self::reject` if `level` was already open (a zero-progress cycle; see
+    /// [`CycleGuard`]). Otherwise, computes `f(guard)`, yielding its value after marking `level` as closed.
+    ///
+    /// # Notes
+    ///
+    /// `exit` is the Rc-wrapped [`Next`] continuation immediately following the `ItemVar`/`FormatCall` whose level we are
+    /// guarding descent into. It is recorded (as a [`NextPtrAddr`]) so that [`Self::from_next`] can close `level` once the
+    /// walk leaves its body and continues into `exit`. It plays no part in detecting a cycle, which depends on `level`
+    /// alone.
+    ///
+    /// While `level` is open, no byte has been consumed since entering it (the walk stops at the first byte), so reaching
+    /// `level` again means re-entering it from within its own body without progress, i.e. left recursion. A sibling
+    /// reference to the same, possibly zero-width, level (the second `B` in `B ~ B ~ 'x'`) is only reached through
+    /// `exit`, by which point `level` has been closed.
+    ///
+    /// This guard serves only to prevent left recursion; formats it accepts may still fail elsewhere (e.g. as ambiguous).
+    fn guarded<F>(level: usize, exit: &Rc<Next<'a>>, guard: &mut CycleGuard, f: F) -> Self
     where
         F: FnOnce(&mut CycleGuard) -> Self,
     {
-        if guard.open(level) {
+        if guard.open(level, exit) {
             return Self::reject();
         }
         let step = f(guard);
@@ -2198,9 +2285,11 @@ impl<'a> MatchTreeStep<'a> {
         guard: &mut CycleGuard,
     ) -> MatchTreeStep<'a> {
         match f {
-            TypedFormat::FormatCall(_, level, ..) => Self::guarded(*level, guard, move |guard| {
-                Self::from_format(module, module.get_format(*level), next, guard)
-            }),
+            TypedFormat::FormatCall(_, level, ..) => {
+                Self::guarded(*level, &next.clone(), guard, move |guard| {
+                    Self::from_format(module, module.get_format(*level), next, guard)
+                })
+            }
             TypedFormat::Fail => Self::reject(),
             TypedFormat::EndOfInput => Self::accept(),
             TypedFormat::Align(_) => {
@@ -2422,7 +2511,7 @@ impl<'a> MatchTreeStep<'a> {
         match f {
             Format::ItemVar(level, _args, _views) => {
                 let level = *level;
-                Self::guarded(level, guard, move |guard| {
+                Self::guarded(level, &next.clone(), guard, move |guard| {
                     Self::from_format(module, module.get_format(level), next, guard)
                 })
             }
@@ -2598,6 +2687,18 @@ impl<'a> MatchTreeStep<'a> {
     }
 }
 
+/// Reason why [`MatchTreeLevel::try_grow`] (and hence [`MatchTree::try_build`]) failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum MatchTreeError {
+    /// A zero-progress cycle through `level` was detected by the [`CycleGuard`].
+    Cycle { level: usize },
+    /// Two distinct indices both accept at the same point, so no amount of lookahead can decide
+    /// between them.
+    Ambiguous { accepted: usize, conflicting: usize },
+    /// The lookahead-depth limit was reached without a decisive choice of index.
+    DepthExhausted,
+}
+
 impl<'a> MatchTreeLevel<'a> {
     /// Constructs a `MatchTreeLevel` that unconditionally rejects all inputs without branching.
     fn reject() -> MatchTreeLevel<'a> {
@@ -2609,15 +2710,15 @@ impl<'a> MatchTreeLevel<'a> {
 
     /// Attempts to modify `self` such that `index` is marked as the unique index of the accepting format.
     ///
-    /// Returns `Err(())` if a different index was already marked as accepting, and `Ok(())` otherwise.
-    fn merge_accept(&mut self, index: usize) -> Result<(), ()> {
+    /// Returns `Err(i)` if a different index `i` was already marked as accepting, and `Ok(())` otherwise.
+    fn merge_accept(&mut self, index: usize) -> Result<(), usize> {
         match self.accept {
             None => {
                 self.accept = Some(index);
                 Ok(())
             }
             Some(i) if i == index => Ok(()),
-            Some(_) => Err(()),
+            Some(i) => Err(i),
         }
     }
 
@@ -2658,9 +2759,13 @@ impl<'a> MatchTreeLevel<'a> {
         mut self,
         index: usize,
         step: MatchTreeStep<'a>,
-    ) -> Result<MatchTreeLevel<'a>, ()> {
+    ) -> Result<MatchTreeLevel<'a>, MatchTreeError> {
         if step.accept {
-            self.merge_accept(index)?;
+            self.merge_accept(index)
+                .map_err(|accepted| MatchTreeError::Ambiguous {
+                    accepted,
+                    conflicting: index,
+                })?;
         }
         for (bs, next) in step.branches {
             self.merge_branch(index, bs, next);
@@ -2688,13 +2793,20 @@ impl<'a> MatchTreeLevel<'a> {
     /// Attempts to accumulate a `MatchTree` recursively up to an overall depth of `depth` layers,
     /// with the immediate layer constructed based on a bundle of indexed choice-points ([`LevelBranch`]).
     ///
-    /// If the depth limit has been reached without a decisive choice of which index to accept, returns None.
+    /// If the depth limit has been reached without a decisive choice of which index to accept,
+    /// returns [`MatchTreeError::DepthExhausted`]; if two indices accept at the same point,
+    /// [`MatchTreeError::Ambiguous`]; and if a zero-progress cycle is detected,
+    /// [`MatchTreeError::Cycle`].
     ///
     /// Otherwise, returns a `MatchTree` that is guaranteed to decide on a unique branch for
     /// all input within at most `depth` bytes of lookahead.
-    fn grow(module: &'a FormatModule, nexts: LevelBranch<'a>, depth: usize) -> Option<MatchTree> {
+    fn try_grow(
+        module: &'a FormatModule,
+        nexts: LevelBranch<'a>,
+        depth: usize,
+    ) -> Result<MatchTree, MatchTreeError> {
         if let Some(tree) = Self::accepts(&nexts) {
-            Some(tree)
+            Ok(tree)
         } else if depth > 0 {
             let mut tree = Self::reject();
             let mut tmp = Vec::from_iter(nexts);
@@ -2705,26 +2817,29 @@ impl<'a> MatchTreeLevel<'a> {
                 let mut guard = CycleGuard::new();
                 let subtree = MatchTreeStep::from_next(module, next, &mut guard);
                 if guard.has_cycle {
-                    // Upon detecting a zero-progress cycle, we know the format is not well-formed, and we return None early to surface the error to the caller.
+                    // Upon detecting a zero-progress cycle, we know the format is not well-formed, and we return early to surface the error to the caller.
                     log::error!(
                         "zero-progress recursive cycle detected in format; cannot construct a valid match tree ({next:?})",
                         next = _next.as_ref()
                     );
-                    return None;
+                    let level = guard
+                        .cycle_level
+                        .expect("has_cycle is only set alongside cycle_level");
+                    return Err(MatchTreeError::Cycle { level });
                 }
-                tree = tree.merge_step(i, subtree).ok()?;
+                tree = tree.merge_step(i, subtree)?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
-                let t = Self::grow(module, nexts, depth - 1)?;
+                let t = Self::try_grow(module, nexts, depth - 1)?;
                 branches.push((bs, t));
             }
-            Some(MatchTree {
+            Ok(MatchTree {
                 accept: tree.accept,
                 branches,
             })
         } else {
-            None
+            Err(MatchTreeError::DepthExhausted)
         }
     }
 }
@@ -2753,12 +2868,21 @@ impl MatchTree {
     ///
     /// A `FormatModule` is also accepted to contextualize any contextually dependent formats, e.g. [`Format::ItemVar`]
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
+        Self::try_build(module, branches, next).ok()
+    }
+
+    /// Like [`Self::build`], but reports why construction failed.
+    fn try_build(
+        module: &FormatModule,
+        branches: &[Format],
+        next: Rc<Next<'_>>,
+    ) -> Result<MatchTree, MatchTreeError> {
         let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
             nexts.insert((i, Rc::new(Next::Cat(MaybeTyped::Untyped(f), next.clone()))));
         }
         const MAX_DEPTH: usize = 80;
-        MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
+        MatchTreeLevel::try_grow(module, nexts, MAX_DEPTH)
     }
 }
 
@@ -3042,7 +3166,7 @@ mod test {
 
     /// A genuinely left-recursive format - `bad := bad | 'Z'` - recurses into its own `ItemVar`
     /// with zero bytes consumed in between, which `MatchTreeStep::from_format`'s guard must
-    /// detect (`guard.detected`) instead of looping/overflowing the stack.
+    /// detect (`guard.has_cycle`) instead of looping/overflowing the stack.
     #[test]
     fn matchtree_zero_progress_self_reference_is_detected_as_left_recursion() {
         use crate::helper::is_byte;
@@ -3092,6 +3216,287 @@ mod test {
             tree.is_none(),
             "MatchTree::build must fail outright (None) on a genuinely left-recursive format, \
              not silently drop the offending branch"
+        );
+    }
+
+    /// `MatchTree::try_build` reports which level closed a genuine zero-progress cycle.
+    #[test]
+    fn matchtree_try_build_reports_cycle_level() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let level = reserve_recursive_level(&mut module);
+        module.formats[level] = Format::Union(vec![
+            Format::ItemVar(level, Vec::new(), Vec::new()),
+            is_byte(b'Z'),
+        ]);
+        let branches = vec![
+            Format::ItemVar(level, Vec::new(), Vec::new()),
+            is_byte(b'B'),
+        ];
+        let res = MatchTree::try_build(&module, &branches, Rc::new(Next::Empty));
+        assert_eq!(res.err(), Some(MatchTreeError::Cycle { level }));
+    }
+
+    /// Two branches that both accept after the same input can never be told apart.
+    #[test]
+    fn matchtree_try_build_reports_ambiguous_accept() {
+        use crate::helper::is_byte;
+
+        let module = FormatModule::new();
+        let branches = vec![is_byte(b'a'), is_byte(b'a')];
+        let res = MatchTree::try_build(&module, &branches, Rc::new(Next::Empty));
+        assert_eq!(
+            res.err(),
+            Some(MatchTreeError::Ambiguous {
+                accepted: 0,
+                conflicting: 1
+            })
+        );
+    }
+
+    /// `'a'* ~ 'b'` versus `'a'* ~ 'c'` can only be decided after an unbounded run of `'a'`s,
+    /// which exceeds any fixed lookahead depth.
+    #[test]
+    fn matchtree_try_build_reports_depth_exhausted() {
+        use crate::helper::is_byte;
+
+        let module = FormatModule::new();
+        let a_star = || Format::Repeat(Box::new(is_byte(b'a')));
+        let branches = vec![
+            Format::Tuple(vec![a_star(), is_byte(b'b')]),
+            Format::Tuple(vec![a_star(), is_byte(b'c')]),
+        ];
+        let res = MatchTree::try_build(&module, &branches, Rc::new(Next::Empty));
+        assert_eq!(res.err(), Some(MatchTreeError::DepthExhausted));
+    }
+
+    /// Closing a level on leaving its body must not hide real left recursion through a nullable
+    /// prefix: `A := B ~ A | 'z'` with zero-width `B` is `A := A | 'z'` in disguise. Leaving `B`
+    /// closes only `B`; `A`'s continuation is different, so `A` is still open when it is reached.
+    #[test]
+    fn matchtree_left_recursion_through_nullable_prefix_is_a_cycle() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let b = module.define_format("test.zero", Format::Compute(Box::new(Expr::U8(0))));
+        let a = reserve_recursive_level(&mut module);
+        module.formats[a] = Format::Union(vec![
+            Format::Tuple(vec![b.call(), Format::ItemVar(a, Vec::new(), Vec::new())]),
+            is_byte(b'z'),
+        ]);
+        let branches = vec![Format::ItemVar(a, Vec::new(), Vec::new()), is_byte(b'y')];
+        let res = MatchTree::try_build(&module, &branches, Rc::new(Next::Empty));
+        assert_eq!(res.err(), Some(MatchTreeError::Cycle { level: a }));
+    }
+
+    /// A failure must be attributed to the right cause.
+    ///
+    /// `branch0 := B ~ B ~ 'x'` with `B := ' '*` is not recursive, but it is ambiguous: an input
+    /// with `N` spaces before the `'x'` has `N + 1` ways to split them between the two `B`s. So
+    /// compilation failing is correct, but it must fail at `B`'s own `Repeat`, whose match tree
+    /// cannot decide when to stop. The union `[branch0, 'y']` itself is decidable (`' '`/`'x'`
+    /// versus `'y'`), as it is when `B` is inlined: the first `B` can match zero bytes, but the
+    /// walk only reaches the second `B` through the first one's exit, where the `CycleGuard` has
+    /// already closed it, so it is not mistaken for a zero-progress cycle.
+    #[test]
+    fn matchtree_ambiguous_repeated_nullable_item_not_reported_as_cycle() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let spaces = module.define_format("test.spaces", Format::Repeat(Box::new(is_byte(b' '))));
+        let branch0 = Format::Tuple(vec![spaces.call(), spaces.call(), is_byte(b'x')]);
+        let branches = vec![branch0.clone(), is_byte(b'y')];
+        let res = MatchTree::try_build(&module, &branches, Rc::new(Next::Empty));
+        assert!(
+            res.is_ok(),
+            "the union itself is decidable and must not be reported as a cycle: {:?}",
+            res.err()
+        );
+
+        let union = module.define_format(
+            "test.union",
+            Format::Union(vec![
+                Format::Variant(Label::Borrowed("X"), Box::new(branch0)),
+                Format::Variant(Label::Borrowed("Y"), Box::new(is_byte(b'y'))),
+            ]),
+        );
+        let err = super::decoder::Compiler::compile_program(&module, &union.call())
+            .err()
+            .expect("an ambiguous format must not compile")
+            .to_string();
+        assert!(
+            err.starts_with("cannot build match tree for Repeat("),
+            "compilation must fail at `B`'s ambiguous `Repeat`, got: {err}"
+        );
+    }
+
+    /// Builds `Union([F: top, Z: 'z'])` as a named format and checks that it compiles, and that each
+    /// `(input, ok)` pair decodes (or fails to) as expected. Building it through
+    /// `MatchTree::build` (via `compile_program`) puts the `ItemVar`s inside `top` on the
+    /// `CycleGuard`'s path, which a single top-level `Tuple` never would.
+    fn check_union_with_z(module: &mut FormatModule, top: Format, cases: &[(&[u8], bool)]) {
+        use crate::helper::is_byte;
+
+        let union = module.define_format(
+            "test.union_with_z",
+            Format::Union(vec![
+                Format::Variant(Label::Borrowed("F"), Box::new(top)),
+                Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'z'))),
+            ]),
+        );
+        let prog = super::decoder::Compiler::compile_program(module, &union.call())
+            .expect("well-formed non-recursive format must compile");
+        for (input, ok) in cases {
+            assert_eq!(
+                prog.run(ReadCtxt::new(input)).is_ok(),
+                *ok,
+                "decoding {:?}",
+                String::from_utf8_lossy(input)
+            );
+        }
+    }
+
+    /// A named zero-width format referenced twice in a row - `F := B ~ B ~ 'x'` with
+    /// `B := compute(0)` - is unambiguous, so it must compile named as well as inlined. The walk
+    /// reaches the second `B` with zero bytes consumed, but only through the first `B`'s exit,
+    /// where the `CycleGuard` closes it, so the second reference is not a re-entry.
+    #[test]
+    fn matchtree_repeated_zero_width_item_is_not_a_cycle() {
+        use crate::helper::is_byte;
+
+        let zero = || Format::Compute(Box::new(Expr::U8(0)));
+        let cases: &[(&[u8], bool)] = &[(b"x", true), (b"z", true), (b"y", false)];
+
+        let mut module = FormatModule::new();
+        check_union_with_z(
+            &mut module,
+            Format::Tuple(vec![zero(), zero(), is_byte(b'x')]),
+            cases,
+        );
+
+        let mut module = FormatModule::new();
+        let b = module.define_format("test.zero", zero());
+        check_union_with_z(
+            &mut module,
+            Format::Tuple(vec![b.call(), b.call(), is_byte(b'x')]),
+            cases,
+        );
+    }
+
+    /// A nullable named format that can also match bytes, referenced twice with a separator whose
+    /// empty case is guarded by lookahead: `F := B ~ C ~ B ~ ('x' | 'c')`, with `B := 'a'?` and
+    /// `C := 'b' | Peek('c')`. `C` can only match empty right before a `'c'`, which neither `B`
+    /// can consume, so every input splits only one way, and it must compile named as well as
+    /// inlined. As in the zero-width case above, the zero-byte route `B ~ C ~ B` reaches the
+    /// second `B` only after leaving the first.
+    #[test]
+    fn matchtree_lookahead_separated_nullable_item_is_not_a_cycle() {
+        use crate::helper::is_byte;
+
+        let opt_a = || {
+            Format::Union(vec![
+                Format::Variant(Label::Borrowed("Some"), Box::new(is_byte(b'a'))),
+                Format::Variant(Label::Borrowed("None"), Box::new(Format::EMPTY)),
+            ])
+        };
+        let sep = || {
+            Format::Union(vec![
+                Format::Variant(Label::Borrowed("B"), Box::new(is_byte(b'b'))),
+                Format::Variant(
+                    Label::Borrowed("P"),
+                    Box::new(Format::Peek(Box::new(is_byte(b'c')))),
+                ),
+            ])
+        };
+        let tail = || Format::Byte(ByteSet::from([b'x', b'c']));
+        let cases: &[(&[u8], bool)] = &[
+            (b"ac", true),
+            (b"abax", true),
+            (b"bx", true),
+            (b"c", true),
+            (b"z", true),
+            (b"x", false),
+        ];
+
+        let mut module = FormatModule::new();
+        check_union_with_z(
+            &mut module,
+            Format::Tuple(vec![opt_a(), sep(), opt_a(), tail()]),
+            cases,
+        );
+
+        let mut module = FormatModule::new();
+        let b = module.define_format("test.opt_a", opt_a());
+        check_union_with_z(
+            &mut module,
+            Format::Tuple(vec![b.call(), sep(), b.call(), tail()]),
+            cases,
+        );
+    }
+
+    /// `MatchTreeStep::from_format` stubs some formats (here `RepeatUntilLast`) as accepting at
+    /// once rather than modelling their bytes, so in `A | B` with `A := RepeatUntilLast(until 'x',
+    /// any byte)` and `B := "ab"`, the tree takes `B` on any leading `'a'`. `"ax"` matches only
+    /// `A`, so it must either decode (as `A`), or the format must be rejected up front as
+    /// undecidable; choosing `B` and then failing to decode is wrong either way.
+    #[test]
+    fn matchtree_accept_stub_does_not_lose_to_byte_reading_branch() {
+        use crate::helper::{alts, expr_eq, is_byte, lambda, tuple, var};
+        use decoder::Value;
+
+        let until_x = Format::RepeatUntilLast(
+            Box::new(lambda("b", expr_eq(var("b"), Expr::U8(b'x')))),
+            Box::new(Format::Byte(ByteSet::full())),
+        );
+        let mut module = FormatModule::new();
+        let top = module.define_format(
+            "test.accept_stub",
+            alts([("A", until_x), ("B", tuple([is_byte(b'a'), is_byte(b'b')]))]),
+        );
+        let Ok(prog) = super::decoder::Compiler::compile_program(&module, &top.call()) else {
+            return; // rejected up front
+        };
+        let res = prog.run(ReadCtxt::new(b"ax"));
+        assert!(
+            matches!(res, Ok((Value::Branch(0, _), _))),
+            "\"ax\" matches only the `RepeatUntilLast` branch, got {res:?}"
+        );
+    }
+
+    /// `Next::cat` must not drop a zero-width continuation that still *constrains* lookahead.
+    ///
+    /// `MonadSeq(('a' | 'a' ~ 'c'), Peek('c'))` on input `"ac"`: only branch 0 (consume `'a'`, then
+    /// peek the `'c'`) can succeed, and the union's `MatchTree` can only see that if it is built
+    /// against the `Peek('c')` continuation. If the `Peek` is skipped as "nonproductive" (its
+    /// `match_bounds` is exactly 0), the tree prefers branch 1 on seeing `'c'`, which consumes the
+    /// whole input and then fails the `Peek`.
+    #[test]
+    fn zero_width_peek_continuation_constrains_union() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let top = module.define_format(
+            "test.peek_after_union",
+            Format::MonadSeq(
+                Box::new(Format::Union(vec![
+                    Format::Variant(Label::Borrowed("A"), Box::new(is_byte(b'a'))),
+                    Format::Variant(
+                        Label::Borrowed("AC"),
+                        Box::new(Format::Tuple(vec![is_byte(b'a'), is_byte(b'c')])),
+                    ),
+                ])),
+                Box::new(Format::Peek(Box::new(is_byte(b'c')))),
+            ),
+        );
+        let prog = super::decoder::Compiler::compile_program(&module, &top.call()).unwrap();
+        assert!(
+            prog.run(ReadCtxt::new(b"acc")).is_ok(),
+            "branch 1 followed by a peeked 'c' must decode"
+        );
+        assert!(
+            prog.run(ReadCtxt::new(b"ac")).is_ok(),
+            "the union must pick branch 0 so that the trailing Peek('c') can succeed"
         );
     }
 
@@ -3360,6 +3765,101 @@ mod test {
         assert!(
             result.is_err(),
             "compiling a genuinely left-recursive format must fail cleanly, not panic or hang"
+        );
+    }
+
+    /// A `RecVar` index past the end of its batch must be rejected at registration, rather than
+    /// becoming an `ItemVar` that indexes out of bounds or silently aliases whatever format is
+    /// registered at that level later.
+    #[test]
+    #[should_panic(
+        expected = "Format::RecVar(1) is out of range for a recursive batch of 1 member(s)"
+    )]
+    fn define_format_rec_batch_rejects_out_of_range_rec_var() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(1)])),
+            ),
+        ]);
+        let _ = module.define_format_rec_batch(vec![("test.typo", body)]);
+    }
+
+    /// A `RecVar` passed to `define_format` (outside any batch) is a usage error, and the panic
+    /// must say so.
+    #[test]
+    #[should_panic(expected = "is only valid in the body of a `define_format_rec_batch` member")]
+    fn define_format_rejects_rec_var() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let _ = module.define_format(
+            "test.stray",
+            Format::Union(vec![is_byte(b'Z'), Format::RecVar(0)]),
+        );
+    }
+
+    /// Same as above, for a `RecVar` returned from a `define_format_recursive` builder, which must
+    /// use its `FormatRef`s instead.
+    #[test]
+    #[should_panic(expected = "is only valid in the body of a `define_format_rec_batch` member")]
+    fn define_format_recursive_rejects_rec_var() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let _ = module.define_format_recursive(
+            ["test.stray"],
+            [Box::new(|_refs: &[FormatRef; 1]| {
+                Format::Union(vec![
+                    Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+                    Format::Variant(
+                        Label::Borrowed("S"),
+                        Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+                    ),
+                ])
+            })],
+        );
+    }
+
+    /// Batch registration types a member's references to itself (and to later siblings) as the
+    /// `ValueType::Any` placeholder, and `ValueType::unify` accepts `Any`, so comparing peano's
+    /// recursive field against a `u8` passes registration even though the full `TypeChecker`
+    /// rejects it. The interpreter then panics while decoding (`cannot apply int-rel Eq`). Either
+    /// registration must reject the format, or decoding must fail without panicking.
+    #[test]
+    fn ill_typed_use_of_recursive_field_is_rejected_or_decodes_without_panic() {
+        use crate::helper::{expr_eq, is_byte, var, where_lambda};
+        use std::panic::{AssertUnwindSafe, catch_unwind};
+
+        let body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'S'),
+                    where_lambda(Format::RecVar(0), "x", expr_eq(var("x"), Expr::U8(0))),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let Ok(refs) = catch_unwind(AssertUnwindSafe(|| {
+            module.define_format_rec_batch(vec![("test.peano_ill_typed", body)])
+        })) else {
+            return; // rejected at registration
+        };
+        let Ok(prog) = super::decoder::Compiler::compile_program(&module, &refs[0].call()) else {
+            return; // rejected at compile time
+        };
+        let decoded = catch_unwind(AssertUnwindSafe(|| {
+            let _ = prog.run(ReadCtxt::new(b"SZ"));
+        }));
+        assert!(
+            decoded.is_ok(),
+            "an ill-typed use of a recursive field passed registration and panicked while decoding"
         );
     }
 
