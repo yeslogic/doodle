@@ -1824,7 +1824,9 @@ impl TryFrom<ValueType> for RustType {
                     Box::new(inner),
                 ))))
             }
-            ValueType::Any | ValueType::Record(..) | ValueType::Union(..) => Err(value),
+            ValueType::Any | ValueType::Record(..) | ValueType::Union(..) | ValueType::Rec(_) => {
+                Err(value)
+            }
         }
     }
 }
