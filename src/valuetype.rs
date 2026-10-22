@@ -190,6 +190,14 @@ pub enum ValueType {
     Union(BTreeMap<Label, ValueType>),
     Seq(Box<ValueType>),
     Option(Box<ValueType>),
+    /// Reference to the registered type of the format at the given level of a `FormatModule`.
+    ///
+    /// Only occurs within the type of a recursive-batch member (see
+    /// `FormatModule::define_format_rec_batch`), at the point where that type refers back to a
+    /// batch level whose type is still being expanded, which no finite `ValueType` could otherwise
+    /// express. The referenced type always has a structural head (never another `Rec`, nor a base
+    /// or numeric type). Resolved via [`ValueType::unify_with`] and `TypeScope`'s unfolding.
+    Rec(usize),
 }
 
 impl From<BaseType> for ValueType {
@@ -306,7 +314,37 @@ impl ValueType {
     }
 
     /// Performs standalone unification between `self` and `other`.
+    ///
+    /// A [`ValueType::Rec`] unifies only with an identical `Rec`; use [`Self::unify_with`] to
+    /// resolve one against the types it refers to.
     pub fn unify(&self, other: &ValueType) -> Result<ValueType, UnificationError<ValueType>> {
+        self.unify_with(other, &[])
+    }
+
+    /// Unifies `self` and `other`, resolving each [`ValueType::Rec(level)`](ValueType::Rec) to
+    /// `rec_types[level]` (typically a `FormatModule`'s registered format types).
+    pub fn unify_with(
+        &self,
+        other: &ValueType,
+        rec_types: &[ValueType],
+    ) -> Result<ValueType, UnificationError<ValueType>> {
+        self.unify_rec(other, rec_types, &mut HashSet::new())
+    }
+
+    /// Low-level helper for [`Self::unify_with`]. `assumed` holds the pairs of `Rec` levels
+    /// already being unified further up the call-stack, which are taken to unify (coinductively),
+    /// so that unifying two recursive types terminates.
+    fn unify_rec(
+        &self,
+        other: &ValueType,
+        rec_types: &[ValueType],
+        assumed: &mut HashSet<(usize, usize)>,
+    ) -> Result<ValueType, UnificationError<ValueType>> {
+        let unfold = |level: usize| {
+            rec_types
+                .get(level)
+                .ok_or_else(|| UnificationError::Unsatisfiable(self.clone(), other.clone()))
+        };
         match (self, other) {
             (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
 
@@ -319,6 +357,16 @@ impl ValueType {
 
             (ValueType::NumericHole, rhs) if rhs.is_numeric() => Ok(rhs.clone()),
             (lhs, ValueType::NumericHole) if lhs.is_numeric() => Ok(lhs.clone()),
+
+            (ValueType::Rec(l1), ValueType::Rec(l2)) => {
+                if l1 == l2 || !assumed.insert((*l1, *l2)) {
+                    Ok(ValueType::Rec(*l1))
+                } else {
+                    unfold(*l1)?.unify_rec(unfold(*l2)?, rec_types, assumed)
+                }
+            }
+            (ValueType::Rec(level), rhs) => unfold(*level)?.unify_rec(rhs, rec_types, assumed),
+            (lhs, ValueType::Rec(level)) => lhs.unify_rec(unfold(*level)?, rec_types, assumed),
 
             (ValueType::ViewObj, ValueType::ViewObj) => Ok(ValueType::ViewObj),
             (ValueType::Base(b1), ValueType::Base(b2)) => {
@@ -342,7 +390,7 @@ impl ValueType {
                 }
                 let mut ts = Vec::new();
                 for (t1, t2) in Iterator::zip(ts1.iter(), ts2.iter()) {
-                    ts.push(t1.unify(t2)?);
+                    ts.push(t1.unify_rec(t2, rec_types, assumed)?);
                 }
                 Ok(ValueType::Tuple(ts))
             }
@@ -358,7 +406,7 @@ impl ValueType {
                         // field label mismatch
                         return Err(UnificationError::Unsatisfiable(self.clone(), other.clone()));
                     }
-                    fs.push((l1.clone(), t1.unify(t2)?));
+                    fs.push((l1.clone(), t1.unify_rec(t2, rec_types, assumed)?));
                 }
                 Ok(ValueType::Record(fs))
             }
@@ -373,7 +421,7 @@ impl ValueType {
                 for key in keys_common.into_iter() {
                     match (bs1.get(key), bs2.get(key)) {
                         (Some(t1), Some(t2)) => {
-                            let t = t1.unify(t2)?;
+                            let t = t1.unify_rec(t2, rec_types, assumed)?;
                             bs.insert(key.clone(), t);
                         }
                         (Some(t), None) | (None, Some(t)) => {
@@ -385,13 +433,15 @@ impl ValueType {
 
                 Ok(ValueType::Union(bs))
             }
-            (ValueType::Seq(t1), ValueType::Seq(t2)) => Ok(ValueType::Seq(Box::new(t1.unify(t2)?))),
-            (ValueType::Option(t1), ValueType::Option(t2)) => {
-                Ok(ValueType::Option(Box::new(t1.unify(t2)?)))
-            }
-            (ValueType::PhantomData(t1), ValueType::PhantomData(t2)) => {
-                Ok(ValueType::PhantomData(Box::new(t1.unify(t2)?)))
-            }
+            (ValueType::Seq(t1), ValueType::Seq(t2)) => Ok(ValueType::Seq(Box::new(
+                t1.unify_rec(t2, rec_types, assumed)?,
+            ))),
+            (ValueType::Option(t1), ValueType::Option(t2)) => Ok(ValueType::Option(Box::new(
+                t1.unify_rec(t2, rec_types, assumed)?,
+            ))),
+            (ValueType::PhantomData(t1), ValueType::PhantomData(t2)) => Ok(ValueType::PhantomData(
+                Box::new(t1.unify_rec(t2, rec_types, assumed)?),
+            )),
             (t1, t2) => Err(UnificationError::Unsatisfiable(t1.clone(), t2.clone())),
         }
     }
@@ -518,6 +568,10 @@ pub(crate) mod augmented {
                 }
                 ValueType::Option(t) => AugValueType::Option(Box::new(From::from(*t))),
                 ValueType::PhantomData(t) => AugValueType::PhantomData(Box::new(From::from(*t))),
+                // Only converted from type annotations, never from a registered format type
+                ValueType::Rec(level) => {
+                    panic!("ValueType::Rec({level}) is not a valid type annotation")
+                }
             }
         }
     }

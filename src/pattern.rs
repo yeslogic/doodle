@@ -58,6 +58,10 @@ impl Pattern {
     }
 
     pub(crate) fn build_scope(&self, scope: &mut TypeScope<'_>, t: Rc<ValueType>) -> AResult<()> {
+        let t = match t.as_ref() {
+            ValueType::Rec(_) => Rc::new(scope.unfold(ValueType::clone(&t))),
+            _ => t,
+        };
         match (self, t.as_ref()) {
             (Pattern::Binding(name), t) => {
                 // FIXME - do we want to store an Rc<ValueType> in the scope instead, perhaps...?

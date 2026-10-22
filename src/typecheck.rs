@@ -413,7 +413,7 @@ impl UType {
                 }
                 Some(Self::Record(ufs))
             }
-            ValueType::Union(..) => None,
+            ValueType::Union(..) | ValueType::Rec(_) => None,
             ValueType::Option(inner) => {
                 let inner_t = Self::from_valuetype(inner)?;
                 Some(UType::Option(Rc::new(inner_t)))
@@ -729,12 +729,22 @@ pub struct TypeChecker {
     /// so any mutation of the meta-context after the first query would leave this table stale.
     void_table: OnceCell<Vec<Cell<VoidState>>>,
     /// Whether the occurs-check requires every recursive cycle to pass through a nominal type
-    /// (see [`TypeChecker::occurs`]). `true` except in [`TypeChecker::check_levels`]: the
+    /// (see [`TypeChecker::occurs`]). `true` except in [`TypeChecker::solve_batch_types`]: the
     /// interpreter represents an anonymous recursive value without difficulty, so only codegen
     /// needs the stricter rule.
     nominal_cycles_only: bool,
     // /// Scaffolding for compartmentalized external type inference in the arithmetic extension grammar
     // sub_extension: EmbeddedResolver,
+}
+
+/// Context for converting a recursive batch's solved types into registration's `ValueType`s (see
+/// [`TypeChecker::solve_batch_types`]).
+struct LegacyCtxt<'a> {
+    module: &'a FormatModule,
+    /// Levels of the batch being registered
+    batch: std::ops::Range<usize>,
+    /// The level(s) each canonical level-variable was allocated for
+    level_of: HashMap<UVar, Vec<usize>>,
 }
 
 // SECTION - Construction and instantiation in the meta-context
@@ -1009,7 +1019,7 @@ impl TypeChecker {
     /// walking the same format, with no allowance for additional unaccounted-for allocations.
     /// Callers that already have such a `UVar` on hand (i.e. `Format::ItemVar`'s own `newvar`)
     /// should supply it; the fallback allocation path is for callers that run no `Elaborator`
-    /// afterwards (i.e. [`TypeChecker::check_levels`]).
+    /// afterwards (i.e. [`TypeChecker::solve_batch_types`]).
     fn infer_var_format_level(
         &mut self,
         level: usize,
@@ -3982,25 +3992,147 @@ impl TypeChecker {
         Ok(this)
     }
 
-    /// Typechecks the formats at `levels` of `module` (and every level they reference), as
-    /// registration's check of a recursive batch (see `FormatModule::infer_batch_types`).
+    /// Typechecks the recursive-batch members at `levels` of `module` (and every level they
+    /// reference), and returns each member's type in the form registration's own inference
+    /// (`FormatModule::infer_format_type`) gives a format, except that a reference back to a batch
+    /// level whose type is still being expanded is [`ValueType::Rec`] rather than a placeholder
+    /// (see [`Self::legacy_valuetype_var`]). Used by `FormatModule::infer_batch_types`.
     ///
     /// Unlike [`Self::infer_module`], this runs no `Elaborator` afterwards, so it checks only that
     /// a consistent typing exists: it does not require unique numeric solutions
     /// (`check_unique_solutions`), and it accepts recursive cycles through anonymous types
     /// (`nominal_cycles_only` unset), both of which only codegen needs.
-    pub(crate) fn check_levels(
+    pub(crate) fn solve_batch_types(
         module: &FormatModule,
         levels: std::ops::Range<usize>,
-    ) -> TCResult<()> {
+    ) -> TCResult<Vec<ValueType>> {
         let mut this = Self::new();
         this.nominal_cycles_only = false;
         let scope = UScope::Empty;
         let ctxt = Ctxt::new(module, &scope);
-        for level in levels {
+        for level in levels.clone() {
             this.infer_var_format_level(level, ctxt, None)?;
         }
-        Ok(())
+
+        let mut level_of: HashMap<UVar, Vec<usize>> = HashMap::new();
+        for (&level, &uv) in this.level_vars.iter() {
+            level_of
+                .entry(this.get_canonical_uvar(uv))
+                .or_default()
+                .push(level);
+        }
+        let cx = LegacyCtxt {
+            module,
+            batch: levels.clone(),
+            level_of,
+        };
+        Ok(levels
+            .map(|level| {
+                this.legacy_valuetype_var(this.level_vars[&level], &cx, &mut HashSet::new())
+            })
+            .collect())
+    }
+
+    /// Converts a solved `UType` into the `ValueType` registration's own inference would assign
+    /// it. See [`Self::legacy_valuetype_var`].
+    fn legacy_valuetype(
+        &self,
+        t: &UType,
+        cx: &LegacyCtxt<'_>,
+        expanding: &mut HashSet<UVar>,
+    ) -> ValueType {
+        match t {
+            UType::Hole => ValueType::Any,
+            UType::Empty => ValueType::Empty,
+            UType::ViewObj => ValueType::ViewObj,
+            &UType::Base(b) => ValueType::Base(b),
+            &UType::Int(it) => ValueType::from(it),
+            &UType::Var(uv) => self.legacy_valuetype_var(uv, cx, expanding),
+            UType::Tuple(ts) => ValueType::Tuple(
+                ts.iter()
+                    .map(|t| self.legacy_valuetype(t, cx, expanding))
+                    .collect(),
+            ),
+            UType::Record(fs) => ValueType::Record(
+                fs.iter()
+                    .map(|(lbl, t)| (lbl.clone(), self.legacy_valuetype(t, cx, expanding)))
+                    .collect(),
+            ),
+            UType::Seq(t, _) => ValueType::Seq(Box::new(self.legacy_valuetype(t, cx, expanding))),
+            UType::Option(t) => {
+                ValueType::Option(Box::new(self.legacy_valuetype(t, cx, expanding)))
+            }
+            UType::PhantomData(t) => {
+                ValueType::PhantomData(Box::new(self.legacy_valuetype(t, cx, expanding)))
+            }
+        }
+    }
+
+    /// Converts the solution of `uv` into the `ValueType` registration's own inference would
+    /// assign it, given the levels in `cx`.
+    ///
+    /// Mirrors that inference's conventions rather than [`Self::reify`]'s:
+    /// - an unconstrained variable is `Any`;
+    /// - a numeric variable whose candidate set is not a singleton is `NumericHole`, even where
+    ///   the set has a default (highest-priority) solution;
+    /// - a union keeps every branch, including any judged uninhabitable;
+    /// - a level outside the batch is its registered type, as inlined by `ItemVar`.
+    ///
+    /// A batch level reached again while its own type is being expanded (in `expanding`) becomes
+    /// [`ValueType::Rec`]; reached otherwise, it is expanded in place. Every cycle in the solution
+    /// closes at a level's placeholder variable (see [`Self::infer_var_format_level`]), so this
+    /// always terminates.
+    fn legacy_valuetype_var(
+        &self,
+        uv: UVar,
+        cx: &LegacyCtxt<'_>,
+        expanding: &mut HashSet<UVar>,
+    ) -> ValueType {
+        let v = self.get_canonical_uvar(uv);
+        if let Some(levels) = cx.level_of.get(&v) {
+            match levels.iter().find(|level| cx.batch.contains(level)) {
+                Some(&level) if expanding.contains(&v) => return ValueType::Rec(level),
+                Some(_) => {}
+                None => return cx.module.get_format_type(levels[0]).clone(),
+            }
+        }
+        if !expanding.insert(v) {
+            unreachable!("cycle through {v:?} does not pass through any batch level's variable");
+        }
+        let ret = match &self.constraints[v.0] {
+            Constraints::Indefinite => ValueType::Any,
+            Constraints::Variant(vmid) => ValueType::Union(
+                self.varmaps
+                    .get_varmap(*vmid)
+                    .iter()
+                    .map(|(lbl, t)| (lbl.clone(), self.legacy_valuetype(t, cx, expanding)))
+                    .collect(),
+            ),
+            Constraints::Invariant(c) => match c {
+                Constraint::Equiv(t) => self.legacy_valuetype(t, cx, expanding),
+                &Constraint::Elem(BaseSet::Single(b)) => ValueType::Base(b),
+                Constraint::Elem(BaseSet::U(us)) => us
+                    .as_singleton()
+                    .map_or(ValueType::NumericHole, ValueType::Base),
+                &Constraint::NumTree(IntSet::Single(prim)) => ValueType::from(prim),
+                Constraint::NumTree(IntSet::Z(zs)) => zs
+                    .as_singleton()
+                    .map_or(ValueType::NumericHole, ValueType::from),
+                &Constraint::Proj(ProjShape::SeqOf(elem)) => {
+                    ValueType::Seq(Box::new(self.legacy_valuetype_var(elem, cx, expanding)))
+                }
+                &Constraint::Proj(ProjShape::OptOf(param)) => {
+                    ValueType::Option(Box::new(self.legacy_valuetype_var(param, cx, expanding)))
+                }
+                Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..)) => {
+                    unreachable!(
+                        "unsolved implicit Tuple or Record leftover from un-unified projection: {c:?}"
+                    )
+                }
+            },
+        };
+        expanding.remove(&v);
+        ret
     }
 
     /// Checks that every canonical variable with an `Elem` or `NumTree` constraint has a unique solution,

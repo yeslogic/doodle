@@ -294,7 +294,7 @@ impl<'a> Compiler<'a> {
     pub fn compile_program(module: &FormatModule, format: &Format) -> AResult<Program> {
         let mut compiler = Compiler::new(module);
         // type
-        let scope = TypeScope::new();
+        let scope = TypeScope::with_rec_types(&module.format_types);
         let t = module.infer_format_type(&scope, format)?;
         // decoder
         compiler.queue_compile(t, format, Rc::new(Next::Empty));
