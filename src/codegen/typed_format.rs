@@ -514,7 +514,7 @@ impl TypedFormat<GenType> {
         self.match_bounds().as_exact() == Some(0)
     }
 
-    /// One-to-one analogue for [`Format::lookahead_effect`]; `FormatCall` is not descended into,
+    /// One-to-one analogue for [`crate::Format::lookahead_effect`]; `FormatCall` is not descended into,
     /// mirroring `ItemVar` there.
     pub(crate) fn lookahead_effect(&self) -> LookaheadEffect {
         match self {

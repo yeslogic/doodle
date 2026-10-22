@@ -2192,7 +2192,7 @@ impl<'a> MatchTreeStep<'a> {
 
     /// Internal helper to dedup and simplify the common ItemVar/FormatCall handling between `from_format` and `from_gt_format`
     ///
-    /// Insterts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
+    /// Inserts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
     /// its value after marking `level` as closed.
     fn guarded<F>(level: usize, guard: &mut CycleGuard, f: F) -> Self
     where
@@ -3092,7 +3092,7 @@ mod test {
 
     /// A genuinely left-recursive format - `bad := bad | 'Z'` - recurses into its own `ItemVar`
     /// with zero bytes consumed in between, which `MatchTreeStep::from_format`'s guard must
-    /// detect (`guard.detected`) instead of looping/overflowing the stack.
+    /// detect (`guard.has_cycle`) instead of looping/overflowing the stack.
     #[test]
     fn matchtree_zero_progress_self_reference_is_detected_as_left_recursion() {
         use crate::helper::is_byte;

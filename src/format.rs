@@ -66,7 +66,7 @@ pub enum Format {
     ///
     /// Construction-time sugar only: written literally by a caller of `FormatModule::define_format_rec_batch`
     /// to allow formats to refer to one another even before they are assigned `ItemVar` levels;
-    /// during this registratio, `RecVar` is invariably converted to the proper `ItemVar` before
+    /// during this registration, `RecVar` is invariably converted to the proper `ItemVar` before
     /// it  is stored in the module, so it should never appear in a `Format` after that point.
     ///
     /// This Format has no individual semantics and it should be treated as an unsupported value
@@ -691,7 +691,7 @@ impl Format {
         self.depends_on_next_open(module, &mut HashSet::new())
     }
 
-    /// See [`Self::match_bounds_open`]'s docs for `open`'s general role. Here, re-entering an
+    /// See [`Self::match_bounds_recursive`]'s docs for `open`'s general role. Here, re-entering an
     /// already-open level conservatively returns `true` (the safe default: answering `false`
     /// incorrectly could make the compiled decoder use `Next::Empty` when it actually needed the
     /// real continuation - a soundness bug - whereas `true` only costs a missed decoder-sharing
@@ -1187,7 +1187,7 @@ mod tests {
         assert_eq!(
             bounds.min(),
             8,
-            "mutual-recursion incorrectly discounted shorter recursive path in favor of non-recursive path when comuting match_bounds"
+            "mutual-recursion incorrectly discounted shorter recursive path in favor of non-recursive path when computing match_bounds"
         );
         assert_eq!(
             bounds.max(),
