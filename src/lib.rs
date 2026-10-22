@@ -2250,8 +2250,22 @@ impl<'a> MatchTreeStep<'a> {
 
     /// Internal helper to dedup and simplify the common ItemVar/FormatCall handling between `from_format` and `from_gt_format`
     ///
-    /// Inserts `level` into `guard`, returning `Self::reject` if already there; otherwise, computes `f(guard)`, yielding
-    /// its value after marking `level` as closed.
+    /// Opens `level` in `guard`, returning `Self::reject` if `level` was already open (a zero-progress cycle; see
+    /// [`CycleGuard`]). Otherwise, computes `f(guard)`, yielding its value after marking `level` as closed.
+    ///
+    /// # Notes
+    ///
+    /// `exit` is the Rc-wrapped [`Next`] continuation immediately following the `ItemVar`/`FormatCall` whose level we are
+    /// guarding descent into. It is recorded (as a [`NextPtrAddr`]) so that [`Self::from_next`] can close `level` once the
+    /// walk leaves its body and continues into `exit`. It plays no part in detecting a cycle, which depends on `level`
+    /// alone.
+    ///
+    /// While `level` is open, no byte has been consumed since entering it (the walk stops at the first byte), so reaching
+    /// `level` again means re-entering it from within its own body without progress, i.e. left recursion. A sibling
+    /// reference to the same, possibly zero-width, level (the second `B` in `B ~ B ~ 'x'`) is only reached through
+    /// `exit`, by which point `level` has been closed.
+    ///
+    /// This guard serves only to prevent left recursion; formats it accepts may still fail elsewhere (e.g. as ambiguous).
     fn guarded<F>(level: usize, exit: &Rc<Next<'a>>, guard: &mut CycleGuard, f: F) -> Self
     where
         F: FnOnce(&mut CycleGuard) -> Self,
@@ -3282,10 +3296,9 @@ mod test {
     /// with `N` spaces before the `'x'` has `N + 1` ways to split them between the two `B`s. So
     /// compilation failing is correct, but it must fail at `B`'s own `Repeat`, whose match tree
     /// cannot decide when to stop. The union `[branch0, 'y']` itself is decidable (`' '`/`'x'`
-    /// versus `'y'`), as it is when `B` is inlined. Before the `CycleGuard` closed a level on
-    /// leaving its body, the first `B` matched zero bytes and the walk continued into `next` with
-    /// `B` still open, so the second (sibling) `B` was taken for a re-entry and the union build
-    /// failed with [`MatchTreeError::Cycle`].
+    /// versus `'y'`), as it is when `B` is inlined: the first `B` can match zero bytes, but the
+    /// walk only reaches the second `B` through the first one's exit, where the `CycleGuard` has
+    /// already closed it, so it is not mistaken for a zero-progress cycle.
     #[test]
     fn matchtree_ambiguous_repeated_nullable_item_not_reported_as_cycle() {
         use crate::helper::is_byte;
@@ -3345,9 +3358,9 @@ mod test {
     }
 
     /// A named zero-width format referenced twice in a row - `F := B ~ B ~ 'x'` with
-    /// `B := compute(0)` - is unambiguous, and compiles when `B` is inlined. Named, the first `B`
-    /// is still open in the `CycleGuard` when the walk reaches the second one with zero bytes
-    /// consumed, so it is taken for a zero-progress cycle and `MatchTree` construction fails.
+    /// `B := compute(0)` - is unambiguous, so it must compile named as well as inlined. The walk
+    /// reaches the second `B` with zero bytes consumed, but only through the first `B`'s exit,
+    /// where the `CycleGuard` closes it, so the second reference is not a re-entry.
     #[test]
     fn matchtree_repeated_zero_width_item_is_not_a_cycle() {
         use crate::helper::is_byte;
@@ -3374,9 +3387,9 @@ mod test {
     /// A nullable named format that can also match bytes, referenced twice with a separator whose
     /// empty case is guarded by lookahead: `F := B ~ C ~ B ~ ('x' | 'c')`, with `B := 'a'?` and
     /// `C := 'b' | Peek('c')`. `C` can only match empty right before a `'c'`, which neither `B`
-    /// can consume, so every input splits only one way. Compiles when `B` is inlined; named, the
-    /// zero-byte route `B ~ C ~ B` trips the `CycleGuard` the same way as the zero-width case
-    /// above.
+    /// can consume, so every input splits only one way, and it must compile named as well as
+    /// inlined. As in the zero-width case above, the zero-byte route `B ~ C ~ B` reaches the
+    /// second `B` only after leaving the first.
     #[test]
     fn matchtree_lookahead_separated_nullable_item_is_not_a_cycle() {
         use crate::helper::is_byte;
