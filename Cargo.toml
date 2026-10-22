@@ -20,6 +20,11 @@ path = "tests/runtime_repeat/mod.rs"
 test = true
 
 [[test]]
+name = "recursive_repeat"
+path = "tests/recursive_repeat/mod.rs"
+test = true
+
+[[test]]
 name = "permit_state_error"
 path = "tests/permit_state_error/mod.rs"
 test = true

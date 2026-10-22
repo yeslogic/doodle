@@ -917,6 +917,30 @@ mod fixture_gen {
         write!(f, "{}", frag).unwrap();
     }
 
+    /// A self-reference in element position of a `RepeatCount` (`Node`'s children) needs no `Box`,
+    /// since `Vec` already provides the indirection; the generated field type and the values the
+    /// `Repeat` decoder pushes must agree, or `tests/recursive_repeat/mod.rs` fails to compile.
+    #[test]
+    fn recursive_repeat_behavior_test() {
+        let tree = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Leaf"), Box::new(is_byte(b'L'))),
+            Format::Variant(
+                Label::Borrowed("Node"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'N'),
+                    repeat_count(Expr::U32(2), Format::RecVar(0)),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tree"), tree)]);
+        let top = refs[0].call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/recursive_repeat/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
+    }
+
     #[test]
     #[ignore = "running this test clobbers the manually-edited test file for permit_state_error"]
     /// Test to pre-generate a Permit-parse of a slice we will peek within and manually remove the 'close_peek' within to cause a state-error we want to see
