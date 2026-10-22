@@ -582,9 +582,10 @@ impl Format {
             Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds_recursive(module, open),
             Format::Apply(_) => RecursiveBounds::at_least(1),
             Format::DecodeBytes(_bytes, _f) => RecursiveBounds::exact(0),
-            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => f
+            // `f0` may read up to its own lookahead, or `f` may read up to its lookahead after `f0`'s match
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => f0
                 .lookahead_bounds_recursive(module, open)
-                .union(f0.lookahead_bounds_recursive(module, open) + f0.match_bounds(module)),
+                .union(f.lookahead_bounds_recursive(module, open) + f0.match_bounds(module)),
             Format::Permit(f, _expr) => f.lookahead_bounds_recursive(module, open),
             #[cfg(feature = "format_enforce")]
             Format::Enforce(f) => f.lookahead_bounds_recursive(module, open),
