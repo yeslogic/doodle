@@ -3435,6 +3435,35 @@ mod test {
         );
     }
 
+    /// `MatchTreeStep::from_format` stubs some formats (here `RepeatUntilLast`) as accepting at
+    /// once rather than modelling their bytes, so in `A | B` with `A := RepeatUntilLast(until 'x',
+    /// any byte)` and `B := "ab"`, the tree takes `B` on any leading `'a'`. `"ax"` matches only
+    /// `A`, so it must either decode (as `A`), or the format must be rejected up front as
+    /// undecidable; choosing `B` and then failing to decode is wrong either way.
+    #[test]
+    fn matchtree_accept_stub_does_not_lose_to_byte_reading_branch() {
+        use crate::helper::{alts, expr_eq, is_byte, lambda, tuple, var};
+        use decoder::Value;
+
+        let until_x = Format::RepeatUntilLast(
+            Box::new(lambda("b", expr_eq(var("b"), Expr::U8(b'x')))),
+            Box::new(Format::Byte(ByteSet::full())),
+        );
+        let mut module = FormatModule::new();
+        let top = module.define_format(
+            "test.accept_stub",
+            alts([("A", until_x), ("B", tuple([is_byte(b'a'), is_byte(b'b')]))]),
+        );
+        let Ok(prog) = super::decoder::Compiler::compile_program(&module, &top.call()) else {
+            return; // rejected up front
+        };
+        let res = prog.run(ReadCtxt::new(b"ax"));
+        assert!(
+            matches!(res, Ok((Value::Branch(0, _), _))),
+            "\"ax\" matches only the `RepeatUntilLast` branch, got {res:?}"
+        );
+    }
+
     /// `Next::cat` must not drop a zero-width continuation that still *constrains* lookahead.
     ///
     /// `MonadSeq(('a' | 'a' ~ 'c'), Peek('c'))` on input `"ac"`: only branch 0 (consume `'a'`, then
