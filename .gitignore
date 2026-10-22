@@ -3,4 +3,4 @@ noindex
 custom/*.hi
 custom/*.o
 custom/MakeNumbers
-*.diff
+**/CLAUDE.md
