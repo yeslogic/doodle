@@ -1802,6 +1802,9 @@ pub struct MatchTree {
     branches: Vec<(ByteSet, MatchTree)>,
 }
 
+/// Alias used for semantic transparency of the `usize` value used to identify `Rc<Next>`-values within [`CycleGuard`]
+type NextPtrAddr = usize;
+
 /// Tracks which `Format::ItemVar`/`TypedFormat::FormatCall` levels are currently being eagerly
 /// expanded within a single top-level [`MatchTreeStep`] construction (one iteration of
 /// [`MatchTreeLevel::try_grow`]'s per-index loop), so that construction terminates instead of
@@ -1828,7 +1831,7 @@ pub struct MatchTree {
 #[derive(Default)]
 struct CycleGuard {
     /// Each open level, mapped to the address of the continuation (`exit`) it was opened with.
-    open_levels: HashMap<usize, usize>,
+    open_levels: HashMap<usize, NextPtrAddr>,
     has_cycle: bool,
     /// The first level found to be re-entered, if any.
     cycle_level: Option<usize>,
@@ -1840,7 +1843,7 @@ impl CycleGuard {
     }
 
     /// The address identifying `next` as some open level's `exit`.
-    fn exit_addr(next: &Rc<Next<'_>>) -> usize {
+    fn exit_addr(next: &Rc<Next<'_>>) -> NextPtrAddr {
         Rc::as_ptr(next) as *const () as usize
     }
 
@@ -1862,12 +1865,12 @@ impl CycleGuard {
     /// Closes, and returns, every open level whose `exit` is `next`: the walk is leaving those
     /// levels' bodies. [`Self::reenter`] must be called with the result once the walk of `next`
     /// returns, since other paths through those bodies may still be explored afterwards.
-    fn leave(&mut self, next: &Rc<Next<'_>>) -> Vec<(usize, usize)> {
+    fn leave(&mut self, next: &Rc<Next<'_>>) -> Vec<(usize, NextPtrAddr)> {
         if self.open_levels.is_empty() {
             return Vec::new();
         }
         let addr = Self::exit_addr(next);
-        let left: Vec<(usize, usize)> = self
+        let left: Vec<(usize, NextPtrAddr)> = self
             .open_levels
             .iter()
             .filter(|(_, exit)| **exit == addr)
@@ -1880,7 +1883,7 @@ impl CycleGuard {
     }
 
     /// Reopens the levels returned by [`Self::leave`].
-    fn reenter(&mut self, left: Vec<(usize, usize)>) {
+    fn reenter(&mut self, left: Vec<(usize, NextPtrAddr)>) {
         self.open_levels.extend(left);
     }
 
