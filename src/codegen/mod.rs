@@ -1436,21 +1436,27 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                             // was promoted to `RecBox` (a self/mutually-recursive reference closing
                             // a cycle through this record - see `CodeGen::lift_uvar`), the
                             // constructed value must be `Box::new(..)`-wrapped to match, which also
-                            // rules out the field-init shorthand (`{ name }`) below.
-                            let is_rec_box = field_types.is_some_and(|fts| {
-                                fts.iter().any(|(lbl, ty)| {
-                                    lbl == name
-                                        && matches!(
-                                            ty,
-                                            RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
-                                        )
-                                })
+                            // rules out the field-init shorthand (`{ name }`) below. A field of
+                            // type `Option<RecBox<..>>` gets `.map(Box::new)` instead: the value
+                            // it is built from (e.g. a `LiftedOption` local) has the unboxed type
+                            // `Option<T>`, as `RecBox` is only inserted on the declared field type.
+                            let field_ty = field_types.and_then(|fts| {
+                                fts.iter().find(|(lbl, _)| lbl == name).map(|(_, ty)| ty)
                             });
                             let embedded = embed_expr_nat(val);
-                            let embedded = if is_rec_box {
-                                embedded.wrap_box()
-                            } else {
-                                embedded
+                            let embedded = match field_ty {
+                                Some(RustType::Atom(AtomType::Comp(CompType::RecBox(_)))) => {
+                                    embedded.wrap_box()
+                                }
+                                Some(RustType::Atom(AtomType::Comp(CompType::Option(inner))))
+                                    if matches!(
+                                        inner.as_ref(),
+                                        RustType::Atom(AtomType::Comp(CompType::RecBox(_)))
+                                    ) =>
+                                {
+                                    embedded.map_box()
+                                }
+                                _ => embedded,
                             };
                             let value = match embedded {
                                 RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
