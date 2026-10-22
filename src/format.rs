@@ -288,6 +288,12 @@ impl Format {
         }
     }
 
+    /// Processes an arbitrary sequence of field-like Formats (which may or may not be named) in the order they are provided,
+    /// and then processes a final Format which may have data-depenencies on any variables captured along the way.
+    ///
+    /// Designed to support [`pseudo_record`](crate::helper::pseudo_record), which mimics the operation of
+    /// standard record-processing but doesn't construct a record from the field-like formats that are given
+    /// names.
     pub fn chaining<Name: IntoLabel>(
         formats: impl IntoIterator<Item = (Option<Name>, Format), IntoIter: DoubleEndedIterator>,
         format: Format,
@@ -332,14 +338,16 @@ impl Format {
 }
 
 impl Format {
-    /// Constructs a [`Format::Align`] from a plain `n`, the single point where the fallible
-    /// `usize -> NonZeroUsize` conversion happens.
+    /// Constructs a [`Format::Align`] from a plain `n`.
+    ///
+    /// This function is the only site where the fallible `usize`-to-`NonZeroUsize` conversion happens.
     ///
     /// # Panics
     ///
-    /// Panics if `n == 0` — alignment to a modulus of 0 has no valid interpretation. This is
-    /// always a format-definition bug (never something that can be triggered by parsed data), so
-    /// it's caught here, immediately and clearly, at format-construction time.
+    /// Panics if `n == 0`. `Format::Align(0)` has no valid interpretation and it can only be constructed
+    /// at time of format registration, as the format itself takes a compile-time constant value for
+    /// its argument (as opposed to an `Expr`). Encountering this panic will always be a symptom of an
+    /// implementation bug and never an accidental operation over non-conformant binary data at runtime.
     pub fn align(n: usize) -> Format {
         Format::Align(
             NonZeroUsize::new(n).expect("Format::align: alignment modulus must be nonzero"),
@@ -350,6 +358,36 @@ impl Format {
     pub(crate) fn match_bounds(&self, module: &FormatModule) -> Bounds {
         self.match_bounds_recursive(module, &mut HashSet::new())
             .into_bounds()
+    }
+
+    /// Returns `true` if `self` has a non-recursive base-case that can be reached after processing
+    /// a finite number of input bytes.
+    ///
+    /// Uses the `open`-set tracking of [`Format::match_bounds_recursive`] to avoid the need to perform a separate traversal;
+    /// If that call returns a [`RecursiveBounds`] whose min is 'unresolved' (i.e. all derivations end up stuck in a recursive-format
+    /// cycle), this method returns `false`.
+    ///
+    /// Otherwise, it returns `true`, indicating that the format is either non-recursive, or is a well-formed recursive definition
+    /// with a reachable base-case.
+    ///
+    /// # Notes
+    ///
+    /// Called by [`define_format_rec_batch`](FormatModule::define_format_rec_batch)/[`define_format_recursive`](FormatModule::define_format_recursive) over every format
+    /// in the recursive batch, to prevent silent acceptance of any format definition that can never terminate
+    /// over finite-length input. If any definition within the batch fails this predicate, the registration
+    /// method will panic.
+    ///
+    /// This check helps ensure that downstream `Format`-processing machinery
+    /// (`MatchTree`/codegen) do not end up recursing indefinitely over a malformed recursive format that
+    /// can never terminate.
+    ///
+    /// Indefinite-recursion and left-recursion are independent forms of invalidity, and the registration-time
+    /// guard that requires this predicate to hold for all formats in a batch, does not replace
+    /// the left-recursion guards that are enforced during `MatchTree` construction.
+    pub(crate) fn has_reachable_base_case(&self, module: &FormatModule) -> bool {
+        !self
+            .match_bounds_recursive(module, &mut HashSet::new())
+            .is_min_unresolved()
     }
 
     /// Internal helper for `match_bounds` that avoids infinite recursion for recursive formats.
@@ -799,15 +837,83 @@ impl Format {
 }
 
 impl Format {
+    /// Unwraps procedural layers like [`Format::Slice`], [`Format::MonadSeq`], [`Format::Permit`],
+    /// and other non-hint, non-structural wrappers around 'inner' formats.
+    ///
+    /// Only type-preserving nodes are unwrapped, any layer that changes the valuetype of the format is preserved.
+    ///
+    /// If called on a leaf-node without a meaningful valuetype, or an interpretation barrier (peek, peeknot), returns `None`.
+    ///
+    /// Returns `Some(self)` for [`ItemVar`], [`Hint`], and any structurally-significant wrappers.
+    pub fn as_inner_format(&self) -> Option<&Self> {
+        match self {
+            // Format indirections - return Some(self)
+            Format::ItemVar(..) | Format::RecVar(_) | Format::Apply(_) => Some(self),
+
+            // Leaf node (meaningful value) - return Some(self)
+            Format::Byte(_) | Format::Compute(_) | Format::WithView(..) => Some(self),
+
+            // Leaf node (non-productive) - return None
+            Format::Fail
+            | Format::EndOfInput
+            | Format::Align(_)
+            | Format::Pos
+            | Format::SkipRemainder => None,
+
+            // Structural wrappers - return Some(self)
+            Format::Variant(..)
+            | Format::Union(..)
+            | Format::UnionNondet(..)
+            | Format::Tuple(..)
+            | Format::Sequence(..)
+            | Format::Repeat(..)
+            | Format::Repeat1(..)
+            | Format::RepeatCount(..)
+            | Format::RepeatBetween(..)
+            | Format::RepeatUntilLast(..)
+            | Format::RepeatUntilSeq(..)
+            | Format::AccumUntil(..)
+            | Format::ForEach(..)
+            | Format::Maybe(..) => Some(self),
+
+            // Hint - return Some(self)
+            Format::Hint(..) => Some(self),
+
+            // Interpretation barriers - return None
+            Format::Peek(_) | Format::PeekNot(_) | Format::Phantom(_) => None,
+
+            // Type-affecting wrapper - return Some(self)
+            Format::Map(..) => Some(self),
+            Format::LiftedOption(..) => Some(self),
+
+            // Multiple paths - return Some(self)
+            Format::Match(..) => Some(self),
+
+            // Procedural layers - recurse inner
+            Format::Bits(inner)
+            | Format::Slice(.., inner)
+            | Format::ParseFromView(.., inner)
+            | Format::LetView(.., inner)
+            | Format::Permit(inner, _)
+            | Format::WithRelativeOffset(.., inner)
+            | Format::MonadSeq(.., inner)
+            | Format::Where(inner, ..)
+            | Format::Let(.., inner)
+            | Format::Dynamic(.., inner)
+            | Format::DecodeBytes(.., inner)
+            | Format::LetFormat(.., inner) => inner.as_inner_format(),
+        }
+    }
+
     /// Returns `true` if values associated to this format should be handled as single ASCII characters
     pub fn is_ascii_char_format(&self, module: &FormatModule) -> bool {
-        match self {
+        let Some(this) = self.as_inner_format() else {
+            return false;
+        };
+        match this {
             Format::Hint(StyleHint::AsciiChar, _) => true,
             Format::ItemVar(level, ..) => module.get_format(*level).is_ascii_char_format(module),
-            Format::Let(.., f) | Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
-                f.is_ascii_char_format(module)
-            }
-            // FIXME - there may be other recursive cases to consider
+            Format::RecVar(..) => unreachable!("RecVar should have been resolved"),
             _ => false,
         }
     }
@@ -817,6 +923,7 @@ impl Format {
         match self {
             Format::Hint(StyleHint::AsciiStr, _) => true,
             Format::ItemVar(level, ..) => module.get_format(*level).is_ascii_string_format(module),
+            Format::RecVar(..) => unreachable!("RecVar should have been resolved"),
             Format::Tuple(formats) | Format::Sequence(formats) => {
                 !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(module))
             }
@@ -825,12 +932,48 @@ impl Format {
             | Format::RepeatCount(_, format)
             | Format::RepeatBetween(_, format)
             | Format::RepeatUntilLast(_, format)
-            | Format::RepeatUntilSeq(_, format) => format.is_ascii_char_format(module),
-            Format::Let(.., f) | Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
-                f.is_ascii_string_format(module)
+            | Format::RepeatUntilSeq(_, format)
+            | Format::ForEach(.., format) => format.is_ascii_char_format(module),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if values associated to this format should be handled as single UTF-8 characters
+    pub fn is_utf8_char_format(&self, module: &FormatModule) -> bool {
+        let Some(this) = self.as_inner_format() else {
+            return false;
+        };
+        match this {
+            // STUB - implement proper detection of StyleHint::UTF8Char if implemented
+            Format::ItemVar(level, ..) => module.get_format(*level).is_utf8_char_format(module),
+            Format::RecVar(..) => unreachable!("RecVar should have been resolved"),
+            Format::Compute(expr) => match expr.as_ref() {
+                Expr::AsChar(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if values associated to this format should be handled as UTF-8 strings
+    pub fn is_utf8_string_format(&self, module: &FormatModule) -> bool {
+        let Some(this) = self.as_inner_format() else {
+            return false;
+        };
+        match this {
+            Format::Hint(StyleHint::UTF8Str, _) => true,
+            Format::ItemVar(level, ..) => module.get_format(*level).is_utf8_string_format(module),
+            Format::RecVar(..) => unreachable!("RecVar should have been resolved"),
+            Format::Tuple(formats) | Format::Sequence(formats) => {
+                !formats.is_empty() && formats.iter().all(|f| f.is_utf8_char_format(module))
             }
-            Format::Slice(_, format) => format.is_ascii_string_format(module),
-            // FIXME - there may be other cases we should consider ASCII
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatBetween(.., format)
+            | Format::RepeatUntilLast(_, format)
+            | Format::RepeatUntilSeq(_, format)
+            | Format::ForEach(.., format) => format.is_utf8_char_format(module),
             _ => false,
         }
     }

@@ -1,0 +1,6 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── int64 <- bson.element.int64 :=
+                ├── key <- bson.cstring := { valid := "big" }
+                └── value <- ReadI64Le := 1234567890123i64

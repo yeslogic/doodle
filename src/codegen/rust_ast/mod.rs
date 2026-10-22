@@ -3109,7 +3109,7 @@ impl ToFragment for FnEntity {
                         .map(|t: &NumType| Fragment::string(t.to_static_str())),
                     Some(Fragment::String(Cow::Borrowed(", "))),
                 )
-                .delimit(Fragment::Char('<'), Fragment::Char('>')),
+                .delimit(Fragment::string("::<"), Fragment::Char('>')),
             ),
         }
     }

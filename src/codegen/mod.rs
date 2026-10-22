@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    cell::OnceCell,
+    cell::{OnceCell, RefCell},
     collections::BTreeSet,
     hash::{Hash, Hasher},
     rc::Rc,
@@ -62,7 +62,8 @@ use typed_decoder::{GTCompiler, GTDecoder, TypedDecoder};
 
 pub(crate) mod typed_format;
 use typed_format::{
-    GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewExpr, TypedViewFormat,
+    GenType, LevelCell, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewExpr,
+    TypedViewFormat,
 };
 
 mod util;
@@ -138,6 +139,13 @@ pub struct CodeGen {
     /// would also incorrectly fire for `Format::Phantom`'s own, pre-existing self-reference case
     /// (`doodle-formats/src/format/opentype/colr.rs`'s `paint`), changing its generated output.
     in_phantom_context: bool,
+    /// The subset of `in_progress` vars that were already in-progress when the current
+    /// `Expansion::Seq` element type began resolving. A reference back to one of these from inside
+    /// the element type is already heap-indirected by the enclosing `Vec<..>` (or borrowed slice),
+    /// so it needs no `RecBox` to close the cycle - and adding one would only yield a redundant
+    /// `Vec<Box<T>>`. Vars that become in-progress *inside* the element type are not included,
+    /// as a self-reference closing a cycle entirely within one element still needs a `Box`.
+    seq_indirected: std::collections::HashSet<UVar>,
 }
 
 impl CodeGen {
@@ -154,6 +162,7 @@ impl CodeGen {
             recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
             fixed_format_defs,
             in_phantom_context: false,
+            seq_indirected: std::collections::HashSet::new(),
         }
     }
 
@@ -241,6 +250,16 @@ impl CodeGen {
         AtomType::from(int_t).into()
     }
 
+    /// Whether a reference to the (canonical) var `canonical` closes a recursive cycle that must be
+    /// broken by `RecBox`: it must be an in-progress ancestor, reached through neither
+    /// `Format::Phantom` (see `in_phantom_context`) nor an intervening sequence (see
+    /// `seq_indirected`).
+    fn needs_rec_box(&self, canonical: UVar) -> bool {
+        !self.in_phantom_context
+            && self.in_progress.contains_key(&canonical)
+            && !self.seq_indirected.contains(&canonical)
+    }
+
     /// Takes a [`WHNFSolution`] from a solved TypeChecker and lifts it to the corresponding `RustType`.
     fn lift_whnf_solution(&mut self, tc: &TypeChecker, sol: WHNFSolution, lt: &RustLt) -> RustType {
         match sol {
@@ -248,8 +267,7 @@ impl CodeGen {
             WHNFSolution::Int(it) => Self::lift_int(it),
             WHNFSolution::Var(var) => {
                 let canonical = tc.get_canonical_uvar(var);
-                let needs_rec_box =
-                    !self.in_phantom_context && self.in_progress.contains_key(&canonical);
+                let needs_rec_box = self.needs_rec_box(canonical);
                 let rt = self.lift_uvar(tc, var, lt).to_rust_type();
                 if needs_rec_box {
                     RustType::from(CompType::RecBox(Box::new(rt)))
@@ -434,8 +452,7 @@ impl CodeGen {
                                 },
                                 _ => {
                                     let canonical = tc.get_canonical_uvar(*branch_v);
-                                    let needs_rec_box = !self.in_phantom_context
-                                        && self.in_progress.contains_key(&canonical);
+                                    let needs_rec_box = self.needs_rec_box(canonical);
                                     let inner = {
                                         let raw = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
                                         if needs_rec_box {
@@ -487,10 +504,11 @@ impl CodeGen {
                 GenType::Def((ix, tname), rt_decl)
             }
             Expansion::Seq(sol, hint) => {
-                // `Vec<..>` is always heap-indirected, so a reference to an *ancestor* var
-                // reached via `sol` needs no special handling here at all - `lift_whnf_solution`
-                // (the reference site) already boxes it if needed, and the ancestor's own
-                // Record/Union/Tuple frame is what's actually marked `in_progress` for that case.
+                // `Vec<..>` is always heap-indirected (as is every other sequence representation
+                // below, being a borrow), so a reference to an *ancestor* var reached via `sol`
+                // needs no `RecBox` - every var already in-progress at this point is recorded in
+                // `seq_indirected` for the duration of `sol`'s resolution, which suppresses the
+                // `RecBox` that `lift_whnf_solution` (the reference site) would otherwise insert.
                 // The only thing this guards against is `var` (this Seq's own identity) being
                 // reached again from within its own element type - a `Vec<..>` that would need to
                 // recursively contain itself with no Tuple/Record/Union boundary in between. That
@@ -506,9 +524,19 @@ impl CodeGen {
                          - not yet supported by codegen"
                     );
                 }
+                let newly_indirected: Vec<UVar> = self
+                    .in_progress
+                    .keys()
+                    .copied()
+                    .filter(|v| !self.seq_indirected.contains(v))
+                    .collect();
+                self.seq_indirected.extend(newly_indirected.iter().copied());
                 self.in_progress.insert(var, None);
                 let inner = self.lift_whnf_solution(tc, sol, lt);
                 self.in_progress.remove(&var);
+                for v in newly_indirected.iter() {
+                    self.seq_indirected.remove(v);
+                }
                 match hint {
                     SeqBorrowHint::ReadArray => {
                         if let Some(p) = inner.try_as_prim()
@@ -4199,7 +4227,7 @@ where
                 match _hint {
                     // REVIEW - do we want to perform any local modifications?
                     StyleHint::Record { .. } => inner_block,
-                    StyleHint::AsciiStr | StyleHint::AsciiChar => inner_block,
+                    StyleHint::AsciiStr | StyleHint::AsciiChar | StyleHint::UTF8Str => inner_block,
                     StyleHint::Common(CommonOp::EndianParse(_kind_endian)) => {
                         // REVIEW - do we want to swap-in particular endian parses instead?
                         inner_block
@@ -4598,6 +4626,9 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             .unwrap()
     }));
     type_decls.sort_by_key(|(_, (ix, _))| ix);
+    // a committed reservation aliased to an identical decl (see `NameGen::commit_reservation`)
+    // leaves a duplicate slot in `defined_types` that resolves to the same `rev_map` entry
+    type_decls.dedup_by_key(|(_, (ix, _))| *ix);
     const HEAP_STRATEGY: HeapStrategy =
         HeapStrategy::new().variant_cutoff(128)
         // .absolute_cutoff(128)
@@ -4940,7 +4971,7 @@ impl<'a> Generator<'a> {
 pub struct Elaborator<'a> {
     module: &'a FormatModule,
     next_index: usize,
-    t_formats: StableMap<usize, Rc<GTFormat>, BTree>,
+    t_formats: StableMap<usize, LevelCell<GenType>, BTree>,
     tc: TypeChecker,
     codegen: CodeGen,
 }
@@ -5029,13 +5060,14 @@ impl<'a> Elaborator<'a> {
                     .push_atom(NameAtom::Explicit(Label::from(
                         self.module.get_name(level).to_string(),
                     )));
-                let t_inner = if let Some(val) = self.t_formats.get(&level) {
-                    val.clone()
+                let t_inner = if let Some(cell) = self.t_formats.get(&level) {
+                    cell.borrow().clone()
                 } else {
                     let fmt = self.module.get_format(level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
                     let ret = Rc::new(tmp);
-                    self.t_formats.insert(level, ret.clone());
+                    self.t_formats
+                        .insert(level, Rc::new(RefCell::new(ret.clone())));
                     ret
                 };
                 self.codegen.name_gen.ctxt.escape();
@@ -5201,39 +5233,37 @@ impl<'a> Elaborator<'a> {
                     t_views.push((lbl.clone(), t_view));
                 }
 
-                let t_inner = if let Some(val) = self.t_formats.get(level) {
-                    val.clone()
+                let t_inner = if let Some(cell) = self.t_formats.get(level) {
+                    cell.clone()
                 } else {
-                    // Reserve a placeholder *before* recursing into the level's own body, so
-                    // that a self-reference reached during that recursion (which can only ever
-                    // occur inside a `Format::Phantom`, the one place `ItemVar` may validly name
-                    // its own not-yet-elaborated level) resolves to this placeholder instead of
-                    // re-entering this same call and recursing without bound.
+                    // Reserve a shared, backpatchable cell *before* recursing into the level's own
+                    // body, so that a self-reference reached during that recursion (which can only
+                    // ever occur inside a `Format::Phantom`, the one place `ItemVar` may validly
+                    // name its own not-yet-elaborated level - *or* inside another recursive
+                    // definition's own body, reached as a sibling arm from within this level's own
+                    // still-open elaboration, e.g. two definitions in the same
+                    // `define_format_rec_batch` that both call back into a shared hub) resolves to
+                    // this placeholder instead of re-entering this same call and recursing without
+                    // bound.
                     //
-                    // `GTCompiler::compile_gt_format` never trusts this placeholder's *content*:
-                    // it discards a `FormatCall` node's `t_inner` whenever `decoder_map` already
-                    // has an entry for that level, and a level's entry is always inserted into
-                    // `decoder_map` at the point its `FormatCall` node is *discovered*, before its
-                    // body is ever walked (body-walking is deferred via `compile_queue`) - so by
-                    // the time a self-reference nested in that body is reached, the real entry is
-                    // already present and this placeholder is never read there. `Format::from`'s
-                    // reverse conversion likewise discards `t_inner` entirely when reconstructing
-                    // `Format::ItemVar`. This insertion also performs no index/`UVar`-style
-                    // allocation of its own, so it cannot desynchronize the lockstep invariant
-                    // with `TypeChecker`.
-                    //
-                    // `TypedFormat::match_bounds`/`lookahead_bounds`, unlike the two consumers
-                    // above, *do* walk straight into `t_inner` on an arbitrary, possibly-nested
-                    // `FormatCall` - so they specifically must use this single, canonical
-                    // `TypedFormat::recursion_placeholder()` value (rather than an unmarked, fresh
-                    // `Rc::new(TypedFormat::Fail)`) to stay recognizable via `Rc::ptr_eq` later.
-                    let placeholder = TypedFormat::recursion_placeholder();
-                    self.t_formats.insert(*level, placeholder);
+                    // Every occurrence of this level - not just the one that triggers its
+                    // elaboration - gets a `clone()` of this *same* `LevelCell`, so backfilling it
+                    // once below (`*cell.borrow_mut() = ...`) is instantly visible everywhere,
+                    // including occurrences frozen on the placeholder mid-elaboration. Previously
+                    // `t_inner` was a plain `Rc<TypedFormat>` snapshotted per-occurrence, which left
+                    // any occurrence other than the triggering one permanently stuck on the
+                    // placeholder - harmless for `GTCompiler::compile_gt_format` (which never trusts
+                    // this content directly: see `decoder_map` below), but `TypedFormat::match_bounds`/
+                    // `lookahead_bounds` *do* walk straight into it, and treated such an occurrence as
+                    // unconditionally nullable even when the format could never actually match zero
+                    // bytes - see the `bson.array` regression this was fixed for.
+                    let cell: LevelCell<GenType> =
+                        Rc::new(RefCell::new(TypedFormat::recursion_placeholder()));
+                    self.t_formats.insert(*level, cell.clone());
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
-                    let ret = Rc::new(tmp);
-                    self.t_formats.insert(*level, ret.clone());
-                    ret
+                    *cell.borrow_mut() = Rc::new(tmp);
+                    cell
                 };
                 let gt = self.get_gt_from_index(index);
                 self.codegen.name_gen.ctxt.escape();
@@ -5615,6 +5645,9 @@ impl<'a> Elaborator<'a> {
                     }
                     StyleHint::AsciiChar => {
                         // REVIEW - should we check for u8-like types?
+                    }
+                    StyleHint::UTF8Str => {
+                        // REVIEW - should we check for Seq(char)-like types?
                     }
                     StyleHint::Common(common_op) => match common_op {
                         CommonOp::EndianParse(base_kind) => {
@@ -6171,8 +6204,10 @@ impl<'a> Elaborator<'a> {
             // Mirrors `TypeChecker::infer_module`'s recording of `level_vars` for levels unreachable from
             // `top_format`, so that later `ItemVar` references to `next_level` hit the cache in both layers alike.
             if self.t_formats.get(&next_level).is_none() {
-                self.t_formats
-                    .insert(next_level, Rc::new(local_root.clone()));
+                self.t_formats.insert(
+                    next_level,
+                    Rc::new(RefCell::new(Rc::new(local_root.clone()))),
+                );
             }
             extra.push(local_root);
             let all_seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();

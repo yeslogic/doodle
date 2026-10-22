@@ -1,0 +1,12 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── binary <- bson.element.binary :=
+                ├── key <- bson.cstring := { valid := "b" }
+                └── value <- { ... } :=
+                    ├── subtype <- ReadU8 := 0
+                    └── data <- match subtype { ... } :=
+                        ├── 0 := 222
+                        ├── 1 := 173
+                        ├── 2 := 190
+                        └── 3 := 239

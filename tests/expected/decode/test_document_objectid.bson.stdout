@@ -1,0 +1,14 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── objectid <- bson.element.objectid :=
+                ├── key <- bson.cstring := { valid := "_id" }
+                └── value <- { ... } :=
+                    ├── timestamp <- ReadU32Be := 16909060
+                    ├── randval <- [ ... ] :=
+                    │   ├── 0 := 170
+                    │   ├── 1 := 187
+                    │   ├── 2 := 204
+                    │   ├── 3 := 221
+                    │   └── 4 := 238
+                    └── counter <- map (x -> u32be x) (...) := 658188

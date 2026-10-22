@@ -1,0 +1,42 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── null <- bson.element.null :=
+        │       ├── key <- bson.cstring := { valid := "nullval" }
+        │       └── value <- ()
+        ├── 1 <- bson.element :=
+        │   └── minkey <- bson.element.minkey :=
+        │       ├── key <- bson.cstring := { valid := "minval" }
+        │       └── value <- ()
+        ├── 2 <- bson.element :=
+        │   └── maxkey <- bson.element.maxkey :=
+        │       ├── key <- bson.cstring := { valid := "maxval" }
+        │       └── value <- ()
+        ├── 3 <- bson.element :=
+        │   └── bool <- bson.element.bool :=
+        │       ├── key <- bson.cstring := { valid := "flag_t" }
+        │       └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := true
+        ├── 4 <- bson.element :=
+        │   └── bool <- bson.element.bool :=
+        │       ├── key <- bson.cstring := { valid := "flag_f" }
+        │       └── value <- map (b -> b > 0) (expect (x -> x <= 1) ReadU8) := false
+        ├── 5 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring := { valid := "count" }
+        │       └── value <- ReadI32Le := 42i32
+        ├── 6 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring := { valid := "delta" }
+        │       └── value <- ReadI32Le := -7i32
+        └── 7 <- bson.element :=
+            └── objectid <- bson.element.objectid :=
+                ├── key <- bson.cstring := { valid := "_id" }
+                └── value <- { ... } :=
+                    ├── timestamp <- ReadU32Be := 1
+                    ├── randval <- [ ... ] :=
+                    │   ├── 0 := 17
+                    │   ├── 1 := 34
+                    │   ├── 2 := 51
+                    │   ├── 3 := 68
+                    │   └── 4 := 85
+                    └── counter <- map (x -> u32be x) (...) := 42

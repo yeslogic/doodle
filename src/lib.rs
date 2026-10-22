@@ -850,6 +850,8 @@ pub enum StyleHint {
     },
     AsciiStr,
     AsciiChar,
+    // REVIEW - consider implementing Utf8Char
+    UTF8Str,
     Common(CommonOp),
 }
 
@@ -1089,43 +1091,167 @@ impl FormatModule {
     ///
     /// # Panics
     ///
-    /// Panics if any constructed format fails to type-check.
+    /// Panics if any constructed format fails to type-check, or if any batch member has no
+    /// reachable, non-recursive base case (see `check_batch_has_base_case`) - e.g. `F := 'a' F`,
+    /// unconditionally self-referential with no non-recursive alternative anywhere on its cycle,
+    /// which would otherwise recurse without any depth bound at decode time.
     pub fn define_format_rec_batch<L: IntoLabel>(
         &mut self,
         formats: Vec<(L, Format)>,
     ) -> Vec<FormatRef> {
-        let start = self.names.len();
         let n = formats.len();
-
-        // Reserve every level in the batch before any body is installed, so that a RecVar-derived
-        // ItemVar reference to any batch member (including itself) resolves to a real (if still
-        // type-provisional) slot rather than indexing out of bounds.
         let mut names = Vec::with_capacity(n);
         let mut bodies = Vec::with_capacity(n);
         for (name, format) in formats {
             names.push(name.into());
             bodies.push(format);
         }
-        for name in &names {
-            self.names.push(name.clone());
+
+        let start = self.reserve_batch_levels(names);
+        for (ix, format) in bodies.into_iter().enumerate() {
+            self.formats[start + ix] = format.substitute_rec_var(start);
+        }
+        self.check_batch_has_base_case(start, n);
+        self.infer_batch_types(start, n);
+
+        (start..start + n).map(FormatRef).collect()
+    }
+
+    /// Registers a batch of `N` co-referential formats specified via delayed-construction closures.
+    ///
+    /// Reserves all `N` levels up front, exactly like [`Self::define_format_rec_batch`], but hands
+    /// each member-builder (a reference to) the resulting `[FormatRef; N]`, rather than requiring the
+    /// caller to pre-build a whole `Format` tree using raw `RecVar` indices. Since [`FormatRef`] is
+    /// `Copy` (unlike [`Format`]), a builder can call `.call()`/`.call_args()`/etc. on any of `refs`
+    /// as many times as it needs, without having to thread a fresh `Format::RecVar(i)`-valued
+    /// parameter through its own signature for each additional use site of the same recursive
+    /// reference - the exact friction that motivated this constructor (see `doc/RECURSION.md`'s
+    /// "mental model" section for the underlying `ItemVar`/level model this still builds on).
+    ///
+    /// Builders do *not* receive `&mut FormatModule` - unlike every other `define_format_*`
+    /// helper, a batch member's own body is built *after* all `N` levels are reserved, so any
+    /// auxiliary sub-format a builder registered mid-build would land at a level *above* the
+    /// batch it logically belongs under, the one place in the module where the usual "a format
+    /// can only be referenced by a later one" ordering would silently fail to hold. A builder
+    /// that needs its own named auxiliary sub-formats (e.g. one that dispatches on a tagged union
+    /// of many sub-formats worth naming independently) registers them *before* this call instead,
+    /// in an ordinary function taking `&mut FormatModule` that returns the residual
+    /// `Box<dyn FnOnce(&[FormatRef; N]) -> Format>` - e.g. `bson.rs`'s `element`, which takes
+    /// `&mut FormatModule` and two sibling `FormatRef`s, registers its sixteen
+    /// `bson.element.*` tag-dispatch sub-formats, and returns the boxed closure that finishes the
+    /// job once `refs` exists. The caller applies it eagerly (`element(module, cstring, string)`)
+    /// and passes the resulting `Box` into `formats` like any other member.
+    ///
+    /// Builders are invoked in `formats` order, and the same order-dependent type-inference
+    /// behavior documented on [`Self::define_format_rec_batch`] applies here too: a member
+    /// referencing an *earlier* sibling sees that sibling's real, already-solved type, while one
+    /// referencing itself or a *later* sibling sees the still-provisional placeholder.
+    ///
+    /// This is presently a thin, additive convenience layer over the same underlying level/`ItemVar`
+    /// machinery `define_format_rec_batch` uses (a builder's returned `Format` never contains a
+    /// `RecVar` to begin with, so no substitution pass is needed) - it does not remove or replace
+    /// `Format::RecVar`/`define_format_rec_batch`, which remain the lower-level, `Vec`-based entry
+    /// point.
+    ///
+    /// Builders are boxed (`Box<dyn FnOnce(..) -> Format>`) rather than a single generic `F`,
+    /// because distinct batch members typically close over distinct free variables (e.g. one member
+    /// needing a couple of sibling `FormatRef`s a neighboring member doesn't) - which makes them
+    /// distinct concrete closure types that a single monomorphic `[F; N]` could not hold together.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any constructed format fails to type-check, or if any batch member has no
+    /// reachable, non-recursive base case - see [`Self::define_format_rec_batch`]'s own `# Panics`
+    /// section.
+    pub fn define_format_recursive<L: IntoLabel, const N: usize>(
+        &mut self,
+        names: [L; N],
+        formats: [Box<dyn FnOnce(&[FormatRef; N]) -> Format>; N],
+    ) -> [FormatRef; N] {
+        let start = self.reserve_batch_levels(names.into_iter().map(Into::into));
+        let refs: [FormatRef; N] = std::array::from_fn(|ix| FormatRef(start + ix));
+
+        for (ix, build) in formats.into_iter().enumerate() {
+            let body = build(&refs);
+            self.formats[start + ix] = body;
+        }
+        self.check_batch_has_base_case(start, N);
+        self.infer_batch_types(start, N);
+
+        refs
+    }
+
+    /// Reserves `names.len()` contiguous levels, starting at the module's current length, each with
+    /// a placeholder (`Format::EMPTY`/`ValueType::Any`) body - so that a self- or forward-reference
+    /// to any reserved level (including one still awaiting its real body) resolves to a real, if
+    /// still type-provisional, slot rather than indexing out of bounds. Shared by
+    /// [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`]; returns the starting
+    /// level.
+    fn reserve_batch_levels(&mut self, names: impl IntoIterator<Item = Label>) -> usize {
+        let start = self.names.len();
+        for name in names {
+            self.names.push(name);
             self.args.push(Vec::new());
             self.views.push(Vec::new());
             self.formats.push(Format::EMPTY);
             self.format_types.push(ValueType::Any);
         }
-        for (ix, format) in bodies.into_iter().enumerate() {
-            self.formats[start + ix] = format.substitute_rec_var(start);
-        }
+        start
+    }
 
-        // `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
-        // level's body - it just reads `format_types[level]` directly (see that method) - so,
-        // unlike an eager equirecursive inference engine, no occurs-tracking is needed here: a
-        // still-provisional sibling (including self) is read as-is (currently `ValueType::Any`,
-        // which `ValueType::unify` always accepts unconditionally) and treated as an
-        // already-terminating leaf. Processing members in `formats`-order means a member
-        // referencing an *earlier* sibling sees that sibling's real, already-solved type, while
-        // one referencing a *later* sibling (or itself) sees the placeholder - an accepted,
-        // order-dependent imprecision, not a soundness gap for this module's own purposes.
+    /// Rejects a just-installed recursive batch if any of its `n` members (starting at `start`) has
+    /// no reachable, non-recursive base case - i.e. every derivation through its body eventually
+    /// depends on re-entering a level that's still open (see [`Format::has_reachable_base_case`]).
+    /// `F := 'a' F`, with no non-recursive alternative anywhere on its cycle, is the canonical
+    /// example: it makes byte progress on every step (so the [`MatchTree`] cycle guard treats it as
+    /// fine, and it isn't left-recursive), yet can never actually complete on any finite input - a
+    /// decoder for it would only ever stop because the input ran out, after recursing once per
+    /// remaining byte with no depth bound of its own. Left unchecked, this shape reaches
+    /// `MatchTree`/codegen and recurses at decode time via a plain, uncounted call stack (both the
+    /// interpreter's `Decoder::Call` and generated code's per-level functions), so an
+    /// attacker-controlled input to a format with this shape can exhaust the stack. Catching it here
+    /// - at the single, shared point both the interpreter and codegen compile from - closes that gap
+    /// for both backends at once, rather than needing a runtime depth counter threaded through
+    /// either one.
+    ///
+    /// This is a distinct, narrower check than genuine left recursion (`bad := bad | 'Z'`, still
+    /// only caught later, at `MatchTree`-build time - see [`Self::define_format_rec_batch`]'s own
+    /// doc comment): a format can have a perfectly reachable base case and still be left-recursive
+    /// (progress is not reachability), and a format can make byte progress on every single step and
+    /// still have no base case at all (reachability is not progress). Neither check subsumes the
+    /// other, so both remain necessary.
+    ///
+    /// Panics naming every offending member, mirroring the type-check panic just below it - a
+    /// malformed recursive batch is a genuine grammar defect, not a recoverable `Result`, exactly
+    /// like an ill-typed one.
+    fn check_batch_has_base_case(&self, start: usize, n: usize) {
+        let bad_names: Vec<&str> = (start..start + n)
+            .filter(|&ix| !self.formats[ix].has_reachable_base_case(self))
+            .map(|ix| self.names[ix].as_ref())
+            .collect();
+        if !bad_names.is_empty() {
+            panic!(
+                "recursive format batch has no reachable base case for: {} - every derivation \
+                 requires revisiting a still-open recursive reference; add a non-recursive \
+                 alternative (e.g. a `Union` branch, or `Repeat`'s implicit zero-length case) \
+                 somewhere on the cycle",
+                bad_names.join(", ")
+            );
+        }
+    }
+
+    /// Solves and installs the real type for each of `n` levels starting at `start`, in ascending
+    /// order. `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
+    /// level's body - it just reads `format_types[level]` directly - so, unlike an eager
+    /// equirecursive inference engine, no occurs-tracking is needed here: a still-provisional
+    /// sibling (including self) is read as-is (currently `ValueType::Any`, which `ValueType::unify`
+    /// always accepts unconditionally) and treated as an already-terminating leaf. Processing in
+    /// ascending order means a member referencing an *earlier* sibling sees that sibling's real,
+    /// already-solved type, while one referencing a *later* sibling (or itself) sees the
+    /// placeholder - an accepted, order-dependent imprecision, not a soundness gap for this module's
+    /// own purposes. Shared by [`Self::define_format_rec_batch`] and
+    /// [`Self::define_format_recursive`].
+    fn infer_batch_types(&mut self, start: usize, n: usize) {
         for ix in start..start + n {
             let scope = TypeScope::new();
             let format_type = match self.infer_format_type(&scope, &self.formats[ix]) {
@@ -1134,8 +1260,6 @@ impl FormatModule {
             };
             self.format_types[ix] = format_type;
         }
-
-        (start..start + n).map(FormatRef).collect()
     }
 
     pub fn get_name(&self, level: usize) -> &str {
@@ -3237,5 +3361,84 @@ mod test {
             result.is_err(),
             "compiling a genuinely left-recursive format must fail cleanly, not panic or hang"
         );
+    }
+
+    /// The specific gap `check_batch_has_base_case` closes: `F := 'a' F`, with no non-recursive
+    /// alternative anywhere on its cycle, makes byte progress on every step (unlike
+    /// `define_format_rec_batch_left_recursion_still_rejected_at_compile_time`'s `bad` above), so
+    /// neither the `MatchTree` cycle guard nor `infer_format_type`'s occurs-check has any reason to
+    /// reject it - it would otherwise reach `MatchTree`/codegen and recurse at decode time with no
+    /// depth bound, bounded only by how much input an attacker supplies. Must now be rejected at
+    /// registration time instead, before a `FormatRef` to it ever escapes into `compile_program` or
+    /// codegen.
+    #[test]
+    #[should_panic(expected = "no reachable base case for: test.no_base_case")]
+    fn define_format_rec_batch_no_base_case_rejected_at_registration() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        // F := 'a' F -- unconditionally, mandatorily self-referential; no branch ever escapes.
+        let no_base_case = Format::Tuple(vec![is_byte(b'a'), Format::RecVar(0)]);
+        let _ = module.define_format_rec_batch(vec![("test.no_base_case", no_base_case)]);
+    }
+
+    /// Mutual-recursion counterpart of the above: two batch members that unconditionally call each
+    /// other (`a := 'a' b`, `b := 'b' a`) with no non-recursive alternative anywhere on the cycle -
+    /// confirms the check follows `ItemVar` references across batch members, not just within a
+    /// single member's own body.
+    #[test]
+    #[should_panic(expected = "no reachable base case for: test.mutual_a, test.mutual_b")]
+    fn define_format_rec_batch_mutual_no_base_case_rejected_at_registration() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let a_body = Format::Tuple(vec![is_byte(b'a'), Format::RecVar(1)]);
+        let b_body = Format::Tuple(vec![is_byte(b'b'), Format::RecVar(0)]);
+        let _ = module
+            .define_format_rec_batch(vec![("test.mutual_a", a_body), ("test.mutual_b", b_body)]);
+    }
+
+    /// Guards a subtle correctness boundary inside `Format::has_reachable_base_case` itself, not
+    /// just the two `no_base_case` cases above: `Format::Repeat` (zero-or-more) always has an
+    /// implicit, unconditional base case (choosing zero repetitions), *regardless* of what its
+    /// inner format is - `match_bounds_recursive`'s `Repeat` arm reports `RecursiveBounds::any()`
+    /// without even inspecting `inner` at all. Deliberately calls `has_reachable_base_case` directly
+    /// on a hand-built `Format` against an otherwise-empty `FormatModule` (level `0` is never
+    /// actually installed) rather than going through `define_format_rec_batch` end-to-end: this
+    /// isolates the exact algorithmic claim (`Repeat` never needs to resolve what's inside it) from
+    /// `MatchTree`'s own, separate and unrelated inability to disambiguate repetition of a directly
+    /// self-referential item at decode time - a real but orthogonal limitation, not a regression in
+    /// this check. If a future change to the `Repeat` arm ever started threading `inner`'s own
+    /// resolution through instead of unconditionally escaping, this would start failing here (and
+    /// real recursive-list shapes like a BSON array/document, whose elements can themselves recurse
+    /// through a `Repeat`, would start spuriously failing to register).
+    #[test]
+    fn has_reachable_base_case_repeat_escape_ignores_inner_entirely() {
+        use crate::helper::is_byte;
+
+        let module = FormatModule::new();
+        let body = Format::Tuple(vec![
+            is_byte(b'a'),
+            Format::Repeat(Box::new(Format::ItemVar(0, vec![], vec![]))),
+        ]);
+        assert!(
+            body.has_reachable_base_case(&module),
+            "a self-reference reached only inside `Repeat` must have a base case, regardless of \
+             whether the referenced level itself does"
+        );
+    }
+
+    /// The mirror-image check: `Format::Repeat1` (one-or-more) does *not* get `Repeat`'s free pass -
+    /// it unconditionally requires at least one resolution of its inner format, so wrapping the
+    /// *only* self-reference in `Repeat1` alone (with nothing else on the cycle) is exactly as
+    /// mandatorily-infinite as `F := 'a' F` and must still be rejected. This is the case a naive
+    /// "any `Repeat*` variant has a free escape" simplification would wrongly let through.
+    #[test]
+    #[should_panic(expected = "no reachable base case for: test.repeat1_self")]
+    fn define_format_rec_batch_self_recursive_via_repeat1_still_rejected() {
+        let mut module = FormatModule::new();
+        // F := Repeat1(F) -- one-or-more copies of itself, with no non-recursive alternative.
+        let body = Format::Repeat1(Box::new(Format::RecVar(0)));
+        let _ = module.define_format_rec_batch(vec![("test.repeat1_self", body)]);
     }
 }
