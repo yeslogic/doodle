@@ -19,11 +19,10 @@ fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
 mod elaboration {
     use super::*;
 
-    /// The occurs-check treats `Tuple` positions as an indirection boundary, but codegen can only
-    /// break a recursive cycle with a `Box` at a `Record`/`Variant` construction site, and hits an
-    /// `unreachable!` on a tuple that contains itself. For `(tag, Maybe(tag == 'C', self))`, of
-    /// type `(u8, Option<self>)`, the two must agree: either the typechecker rejects the format, or
-    /// codegen handles it.
+    /// Codegen can only break a recursive cycle with a `Box` at a nominal (`Record`/union) type,
+    /// and hits an `unreachable!` on an anonymous tuple that contains itself. For
+    /// `(tag, Maybe(tag == 'C', self))`, of type `(u8, Option<self>)`, the typechecker and codegen
+    /// must agree: either the typechecker rejects the format, or codegen handles it.
     #[test]
     fn typecheck_accepting_tuple_self_reference_implies_codegen_succeeds() {
         use crate::helper::{byte_in, chain, compute, expr_eq, var};

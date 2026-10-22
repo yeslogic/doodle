@@ -1024,6 +1024,9 @@ impl TypeChecker {
         self.level_vars.insert(level, placeholder);
         let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
         self.unify_var_pair(placeholder, ret)?;
+        // A self-reference in the body closes its cycle only here, through a var-var
+        // unification, which (unlike `unify_utype`'s `Var`-vs-shape cases) runs no occurs-check.
+        self.occurs(placeholder)?;
         Ok(placeholder)
     }
 
@@ -1298,9 +1301,11 @@ impl TypeChecker {
 
     /// Performs an occurs-check for early detection of infinite types.
     ///
-    /// A self-reference is only actually infinite (unrepresentable as a finite Rust type) when
-    /// reached with no intervening indirection anywhere on the cycle - exactly Rust's own E0072
-    /// criterion (`type X = Box<X>` illegal, `enum X { Y(Box<X>) }` fine). See
+    /// A self-reference is representable in generated Rust code only if the cycle passes through
+    /// a nominal type - a `Record` (generated struct) or a union arm (generated enum) - at which
+    /// codegen can close it with a `Box`. A cycle through only `Tuple`/`Seq`/`Option` positions
+    /// would need a recursive type alias (e.g. `type X = (u8, Option<Box<X>>)`, or even
+    /// `type X = Vec<X>`), which Rust does not allow, so it is reported as an infinite type. See
     /// [`Self::occurs_in`]/[`Self::occurs_in_constraints`] for where indirection is tracked.
     pub fn occurs(&self, v: UVar) -> TCResult<()> {
         self.occurs_in_constraints(v, &self.constraints[v.0], false, &mut HashSet::new())
@@ -1310,10 +1315,11 @@ impl TypeChecker {
     /// [`Constraints`] object that was encountered during the expansion of the original UVar association.
     ///
     /// `indirected` is `true` once the walk (since the check for `v` began) has crossed a
-    /// representability boundary - a `Tuple`/`Record`/`Seq`/`Option` position (tracked in
-    /// [`Self::occurs_in`]) or a `Constraints::Variant`'s labeled union-arm (tracked here) - and is
-    /// threaded through unchanged across a plain `Constraint::Equiv` (direct type equivalence, not
-    /// an embedding, same as `Var`-forwarding). `visited` is keyed by `(canonical constraint index,
+    /// nominal boundary - a `Record` position (tracked in [`Self::occurs_in`] and via
+    /// `ProjShape::RecordWith`) or a `Constraints::Variant`'s labeled union-arm (tracked here). It
+    /// is threaded through unchanged across `Tuple`/`Seq`/`Option` positions (anonymous types,
+    /// which give a cycle nothing to be named through) and across a plain `Constraint::Equiv`
+    /// (direct type equivalence, not an embedding, same as `Var`-forwarding). `visited` is keyed by `(canonical constraint index,
     /// indirected)` and threaded through the whole walk without resetting at indirection
     /// boundaries, so a legitimate, already-indirected cycle reached while searching for `v` can't
     /// loop forever (this only becomes reachable at all once this generalization allows an
@@ -1335,7 +1341,7 @@ impl TypeChecker {
                     // A labeled union-arm is itself an indirection boundary - real doodle has no
                     // `UType::Union` variant; sum-type-ness lives here, in `Constraints`, not in
                     // `UType`'s own shape - so this is the "enum variant behind a tag" analog of
-                    // `UType::Tuple`/`Record`/`Seq`/`Option` below, not a plain forwarding step.
+                    // `UType::Record` below, not a plain forwarding step.
                     self.occurs_in(v, inner.clone(), true, visited)?;
                 }
                 Ok(())
@@ -1348,7 +1354,7 @@ impl TypeChecker {
                 Constraint::Proj(p) => match p {
                     ProjShape::TupleWith(ix_vars) => {
                         for (_ix, var) in ix_vars.iter() {
-                            self.occurs_in(v, Rc::<UType>::from(*var), true, visited)?;
+                            self.occurs_in(v, Rc::<UType>::from(*var), indirected, visited)?;
                         }
                         Ok(())
                     }
@@ -1359,10 +1365,10 @@ impl TypeChecker {
                         Ok(())
                     }
                     ProjShape::SeqOf(elem_v) => {
-                        self.occurs_in(v, Rc::<UType>::from(*elem_v), true, visited)
+                        self.occurs_in(v, Rc::<UType>::from(*elem_v), indirected, visited)
                     }
                     ProjShape::OptOf(param_v) => {
-                        self.occurs_in(v, Rc::<UType>::from(*param_v), true, visited)
+                        self.occurs_in(v, Rc::<UType>::from(*param_v), indirected, visited)
                     }
                 },
             },
@@ -1398,7 +1404,7 @@ impl TypeChecker {
             }
             UType::Tuple(ts) => {
                 for t in ts.iter() {
-                    self.occurs_in(v, t.clone(), true, visited)?;
+                    self.occurs_in(v, t.clone(), indirected, visited)?;
                 }
                 Ok(())
             }
@@ -1409,15 +1415,15 @@ impl TypeChecker {
                 Ok(())
             }
             UType::Seq(inner, _) | UType::Option(inner) => {
-                self.occurs_in(v, inner.clone(), true, visited)
+                self.occurs_in(v, inner.clone(), indirected, visited)
             }
             // As in `UType::iter_embeds`: PhantomData is reference-only, so a self-reference
             // reached only through it (as with `Format::Phantom`/`define_format_phantom_rec`)
             // does not constitute an infinite type, and must not be walked into here - doing so
             // would recurse without bound around the same self-referential cycle that
             // `iter_embeds`/`is_infinite_type` already know to treat as opaque. Unlike the
-            // `Tuple`/`Record`/`Seq`/`Option` cases above, this stays a blanket exemption rather
-            // than an indirection boundary: `Format::Phantom` content is never actually decoded,
+            // `Record` case above, this is a blanket exemption rather than an indirection
+            // boundary: `Format::Phantom` content is never actually decoded,
             // so its representability as a finite Rust type is moot, not merely satisfied.
             UType::PhantomData(..) => Ok(()),
         }
@@ -5086,9 +5092,9 @@ mod tests {
         let v = tc.get_new_uvar();
         tc.unify_var_constraint(v, Constraint::Equiv(Rc::new(UType::Var(v))))
             .expect("installing the constraint itself should succeed");
-        let err = tc.occurs(v).expect_err(
-            "a bare self-alias with no Tuple/Record/Seq/Option/variant indirection must be rejected",
-        );
+        let err = tc
+            .occurs(v)
+            .expect_err("a bare self-alias with no Record/variant indirection must be rejected");
         assert!(
             matches!(*err.err, TCErrorKind::InfiniteType(..)),
             "unexpected error: {err}"
@@ -5096,16 +5102,41 @@ mod tests {
     }
 
     #[test]
-    fn self_reference_behind_a_tuple_is_accepted() {
+    fn self_reference_behind_only_anonymous_types_is_rejected() {
+        // `(Option<Self>,)` / `Vec<Self>`: no nominal type on the cycle to close it through.
+        let shapes: [fn(Rc<UType>) -> UType; 2] = [
+            |v| UType::Tuple(vec![Rc::new(UType::Option(v))]),
+            |v| UType::Seq(v, SeqBorrowHint::Constructed),
+        ];
+        for shape in shapes {
+            let mut tc = TypeChecker::new();
+            let v = tc.get_new_uvar();
+            tc.unify_var_constraint(v, Constraint::Equiv(Rc::new(shape(Rc::new(UType::Var(v))))))
+                .expect("installing the constraint itself should succeed");
+            let err = tc
+                .occurs(v)
+                .expect_err("a self-reference behind only Tuple/Seq/Option must be rejected");
+            assert!(
+                matches!(*err.err, TCErrorKind::InfiniteType(..)),
+                "unexpected error: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn self_reference_behind_a_record_is_accepted() {
         let mut tc = TypeChecker::new();
         let v = tc.get_new_uvar();
         tc.unify_var_constraint(
             v,
-            Constraint::Equiv(Rc::new(UType::Tuple(vec![Rc::new(UType::Var(v))]))),
+            Constraint::Equiv(Rc::new(UType::Record(vec![(
+                Label::from("next"),
+                Rc::new(UType::Option(Rc::new(UType::Var(v)))),
+            )]))),
         )
         .expect("installing the constraint itself should succeed");
         tc.occurs(v)
-            .expect("a self-reference indirected through a Tuple must be accepted");
+            .expect("a self-reference indirected through a Record must be accepted");
     }
 
     #[test]
@@ -5123,15 +5154,18 @@ mod tests {
 
     #[test]
     fn an_unrelated_pre_existing_cycle_does_not_hang_occurs_check() {
-        // w1 <-> w2 form their own legitimate, indirected cycle, unrelated to `target`. Checking
-        // whether `target` (which merely refers to w1, behind a Tuple of its own) occurs must
-        // terminate by way of `visited`, not loop forever chasing the w1/w2 cycle.
+        // w1 <-> w2 form their own legitimate, indirected cycle (through w1's Record), unrelated
+        // to `target`. Checking whether `target` (which merely refers to w1, behind a Tuple of its
+        // own) occurs must terminate by way of `visited`, not loop forever chasing the w1/w2 cycle.
         let mut tc = TypeChecker::new();
         let w1 = tc.get_new_uvar();
         let w2 = tc.get_new_uvar();
         tc.unify_var_constraint(
             w1,
-            Constraint::Equiv(Rc::new(UType::Tuple(vec![Rc::new(UType::Var(w2))]))),
+            Constraint::Equiv(Rc::new(UType::Record(vec![(
+                Label::from("w2"),
+                Rc::new(UType::Var(w2)),
+            )]))),
         )
         .unwrap();
         tc.unify_var_constraint(
@@ -5154,8 +5188,8 @@ mod tests {
     }
 
     /// The actual unblock, end-to-end: a genuinely self-recursive format (built via Phase 1.5's
-    /// `FormatModule::define_format_rec_batch`, indirected through a `Tuple` exactly as
-    /// `self_reference_behind_a_tuple_is_accepted` tests in isolation) now typechecks through the
+    /// `FormatModule::define_format_rec_batch`, indirected through a union arm exactly as
+    /// `self_reference_behind_a_union_variant_is_accepted` tests in isolation) now typechecks through the
     /// real production entry point, `TypeChecker::infer_module` - not just the raw `UType`-level
     /// `occurs` check above. Before this phase, this format could be registered (Phase 1.5) and
     /// interpreted (Phase 1), but not typechecked for codegen purposes at all.
@@ -5175,6 +5209,6 @@ mod tests {
         let peano_ref = refs[0];
 
         TypeChecker::infer_module(&module, &peano_ref.call())
-            .expect("a self-recursive format indirected through a Tuple must typecheck");
+            .expect("a self-recursive format indirected through a union arm must typecheck");
     }
 }
