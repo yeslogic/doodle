@@ -868,7 +868,7 @@ impl RustType {
                     CompType::RecBox(..) => {
                         // NOTE - it doesn't seem likely that RecBox will ever crop up in a Decoder function argument, but we neither want to ignore that happening nor panic
                         log::warn!(
-                            "RecBox unexpected to ocur in param-lists, but it does here: {self:?}"
+                            "RecBox unexpected to occur in param-lists, but it does here: {self:?}"
                         );
                         true
                     }
@@ -1045,7 +1045,7 @@ impl RustType {
             RustType::Atom(at) => match at {
                 AtomType::Prim(..) => true,
                 AtomType::Signed(..) => true,
-                // This estimate is conservative and stateless, so we cannot solve TypeRef and instead default to false, the more consevative answer
+                // This estimate is conservative and stateless, so we cannot solve TypeRef and instead default to false, the more conservative answer
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
                     CompType::Vec(_) | CompType::RecBox(_) => false,
