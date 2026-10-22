@@ -218,6 +218,33 @@ impl std::fmt::Display for RepeatRange {
     }
 }
 
+/// How a format, as the head of a `Next::Cat(format, next)` continuation, affects the `MatchTree`
+/// walk of that continuation. Used by `Next::cat`/`Next::sequence` to drop wrappers that add
+/// nothing, so equivalent continuations share `decoder_map`'s `(level, next)` cache key.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum LookaheadEffect {
+    /// The walk reduces to walking `next`: no bytes consumed, no constraint on what follows.
+    Transparent,
+    /// The walk accepts without consulting `next` (`EndOfInput`, `Phantom`), so it is the same as
+    /// walking `Next::Empty`.
+    Terminal,
+    /// Anything else, including zero-width formats that constrain lookahead (`Peek`, `PeekNot`,
+    /// `Fail`).
+    Opaque,
+}
+
+impl LookaheadEffect {
+    /// The effect of a sequence of formats, given each element's effect in order: the first
+    /// element that isn't transparent decides, and an empty or all-transparent sequence is
+    /// transparent.
+    pub(crate) fn of_sequence(effects: impl IntoIterator<Item = LookaheadEffect>) -> Self {
+        effects
+            .into_iter()
+            .find(|e| *e != LookaheadEffect::Transparent)
+            .unwrap_or(LookaheadEffect::Transparent)
+    }
+}
+
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
@@ -331,9 +358,49 @@ impl Format {
     /// Returns `true` if the format will always match zero bytes, i.e. it is non-productive.
     ///
     /// This is a conservative approximation: some formats that can match zero bytes in some cases but not others may return `false` here.
+    ///
+    /// Test-only since `Next::cat` switched to [`Self::lookahead_effect`].
+    #[cfg(test)]
     pub(crate) fn is_nonproductive(&self, module: &FormatModule) -> bool {
         // NOTE - this is a placeholder but the logic itself is sound; we only need to reimplement if we want more precision
         self.match_bounds(module).as_exact() == Some(0)
+    }
+
+    /// How `self`, as the head of a `Next::Cat(self, next)` continuation, affects the `MatchTree`
+    /// walk of that continuation; see [`LookaheadEffect`].
+    ///
+    /// Merely matching zero bytes is not enough to be transparent: `Peek`, `PeekNot` and `Fail`
+    /// match zero bytes but constrain lookahead. Conservative: `ItemVar` is not descended into, so
+    /// a named zero-width format is [`LookaheadEffect::Opaque`]. Stops at the first node that
+    /// isn't transparent.
+    pub(crate) fn lookahead_effect(&self) -> LookaheadEffect {
+        match self {
+            Format::Compute(_)
+            | Format::Pos
+            | Format::DecodeBytes(..)
+            | Format::ParseFromView(..)
+            | Format::WithView(..)
+            | Format::LiftedOption(None) => LookaheadEffect::Transparent,
+            Format::EndOfInput | Format::Phantom(_) => LookaheadEffect::Terminal,
+            Format::Variant(_, f)
+            | Format::Map(f, _)
+            | Format::Where(f, _)
+            | Format::Let(_, _, f)
+            | Format::LetView(_, f)
+            | Format::Permit(f, _)
+            | Format::Dynamic(_, _, f)
+            | Format::Hint(_, f)
+            | Format::LiftedOption(Some(f)) => f.lookahead_effect(),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(f) => f.lookahead_effect(),
+            Format::Tuple(fs) | Format::Sequence(fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(Format::lookahead_effect))
+            }
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => {
+                LookaheadEffect::of_sequence([f0.lookahead_effect(), f.lookahead_effect()])
+            }
+            _ => LookaheadEffect::Opaque,
+        }
     }
 }
 
@@ -1018,6 +1085,35 @@ impl Format {
 mod tests {
     use super::*;
     use crate::helper::*;
+
+    /// `lookahead_effect` must only call a format transparent when skipping it in a `Next` cannot
+    /// change any `MatchTree`: zero-width formats that constrain lookahead are opaque, and the
+    /// first non-transparent element of a sequence decides.
+    #[test]
+    fn lookahead_effect_classification() {
+        use LookaheadEffect::*;
+
+        let cases = [
+            (compute(Expr::U8(0)), Transparent),
+            (Format::Pos, Transparent),
+            (Format::EMPTY, Transparent),
+            (Format::EndOfInput, Terminal),
+            (Format::Peek(Box::new(is_byte(0))), Opaque),
+            (Format::PeekNot(Box::new(is_byte(0))), Opaque),
+            (Format::Fail, Opaque),
+            (is_byte(0), Opaque),
+            (Format::ItemVar(0, vec![], vec![]), Opaque),
+            (tuple([compute(Expr::U8(0)), Format::Fail]), Opaque),
+            (
+                tuple([compute(Expr::U8(0)), Format::EndOfInput, Format::Fail]),
+                Terminal,
+            ),
+            (monad_seq(Format::Pos, compute(Expr::U8(0))), Transparent),
+        ];
+        for (f, expected) in cases {
+            assert_eq!(f.lookahead_effect(), expected, "for {f:?}");
+        }
+    }
 
     /// `MonadSeq(f0, f)`/`LetFormat(f0, _, f)` may read up to `f0.lookahead` bytes while parsing
     /// `f0`, or up to `f0.match + f.lookahead` bytes once `f` starts after it. With a 1-byte `f0`
