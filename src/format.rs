@@ -989,6 +989,27 @@ mod tests {
     use super::*;
     use crate::helper::*;
 
+    /// `MonadSeq(f0, f)`/`LetFormat(f0, _, f)` may read up to `f0.lookahead` bytes while parsing
+    /// `f0`, or up to `f0.match + f.lookahead` bytes once `f` starts after it. With a 1-byte `f0`
+    /// and a 3-byte `f`, the maximum lookahead is 4. With the operands swapped
+    /// (`f.lookahead ∪ (f0.lookahead + f0.match)`) it comes out as 3.
+    #[test]
+    fn lookahead_bounds_monad_seq_counts_f0_match_before_f() {
+        let module = FormatModule::new();
+        let f0 = || is_byte(0x01);
+        let f = || byte_seq(&[0x02, 0x03, 0x04]);
+        for (name, fmt) in [
+            ("MonadSeq", monad_seq(f0(), f())),
+            ("LetFormat", chain(f0(), "x", f())),
+        ] {
+            assert_eq!(
+                fmt.lookahead_bounds(&module).max(),
+                Some(4),
+                "{name}: max lookahead must include f0's match before f's lookahead"
+            );
+        }
+    }
+
     /// Tests that `match_bounds` correctly estimates the minimum bytes consumed when processing
     /// a recursive `Union`.
     ///
