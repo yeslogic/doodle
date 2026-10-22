@@ -39,6 +39,6 @@ Some((Decoder1(input))?)
 } else {
 None
 };
-PResult::Ok(test_chain { tag, next })
+PResult::Ok(test_chain { tag, next: next.map(Box::new) })
 }
 
