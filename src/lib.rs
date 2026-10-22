@@ -859,6 +859,7 @@ pub(crate) mod record_fmt;
 pub(crate) use record_fmt::{OwnedRecordFormat, RecordBuilder};
 
 pub mod format;
+use format::LookaheadEffect;
 pub use format::{Format, RepeatRange};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
@@ -1734,41 +1735,45 @@ enum Next<'a> {
 }
 
 impl<'a> Next<'a> {
-    /// Smart constructor for [`Next::Cat`]: when `content` is guaranteed to match zero bytes (e.g.
-    /// a trailing `Format::Compute`), wrapping it around `next` adds no real information but *does*
-    /// add a structurally distinct `Next` layer - which, for a self-referential reference compiled
-    /// under it, can miss `decoder_map`'s `(level, next)` cache and queue a doomed duplicate compile
-    /// (see `doc/RECURSION.md`'s mechanism 4). Skips the wrapper in that case and returns `next`
-    /// directly instead.
-    fn cat(module: &FormatModule, content: MTFormatRef<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
-        let nonproductive = match content {
-            MaybeTyped::Untyped(f) => f.is_nonproductive(module),
-            MaybeTyped::Typed(f) => f.is_nonproductive(),
+    /// Smart constructor for [`Next::Cat`]. When `content` is transparent to lookahead (it neither
+    /// consumes bytes nor constrains what may follow, e.g. a trailing `Format::Compute`), wrapping
+    /// it around `next` adds no real information but *does* add a structurally distinct `Next`
+    /// layer - which, for a self-referential reference compiled under it, can miss `decoder_map`'s
+    /// `(level, next)` cache and queue a doomed duplicate compile (see `doc/RECURSION.md`'s
+    /// mechanism 4). Returns `next` directly in that case, and `Next::Empty` when `content` accepts
+    /// without consulting `next` at all (see [`LookaheadEffect`]).
+    ///
+    /// Merely matching zero bytes is not enough: a zero-width `Peek`/`PeekNot`/`Fail` still
+    /// constrains the lookahead of whatever precedes it.
+    fn cat(content: MTFormatRef<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        let effect = match content {
+            MaybeTyped::Untyped(f) => f.lookahead_effect(),
+            MaybeTyped::Typed(f) => f.lookahead_effect(),
         };
-        if nonproductive {
-            next
-        } else {
-            Rc::new(Next::Cat(content, next))
+        match effect {
+            LookaheadEffect::Transparent => next,
+            LookaheadEffect::Terminal => Rc::new(Next::Empty),
+            LookaheadEffect::Opaque => Rc::new(Next::Cat(content, next)),
         }
     }
 
     /// Smart constructor for [`Next::Sequence`]: analogous to [`Self::cat`], but for a `Tuple`/
-    /// `Sequence`'s trailing field-suffix as a whole - skips the wrapper when every element of
-    /// `content` is nonproductive, which is vacuously true for an empty slice (the previously
+    /// `Sequence`'s trailing field-suffix as a whole, whose effect is that of its first element
+    /// that isn't transparent; an empty or all-transparent suffix is transparent (the previously
     /// special-cased `remaining == []` case falls out of this for free).
-    fn sequence(
-        module: &FormatModule,
-        content: MTFormatSlice<'a>,
-        next: Rc<Next<'a>>,
-    ) -> Rc<Next<'a>> {
-        let nonproductive = match content {
-            MaybeTyped::Untyped(fs) => fs.iter().all(|f| f.is_nonproductive(module)),
-            MaybeTyped::Typed(fs) => fs.iter().all(|f| f.is_nonproductive()),
+    fn sequence(content: MTFormatSlice<'a>, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        let effect = match content {
+            MaybeTyped::Untyped(fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(Format::lookahead_effect))
+            }
+            MaybeTyped::Typed(fs) => {
+                LookaheadEffect::of_sequence(fs.iter().map(TypedFormat::lookahead_effect))
+            }
         };
-        if nonproductive {
-            next
-        } else {
-            Rc::new(Next::Sequence(content, next))
+        match effect {
+            LookaheadEffect::Transparent => next,
+            LookaheadEffect::Terminal => Rc::new(Next::Empty),
+            LookaheadEffect::Opaque => Rc::new(Next::Sequence(content, next)),
         }
     }
 }
