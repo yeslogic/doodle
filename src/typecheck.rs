@@ -728,6 +728,11 @@ pub struct TypeChecker {
     /// inference over the full module has completed. No upkeep is performed by the `infer_*`/`unify_*` methods,
     /// so any mutation of the meta-context after the first query would leave this table stale.
     void_table: OnceCell<Vec<Cell<VoidState>>>,
+    /// Whether the occurs-check requires every recursive cycle to pass through a nominal type
+    /// (see [`TypeChecker::occurs`]). `true` except in [`TypeChecker::check_levels`]: the
+    /// interpreter represents an anonymous recursive value without difficulty, so only codegen
+    /// needs the stricter rule.
+    nominal_cycles_only: bool,
     // /// Scaffolding for compartmentalized external type inference in the arithmetic extension grammar
     // sub_extension: EmbeddedResolver,
 }
@@ -742,6 +747,7 @@ impl TypeChecker {
             varmaps: VarMapMap::new(),
             level_vars: HashMap::new(),
             void_table: OnceCell::new(),
+            nominal_cycles_only: true,
             // sub_extension: EmbeddedResolver::new(),
         }
     }
@@ -1002,8 +1008,8 @@ impl TypeChecker {
     /// which assumes exactly as many `UVar`s are allocated here as indices it increments while
     /// walking the same format, with no allowance for additional unaccounted-for allocations.
     /// Callers that already have such a `UVar` on hand (i.e. `Format::ItemVar`'s own `newvar`)
-    /// should supply it; the fallback allocation path exists only for hypothetical future callers
-    /// that do not.
+    /// should supply it; the fallback allocation path is for callers that run no `Elaborator`
+    /// afterwards (i.e. [`TypeChecker::check_levels`]).
     fn infer_var_format_level(
         &mut self,
         level: usize,
@@ -1305,10 +1311,18 @@ impl TypeChecker {
     /// a nominal type - a `Record` (generated struct) or a union arm (generated enum) - at which
     /// codegen can close it with a `Box`. A cycle through only `Tuple`/`Seq`/`Option` positions
     /// would need a recursive type alias (e.g. `type X = (u8, Option<Box<X>>)`, or even
-    /// `type X = Vec<X>`), which Rust does not allow, so it is reported as an infinite type. See
+    /// `type X = Vec<X>`), which Rust does not allow, so it is reported as an infinite type. With
+    /// `nominal_cycles_only` unset, `Tuple`/`Seq`/`Option` positions count as indirection too, and
+    /// only a cycle with no intervening type constructor at all is rejected. See
     /// [`Self::occurs_in`]/[`Self::occurs_in_constraints`] for where indirection is tracked.
     pub fn occurs(&self, v: UVar) -> TCResult<()> {
         self.occurs_in_constraints(v, &self.constraints[v.0], false, &mut HashSet::new())
+    }
+
+    /// The `indirected` flag for the contents of a `Tuple`/`Seq`/`Option` position reached with
+    /// `indirected` (see [`Self::occurs`]).
+    fn anon_indirected(&self, indirected: bool) -> bool {
+        indirected || !self.nominal_cycles_only
     }
 
     /// Low-level helper for [`TypeChecker::occurs`] for recursive, possibly iterative occurs-checks within a
@@ -1318,9 +1332,10 @@ impl TypeChecker {
     /// nominal boundary - a `Record` position (tracked in [`Self::occurs_in`] and via
     /// `ProjShape::RecordWith`) or a `Constraints::Variant`'s labeled union-arm (tracked here). It
     /// is threaded through unchanged across `Tuple`/`Seq`/`Option` positions (anonymous types,
-    /// which give a cycle nothing to be named through) and across a plain `Constraint::Equiv`
-    /// (direct type equivalence, not an embedding, same as `Var`-forwarding). `visited` is keyed by `(canonical constraint index,
-    /// indirected)` and threaded through the whole walk without resetting at indirection
+    /// which give a cycle nothing to be named through; see [`Self::anon_indirected`]) and across a
+    /// plain `Constraint::Equiv` (direct type equivalence, not an embedding, same as
+    /// `Var`-forwarding). `visited` is keyed by `(canonical constraint index, indirected)` and
+    /// threaded through the whole walk without resetting at indirection
     /// boundaries, so a legitimate, already-indirected cycle reached while searching for `v` can't
     /// loop forever (this only becomes reachable at all once this generalization allows an
     /// indirected cycle to be constructed in the first place - previously `occurs_in`'s blanket
@@ -1353,6 +1368,7 @@ impl TypeChecker {
                 Constraint::Equiv(t) => self.occurs_in(v, t, indirected, visited),
                 Constraint::Proj(p) => match p {
                     ProjShape::TupleWith(ix_vars) => {
+                        let indirected = self.anon_indirected(indirected);
                         for (_ix, var) in ix_vars.iter() {
                             self.occurs_in(v, Rc::<UType>::from(*var), indirected, visited)?;
                         }
@@ -1365,9 +1381,11 @@ impl TypeChecker {
                         Ok(())
                     }
                     ProjShape::SeqOf(elem_v) => {
+                        let indirected = self.anon_indirected(indirected);
                         self.occurs_in(v, Rc::<UType>::from(*elem_v), indirected, visited)
                     }
                     ProjShape::OptOf(param_v) => {
+                        let indirected = self.anon_indirected(indirected);
                         self.occurs_in(v, Rc::<UType>::from(*param_v), indirected, visited)
                     }
                 },
@@ -1403,6 +1421,7 @@ impl TypeChecker {
                 }
             }
             UType::Tuple(ts) => {
+                let indirected = self.anon_indirected(indirected);
                 for t in ts.iter() {
                     self.occurs_in(v, t.clone(), indirected, visited)?;
                 }
@@ -1415,6 +1434,7 @@ impl TypeChecker {
                 Ok(())
             }
             UType::Seq(inner, _) | UType::Option(inner) => {
+                let indirected = self.anon_indirected(indirected);
                 self.occurs_in(v, inner.clone(), indirected, visited)
             }
             // As in `UType::iter_embeds`: PhantomData is reference-only, so a self-reference
@@ -3960,6 +3980,27 @@ impl TypeChecker {
         }
         this.check_unique_solutions()?;
         Ok(this)
+    }
+
+    /// Typechecks the formats at `levels` of `module` (and every level they reference), as
+    /// registration's check of a recursive batch (see `FormatModule::infer_batch_types`).
+    ///
+    /// Unlike [`Self::infer_module`], this runs no `Elaborator` afterwards, so it checks only that
+    /// a consistent typing exists: it does not require unique numeric solutions
+    /// (`check_unique_solutions`), and it accepts recursive cycles through anonymous types
+    /// (`nominal_cycles_only` unset), both of which only codegen needs.
+    pub(crate) fn check_levels(
+        module: &FormatModule,
+        levels: std::ops::Range<usize>,
+    ) -> TCResult<()> {
+        let mut this = Self::new();
+        this.nominal_cycles_only = false;
+        let scope = UScope::Empty;
+        let ctxt = Ctxt::new(module, &scope);
+        for level in levels {
+            this.infer_var_format_level(level, ctxt, None)?;
+        }
+        Ok(())
     }
 
     /// Checks that every canonical variable with an `Elem` or `NumTree` constraint has a unique solution,

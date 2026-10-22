@@ -1251,9 +1251,11 @@ impl FormatModule {
     /// always accepts unconditionally) and treated as an already-terminating leaf. Processing in
     /// ascending order means a member referencing an *earlier* sibling sees that sibling's real,
     /// already-solved type, while one referencing a *later* sibling (or itself) sees the
-    /// placeholder - an accepted, order-dependent imprecision, not a soundness gap for this module's
-    /// own purposes. Shared by [`Self::define_format_rec_batch`] and
-    /// [`Self::define_format_recursive`].
+    /// placeholder, so an ill-typed use of such a reference (e.g. comparing a recursive field
+    /// against a `u8`) passes this inference. The batch is therefore also checked by
+    /// [`TypeChecker::check_levels`], whose equirecursive inference sees through the cycle;
+    /// without that check the interpreter would panic on such a format at decode time. Shared by
+    /// [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`].
     fn infer_batch_types(&mut self, start: usize, n: usize) {
         for ix in start..start + n {
             let scope = TypeScope::new();
@@ -1262,6 +1264,12 @@ impl FormatModule {
                 Err(msg) => panic!("Failed to solve type for {}: {msg}", self.names[ix]),
             };
             self.format_types[ix] = format_type;
+        }
+        if let Err(err) = typecheck::TypeChecker::check_levels(self, start..start + n) {
+            panic!(
+                "recursive format batch failed to type-check ({}): {err}",
+                self.names[start..start + n].join(", ")
+            );
         }
     }
 
@@ -3825,11 +3833,11 @@ mod test {
         );
     }
 
-    /// Batch registration types a member's references to itself (and to later siblings) as the
-    /// `ValueType::Any` placeholder, and `ValueType::unify` accepts `Any`, so comparing peano's
-    /// recursive field against a `u8` passes registration even though the full `TypeChecker`
-    /// rejects it. The interpreter then panics while decoding (`cannot apply int-rel Eq`). Either
-    /// registration must reject the format, or decoding must fail without panicking.
+    /// Batch registration's own inference types a member's references to itself (and to later
+    /// siblings) as the `ValueType::Any` placeholder, which `ValueType::unify` accepts, so it lets
+    /// a comparison of peano's recursive field against a `u8` through; the interpreter panics on
+    /// that comparison while decoding (`cannot apply int-rel Eq`). Either registration must reject
+    /// the format, or decoding must fail without panicking.
     #[test]
     fn ill_typed_use_of_recursive_field_is_rejected_or_decodes_without_panic() {
         use crate::helper::{expr_eq, is_byte, var, where_lambda};
