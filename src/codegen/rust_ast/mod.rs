@@ -2992,6 +2992,13 @@ impl RustExpr {
         }
     }
 
+    /// Maps `Box::new` over an `Option`-typed `self` (as `self.map(Box::new)`) - the `Option`
+    /// counterpart of [`wrap_box`](Self::wrap_box), used at a construction site whose target
+    /// position is `Option<RecBox<..>>`.
+    pub(crate) fn map_box(self) -> RustExpr {
+        self.call_method_with("map", [RustExpr::scoped(["Box"], "new")])
+    }
+
     pub(crate) fn option_none() -> Self {
         RustExpr::local("None")
     }

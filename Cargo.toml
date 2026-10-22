@@ -24,14 +24,9 @@ name = "recursive_repeat"
 path = "tests/recursive_repeat/mod.rs"
 test = true
 
-# Excluded from `cargo test`: the generated fixture does not compile yet (`Option<Box<T>>` field
-# vs. an unboxed `Some(T)`, review finding 5 on #332), and a test target that fails to build
-# stops `cargo test` from running any tests at all. Run it explicitly with
-# `cargo test --test recursive_maybe`. Set back to `test = true` once that codegen bug is fixed.
 [[test]]
 name = "recursive_maybe"
 path = "tests/recursive_maybe/mod.rs"
-test = false
 
 [[test]]
 name = "permit_state_error"
