@@ -106,6 +106,7 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
         }
         ValueType::Seq(t) => Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?])),
         ValueType::Option(t) => Some(Expr::LiftOption(Some(Box::new(mk_value_expr(t)?)))),
+        ValueType::Rec(_) => None,
     }
 }
 
@@ -236,7 +237,7 @@ impl Expr {
     fn infer_type(&self, scope: &TypeScope<'_, ValueType>) -> AResult<ValueType> {
         match self {
             Expr::Var(name) => match scope.get_type_by_name(name) {
-                ValueKind::Value(t) => Ok(t.clone()),
+                ValueKind::Value(t) => Ok(scope.unfold(t.clone())),
                 ValueKind::View => Err(anyhow!(
                     "expected ValueKind::Value, found ValueKind::View for var {name}"
                 )),
@@ -258,7 +259,7 @@ impl Expr {
                 Ok(ValueType::Tuple(ts))
             }
             Expr::TupleProj(head, index) => match head.infer_type(scope)? {
-                ValueType::Tuple(vs) => Ok(vs[*index].clone()),
+                ValueType::Tuple(vs) => Ok(scope.unfold(vs[*index].clone())),
                 other => Err(anyhow!("tuple projection on non-tuple type {other:?}")),
             },
             Expr::Record(fields) => {
@@ -268,7 +269,9 @@ impl Expr {
                 }
                 Ok(ValueType::Record(fs))
             }
-            Expr::RecordProj(head, label) => Ok(head.infer_type(scope)?.record_proj(label)),
+            Expr::RecordProj(head, label) => {
+                Ok(scope.unfold(head.infer_type(scope)?.record_proj(label)))
+            }
             Expr::Variant(label, expr) => Ok(ValueType::Union(BTreeMap::from([(
                 label.clone(),
                 expr.infer_type(scope)?,
@@ -276,7 +279,7 @@ impl Expr {
             Expr::Seq(exprs) => {
                 let mut t = ValueType::Any;
                 for e in exprs {
-                    t = t.unify(&e.infer_type(scope)?)?;
+                    t = scope.unify(&t, &e.infer_type(scope)?)?;
                 }
                 Ok(ValueType::Seq(Box::new(t)))
             }
@@ -287,11 +290,10 @@ impl Expr {
                 let head_type = Rc::new(head.infer_type(scope)?);
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
-                    t = t.unify(&pattern.infer_expr_branch_type(
-                        scope,
-                        head_type.clone(),
-                        branch,
-                    )?)?;
+                    t = scope.unify(
+                        &t,
+                        &pattern.infer_expr_branch_type(scope, head_type.clone(), branch)?,
+                    )?;
                 }
                 Ok(t)
             }
@@ -303,7 +305,11 @@ impl Expr {
 
             Expr::IntRel(_rel, x, y) => {
                 let (t0, t1) = (x.infer_type(scope)?, y.infer_type(scope)?);
-                if t0.unify(&t1).as_ref().is_ok_and(ValueType::is_numeric) {
+                if scope
+                    .unify(&t0, &t1)
+                    .as_ref()
+                    .is_ok_and(ValueType::is_numeric)
+                {
                     Ok(ValueType::Base(BaseType::Bool))
                 } else {
                     Err(anyhow!(
@@ -324,16 +330,19 @@ impl Expr {
 
             Expr::Arith(_arith, x, y) => {
                 let (t1, t2) = (x.infer_type(scope)?, y.infer_type(scope)?);
-                t1.unify(&t2).map_err(|e| anyhow!("{e}")).and_then(|t0| {
-                    // NOTE - signed arithmetic is only supported within `Expr::Numeric`
-                    if t0.is_unsigned_or_auto() {
-                        Ok(t0)
-                    } else {
-                        Err(anyhow!(
-                            "mismatched operand types for {_arith:?}: {t1:?}, {t2:?}"
-                        ))
-                    }
-                })
+                scope
+                    .unify(&t1, &t2)
+                    .map_err(|e| anyhow!("{e}"))
+                    .and_then(|t0| {
+                        // NOTE - signed arithmetic is only supported within `Expr::Numeric`
+                        if t0.is_unsigned_or_auto() {
+                            Ok(t0)
+                        } else {
+                            Err(anyhow!(
+                                "mismatched operand types for {_arith:?}: {t1:?}, {t2:?}"
+                            ))
+                        }
+                    })
             }
             Expr::Unary(_op @ UnaryOp::BoolNot, x) => match x.infer_type(scope)? {
                 ValueType::Base(BaseType::Bool) => Ok(ValueType::Base(BaseType::Bool)),
@@ -450,7 +459,7 @@ impl Expr {
                             "SeqIx `index` param: expected unsigned or auto, found {index_type:?}"
                         ));
                     }
-                    Ok(ValueType::clone(&t))
+                    Ok(scope.unfold(ValueType::clone(&t)))
                 }
                 other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
             },
@@ -492,7 +501,8 @@ impl Expr {
             Expr::FlatMapAccum(expr, accum, accum_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
-                        let accum_type = accum.infer_type(scope)?.unify(accum_type.as_ref())?;
+                        let accum_type =
+                            scope.unify(&accum.infer_type(scope)?, accum_type.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         child_scope
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
@@ -502,7 +512,7 @@ impl Expr {
                             .as_mut_slice()
                         {
                             [accum_result, ValueType::Seq(t2)] => {
-                                accum_result.unify(&accum_type)?;
+                                scope.unify(accum_result, &accum_type)?;
                                 Ok(ValueType::Seq(t2.clone()))
                             }
                             _ => Err(anyhow!("FlatMapAccum: expected two values")),
@@ -515,11 +525,12 @@ impl Expr {
             Expr::LeftFold(expr, accum, accum_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
-                        let accum_type = accum.infer_type(scope)?.unify(accum_type.as_ref())?;
+                        let accum_type =
+                            scope.unify(&accum.infer_type(scope)?, accum_type.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         child_scope
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
-                        Ok(expr.infer_type(&child_scope)?.unify(&accum_type)?)
+                        Ok(scope.unify(&expr.infer_type(&child_scope)?, &accum_type)?)
                     }
                     other => Err(anyhow!("LeftFold: expected Seq, found {other:?}")),
                 },
@@ -531,7 +542,7 @@ impl Expr {
                         let key_type = query_key.infer_type(scope)?;
                         let mut child_scope = TypeScope::child(scope);
                         child_scope.push(name.clone(), t.as_ref().clone());
-                        match expr.infer_type(&child_scope)?.unify(&key_type)? {
+                        match scope.unify(&expr.infer_type(&child_scope)?, &key_type)? {
                             ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Option(t)),
                             other => Err(anyhow!(
                                 "FindByKey: expected numeric key type, found {other:?}"
@@ -566,7 +577,7 @@ impl Expr {
                 let start_type = start.infer_type(scope)?;
                 let end_type = end.infer_type(scope)?;
 
-                let Ok(t) = start_type.unify(&end_type) else {
+                let Ok(t) = scope.unify(&start_type, &end_type) else {
                     return Err(anyhow!(
                         "EnumFromTo: start and end do not agree: {start_type:?} ∩ {end_type:?} = ∅"
                     ));
@@ -600,7 +611,7 @@ impl Expr {
                 let rhs_type = rhs.infer_type(scope)?;
                 match (&lhs_type, &rhs_type) {
                     (ValueType::Seq(t1), ValueType::Seq(t2)) => {
-                        let elem_t = t1.unify(t2)?;
+                        let elem_t = scope.unify(t1, t2)?;
                         Ok(ValueType::Seq(Box::new(elem_t)))
                     }
                     (ValueType::Seq(..), other) => {
@@ -941,7 +952,7 @@ impl FormatModule {
         views: Vec<Label>,
         format: Format,
     ) -> FormatRef {
-        let mut scope = TypeScope::new();
+        let mut scope = TypeScope::with_rec_types(&self.format_types);
         for (arg_name, arg_type) in &args {
             scope.push(arg_name.clone(), arg_type.clone());
         }
@@ -1057,7 +1068,7 @@ impl FormatModule {
         let phantom_param = inner(self_ref);
         let format = outer(Format::Phantom(Box::new(phantom_param)));
 
-        let mut scope = TypeScope::new();
+        let mut scope = TypeScope::with_rec_types(&self.format_types);
         for (arg_name, arg_type) in &args {
             scope.push(arg_name.clone(), arg_type.clone());
         }
@@ -1243,33 +1254,40 @@ impl FormatModule {
         }
     }
 
-    /// Solves and installs the real type for each of `n` levels starting at `start`, in ascending
-    /// order. `infer_format_type`'s own `Format::ItemVar` arm never recurses into a referenced
-    /// level's body - it just reads `format_types[level]` directly - so, unlike an eager
-    /// equirecursive inference engine, no occurs-tracking is needed here: a still-provisional
-    /// sibling (including self) is read as-is (currently `ValueType::Any`, which `ValueType::unify`
-    /// always accepts unconditionally) and treated as an already-terminating leaf. Processing in
-    /// ascending order means a member referencing an *earlier* sibling sees that sibling's real,
-    /// already-solved type, while one referencing a *later* sibling (or itself) sees the
-    /// placeholder, so an ill-typed use of such a reference (e.g. comparing a recursive field
-    /// against a `u8`) passes this inference. The batch is therefore also checked by
-    /// [`TypeChecker::check_levels`], whose equirecursive inference sees through the cycle;
-    /// without that check the interpreter would panic on such a format at decode time. Shared by
-    /// [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`].
+    /// Solves and installs the real type for each of `n` levels starting at `start`.
+    ///
+    /// Each member is first inferred in ascending order by registration's own inference, with
+    /// the same checks as any other registration. `infer_format_type`'s `Format::ItemVar` arm
+    /// reads `format_types[level]` directly rather than recursing into the level's body, so a
+    /// member referencing an *earlier* sibling sees that sibling's type from this pass, while one
+    /// referencing a *later* sibling (or itself) sees the `ValueType::Any` placeholder, which
+    /// `ValueType::unify` accepts unconditionally. An ill-typed use of such a reference (e.g.
+    /// comparing a recursive field against a `u8`) therefore passes this pass.
+    ///
+    /// The batch is then solved by [`TypeChecker::solve_batch_types`], whose equirecursive
+    /// inference sees through the cycle and rejects such a use. Its solution, in which a reference
+    /// back to a batch level is [`ValueType::Rec`] instead of a placeholder, is what gets installed,
+    /// so a later registration that reaches into a member's recursive field sees its real type.
+    /// Shared by [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`].
     fn infer_batch_types(&mut self, start: usize, n: usize) {
         for ix in start..start + n {
-            let scope = TypeScope::new();
+            let scope = TypeScope::with_rec_types(&self.format_types);
             let format_type = match self.infer_format_type(&scope, &self.formats[ix]) {
                 Ok(t) => t,
                 Err(msg) => panic!("Failed to solve type for {}: {msg}", self.names[ix]),
             };
             self.format_types[ix] = format_type;
         }
-        if let Err(err) = typecheck::TypeChecker::check_levels(self, start..start + n) {
-            panic!(
+        match typecheck::TypeChecker::solve_batch_types(self, start..start + n) {
+            Ok(types) => {
+                for (ix, format_type) in (start..start + n).zip(types) {
+                    self.format_types[ix] = format_type;
+                }
+            }
+            Err(err) => panic!(
                 "recursive format batch failed to type-check ({}): {err}",
                 self.names[start..start + n].join(", ")
-            );
+            ),
         }
     }
 
@@ -1338,7 +1356,7 @@ impl FormatModule {
                 }
                 for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     let t = expr.infer_type(scope)?;
-                    let _t = arg_type.unify(&t)?;
+                    let _t = scope.unify(arg_type, &t)?;
                 }
                 Ok(self.get_format_type(*level).clone())
             }
@@ -1375,7 +1393,7 @@ impl FormatModule {
             Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut t = ValueType::Any;
                 for f in branches {
-                    t = t.unify(&self.infer_format_type(scope, f)?)?;
+                    t = scope.unify(&t, &self.infer_format_type(scope, f)?)?;
                 }
                 Ok(t)
             }
@@ -1402,7 +1420,7 @@ impl FormatModule {
             Format::Sequence(formats) => {
                 let mut elem_t = ValueType::Any;
                 for f in formats {
-                    elem_t = elem_t.unify(&self.infer_format_type(scope, f)?)?;
+                    elem_t = scope.unify(&elem_t, &self.infer_format_type(scope, f)?)?;
                 }
                 Ok(ValueType::Seq(Box::new(elem_t)))
             }
@@ -1449,7 +1467,7 @@ impl FormatModule {
                     Expr::Lambda(head, expr) => {
                         let t = self.infer_format_type(scope, a)?;
                         // Check that the initial accumulator value's type unifies with the type-claim
-                        let _acc_type = init.infer_type(scope)?.unify(vt.as_ref())?;
+                        let _acc_type = scope.unify(&init.infer_type(scope)?, vt.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         let t_seq = ValueType::Seq(Box::new(t.clone()));
                         let vt_acc_seq = ValueType::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
@@ -1464,8 +1482,8 @@ impl FormatModule {
                                             ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
                                         child_scope.push(head.clone(), vt_acc_elem);
                                         // we just need to check that these types unify, the value is unimportant
-                                        let _ret_type =
-                                            expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
+                                        let _ret_type = scope
+                                            .unify(&expr.infer_type(&child_scope)?, vt.as_ref())?;
                                         Ok(vt_acc_seq)
                                     }
                                     other => Err(anyhow!(
@@ -1567,7 +1585,7 @@ impl FormatModule {
             Format::Permit(f, expr) => {
                 let t0 = expr.infer_type(scope)?;
                 let t = self.infer_format_type(scope, f)?;
-                Ok(t0.unify(&t)?)
+                Ok(scope.unify(&t0, &t)?)
             }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
@@ -1576,12 +1594,15 @@ impl FormatModule {
                 let head_type = Rc::new(head.infer_type(scope)?);
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
-                    t = t.unify(&pattern.infer_format_branch_type(
-                        scope,
-                        head_type.clone(),
-                        self,
-                        branch,
-                    )?)?;
+                    t = scope.unify(
+                        &t,
+                        &pattern.infer_format_branch_type(
+                            scope,
+                            head_type.clone(),
+                            self,
+                            branch,
+                        )?,
+                    )?;
                 }
                 Ok(t)
             }
@@ -2898,10 +2919,18 @@ pub struct TypeScope<'a, T = ValueType> {
     parent: Option<&'a TypeScope<'a, T>>,
     names: Vec<Label>,
     types: Vec<ValueKind<T>>,
+    /// The types each [`ValueType::Rec`] refers to, indexed by level (a `FormatModule`'s
+    /// registered format types); shared by every child of the root scope.
+    rec_types: &'a [ValueType],
 }
 
 impl<'a, T> TypeScope<'a, T> {
     fn new() -> Self {
+        Self::with_rec_types(&[])
+    }
+
+    /// Constructs a root scope that resolves [`ValueType::Rec`] against `rec_types`.
+    fn with_rec_types(rec_types: &'a [ValueType]) -> Self {
         let parent = None;
         let names = Vec::new();
         let types = Vec::new();
@@ -2909,10 +2938,12 @@ impl<'a, T> TypeScope<'a, T> {
             parent,
             names,
             types,
+            rec_types,
         }
     }
 
     fn child(parent: &'a TypeScope<'a, T>) -> Self {
+        let rec_types = parent.rec_types;
         let parent = Some(parent);
         let names = Vec::new();
         let types = Vec::new();
@@ -2920,7 +2951,28 @@ impl<'a, T> TypeScope<'a, T> {
             parent,
             names,
             types,
+            rec_types,
         }
+    }
+
+    /// Replaces a head [`ValueType::Rec`] in `t` with the type it refers to, so that `t` can be
+    /// destructured. Applied wherever a component type is extracted from a larger one (variable
+    /// lookup, projections, pattern destructuring), which is the only way a `Rec` can reach the
+    /// head of a type: a registered format type itself always has a structural head.
+    fn unfold(&self, t: ValueType) -> ValueType {
+        match t {
+            ValueType::Rec(level) if level < self.rec_types.len() => self.rec_types[level].clone(),
+            other => other,
+        }
+    }
+
+    /// Unifies `a` and `b`, resolving any [`ValueType::Rec`] they contain.
+    fn unify(
+        &self,
+        a: &ValueType,
+        b: &ValueType,
+    ) -> Result<ValueType, typecheck::error::UnificationError<ValueType>> {
+        a.unify_with(b, self.rec_types)
     }
 
     fn push(&mut self, name: Label, t: T) {
@@ -3868,6 +3920,116 @@ mod test {
         assert!(
             decoded.is_ok(),
             "an ill-typed use of a recursive field passed registration and panicked while decoding"
+        );
+    }
+
+    /// `peano := 'Z' | 'S' ~ peano`, registered as a batch, for the tests below.
+    fn register_peano(module: &mut FormatModule) -> FormatRef {
+        use crate::helper::is_byte;
+
+        let body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+            ),
+        ]);
+        module.define_format_rec_batch(vec![("test.peano", body)])[0]
+    }
+
+    /// A format registered after a batch, rather than as part of it, can reach a member's
+    /// recursive field (`S(_, inner)`) and compare it against a `u8`; the interpreter panics on
+    /// that comparison while decoding (`cannot apply int-rel Eq`). Either registration must reject
+    /// the format, or decoding must fail without panicking.
+    #[test]
+    fn ill_typed_use_of_recursive_field_from_later_registration_is_rejected_or_decodes_without_panic()
+     {
+        use crate::helper::{expr_eq, expr_match, var, where_lambda};
+        use std::panic::{AssertUnwindSafe, catch_unwind};
+
+        let mut module = FormatModule::new();
+        let peano = register_peano(&mut module);
+        let user = where_lambda(
+            peano.call(),
+            "x",
+            expr_match(
+                var("x"),
+                [
+                    (
+                        Pattern::variant(
+                            "S",
+                            Pattern::Tuple(vec![Pattern::Wildcard, Pattern::binding("inner")]),
+                        ),
+                        expr_eq(var("inner"), Expr::U8(0)),
+                    ),
+                    (Pattern::Wildcard, Expr::Bool(true)),
+                ],
+            ),
+        );
+        let Ok(user_ref) = catch_unwind(AssertUnwindSafe(|| {
+            module.define_format("test.peano_user", user)
+        })) else {
+            return; // rejected at registration
+        };
+        let Ok(prog) = super::decoder::Compiler::compile_program(&module, &user_ref.call()) else {
+            return; // rejected at compile time
+        };
+        let decoded = catch_unwind(AssertUnwindSafe(|| {
+            let _ = prog.run(ReadCtxt::new(b"SZ"));
+        }));
+        assert!(
+            decoded.is_ok(),
+            "an ill-typed use of a recursive field passed registration and panicked while decoding"
+        );
+    }
+
+    /// A batch member's registered type refers back to itself through `ValueType::Rec`, rather
+    /// than through a placeholder that every later use would unify with.
+    #[test]
+    fn rec_batch_member_type_refers_to_itself_through_rec() {
+        let mut module = FormatModule::new();
+        let peano = register_peano(&mut module);
+        let level = peano.get_level();
+        assert_eq!(
+            module.get_format_type(level),
+            &ValueType::Union(BTreeMap::from([
+                (Label::Borrowed("Z"), ValueType::U8),
+                (
+                    Label::Borrowed("S"),
+                    ValueType::Tuple(vec![ValueType::U8, ValueType::Rec(level)]),
+                ),
+            ]))
+        );
+    }
+
+    /// A batch member's registered type follows registration's own conventions rather than the
+    /// `TypeChecker`'s: an auto-width numeric stays `NumericHole` although the `TypeChecker` has a
+    /// default width for it, and a union branch that can never be decoded is kept.
+    #[test]
+    fn rec_batch_member_type_keeps_registration_conventions() {
+        use crate::helper::{compute, is_byte, poly_zero};
+
+        let body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("N"), Box::new(compute(poly_zero()))),
+            Format::Variant(Label::Borrowed("Dead"), Box::new(Format::Fail)),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![("test.conventions", body)]);
+        let level = refs[0].get_level();
+        assert_eq!(
+            module.get_format_type(level),
+            &ValueType::Union(BTreeMap::from([
+                (Label::Borrowed("N"), ValueType::NumericHole),
+                (Label::Borrowed("Dead"), ValueType::Empty),
+                (
+                    Label::Borrowed("S"),
+                    ValueType::Tuple(vec![ValueType::U8, ValueType::Rec(level)]),
+                ),
+            ]))
         );
     }
 

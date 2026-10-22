@@ -356,6 +356,10 @@ impl From<ValueType> for ValueTypeExt {
             ValueType::PhantomData(t) => {
                 ValueTypeExt::PhantomData(Box::new(ValueTypeExt::from(*t)))
             }
+            // Only converted from type annotations, never from a registered format type
+            ValueType::Rec(level) => {
+                panic!("ValueType::Rec({level}) is not a valid type annotation")
+            }
         }
     }
 }
