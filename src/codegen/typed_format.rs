@@ -484,9 +484,10 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Apply(_, _, _) => RecursiveBounds::at_least(1),
-            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => f
+            // `f0` may read up to its own lookahead, or `f` may read up to its lookahead after `f0`'s match
+            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => f0
                 .lookahead_bounds_recursive(open)
-                .union(f0.lookahead_bounds_recursive(open) + f0.match_bounds()),
+                .union(f.lookahead_bounds_recursive(open) + f0.match_bounds()),
             #[cfg(feature = "format_enforce")]
             TypedFormat::Enforce(.., inner) => inner.lookahead_bounds_recursive(open),
             TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
