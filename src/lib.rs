@@ -1109,7 +1109,7 @@ impl FormatModule {
 
         let start = self.reserve_batch_levels(names);
         for (ix, format) in bodies.into_iter().enumerate() {
-            self.formats[start + ix] = format.substitute_rec_var(start);
+            self.formats[start + ix] = format.substitute_rec_var(start, n);
         }
         self.check_batch_has_base_case(start, n);
         self.infer_batch_types(start, n);
@@ -1172,7 +1172,9 @@ impl FormatModule {
         let refs: [FormatRef; N] = std::array::from_fn(|ix| FormatRef(start + ix));
 
         for (ix, build) in formats.into_iter().enumerate() {
-            let body = build(&refs);
+            // A batch length of 0 rejects any `RecVar` a builder returned, before the base-case
+            // check below can trip over it.
+            let body = build(&refs).substitute_rec_var(start, 0);
             self.formats[start + ix] = body;
         }
         self.check_batch_has_base_case(start, N);
@@ -1331,9 +1333,13 @@ impl FormatModule {
                 }
                 Ok(self.get_format_type(*level).clone())
             }
-            Format::RecVar(_) => unreachable!(
-                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
-            ),
+            // `define_format_rec_batch` rewrites every `RecVar` before inferring types, so one
+            // reaching here was passed to some other registration path (e.g. `define_format`, or
+            // returned from a `define_format_recursive` builder).
+            Format::RecVar(ix) => Err(anyhow!(
+                "Format::RecVar({ix}) is only valid in the body of a `define_format_rec_batch` member \
+                 (in a `define_format_recursive` builder, use the provided `FormatRef`s instead)"
+            )),
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
                 match bytes_type {
@@ -3634,6 +3640,63 @@ mod test {
         assert!(
             result.is_err(),
             "compiling a genuinely left-recursive format must fail cleanly, not panic or hang"
+        );
+    }
+
+    /// A `RecVar` index past the end of its batch must be rejected at registration, rather than
+    /// becoming an `ItemVar` that indexes out of bounds or silently aliases whatever format is
+    /// registered at that level later.
+    #[test]
+    #[should_panic(
+        expected = "Format::RecVar(1) is out of range for a recursive batch of 1 member(s)"
+    )]
+    fn define_format_rec_batch_rejects_out_of_range_rec_var() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let body = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+            Format::Variant(
+                Label::Borrowed("S"),
+                Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(1)])),
+            ),
+        ]);
+        let _ = module.define_format_rec_batch(vec![("test.typo", body)]);
+    }
+
+    /// A `RecVar` passed to `define_format` (outside any batch) is a usage error, and the panic
+    /// must say so.
+    #[test]
+    #[should_panic(expected = "is only valid in the body of a `define_format_rec_batch` member")]
+    fn define_format_rejects_rec_var() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let _ = module.define_format(
+            "test.stray",
+            Format::Union(vec![is_byte(b'Z'), Format::RecVar(0)]),
+        );
+    }
+
+    /// Same as above, for a `RecVar` returned from a `define_format_recursive` builder, which must
+    /// use its `FormatRef`s instead.
+    #[test]
+    #[should_panic(expected = "is only valid in the body of a `define_format_rec_batch` member")]
+    fn define_format_recursive_rejects_rec_var() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let _ = module.define_format_recursive(
+            ["test.stray"],
+            [Box::new(|_refs: &[FormatRef; 1]| {
+                Format::Union(vec![
+                    Format::Variant(Label::Borrowed("Z"), Box::new(is_byte(b'Z'))),
+                    Format::Variant(
+                        Label::Borrowed("S"),
+                        Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
+                    ),
+                ])
+            })],
         );
     }
 
