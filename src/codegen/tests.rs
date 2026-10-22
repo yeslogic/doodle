@@ -19,6 +19,31 @@ fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
 mod elaboration {
     use super::*;
 
+    /// Typed counterpart of `format::tests::lookahead_bounds_monad_seq_counts_f0_match_before_f`:
+    /// `TypedFormat::lookahead_bounds` for `MonadSeq`/`LetFormat` with a 1-byte `f0` and a 3-byte
+    /// `f` must report a maximum lookahead of 4.
+    #[test]
+    fn typed_lookahead_bounds_monad_seq_counts_f0_match_before_f() {
+        use crate::helper::{byte_seq, chain, is_byte, monad_seq};
+
+        let f0 = || is_byte(0x01);
+        let f = || byte_seq(&[0x02, 0x03, 0x04]);
+        for (name, fmt) in [
+            ("MonadSeq", monad_seq(f0(), f())),
+            ("LetFormat", chain(f0(), "x", f())),
+        ] {
+            let module = FormatModule::new();
+            let tc = TypeChecker::infer_module(&module, &fmt).unwrap();
+            let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+            let (typed, _extra) = elaborator.elaborate_module(&module, &fmt);
+            assert_eq!(
+                typed.lookahead_bounds().max(),
+                Some(4),
+                "{name}: max lookahead must include f0's match before f's lookahead"
+            );
+        }
+    }
+
     /// Runs full-module inference on `module` starting from top-level format `f` using `TypeChecker`,
     /// as well as full-module elaboration using the finalized `TypeChecker` artifact, and makes the
     /// assertion that the two have the exact same 'population count' (largest-index UVar in TypeChecker should
