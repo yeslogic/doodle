@@ -176,46 +176,52 @@ mod elaboration {
     }
 
     /// All direct child [`TypedFormat`]s of `tf`, for a generic (variant-agnostic) traversal.
-    fn typed_format_children(tf: &GTFormat) -> Vec<&GTFormat> {
+    ///
+    /// Returns owned `Rc`s rather than borrowed references because `FormatCall`'s child now lives
+    /// behind a `LevelCell` (`Rc<RefCell<Rc<GTFormat>>>`) - `def.borrow().clone()` is a cheap `Rc`
+    /// clone, not a deep copy, and every other variant's `Box`ed child is likewise cheaply re-homed
+    /// in an `Rc` just for this (test-only) traversal.
+    fn typed_format_children(tf: &GTFormat) -> Vec<Rc<GTFormat>> {
         use TypedFormat::*;
+        let boxed = |f: &Box<GTFormat>| Rc::new((**f).clone());
         match tf {
-            FormatCall(_, _, _, _, def) => vec![def.as_ref()],
-            ForEach(_, _, _, f) => vec![f.as_ref()],
+            FormatCall(_, _, _, _, def) => vec![def.borrow().clone()],
+            ForEach(_, _, _, f) => vec![boxed(f)],
             Fail | EndOfInput | Align(_) | Byte(_) | Pos(_) | SkipRemainder | WithView(..) => {
                 vec![]
             }
-            Variant(_, _, f) => vec![f.as_ref()],
+            Variant(_, _, f) => vec![boxed(f)],
             Union(_, fs) | UnionNondet(_, fs) | Tuple(_, fs) | Sequence(_, fs) => {
-                fs.iter().collect()
+                fs.iter().map(|f| Rc::new(f.clone())).collect()
             }
-            Repeat(_, f) | Repeat1(_, f) => vec![f.as_ref()],
-            RepeatCount(_, _, f) => vec![f.as_ref()],
-            RepeatBetween(_, _, f) => vec![f.as_ref()],
-            RepeatUntilLast(_, _, f) | RepeatUntilSeq(_, _, f) => vec![f.as_ref()],
-            Maybe(_, _, f) => vec![f.as_ref()],
-            Peek(_, f) | PeekNot(_, f) => vec![f.as_ref()],
-            Slice(_, _, f) => vec![f.as_ref()],
-            Bits(_, f) => vec![f.as_ref()],
-            WithRelativeOffset(_, _, _, f) => vec![f.as_ref()],
-            Map(_, f, _) => vec![f.as_ref()],
-            Where(_, f, _) => vec![f.as_ref()],
+            Repeat(_, f) | Repeat1(_, f) => vec![boxed(f)],
+            RepeatCount(_, _, f) => vec![boxed(f)],
+            RepeatBetween(_, _, f) => vec![boxed(f)],
+            RepeatUntilLast(_, _, f) | RepeatUntilSeq(_, _, f) => vec![boxed(f)],
+            Maybe(_, _, f) => vec![boxed(f)],
+            Peek(_, f) | PeekNot(_, f) => vec![boxed(f)],
+            Slice(_, _, f) => vec![boxed(f)],
+            Bits(_, f) => vec![boxed(f)],
+            WithRelativeOffset(_, _, _, f) => vec![boxed(f)],
+            Map(_, f, _) => vec![boxed(f)],
+            Where(_, f, _) => vec![boxed(f)],
             Compute(_, _) => vec![],
-            Let(_, _, _, f) => vec![f.as_ref()],
-            Match(_, _, branches) => branches.iter().map(|(_, f)| f).collect(),
-            Dynamic(_, _, _, f) => vec![f.as_ref()],
+            Let(_, _, _, f) => vec![boxed(f)],
+            Match(_, _, branches) => branches.iter().map(|(_, f)| Rc::new(f.clone())).collect(),
+            Dynamic(_, _, _, f) => vec![boxed(f)],
             Apply(_, _, _) => vec![],
-            DecodeBytes(_, _, f) => vec![f.as_ref()],
-            ParseFromView(_, _, f) => vec![f.as_ref()],
-            LetFormat(_, f0, _, f1) => vec![f0.as_ref(), f1.as_ref()],
-            MonadSeq(_, f0, f1) => vec![f0.as_ref(), f1.as_ref()],
-            Hint(_, _, f) => vec![f.as_ref()],
-            AccumUntil(_, _, _, _, _, f) => vec![f.as_ref()],
-            LiftedOption(_, f) => f.as_deref().into_iter().collect(),
-            LetView(_, _, f) => vec![f.as_ref()],
-            Phantom(_, f) => vec![f.as_ref()],
+            DecodeBytes(_, _, f) => vec![boxed(f)],
+            ParseFromView(_, _, f) => vec![boxed(f)],
+            LetFormat(_, f0, _, f1) => vec![boxed(f0), boxed(f1)],
+            MonadSeq(_, f0, f1) => vec![boxed(f0), boxed(f1)],
+            Hint(_, _, f) => vec![boxed(f)],
+            AccumUntil(_, _, _, _, _, f) => vec![boxed(f)],
+            LiftedOption(_, f) => f.as_ref().map(boxed).into_iter().collect(),
+            LetView(_, _, f) => vec![boxed(f)],
+            Phantom(_, f) => vec![boxed(f)],
             #[cfg(feature = "format_enforce")]
-            Enforce(_, f) => vec![f.as_ref()],
-            Permit(_, f, _) => vec![f.as_ref()],
+            Enforce(_, f) => vec![boxed(f)],
+            Permit(_, f, _) => vec![boxed(f)],
         }
     }
 
@@ -241,7 +247,7 @@ mod elaboration {
             "TypedFormat::is_nonproductive disagreed with erase-then-Format::is_nonproductive for {tf:?}"
         );
         for child in typed_format_children(tf) {
-            check_is_nonproductive_agrees(child, module, seen);
+            check_is_nonproductive_agrees(&child, module, seen);
         }
     }
 
@@ -398,8 +404,23 @@ mod elaboration {
         }
     }
 
+    /// `pair_a`/`pair_b` is a directly self-referential bare `Tuple` cycle with no `Record`/`Union`
+    /// boundary anywhere on it - originally written to confirm this anti-pattern is rejected
+    /// cleanly by codegen's box-placement `unreachable!("Expansion::Tuple(UVar) is directly
+    /// self-referential ... not yet supported by codegen")` rather than hanging or mis-generating.
+    ///
+    /// A bare-`Tuple`-only cycle like this is, by construction, *also* always a cycle with no
+    /// reachable base case (a `Tuple`'s own sequencing has no analog of `Union`'s "pick a different
+    /// branch" escape, and nothing here wraps the recursive field in a `Repeat` to give it one) - so
+    /// `FormatModule::check_batch_has_base_case` now rejects this exact shape earlier, at
+    /// `define_format_rec_batch` registration time, before a `FormatRef` to it can ever reach
+    /// `produce_string_gencode` (or the interpreter) to hit the older codegen-specific guard at all.
+    /// The codegen `unreachable!` is kept as a defensive backstop - see `doc/RECURSION.md`'s
+    /// Anti-patterns section - since `define_format_rec_batch`/`define_format_recursive` are
+    /// documented as the only sanctioned entry points for real recursion, so nothing in the public
+    /// API can currently construct a batch member that reaches it.
     #[test]
-    #[should_panic(expected = "not yet supported")]
+    #[should_panic(expected = "no reachable base case for: pair_a, pair_b")]
     fn phase3_final_check_pure_tuple_cycle_rejects_cleanly() {
         let pair_a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
         let pair_b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);

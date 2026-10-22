@@ -1,0 +1,13 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── code_w_scope <- { ... } :=
+                ├── key <- bson.cstring := { valid := "fn" }
+                └── value <- let-format len (require (x -> match x { ... }) ReadI32Le) (slice (len -u32 4?) { ... }) :=
+                    ├── code <- bson.string := { valid := "function(){}" }
+                    └── scope <- bson.document :=
+                        └── elements <- repeat bson.element :=
+                            └── 0 <- bson.element :=
+                                └── int32 <- bson.element.int32 :=
+                                    ├── key <- bson.cstring := { valid := "x" }
+                                    └── value <- ReadI32Le := 42i32

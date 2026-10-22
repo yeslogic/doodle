@@ -1,0 +1,25 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        ├── 0 <- bson.element :=
+        │   └── int32 <- bson.element.int32 :=
+        │       ├── key <- bson.cstring := { valid := "depth" }
+        │       └── value <- ReadI32Le := 0i32
+        └── 1 <- bson.element :=
+            └── document <- { ... } :=
+                ├── key <- bson.cstring := { valid := "l1" }
+                └── value <- bson.document :=
+                    └── elements <- repeat bson.element :=
+                        └── 0 <- bson.element :=
+                            └── document <- { ... } :=
+                                ├── key <- bson.cstring := { valid := "l2" }
+                                └── value <- bson.document :=
+                                    └── elements <- repeat bson.element :=
+                                        └── 0 <- bson.element :=
+                                            └── document <- { ... } :=
+                                                ├── key <- bson.cstring := { valid := "l3" }
+                                                └── value <- bson.document :=
+                                                    └── elements <- repeat bson.element :=
+                                                        └── 0 <- bson.element :=
+                                                            └── int32 <- bson.element.int32 :=
+                                                                ├── key <- bson.cstring := { valid := "depth" }
+                                                                └── value <- ReadI32Le := 3i32

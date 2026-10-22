@@ -1,6 +1,6 @@
 use doodle::byte_set::ByteSet;
 use doodle::helper::*;
-use doodle::{Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, Format, FormatModule, FormatRef, StyleHint};
 
 // mask table for bitwise and in order to drop N bits, for N = 0 ..= 5
 // We technically don't need a mask to drop 0, but it keeps the other indices intuitively correct
@@ -20,6 +20,9 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
     )
 }
 
+/// Registers and returns two UTF-8 text formats, in order:
+///   - `text.string`: arbitrary string of UTF-8 characters
+///   - `text.string.utf8.non-null`: string consisting of non-null UTF-8 characters
 pub fn main(module: &mut FormatModule) -> (FormatRef, FormatRef) {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
@@ -108,8 +111,14 @@ pub fn main(module: &mut FormatModule) -> (FormatRef, FormatRef) {
         ]),
     );
 
-    let utf8_zstr = module.define_format("text.string.utf8.non-null", repeat(utf8_char_nz.call()));
-    let utf8_str = module.define_format("text.string.utf8", repeat(utf8_char.call()));
+    let utf8_zstr = module.define_format(
+        "text.string.utf8.non-null",
+        hint(StyleHint::UTF8Str, repeat(utf8_char_nz.call())),
+    );
+    let utf8_str = module.define_format(
+        "text.string.utf8",
+        hint(StyleHint::UTF8Str, repeat(utf8_char.call())),
+    );
 
     let text = module.define_format("text.string", utf8_str.call());
     (text, utf8_zstr)

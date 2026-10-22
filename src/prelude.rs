@@ -8,6 +8,9 @@ pub use crate::parser::{
     Parser, View,
     error::{PResult, ParseError, Permissible},
 };
+// NOTE - required by the closures synthesized for `eval_fallback` call-sites in generated code
+pub use num_bigint::BigInt;
+pub use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub};
 pub use smallsorts::{
     self as allsorts,
     binary::{

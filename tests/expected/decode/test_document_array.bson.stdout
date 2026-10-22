@@ -1,0 +1,15 @@
+└── document <- bson.document :=
+    └── elements <- repeat bson.element :=
+        └── 0 <- bson.element :=
+            └── array <- { ... } :=
+                ├── key <- bson.cstring := { valid := "items" }
+                └── value <- bson.array :=
+                    └── elements <- repeat bson.element :=
+                        ├── 0 <- bson.element :=
+                        │   └── int32 <- bson.element.int32 :=
+                        │       ├── key <- bson.cstring := { valid := "0" }
+                        │       └── value <- ReadI32Le := 111i32
+                        └── 1 <- bson.element :=
+                            └── string <- bson.element.string :=
+                                ├── key <- bson.cstring := { valid := "1" }
+                                └── value <- bson.string := { valid := "hi" }
