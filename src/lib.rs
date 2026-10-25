@@ -2083,7 +2083,7 @@ type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 const MATCH_TREE_MAX_DEPTH: usize = 80;
 
 /// A byte-level prefix-tree evaluated to a fixed depth.
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct MatchTree {
     accept: Option<usize>,
     branches: Vec<(ByteSet, MatchTree)>,

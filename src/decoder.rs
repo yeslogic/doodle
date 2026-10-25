@@ -158,7 +158,7 @@ pub(crate) mod search;
 /// compiled `Decoder` tree is fully self-contained and is never given `&FormatModule` access
 /// again once built, so the layout has to be resolved once, at compile-time
 /// (`Compiler::compile_format`), rather than looked up per-parse.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ReadArrayKind {
     Base(BaseKind<Endian>),
     /// A single `SpineElem` (see [`crate::fixed::FixedShape::Single`]), read directly as the
@@ -184,7 +184,7 @@ pub enum ReadArrayKind {
 /// read, or a self-contained sub-`Decoder` compiled from the target of a `SpineElem::Indirect`'s
 /// `FormatRef` (which is restricted to a single `CommonOp` read, possibly `Variant`-wrapped, so
 /// the compiled `Decoder` never contains a `Decoder::Call` of its own and can be parsed standalone).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SpineDecoder {
     Raw(BaseKind<Endian>),
     Indirect { dec: Rc<Decoder> },
@@ -201,7 +201,7 @@ impl ReadArrayKind {
 }
 
 /// Decoders with a fixed amount of lookahead
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Decoder {
     Call(usize, Vec<(Label, Expr)>, Vec<(Label, ViewExpr)>),
     Pos,
@@ -257,6 +257,122 @@ pub struct Program {
     pub decoders: Vec<(Decoder, ValueType)>,
 }
 
+/// A compiled decoder that may call other decoders of the same program by index.
+pub(crate) trait CallIndices {
+    /// Applies `f` to the index of every call this decoder makes.
+    fn for_each_call_mut(&mut self, f: &mut dyn FnMut(&mut usize));
+}
+
+/// Merges decoders of a compiled program that are identical, along with their types, into the
+/// first of them, and renumbers every call accordingly; repeats until no two remain identical,
+/// since merging the decoders two others call can make those two identical as well. Index 0,
+/// the program's entry point, keeps its index.
+///
+/// The compilers produce such duplicates for a level whose decoder can depend on the
+/// continuation it is compiled against (see `NextDependence`) but happens not to for some of
+/// the continuations it is called with.
+pub(crate) fn merge_identical_decoders<D, T>(decoders: &mut Vec<(D, T)>)
+where
+    D: CallIndices + PartialEq,
+    T: PartialEq,
+{
+    loop {
+        let n = decoders.len();
+        let mut canonical: Vec<usize> = (0..n).collect();
+        let mut merged = false;
+        for i in 1..n {
+            if let Some(j) = (0..i).find(|&j| canonical[j] == j && decoders[j] == decoders[i]) {
+                canonical[i] = j;
+                merged = true;
+            }
+        }
+        if !merged {
+            return;
+        }
+        let mut new_index = vec![usize::MAX; n];
+        let mut kept = 0;
+        for i in 0..n {
+            if canonical[i] == i {
+                new_index[i] = kept;
+                kept += 1;
+            }
+        }
+        let remap: Vec<usize> = canonical.iter().map(|&c| new_index[c]).collect();
+        let old = std::mem::take(decoders);
+        for (i, (mut dec, t)) in old.into_iter().enumerate() {
+            if canonical[i] == i {
+                dec.for_each_call_mut(&mut |ix| *ix = remap[*ix]);
+                decoders.push((dec, t));
+            }
+        }
+    }
+}
+
+impl CallIndices for Decoder {
+    fn for_each_call_mut(&mut self, f: &mut dyn FnMut(&mut usize)) {
+        match self {
+            Decoder::Call(ix, _, _) => f(ix),
+            Decoder::Pos
+            | Decoder::Fail
+            | Decoder::EndOfInput
+            | Decoder::Align(_)
+            | Decoder::Byte(_)
+            | Decoder::Compute(_)
+            | Decoder::Apply(_)
+            | Decoder::SkipRemainder
+            | Decoder::CaptureBytes(..)
+            // `SpineDecoder`s never contain a `Call`
+            | Decoder::ReadArray(..)
+            | Decoder::ReifyView(_)
+            | Decoder::Phantom
+            | Decoder::LiftedOption(None) => {}
+            Decoder::Parallel(ds)
+            | Decoder::Branch(_, ds)
+            | Decoder::Tuple(ds)
+            | Decoder::Sequence(ds) => {
+                for d in ds {
+                    d.for_each_call_mut(f);
+                }
+            }
+            Decoder::Match(_, branches) => {
+                for (_, d) in branches {
+                    d.for_each_call_mut(f);
+                }
+            }
+            Decoder::LetFormat(d0, _, d1) | Decoder::MonadSeq(d0, d1) => {
+                d0.for_each_call_mut(f);
+                d1.for_each_call_mut(f);
+            }
+            Decoder::Variant(_, d)
+            | Decoder::While(_, d)
+            | Decoder::Until(_, d)
+            | Decoder::RepeatCount(_, d)
+            | Decoder::RepeatUntilLast(_, d)
+            | Decoder::RepeatUntilSeq(_, d)
+            | Decoder::Maybe(_, d)
+            | Decoder::Peek(d)
+            | Decoder::PeekNot(d)
+            | Decoder::Slice(_, d)
+            | Decoder::Bits(d)
+            | Decoder::WithRelativeOffset(_, _, d)
+            | Decoder::Map(d, _)
+            | Decoder::Where(d, _)
+            | Decoder::Let(_, _, d)
+            | Decoder::Dynamic(_, _, d)
+            | Decoder::RepeatBetween(_, _, d)
+            | Decoder::ForEach(_, _, d)
+            | Decoder::DecodeBytes(_, d)
+            | Decoder::ParseFromView(_, d)
+            | Decoder::AccumUntil(_, _, _, _, d)
+            | Decoder::LiftedOption(Some(d))
+            | Decoder::LetView(_, d)
+            | Decoder::Permit(d, _) => d.for_each_call_mut(f),
+            #[cfg(feature = "format_enforce")]
+            Decoder::Enforce(d) => d.for_each_call_mut(f),
+        }
+    }
+}
+
 impl Program {
     pub(crate) fn new() -> Self {
         let decoders = Vec::new();
@@ -274,6 +390,12 @@ impl Program {
 pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
+    /// The decoder compiled for each call to a level, keyed on the level and the continuation the
+    /// call is compiled against: that continuation, truncated to `MATCH_TREE_MAX_DEPTH` bytes, if
+    /// the level's decoder can depend on it (see `NextDependence`), and `Next::Empty` otherwise.
+    /// Continuations are compared structurally, so a dependent level called with continuations
+    /// that differ, but not in anything its decisions consult, gets identical decoders; those are
+    /// merged once compilation finishes (see [`merge_identical_decoders`]).
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
     compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
     next_dependence: NextDependence,
@@ -305,6 +427,7 @@ impl<'a> Compiler<'a> {
             let d = compiler.compile_format(f, next)?;
             compiler.program.decoders[n].0 = d;
         }
+        merge_identical_decoders(&mut compiler.program.decoders);
         Ok(compiler.program)
     }
 
@@ -1483,6 +1606,39 @@ where
 mod tests {
     use super::*;
     use crate::helper::*;
+
+    /// Identical decoders merge into the first of them, and calls are renumbered to match; two
+    /// decoders that differ only in calling decoders that themselves merge (`3` and `4` below)
+    /// merge in a later round. The entry point keeps index 0.
+    #[test]
+    fn merge_identical_decoders_merges_transitively_and_renumbers_calls() {
+        let call = |ix| Decoder::Call(ix, Vec::new(), Vec::new());
+        let byte = |b| Decoder::Byte(ByteSet::from([b]));
+        let mut decoders = vec![
+            (
+                Decoder::Tuple(vec![call(3), call(4), call(5)]),
+                ValueType::Any,
+            ),
+            (byte(b'a'), ValueType::U8),
+            (byte(b'a'), ValueType::U8),
+            (Decoder::Tuple(vec![call(1)]), ValueType::Any),
+            (Decoder::Tuple(vec![call(2)]), ValueType::Any),
+            (byte(b'b'), ValueType::U8),
+        ];
+        merge_identical_decoders(&mut decoders);
+        assert_eq!(
+            decoders,
+            vec![
+                (
+                    Decoder::Tuple(vec![call(2), call(2), call(3)]),
+                    ValueType::Any
+                ),
+                (byte(b'a'), ValueType::U8),
+                (Decoder::Tuple(vec![call(1)]), ValueType::Any),
+                (byte(b'b'), ValueType::U8),
+            ]
+        );
+    }
 
     /// Test-helper function for decoder tests.
     ///
