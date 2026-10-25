@@ -387,7 +387,8 @@ impl UType {
 
     /// Attempts to convert a `ValueType` to an `UType`, returning `Some(ut)` if the conversion was successful.
     ///
-    /// Will return `None` if the conversion failed due to the presence of a Union-type at any layer.
+    /// Will return `None` if the conversion failed due to the presence of a Union-type,
+    /// or recursive reference, at any layer.
     pub(crate) fn from_valuetype(vt: &ValueType) -> Option<UType> {
         match vt {
             ValueType::Any | ValueType::NumericHole => Some(Self::Hole),
