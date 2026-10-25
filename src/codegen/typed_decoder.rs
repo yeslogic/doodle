@@ -1,4 +1,5 @@
 use crate::byte_set::ByteSet;
+use crate::decoder::{CallIndices, merge_identical_decoders};
 use crate::validation::TypedCondition;
 use crate::{
     Format, FormatModule, Label, MATCH_TREE_MAX_DEPTH, MatchTree, MaybeTyped, Next, NextDependence,
@@ -20,7 +21,72 @@ use super::{
 };
 use super::{PrimType, RustLt, RustType};
 
-#[derive(Clone, Debug)]
+impl<TypeRep> CallIndices for TypedDecoderExt<TypeRep> {
+    fn for_each_call_mut(&mut self, f: &mut dyn FnMut(&mut usize)) {
+        match &mut self.dec {
+            TypedDecoder::Call(_, ix, _) => f(ix),
+            TypedDecoder::Fail
+            | TypedDecoder::EndOfInput
+            | TypedDecoder::Align(_)
+            | TypedDecoder::Byte(_)
+            | TypedDecoder::Compute(..)
+            | TypedDecoder::Apply(..)
+            | TypedDecoder::Pos(_)
+            | TypedDecoder::SkipRemainder
+            | TypedDecoder::CaptureBytes(..)
+            | TypedDecoder::ReadArray(..)
+            | TypedDecoder::ReifyView(..)
+            | TypedDecoder::Phantom
+            | TypedDecoder::LiftedOption(_, None) => {}
+            TypedDecoder::Parallel(_, ds)
+            | TypedDecoder::Branch(_, _, ds)
+            | TypedDecoder::Tuple(_, ds)
+            | TypedDecoder::Sequence(_, ds) => {
+                for d in ds {
+                    d.for_each_call_mut(f);
+                }
+            }
+            TypedDecoder::Match(_, _, branches) => {
+                for (_, d) in branches {
+                    d.for_each_call_mut(f);
+                }
+            }
+            TypedDecoder::LetFormat(_, d0, _, d1) | TypedDecoder::MonadSeq(_, d0, d1) => {
+                d0.for_each_call_mut(f);
+                d1.for_each_call_mut(f);
+            }
+            TypedDecoder::Variant(_, _, d)
+            | TypedDecoder::Repeat0While(_, _, d)
+            | TypedDecoder::Repeat1Until(_, _, d)
+            | TypedDecoder::RepeatCount(_, _, d)
+            | TypedDecoder::RepeatBetween(_, _, _, d)
+            | TypedDecoder::RepeatUntilLast(_, _, d)
+            | TypedDecoder::RepeatUntilSeq(_, _, d)
+            | TypedDecoder::Peek(_, d)
+            | TypedDecoder::PeekNot(_, d)
+            | TypedDecoder::Slice(_, _, d)
+            | TypedDecoder::Bits(_, d)
+            | TypedDecoder::WithRelativeOffset(_, _, _, d)
+            | TypedDecoder::Map(_, d, _)
+            | TypedDecoder::Where(_, d, _)
+            | TypedDecoder::Let(_, _, _, d)
+            | TypedDecoder::Dynamic(_, _, _, d)
+            | TypedDecoder::Maybe(_, _, d)
+            | TypedDecoder::ForEach(_, _, _, d)
+            | TypedDecoder::DecodeBytes(_, _, d)
+            | TypedDecoder::AccumUntil(_, _, _, _, d)
+            | TypedDecoder::Hint(_, _, d)
+            | TypedDecoder::LiftedOption(_, Some(d))
+            | TypedDecoder::LetView(_, _, d)
+            | TypedDecoder::ParseFromView(_, _, d)
+            | TypedDecoder::Permit(_, d, _) => d.for_each_call_mut(f),
+            #[cfg(feature = "format_enforce")]
+            TypedDecoder::Enforce(_, d) => d.for_each_call_mut(f),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TypedDecoderExt<TypeRep> {
     dec: TypedDecoder<TypeRep>,
     args: Option<Vec<(Label, TypeRep)>>,
@@ -117,7 +183,7 @@ impl TypedDecoder<GenType> {
 }
 
 /// Decoders with a fixed amount of lookahead
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TypedDecoder<TypeRep> {
     Call(
         TypeRep,
@@ -287,6 +353,9 @@ type QueueItem<'a> = (
 pub struct GTCompiler<'a> {
     module: &'a FormatModule,
     program: TypedProgram<GenType>,
+    /// As `decoder::Compiler`'s `decoder_map`: the decoder compiled for each call to a level,
+    /// keyed on the level and the (possibly truncated, possibly `Next::Empty`) continuation the
+    /// call is compiled against.
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
     compile_queue: Vec<QueueItem<'a>>,
     next_dependence: NextDependence,
@@ -322,6 +391,7 @@ impl<'a> GTCompiler<'a> {
             compiler.compile_local_root(extra_f, true)?;
         }
 
+        merge_identical_decoders(&mut compiler.program.decoders);
         Ok(compiler.program)
     }
 
