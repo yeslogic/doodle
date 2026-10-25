@@ -1,6 +1,9 @@
 use crate::byte_set::ByteSet;
 use crate::validation::TypedCondition;
-use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, RepeatRange, StyleHint};
+use crate::{
+    Format, FormatModule, Label, MATCH_TREE_MAX_DEPTH, MatchTree, MaybeTyped, Next, NextDependence,
+    RepeatRange, StyleHint,
+};
 use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -286,6 +289,7 @@ pub struct GTCompiler<'a> {
     program: TypedProgram<GenType>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
     compile_queue: Vec<QueueItem<'a>>,
+    next_dependence: NextDependence,
 }
 
 pub(crate) type GTDecoder = TypedDecoder<GenType>;
@@ -301,6 +305,7 @@ impl<'a> GTCompiler<'a> {
             program,
             decoder_map,
             compile_queue,
+            next_dependence: NextDependence::default(),
         }
     }
 
@@ -393,9 +398,11 @@ impl<'a> GTCompiler<'a> {
                             .collect(),
                     )
                 };
-                let _f = self.module.get_format(*level);
-                let next = if _f.depends_on_next(self.module) {
-                    next
+                let next = if self
+                    .next_dependence
+                    .level_depends_on_next(self.module, *level)
+                {
+                    Next::truncated(&next, self.module, MATCH_TREE_MAX_DEPTH)
                 } else {
                     Rc::new(Next::Empty)
                 };

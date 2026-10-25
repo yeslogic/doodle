@@ -13,8 +13,9 @@ use crate::util::{EResult, WithErr};
 use crate::util::{ErrTrace as _, try_downgrade_error_with};
 use crate::validation::Condition;
 use crate::{
-    BaseKind, DynFormat, Endian, Expr, Format, FormatModule, Label, MatchTree, MaybeTyped, Next,
-    Pattern, RepeatRange, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
+    BaseKind, DynFormat, Endian, Expr, Format, FormatModule, Label, MATCH_TREE_MAX_DEPTH,
+    MatchTree, MaybeTyped, Next, NextDependence, Pattern, RepeatRange, TypeHint, TypeScope,
+    ValueType, ViewExpr, ViewFormat,
 };
 use crate::{FixedReadKind, try_with};
 
@@ -275,6 +276,7 @@ pub struct Compiler<'a> {
     program: Program,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
     compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
+    next_dependence: NextDependence,
 }
 
 impl<'a> Compiler<'a> {
@@ -287,6 +289,7 @@ impl<'a> Compiler<'a> {
             program,
             decoder_map,
             compile_queue,
+            next_dependence: NextDependence::default(),
         }
     }
 
@@ -349,8 +352,11 @@ impl<'a> Compiler<'a> {
         match format {
             Format::ItemVar(level, arg_exprs, arg_views) => {
                 let f = self.module.get_format(*level);
-                let next = if f.depends_on_next(self.module) {
-                    next
+                let next = if self
+                    .next_dependence
+                    .level_depends_on_next(self.module, *level)
+                {
+                    Next::truncated(&next, self.module, MATCH_TREE_MAX_DEPTH)
                 } else {
                     Rc::new(Next::Empty)
                 };

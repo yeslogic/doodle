@@ -52,12 +52,11 @@ mod elaboration {
         }
     }
 
-    /// `tree := 'L' | 'N' ~ tree* ~ 'E'` is well-formed (every `tree` starts with a byte, and `'E'`
-    /// ends the repetition), but codegen recurses without bound on it and overflows the stack,
-    /// which aborts the whole test process; on #332 it instead panicked with "cannot repeat
-    /// nullable format".
+    /// `tree := 'L' | 'N' ~ tree* ~ 'E'` settles every choice before reaching its own
+    /// continuation, so one decoder serves every call to it; compiling it once per distinct
+    /// continuation of its calls would never end, since each nested call extends that
+    /// continuation.
     #[test]
-    #[ignore = "repro: codegen overflows the stack (aborting the test process) on Repeat of a recursive item"]
     fn codegen_repeat_of_recursive_item_terminates() {
         use crate::helper::{is_byte, repeat};
 
@@ -76,6 +75,38 @@ mod elaboration {
         let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tree"), tree)]);
         let src = produce_string_gencode(&module, &refs[0].call());
         assert!(src.contains("Vec<"), "source was:\n{src}");
+    }
+
+    /// `t := 'a' | 'a' ~ 'b' | 'N' ~ t* ~ 'E'` depends on its continuation (whether an `'a'` takes a
+    /// following `'b'`), so it is compiled once per distinct continuation of its calls; truncating
+    /// those continuations to `MATCH_TREE_MAX_DEPTH` bytes bounds how many decoders that makes.
+    #[test]
+    fn codegen_continuation_dependent_recursion_has_bounded_decoders() {
+        use crate::helper::{is_byte, repeat};
+
+        let t = Format::Union(vec![
+            Format::Variant(Label::Borrowed("A"), Box::new(is_byte(b'a'))),
+            Format::Variant(
+                Label::Borrowed("AB"),
+                Box::new(Format::Tuple(vec![is_byte(b'a'), is_byte(b'b')])),
+            ),
+            Format::Variant(
+                Label::Borrowed("Node"),
+                Box::new(Format::Tuple(vec![
+                    is_byte(b'N'),
+                    repeat(Format::RecVar(0)),
+                    is_byte(b'E'),
+                ])),
+            ),
+        ]);
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.cont_tree"), t)]);
+        let src = produce_string_gencode(&module, &refs[0].call());
+        let decoders = src.matches("\nfn Decoder").count();
+        assert!(
+            decoders <= 2 * crate::MATCH_TREE_MAX_DEPTH,
+            "{decoders} decoders"
+        );
     }
 
     /// Typed counterpart of `format::tests::lookahead_bounds_monad_seq_counts_f0_match_before_f`:

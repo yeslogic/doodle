@@ -1,13 +1,9 @@
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
-use std::rc::Rc;
 
 use serde::Serialize;
 
-use crate::{
-    Bounds, DynFormat, Expr, IntoLabel, Label, MatchTree, Next, StyleHint, TypeHint, ViewExpr,
-    ViewFormat,
-};
+use crate::{Bounds, DynFormat, Expr, IntoLabel, Label, StyleHint, TypeHint, ViewExpr, ViewFormat};
 
 use crate::FormatModule;
 use crate::byte_set::ByteSet;
@@ -684,110 +680,6 @@ impl Format {
     /// Returns `true` if the format could match the empty byte string
     pub(crate) fn is_nullable(&self, module: &FormatModule) -> bool {
         self.match_bounds(module).min == 0
-    }
-
-    /// True if the compilation of this format depends on the format that follows it
-    pub(crate) fn depends_on_next(&self, module: &FormatModule) -> bool {
-        self.depends_on_next_open(module, &mut HashSet::new())
-    }
-
-    /// See [`Self::match_bounds_recursive`]'s docs for `open`'s general role. Here, re-entering an
-    /// already-open level conservatively returns `true` (the safe default: answering `false`
-    /// incorrectly could make the compiled decoder use `Next::Empty` when it actually needed the
-    /// real continuation - a soundness bug - whereas `true` only costs a missed decoder-sharing
-    /// optimization).
-    fn depends_on_next_open(&self, module: &FormatModule, open: &mut HashSet<usize>) -> bool {
-        match self {
-            Format::ItemVar(level, _args, _views) => {
-                let level = *level;
-                if !open.insert(level) {
-                    return true;
-                }
-                let b = module.get_format(level).depends_on_next_open(module, open);
-                open.remove(&level);
-                b
-            }
-            Format::RecVar(_) => unreachable!(
-                "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
-            ),
-            Format::Fail => false,
-            Format::EndOfInput => false,
-            // NOTE - compiling SkipRemainder doesn't depend on the next format because the next format can only ever match the empty byte string at that point
-            Format::SkipRemainder => false,
-            Format::Align(..) => false,
-            Format::Byte(..) => false,
-            Format::WithView(..) => false,
-            Format::Variant(_label, f) => f.depends_on_next_open(module, open),
-            Format::Union(branches) | Format::UnionNondet(branches) => {
-                Format::union_depends_on_next_open(branches, module, open)
-            }
-            Format::Tuple(fmts) | Format::Sequence(fmts) => {
-                let mut any = false;
-                for f in fmts {
-                    if f.depends_on_next_open(module, open) {
-                        any = true;
-                        break;
-                    }
-                }
-                any
-            }
-            Format::Repeat(..) | Format::Repeat1(..) | Format::RepeatBetween(..) => true,
-            Format::RepeatCount(..) | Format::RepeatUntilLast(..) | Format::RepeatUntilSeq(..) => {
-                false
-            }
-            Format::AccumUntil(..) => false,
-            Format::Maybe(..) => true,
-            Format::Peek(..) | Format::PeekNot(..) => false,
-            Format::Slice(..) => false,
-            Format::Bits(..) => false,
-            Format::WithRelativeOffset(..) => false,
-            Format::Map(f, _expr) => f.depends_on_next_open(module, open),
-            Format::Where(f, _expr) => f.depends_on_next_open(module, open),
-            Format::Compute(..) | Format::Pos => false,
-            Format::Let(_name, _expr, f) => f.depends_on_next_open(module, open),
-            Format::LetView(_name, f) => f.depends_on_next_open(module, open),
-            Format::Match(_, branches) => {
-                let mut any = false;
-                for (_, f) in branches {
-                    if f.depends_on_next_open(module, open) {
-                        any = true;
-                        break;
-                    }
-                }
-                any
-            }
-            Format::Dynamic(_name, _dynformat, f) => f.depends_on_next_open(module, open),
-            Format::Apply(..) => false,
-            Format::ForEach(_expr, _lbl, f) => f.depends_on_next_open(module, open),
-            Format::DecodeBytes(..) | Format::ParseFromView(..) => false,
-            Format::MonadSeq(first, second) | Format::LetFormat(first, _, second) => {
-                first.depends_on_next_open(module, open)
-                    || second.depends_on_next_open(module, open)
-            }
-            #[cfg(feature = "format_enforce")]
-            Format::Enforce(f) => f.depends_on_next_open(module, open),
-            Format::Permit(f, _) | Format::Hint(_, f) => f.depends_on_next_open(module, open),
-            Format::LiftedOption(opt) => match opt {
-                None => false,
-                Some(f) => f.depends_on_next_open(module, open),
-            },
-            Format::Phantom(_) => false,
-        }
-    }
-
-    fn union_depends_on_next_open(
-        branches: &[Format],
-        module: &FormatModule,
-        open: &mut HashSet<usize>,
-    ) -> bool {
-        let mut fs = Vec::with_capacity(branches.len());
-        for f in branches {
-            if f.depends_on_next_open(module, open) {
-                return true;
-            }
-            fs.push(f.clone());
-        }
-        MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
     }
 
     /// Rewrites every `Format::RecVar(ix)` in `self` to `Format::ItemVar(start + ix, vec![], vec![])`,
