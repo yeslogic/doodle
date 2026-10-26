@@ -156,6 +156,14 @@ pub struct DecodeError<V: Clone = Value> {
     pub _trace: Vec<Box<dyn std::fmt::Debug + Sync + Send + 'static>>,
 }
 
+impl<V: Clone> DecodeError<V> {
+    /// Whether this is a [`DecodeErrorKind::RecursionLimit`] error, which constructs that recover
+    /// from a failed parse must propagate instead.
+    pub fn is_recursion_limit(&self) -> bool {
+        matches!(*self.err, DecodeErrorKind::RecursionLimit { .. })
+    }
+}
+
 impl<V: Clone + std::fmt::Debug> crate::util::ErrTrace for DecodeError<V> {
     fn with_trace<T>(mut self, ctxt: T) -> Self
     where
@@ -353,6 +361,20 @@ pub enum DecodeErrorKind<V: Clone = Value> {
     },
     /// Evaluation of an [`Expr`] failed (see [`EvalError`]).
     Eval(EvalError),
+    /// Decoding would nest calls to recursive levels more deeply than the program's limit (see
+    /// [`Program::set_recursion_limit`](crate::decoder::Program::set_recursion_limit)).
+    ///
+    /// Unlike other errors, constructs that recover from a failed parse (`Permit`, `UnionNondet`,
+    /// `PeekNot`) never recover from this one: it rejects the input rather than changing how it
+    /// decodes.
+    RecursionLimit {
+        /// Name of the recursive level whose call exceeded the limit
+        level: Label,
+        /// The limit that was exceeded
+        limit: usize,
+        /// Offset in the buffer at which the call was made
+        offset: usize,
+    },
 }
 
 impl BufferLimitError {
@@ -441,6 +463,16 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeErrorKind<V> {
                 )
             }
             Self::Eval(err) => err.fmt(f),
+            Self::RecursionLimit {
+                level,
+                limit,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "recursion limit of {limit} exceeded calling `{level}` at Offset={offset}"
+                )
+            }
         }
     }
 }

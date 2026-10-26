@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::rc::Rc;
@@ -250,11 +251,49 @@ pub enum Decoder {
     #[cfg(feature = "format_enforce")]
     Enforce(Box<Decoder>),
     Permit(Box<Decoder>, Box<Expr>),
+    /// The decoder of a level in a recursive batch (named by the `Label`), which counts towards
+    /// the program's recursion limit while it runs (see [`Program::set_recursion_limit`]).
+    Recursive(Label, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
 pub struct Program {
     pub decoders: Vec<(Decoder, ValueType)>,
+    /// How deeply decoders of recursive levels may nest; see [`Self::set_recursion_limit`].
+    recursion_limit: usize,
+}
+
+std::thread_local! {
+    /// How many `Decoder::Recursive` decoders are running on this thread.
+    static RECURSION_DEPTH: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Counts one running `Decoder::Recursive` decoder in [`RECURSION_DEPTH`] for as long as it lives,
+/// so the count is restored however the decoder returns.
+pub(crate) struct RecursionGuard;
+
+impl RecursionGuard {
+    /// Counts one more running recursive decoder, or returns `None` if `limit` are already running.
+    pub(crate) fn enter(limit: usize) -> Option<Self> {
+        RECURSION_DEPTH.with(|depth| {
+            let current = depth.get();
+            (current < limit).then(|| {
+                depth.set(current + 1);
+                RecursionGuard
+            })
+        })
+    }
+}
+
+/// How many `Decoder::Recursive` decoders are running on this thread.
+pub(crate) fn recursion_depth() -> usize {
+    RECURSION_DEPTH.with(Cell::get)
+}
+
+impl Drop for RecursionGuard {
+    fn drop(&mut self) {
+        RECURSION_DEPTH.with(|depth| depth.set(depth.get() - 1));
+    }
 }
 
 /// A compiled decoder that may call other decoders of the same program by index.
@@ -366,7 +405,8 @@ impl CallIndices for Decoder {
             | Decoder::AccumUntil(_, _, _, _, d)
             | Decoder::LiftedOption(Some(d))
             | Decoder::LetView(_, d)
-            | Decoder::Permit(d, _) => d.for_each_call_mut(f),
+            | Decoder::Permit(d, _)
+            | Decoder::Recursive(_, d) => d.for_each_call_mut(f),
             #[cfg(feature = "format_enforce")]
             Decoder::Enforce(d) => d.for_each_call_mut(f),
         }
@@ -374,9 +414,34 @@ impl CallIndices for Decoder {
 }
 
 impl Program {
+    /// The default for [`Self::set_recursion_limit`].
+    pub const DEFAULT_RECURSION_LIMIT: usize = 256;
+
     pub(crate) fn new() -> Self {
         let decoders = Vec::new();
-        Program { decoders }
+        Program {
+            decoders,
+            recursion_limit: Self::DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    /// Sets how many decoders of recursive levels (levels registered by
+    /// [`FormatModule::define_format_rec_batch`] or [`FormatModule::define_format_recursive`]) may
+    /// be running at once, nested within each other; a call that would exceed it fails with
+    /// [`DecodeErrorKind::RecursionLimit`]. Defaults to [`Self::DEFAULT_RECURSION_LIMIT`].
+    ///
+    /// The limit counts nested calls, not stack space, so it prevents a stack overflow only if
+    /// the stack can hold that many: how much each call takes depends on the format, the build
+    /// profile and what the thread's stack size is. Nested BSON documents, for instance, count two
+    /// calls per level of nesting. The count is per thread, and is shared by any programs running
+    /// nested within each other on that thread.
+    pub fn set_recursion_limit(&mut self, limit: usize) {
+        self.recursion_limit = limit;
+    }
+
+    /// See [`Self::set_recursion_limit`].
+    pub fn recursion_limit(&self) -> usize {
+        self.recursion_limit
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> DecodeResult<(Value, ReadCtxt<'input>)> {
@@ -397,7 +462,10 @@ pub struct Compiler<'a> {
     /// that differ, but not in anything its decisions consult, gets identical decoders; those are
     /// merged once compilation finishes (see [`merge_identical_decoders`]).
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
-    compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
+    /// Formats awaiting compilation, with the continuation to compile each against, the index of
+    /// its decoder, and the name of its level if that level is recursive (see
+    /// [`FormatModule::is_recursive_level`]), in which case its decoder is a `Decoder::Recursive`.
+    compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize, Option<Label>)>,
     next_dependence: NextDependence,
 }
 
@@ -422,19 +490,28 @@ impl<'a> Compiler<'a> {
         let scope = TypeScope::with_rec_types(&module.format_types);
         let t = module.infer_format_type(&scope, format)?;
         // decoder
-        compiler.queue_compile(t, format, Rc::new(Next::Empty));
-        while let Some((f, next, n)) = compiler.compile_queue.pop() {
+        compiler.queue_compile(t, format, Rc::new(Next::Empty), None);
+        while let Some((f, next, n, recursive)) = compiler.compile_queue.pop() {
             let d = compiler.compile_format(f, next)?;
-            compiler.program.decoders[n].0 = d;
+            compiler.program.decoders[n].0 = match recursive {
+                Some(level) => Decoder::Recursive(level, Box::new(d)),
+                None => d,
+            };
         }
         merge_identical_decoders(&mut compiler.program.decoders);
         Ok(compiler.program)
     }
 
-    fn queue_compile(&mut self, t: ValueType, f: &'a Format, next: Rc<Next<'a>>) -> usize {
+    fn queue_compile(
+        &mut self,
+        t: ValueType,
+        f: &'a Format,
+        next: Rc<Next<'a>>,
+        recursive: Option<Label>,
+    ) -> usize {
         let n = self.program.decoders.len();
         self.program.decoders.push((Decoder::Fail, t));
-        self.compile_queue.push((f, next, n));
+        self.compile_queue.push((f, next, n, recursive));
         n
     }
 
@@ -487,7 +564,11 @@ impl<'a> Compiler<'a> {
                     *n
                 } else {
                     let t = self.module.get_format_type(*level).clone();
-                    let n = self.queue_compile(t, f, next.clone());
+                    let recursive = self
+                        .module
+                        .is_recursive_level(*level)
+                        .then(|| Label::from(self.module.get_name(*level).to_string()));
+                    let n = self.queue_compile(t, f, next.clone(), recursive);
                     self.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
@@ -869,6 +950,7 @@ impl Decoder {
             #[cfg(feature = "format_enforce")]
             Decoder::Enforce(..) => Self::parse_enforce,
             Decoder::Permit(..) => Self::parse_permit,
+            Decoder::Recursive(..) => Self::parse_recursive,
         };
         parse_arm(self, program, scope, input)
     }
@@ -1034,10 +1116,14 @@ impl Decoder {
         let Decoder::Parallel(branches) = self else {
             unreachable!()
         };
+        // Inside a recursive decoder, hitting the recursion limit rejects the input; outside one
+        // it only rules out the branch, e.g. one format among the alternatives a file is tried as.
+        let limit_is_fatal = recursion_depth() > 0;
         for (index, d) in branches.iter().enumerate() {
-            let res = d.parse(program, scope, input);
-            if let Ok(p) = res {
-                return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
+            match d.parse(program, scope, input) {
+                Ok(p) => return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input))),
+                Err(err) if limit_is_fatal && err.is_recursion_limit() => return Err(err),
+                Err(_) => {}
             }
         }
         Err(DecodeErrorKind::<Value>::fail(scope, input).with_trace("no valid branch"))
@@ -1503,11 +1589,11 @@ impl Decoder {
         let Decoder::PeekNot(a) = self else {
             unreachable!()
         };
-        if a.parse(program, scope, input).is_ok() {
-            Err(DecodeErrorKind::<Value>::fail(scope, input)
-                .with_trace(("PeekNot", format!("{:?}", a))))
-        } else {
-            Ok(WithErr::new((Value::Tuple(vec![]), input)))
+        match a.parse(program, scope, input) {
+            Ok(_) => Err(DecodeErrorKind::<Value>::fail(scope, input)
+                .with_trace(("PeekNot", format!("{:?}", a)))),
+            Err(err) if err.is_recursion_limit() => Err(err),
+            Err(_) => Ok(WithErr::new((Value::Tuple(vec![]), input))),
         }
     }
 
@@ -1941,9 +2027,12 @@ impl Decoder {
         let Decoder::Permit(a, expr) = self else {
             unreachable!()
         };
+        let res = a.parse(program, scope, input);
+        if matches!(&res, Err(err) if err.is_recursion_limit()) {
+            return res;
+        }
         Ok(try_downgrade_error_with(
-            a.parse(program, scope, input)
-                .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
+            res.map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
             || {
                 Ok::<_, EvalError>((
                     Value::Permit(Err(Some(Box::new(expr.eval_value(scope)?)))),
@@ -1952,6 +2041,27 @@ impl Decoder {
             },
         )
         .trace_eval(|| ("Permit(default)", format!("{expr:?}")))?)
+    }
+
+    #[inline(never)]
+    fn parse_recursive<'input>(
+        &self,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let Decoder::Recursive(level, d) = self else {
+            unreachable!()
+        };
+        let Some(_guard) = RecursionGuard::enter(program.recursion_limit) else {
+            return Err(DecodeErrorKind::RecursionLimit {
+                level: level.clone(),
+                limit: program.recursion_limit,
+                offset: input.offset,
+            }
+            .into());
+        };
+        d.parse(program, scope, input)
     }
     /// Given a `ViewExpr` and a `Scope` to evaluate named views under, returns the appropriate `View`
     /// (`:= ReadCtxt`).
@@ -2135,6 +2245,148 @@ where
 mod tests {
     use super::*;
     use crate::helper::*;
+
+    mod recursion_limit {
+        use super::*;
+        use crate::FormatRef;
+
+        /// Registers `nat := 'Z' | 'S' nat`, whose every call to itself counts towards the limit.
+        fn nat(module: &mut FormatModule) -> FormatRef {
+            module.define_format_rec_batch(vec![(
+                "test.nat",
+                alts([
+                    ("Z", is_byte(b'Z')),
+                    ("S", tuple([is_byte(b'S'), Format::RecVar(0)])),
+                ]),
+            )])[0]
+        }
+
+        /// Decodes `input` with both interpreters and returns their outcomes, which must agree:
+        /// `Ok(())`, or `Err(true)` for a `RecursionLimit` error and `Err(false)` for any other.
+        /// Also checks that no decoder is left counted as running afterwards.
+        fn run(
+            module: &FormatModule,
+            top: &Format,
+            limit: usize,
+            input: &[u8],
+        ) -> Result<(), bool> {
+            let mut program = Compiler::compile_program(module, top).unwrap();
+            program.set_recursion_limit(limit);
+            let plain = program
+                .run(ReadCtxt::new(input))
+                .map(|_| ())
+                .map_err(|err| err.is_recursion_limit());
+            assert_eq!(recursion_depth(), 0, "run left recursive decoders counted");
+            let with_loc = program
+                .run_with_loc(ReadCtxt::new(input))
+                .map(|_| ())
+                .map_err(|err| err.is_recursion_limit());
+            assert_eq!(
+                recursion_depth(),
+                0,
+                "run_with_loc left recursive decoders counted"
+            );
+            assert_eq!(plain, with_loc, "interpreters disagree");
+            plain
+        }
+
+        fn s_then_z(n: usize) -> Vec<u8> {
+            let mut input = vec![b'S'; n];
+            input.push(b'Z');
+            input
+        }
+
+        /// Each nested call to a recursive level counts once: `S^n Z` makes `n + 1` calls.
+        #[test]
+        fn counts_nested_calls_to_recursive_levels() {
+            let mut module = FormatModule::new();
+            let top = nat(&mut module).call();
+            assert_eq!(run(&module, &top, 8, &s_then_z(7)), Ok(()));
+            assert_eq!(run(&module, &top, 8, &s_then_z(8)), Err(true));
+        }
+
+        #[test]
+        fn default_limit_is_256() {
+            let mut module = FormatModule::new();
+            let top = nat(&mut module).call();
+            let program = Compiler::compile_program(&module, &top).unwrap();
+            assert_eq!(program.recursion_limit(), 256);
+            // only `run`: `run_with_loc` overflows a debug-build stack well short of 256 levels
+            let run = |input: &[u8]| {
+                let res = program.run(ReadCtxt::new(input));
+                assert_eq!(recursion_depth(), 0, "run left recursive decoders counted");
+                res.map(|_| ()).map_err(|err| err.is_recursion_limit())
+            };
+            assert_eq!(run(&s_then_z(255)), Ok(()));
+            assert_eq!(run(&s_then_z(256)), Err(true));
+        }
+
+        /// `Permit` would otherwise substitute its default.
+        #[test]
+        fn permit_propagates_it() {
+            let mut module = FormatModule::new();
+            let nat = nat(&mut module);
+            let top = permit(chain(nat.call(), "n", compute(Expr::U8(0))), Expr::U8(1));
+            assert_eq!(run(&module, &top, 8, &s_then_z(7)), Ok(()));
+            assert_eq!(run(&module, &top, 8, &s_then_z(8)), Err(true));
+        }
+
+        /// `PeekNot` would otherwise succeed. Its format is a `Slice` so that its lookahead is
+        /// bounded, and fails at the first `'X'` unless the limit is reached first.
+        #[test]
+        fn peek_not_propagates_it() {
+            let mut module = FormatModule::new();
+            let nat = nat(&mut module);
+            let top = tuple([
+                Format::PeekNot(Box::new(slice(Expr::U8(16), nat.call()))),
+                repeat(ANY_BYTE),
+            ]);
+            let s_then_x = |n: usize| {
+                let mut input = vec![b'S'; n];
+                input.resize(20, b'X');
+                input
+            };
+            assert_eq!(run(&module, &top, 8, &s_then_x(7)), Ok(()));
+            assert_eq!(run(&module, &top, 8, &s_then_x(8)), Err(true));
+        }
+
+        /// Inside a recursive decoder, a `UnionNondet` propagates the error rather than trying its
+        /// next branch, here a `Shallow` branch that would accept the rest of the input.
+        #[test]
+        fn union_nondet_inside_recursion_propagates_it() {
+            let mut module = FormatModule::new();
+            let deep = module.define_format_rec_batch(vec![(
+                "test.deep",
+                alts_nondet([
+                    ("Deep", tuple([is_byte(b'S'), Format::RecVar(0)])),
+                    ("Shallow", repeat(ANY_BYTE)),
+                ]),
+            )])[0];
+            let top = deep.call();
+            assert_eq!(run(&module, &top, 8, &[b'S'; 7]), Ok(()));
+            assert_eq!(run(&module, &top, 8, &[b'S'; 20]), Err(true));
+        }
+
+        /// Outside any recursive decoder, a `UnionNondet` treats the error like any other and tries
+        /// its next branch.
+        #[test]
+        fn union_nondet_outside_recursion_tries_next_branch() {
+            let mut module = FormatModule::new();
+            let nat = nat(&mut module);
+            let top = alts_nondet([("Nat", nat.call()), ("Rest", repeat(ANY_BYTE))]);
+            assert_eq!(run(&module, &top, 8, &s_then_z(8)), Ok(()));
+            let program = {
+                let mut program = Compiler::compile_program(&module, &top).unwrap();
+                program.set_recursion_limit(8);
+                program
+            };
+            let (value, _) = program.run(ReadCtxt::new(&s_then_z(8))).unwrap();
+            assert!(
+                matches!(value, Value::Branch(1, _)),
+                "expected the `Rest` branch, got {value:?}"
+            );
+        }
+    }
 
     /// Identical decoders merge into the first of them, and calls are renumbered to match; two
     /// decoders that differ only in calling decoders that themselves merge (`3` and `4` below)

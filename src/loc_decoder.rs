@@ -7,8 +7,8 @@ use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
-    Compiler, Decoder, Program, ReadArrayKind, SeqKind, SpineDecoder, Value, ValueSeq,
-    value::Coerced,
+    Compiler, Decoder, Program, ReadArrayKind, RecursionGuard, SeqKind, SpineDecoder, Value,
+    ValueSeq, recursion_depth, value::Coerced,
 };
 use crate::error::{DecodeError, DecodeErrorKind, EvalError, EvalResultExt as _};
 use crate::read::{BufferKind, ReadCtxt};
@@ -738,12 +738,18 @@ impl Decoder {
                     .map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input)))
             }
             Decoder::Parallel(branches) => {
+                // as in `Decoder::parse`: the recursion limit only rules out a branch outside any
+                // recursive decoder
+                let limit_is_fatal = recursion_depth() > 0;
                 for (index, d) in branches.iter().enumerate() {
-                    let res = d.parse_with_loc(program, scope, input);
-                    if let Ok(p) = res {
-                        return Ok(
-                            p.map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input))
-                        );
+                    match d.parse_with_loc(program, scope, input) {
+                        Ok(p) => {
+                            return Ok(
+                                p.map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input))
+                            );
+                        }
+                        Err(err) if limit_is_fatal && err.is_recursion_limit() => return Err(err),
+                        Err(_) => {}
                     }
                 }
                 Err(DecodeErrorKind::loc_fail(scope, input).with_trace("no valid branch"))
@@ -1046,13 +1052,11 @@ impl Decoder {
             Decoder::Peek(a) => Ok(a
                 .parse_with_loc(program, scope, input)?
                 .map(|(v, _)| (v, input))),
-            Decoder::PeekNot(a) => {
-                if a.parse_with_loc(program, scope, input).is_ok() {
-                    Err(DecodeErrorKind::loc_fail(scope, input).with_trace(("PeekNot", format!("{:?}", a))))
-                } else {
-                    Ok(WithErr::new((ParsedValue::unit_at(start_offset), input)))
-                }
-            }
+            Decoder::PeekNot(a) => match a.parse_with_loc(program, scope, input) {
+                Ok(_) => Err(DecodeErrorKind::loc_fail(scope, input).with_trace(("PeekNot", format!("{:?}", a)))),
+                Err(err) if err.is_recursion_limit() => Err(err),
+                Err(_) => Ok(WithErr::new((ParsedValue::unit_at(start_offset), input))),
+            },
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value_with_loc(scope).and_then(|v| v.try_as_usize()).trace_eval(|| ("Slice(expr)", format!("{expr:?}")))?;
                 let (slice, input) = input
@@ -1253,10 +1257,13 @@ impl Decoder {
                 });
                 Ok(WithErr::new((v, input)))
             }
-            Decoder::Permit(inner, dft) => Ok(try_downgrade_error_with(
-                inner
-                    .parse_with_loc(program, scope, input)
-                    .map(|ok| ok.map(|(v, input)| (ParsedValue::Permit(Ok(Box::new(v))), input))),
+            Decoder::Permit(inner, dft) => {
+                let res = inner.parse_with_loc(program, scope, input);
+                if matches!(&res, Err(err) if err.is_recursion_limit()) {
+                    return res;
+                }
+                Ok(try_downgrade_error_with(
+                res.map(|ok| ok.map(|(v, input)| (ParsedValue::Permit(Ok(Box::new(v))), input))),
                 || {
                     Ok::<_, EvalError>((
                         ParsedValue::Permit(Err(Some(Box::new(
@@ -1266,7 +1273,19 @@ impl Decoder {
                     ))
                 },
             )
-            .trace_eval(|| ("Permit(default)", format!("{dft:?}")))?),
+            .trace_eval(|| ("Permit(default)", format!("{dft:?}")))?)
+            }
+            Decoder::Recursive(level, d) => {
+                let Some(_guard) = RecursionGuard::enter(program.recursion_limit()) else {
+                    return Err(DecodeErrorKind::RecursionLimit {
+                        level: level.clone(),
+                        limit: program.recursion_limit(),
+                        offset: input.offset,
+                    }
+                    .into());
+                };
+                d.parse_with_loc(program, scope, input)
+            }
             #[cfg(feature = "format_enforce")]
             Decoder::Enforce(inner) => {
                 let res = inner.parse_with_loc(program, scope, input)?;

@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::iter::repeat_n;
 use std::num::NonZeroUsize;
 use std::rc::Rc;
@@ -910,6 +910,10 @@ pub struct FormatModule {
     views: IxHeap<Vec<Label>>,
     formats: Vec<Format>,
     format_types: Vec<ValueType>,
+    /// Levels registered as members of a recursive batch (see [`Self::define_format_rec_batch`]),
+    /// the only levels that can take part in a cycle of references.
+    #[serde(skip)]
+    recursive_levels: BTreeSet<usize>,
 }
 
 impl FormatModule {
@@ -920,7 +924,18 @@ impl FormatModule {
             views: IxHeap::new(),
             formats: Vec::new(),
             format_types: Vec::new(),
+            recursive_levels: BTreeSet::new(),
         }
+    }
+
+    /// Whether `level` was registered as a member of a recursive batch, by
+    /// [`Self::define_format_rec_batch`] or [`Self::define_format_recursive`].
+    ///
+    /// Only such levels can be referenced before their definition, so every cycle of references
+    /// between levels passes through them; the interpreter bounds how deeply calls to them may
+    /// nest (see [`Program::set_recursion_limit`](crate::decoder::Program::set_recursion_limit)).
+    pub fn is_recursive_level(&self, level: usize) -> bool {
+        self.recursive_levels.contains(&level)
     }
 
     pub fn define_format(&mut self, name: impl IntoLabel, format: Format) -> FormatRef {
@@ -1106,7 +1121,7 @@ impl FormatModule {
     /// Panics if any constructed format fails to type-check, or if any batch member has no
     /// reachable, non-recursive base case (see `check_batch_has_base_case`) - e.g. `F := 'a' F`,
     /// unconditionally self-referential with no non-recursive alternative anywhere on its cycle,
-    /// which would otherwise recurse without any depth bound at decode time.
+    /// which can never complete on finite input.
     pub fn define_format_rec_batch<L: IntoLabel>(
         &mut self,
         formats: Vec<(L, Format)>,
@@ -1204,6 +1219,7 @@ impl FormatModule {
     fn reserve_batch_levels(&mut self, names: impl IntoIterator<Item = Label>) -> usize {
         let start = self.names.len();
         for name in names {
+            self.recursive_levels.insert(self.names.len());
             self.names.push(name);
             self.args.push(Vec::new());
             self.views.push(Vec::new());
@@ -1220,13 +1236,13 @@ impl FormatModule {
     /// example: it makes byte progress on every step (so the [`MatchTree`] cycle guard treats it as
     /// fine, and it isn't left-recursive), yet can never actually complete on any finite input - a
     /// decoder for it would only ever stop because the input ran out, after recursing once per
-    /// remaining byte with no depth bound of its own. Left unchecked, this shape reaches
-    /// `MatchTree`/codegen and recurses at decode time via a plain, uncounted call stack (both the
-    /// interpreter's `Decoder::Call` and generated code's per-level functions), so an
-    /// attacker-controlled input to a format with this shape can exhaust the stack. Catching it here
-    /// - at the single, shared point both the interpreter and codegen compile from - closes that gap
-    /// for both backends at once, rather than needing a runtime depth counter threaded through
-    /// either one.
+    /// remaining byte.
+    ///
+    /// This check does not bound recursion depth: a format with a reachable base case still
+    /// recurses as deeply as its input nests (e.g. BSON documents within documents). The
+    /// interpreter bounds that depth at decode time (see
+    /// [`Program::set_recursion_limit`](crate::decoder::Program::set_recursion_limit)); generated
+    /// code does not. The check is also syntactic: a `Fail` alternative counts as a base case.
     ///
     /// This is a distinct, narrower check than genuine left recursion (`bad := bad | 'Z'`, still
     /// only caught later, at `MatchTree`-build time - see [`Self::define_format_rec_batch`]'s own
