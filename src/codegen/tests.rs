@@ -292,15 +292,15 @@ mod elaboration {
 
     /// All direct child [`TypedFormat`]s of `tf`, for a generic (variant-agnostic) traversal.
     ///
-    /// Returns owned `Rc`s rather than borrowed references because `FormatCall`'s child now lives
-    /// behind a `LevelCell` (`Rc<RefCell<Rc<GTFormat>>>`) - `def.borrow().clone()` is a cheap `Rc`
-    /// clone, not a deep copy, and every other variant's `Box`ed child is likewise cheaply re-homed
-    /// in an `Rc` just for this (test-only) traversal.
+    /// Returns owned `Rc`s rather than borrowed references because `FormatCall`'s child lives
+    /// behind a `LevelCell` as an `Rc<GTFormat>` - cloning it is a cheap `Rc` clone, not a deep
+    /// copy, and every other variant's `Box`ed child is likewise cheaply re-homed in an `Rc` just
+    /// for this (test-only) traversal.
     fn typed_format_children(tf: &GTFormat) -> Vec<Rc<GTFormat>> {
         use TypedFormat::*;
         let boxed = |f: &Box<GTFormat>| Rc::new((**f).clone());
         match tf {
-            FormatCall(_, _, _, _, def) => vec![def.borrow().clone()],
+            FormatCall(_, _, _, _, def) => def.get().cloned().into_iter().collect(),
             ForEach(_, _, _, f) => vec![boxed(f)],
             Fail | EndOfInput | Align(_) | Byte(_) | Pos(_) | SkipRemainder | WithView(..) => {
                 vec![]
@@ -378,9 +378,9 @@ mod elaboration {
     /// elaborates it exactly as the real `Generator::compile` pipeline does, and checks that
     /// `TypedFormat::is_nonproductive` agrees with the clone-erase-`Format::is_nonproductive` path
     /// at every distinct node of the elaborated tree - including, critically, nested `FormatCall`
-    /// occurrences reached while their own level was still open during elaboration (whose `def` is
-    /// only the elaborator's placeholder `TypedFormat::Fail`, per its own doc comment in
-    /// `Elaborator::elaborate_format`'s `Format::ItemVar` arm - see `src/codegen/mod.rs`).
+    /// occurrences reached while their own level was still open during elaboration (which share
+    /// that level's `LevelCell`, per `Elaborator::elaborate_format`'s `Format::ItemVar` arm - see
+    /// `src/codegen/mod.rs`).
     #[test]
     fn is_nonproductive_agrees() {
         use crate::helper::{alts, byte_seq, is_byte, optional, record, repeat, repeat1, tuple};
@@ -449,6 +449,91 @@ mod elaboration {
             seen.len() > 10,
             "expected to have walked a nontrivial number of distinct TypedFormat nodes, only saw {}",
             seen.len()
+        );
+    }
+
+    /// Elaborates `r := 'a' r | 'b'` as the real pipeline does, returning the typed root.
+    fn elaborate_self_recursive() -> GTFormat {
+        use crate::helper::{alts, is_byte, tuple};
+
+        let mut module = FormatModule::new();
+        let refs = module.define_format_rec_batch(vec![(
+            Label::Borrowed("test.r"),
+            alts([
+                ("A", tuple([is_byte(b'a'), Format::RecVar(0)])),
+                ("B", is_byte(b'b')),
+            ]),
+        )]);
+        let top = refs[0].call();
+        let tc = TypeChecker::infer_module(&module, &top).unwrap();
+        let mut elaborator = Elaborator::new(&module, tc, CodeGen::new());
+        elaborator.elaborate_module(&module, &top).0
+    }
+
+    /// The body of a recursive level contains a `FormatCall` holding that level's own
+    /// `LevelCell`, so `Debug` must stop where it re-enters a cell it is already printing. The
+    /// output goes to a writer that fails past a fixed size, so non-termination shows up as a
+    /// failed assertion instead of a stack overflow aborting the test binary.
+    #[test]
+    fn debug_terminates_on_recursive_format_call() {
+        struct Capped(String);
+        impl std::fmt::Write for Capped {
+            fn write_str(&mut self, s: &str) -> std::fmt::Result {
+                if self.0.len() + s.len() > 1 << 16 {
+                    return Err(std::fmt::Error);
+                }
+                self.0.push_str(s);
+                Ok(())
+            }
+        }
+
+        let top_typed = elaborate_self_recursive();
+        let mut out = Capped(String::new());
+        assert!(
+            std::fmt::write(&mut out, format_args!("{top_typed:?}")).is_ok(),
+            "Debug output of a self-recursive format exceeded 64KiB:\n{}...",
+            &out.0[..1024]
+        );
+        assert!(
+            out.0.contains("LevelCell(<recursive>)"),
+            "expected the self-reference to print as `<recursive>`, got:\n{}",
+            out.0
+        );
+    }
+
+    /// After elaboration, a level's `LevelCell` is set (`GTCompiler` reads it through
+    /// `LevelCell::body`), and the self-reference created while the level was still open holds
+    /// the same cell as the call that triggered the level's elaboration.
+    #[test]
+    fn level_cell_resolved_and_shared_after_elaboration() {
+        /// Collects the `FormatCall`s in `tf` without descending into their bodies.
+        fn calls_in(tf: &GTFormat, out: &mut Vec<(usize, LevelCell<GenType>)>) {
+            if let TypedFormat::FormatCall(_, level, _, _, def) = tf {
+                out.push((*level, def.clone()));
+                return;
+            }
+            for child in typed_format_children(tf) {
+                calls_in(&child, out);
+            }
+        }
+
+        let top_typed = elaborate_self_recursive();
+        let TypedFormat::FormatCall(_, level, _, _, cell) = &top_typed else {
+            panic!("expected the root to be a FormatCall, got {top_typed:?}");
+        };
+        let body = cell.get().expect("root cell still open after elaboration");
+        let mut inner = Vec::new();
+        calls_in(body, &mut inner);
+        assert_eq!(
+            inner.len(),
+            1,
+            "expected exactly one self-reference in {body:?}"
+        );
+        let (inner_level, inner_cell) = &inner[0];
+        assert_eq!(inner_level, level);
+        assert!(
+            inner_cell == cell,
+            "self-reference holds a different cell from its level's root call"
         );
     }
 

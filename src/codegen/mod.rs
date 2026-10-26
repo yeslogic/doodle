@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    cell::{OnceCell, RefCell},
+    cell::OnceCell,
     collections::BTreeSet,
     hash::{Hash, Hasher},
     rc::Rc,
@@ -5067,13 +5067,15 @@ impl<'a> Elaborator<'a> {
                         self.module.get_name(level).to_string(),
                     )));
                 let t_inner = if let Some(cell) = self.t_formats.get(&level) {
-                    cell.borrow().clone()
+                    Rc::clone(cell.get().expect(
+                        "FixedFormat-referenced format referenced while its body is still being elaborated",
+                    ))
                 } else {
                     let fmt = self.module.get_format(level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
                     let ret = Rc::new(tmp);
                     self.t_formats
-                        .insert(level, Rc::new(RefCell::new(ret.clone())));
+                        .insert(level, LevelCell::resolved(ret.clone()));
                     ret
                 };
                 self.codegen.name_gen.ctxt.escape();
@@ -5242,33 +5244,25 @@ impl<'a> Elaborator<'a> {
                 let t_inner = if let Some(cell) = self.t_formats.get(level) {
                     cell.clone()
                 } else {
-                    // Reserve a shared, backpatchable cell *before* recursing into the level's own
-                    // body, so that a self-reference reached during that recursion (which can only
-                    // ever occur inside a `Format::Phantom`, the one place `ItemVar` may validly
-                    // name its own not-yet-elaborated level - *or* inside another recursive
-                    // definition's own body, reached as a sibling arm from within this level's own
-                    // still-open elaboration, e.g. two definitions in the same
-                    // `define_format_rec_batch` that both call back into a shared hub) resolves to
-                    // this placeholder instead of re-entering this same call and recursing without
-                    // bound.
+                    // Reserve the level's (still open) cell *before* recursing into its own body,
+                    // so that a reference to this level reached during that recursion resolves to
+                    // the same cell instead of re-entering this call and recursing without bound.
+                    // Such a reference occurs inside a `Format::Phantom` (the one place `ItemVar`
+                    // may name its own not-yet-elaborated level), or inside another recursive
+                    // definition's body reached from this level's own still-open elaboration (e.g.
+                    // two definitions in the same `define_format_rec_batch` that both call back
+                    // into a shared hub).
                     //
-                    // Every occurrence of this level - not just the one that triggers its
-                    // elaboration - gets a `clone()` of this *same* `LevelCell`, so backfilling it
-                    // once below (`*cell.borrow_mut() = ...`) is instantly visible everywhere,
-                    // including occurrences frozen on the placeholder mid-elaboration. Previously
-                    // `t_inner` was a plain `Rc<TypedFormat>` snapshotted per-occurrence, which left
-                    // any occurrence other than the triggering one permanently stuck on the
-                    // placeholder - harmless for `GTCompiler::compile_gt_format` (which never trusts
-                    // this content directly: see `decoder_map` below), but `TypedFormat::match_bounds`/
-                    // `lookahead_bounds` *do* walk straight into it, and treated such an occurrence as
-                    // unconditionally nullable even when the format could never actually match zero
-                    // bytes - see the `bson.array` regression this was fixed for.
-                    let cell: LevelCell<GenType> =
-                        Rc::new(RefCell::new(TypedFormat::recursion_placeholder()));
+                    // Every occurrence of this level holds a clone of this one `LevelCell`, so
+                    // setting it below makes the body visible to all of them, including those
+                    // created while it was open. `TypedFormat::match_bounds`/`lookahead_bounds`
+                    // walk into that body, and read a still-open cell as unresolved rather than
+                    // as matching zero bytes.
+                    let cell: LevelCell<GenType> = LevelCell::open();
                     self.t_formats.insert(*level, cell.clone());
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
-                    *cell.borrow_mut() = Rc::new(tmp);
+                    cell.set(Rc::new(tmp));
                     cell
                 };
                 let gt = self.get_gt_from_index(index);
@@ -6210,10 +6204,8 @@ impl<'a> Elaborator<'a> {
             // Mirrors `TypeChecker::infer_module`'s recording of `level_vars` for levels unreachable from
             // `top_format`, so that later `ItemVar` references to `next_level` hit the cache in both layers alike.
             if self.t_formats.get(&next_level).is_none() {
-                self.t_formats.insert(
-                    next_level,
-                    Rc::new(RefCell::new(Rc::new(local_root.clone()))),
-                );
+                self.t_formats
+                    .insert(next_level, LevelCell::resolved(Rc::new(local_root.clone())));
             }
             extra.push(local_root);
             let all_seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();
