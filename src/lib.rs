@@ -3044,6 +3044,28 @@ enum MatchTreeError {
     DepthExhausted,
 }
 
+impl MatchTreeError {
+    /// Describes why construction failed, naming the level of a cycle as registered in `module`.
+    fn describe(&self, module: &FormatModule) -> String {
+        match self {
+            MatchTreeError::Cycle { level } => format!(
+                "zero-progress recursive cycle through `{}`",
+                module.get_name(*level)
+            ),
+            MatchTreeError::Ambiguous {
+                accepted,
+                conflicting,
+            } => format!(
+                "alternatives {accepted} and {conflicting} both accept the same input, so no \
+                 amount of lookahead can decide between them"
+            ),
+            MatchTreeError::DepthExhausted => format!(
+                "alternatives cannot be told apart within {MATCH_TREE_MAX_DEPTH} bytes of lookahead"
+            ),
+        }
+    }
+}
+
 impl<'a> MatchTreeLevel<'a> {
     /// Constructs a `MatchTreeLevel` that unconditionally rejects all inputs without branching.
     fn reject() -> MatchTreeLevel<'a> {
@@ -3216,6 +3238,9 @@ impl MatchTree {
     /// to within a fixed but externally opaque lookahead-depth.
     ///
     /// A `FormatModule` is also accepted to contextualize any contextually dependent formats, e.g. [`Format::ItemVar`]
+    ///
+    /// The compilers use [`Self::build_for`], which reports why construction failed.
+    #[cfg(test)]
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         Self::try_build(module, branches, next).ok()
     }
@@ -3227,6 +3252,23 @@ impl MatchTree {
         next: Rc<Next<'_>>,
     ) -> Result<MatchTree, MatchTreeError> {
         Self::try_build_probed(module, branches, next, &mut false)
+    }
+
+    /// Like [`Self::try_build`], but as an error naming `what` (the format whose choice the tree
+    /// would decide) along with why construction failed.
+    fn build_for(
+        module: &FormatModule,
+        branches: &[Format],
+        next: Rc<Next<'_>>,
+        what: impl FnOnce() -> String,
+    ) -> AResult<MatchTree> {
+        Self::try_build(module, branches, next).map_err(|err| {
+            anyhow!(
+                "cannot build match tree for {}: {}",
+                what(),
+                err.describe(module)
+            )
+        })
     }
 
     /// Returns `true` if building the `MatchTree` for `branches` followed by `next` could consult
@@ -4201,6 +4243,37 @@ mod test {
         assert!(
             result.is_err(),
             "compiling a genuinely left-recursive format must fail cleanly, not panic or hang"
+        );
+    }
+
+    /// A compile error for an undecidable choice says why the `MatchTree` could not be built.
+    #[test]
+    fn match_tree_compile_errors_report_the_reason() {
+        use crate::helper::{alts, is_byte, tuple};
+
+        let error_for = |module: &FormatModule, f: &Format| {
+            super::decoder::Compiler::compile_program(module, f)
+                .err()
+                .map(|e| e.to_string())
+                .unwrap_or_default()
+        };
+        let a_star = || Format::Repeat(Box::new(is_byte(b'a')));
+
+        let module = FormatModule::new();
+        let ambiguous = alts([("A", is_byte(b'a')), ("B", is_byte(b'a'))]);
+        assert!(error_for(&module, &ambiguous).contains("both accept the same input"));
+        let too_deep = alts([
+            ("B", tuple([a_star(), is_byte(b'b')])),
+            ("C", tuple([a_star(), is_byte(b'c')])),
+        ]);
+        assert!(error_for(&module, &too_deep).contains("bytes of lookahead"));
+
+        let mut module = FormatModule::new();
+        let bad_body = Format::Union(vec![Format::RecVar(0), is_byte(b'Z')]);
+        let bad = module.define_format_rec_batch(vec![("test.bad", bad_body)])[0];
+        assert!(
+            error_for(&module, &bad.call())
+                .contains("zero-progress recursive cycle through `test.bad`")
         );
     }
 

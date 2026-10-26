@@ -534,11 +534,9 @@ impl<'a> Compiler<'a> {
                 for f in branches {
                     ds.push(self.compile_format(f, next.clone())?);
                 }
-                if let Some(tree) = MatchTree::build(self.module, branches, next) {
-                    Ok(Decoder::Branch(tree, ds))
-                } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
-                }
+                let tree =
+                    MatchTree::build_for(self.module, branches, next, || format!("{format:?}"))?;
+                Ok(Decoder::Branch(tree, ds))
             }
             Format::UnionNondet(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
@@ -581,11 +579,9 @@ impl<'a> Compiler<'a> {
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
-                if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next) {
-                    Ok(Decoder::While(tree, Box::new(da)))
-                } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
-                }
+                let tree =
+                    MatchTree::build_for(self.module, &[fa, fb], next, || format!("{format:?}"))?;
+                Ok(Decoder::While(tree, Box::new(da)))
             }
             Format::Repeat1(a) => {
                 if a.is_nullable(self.module) {
@@ -598,11 +594,9 @@ impl<'a> Compiler<'a> {
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::EMPTY;
                 let fb = Format::Tuple(vec![(**a).clone(), astar]);
-                if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next) {
-                    Ok(Decoder::Until(tree, Box::new(da)))
-                } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
-                }
+                let tree =
+                    MatchTree::build_for(self.module, &[fa, fb], next, || format!("{format:?}"))?;
+                Ok(Decoder::Until(tree, Box::new(da)))
             }
             Format::RepeatCount(expr, a) => {
                 let next = Self::__repeat_next(a, next);
@@ -629,10 +623,9 @@ impl<'a> Compiler<'a> {
                             Format::RepeatCount(Box::new(Expr::U32(count as u32)), a.clone());
                         branches.push(f_count);
                     }
-                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        return Err(anyhow!("cannot build match tree for {format:?}"));
-                    };
-                    tree
+                    MatchTree::build_for(self.module, &branches[..], next, || {
+                        format!("{format:?}")
+                    })?
                 };
                 Ok(Decoder::RepeatBetween(tree, *range, Box::new(da)))
             }

@@ -440,7 +440,7 @@ impl<'a> GTCompiler<'a> {
         args: Option<Vec<(Label, GenType)>>,
         next: Rc<Next<'a>>,
     ) -> AResult<GTDecoderExt> {
-        let dec = match format {
+        let dec: AResult<GTDecoder> = match format {
             TypedFormat::FormatCall(gt, level, arg_exprs, arg_views, deref) => {
                 let this_args = (arg_exprs.to_vec(), arg_views.to_vec());
                 let sig_args = if arg_exprs.is_empty() && arg_views.is_empty() {
@@ -525,14 +525,10 @@ impl<'a> GTCompiler<'a> {
                     ds.push(self.compile_gt_format(f, None, next.clone())?);
                     fs.push(f.clone().into());
                 }
-                if let Some(tree) = MatchTree::build(self.module, &fs, next) {
-                    Ok(TypedDecoder::Branch(gt.clone(), tree, ds))
-                } else {
-                    Err(anyhow!(
-                        "cannot build match tree for {}",
-                        serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
-                    ))
-                }
+                let tree = MatchTree::build_for(self.module, &fs, next, || {
+                    serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
+                })?;
+                Ok(TypedDecoder::Branch(gt.clone(), tree, ds))
             }
             TypedFormat::UnionNondet(gt, branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
@@ -576,14 +572,11 @@ impl<'a> GTCompiler<'a> {
                 let astar = TypedFormat::Repeat(gt.clone(), a.clone());
                 let fa = TypedFormat::tuple(vec![(**a).clone(), astar]);
                 let fb = TypedFormat::EMPTY;
-                if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
-                    Ok(TypedDecoder::Repeat0While(gt.clone(), tree, Box::new(da)))
-                } else {
-                    Err(anyhow!(
-                        "cannot build match tree for {}",
+                let tree =
+                    MatchTree::build_for(self.module, &[fa.into(), fb.into()], next, || {
                         serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
-                    ))
-                }
+                    })?;
+                Ok(TypedDecoder::Repeat0While(gt.clone(), tree, Box::new(da)))
             }
             TypedFormat::Repeat1(gt, a) => {
                 if a.is_nullable() {
@@ -597,14 +590,11 @@ impl<'a> GTCompiler<'a> {
                 let astar = TypedFormat::Repeat(gt.clone(), a.clone());
                 let fa = TypedFormat::EMPTY;
                 let fb = TypedFormat::tuple(vec![(**a).clone(), astar]);
-                if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
-                    Ok(TypedDecoder::Repeat1Until(gt.clone(), tree, Box::new(da)))
-                } else {
-                    Err(anyhow!(
-                        "cannot build match tree for {}",
+                let tree =
+                    MatchTree::build_for(self.module, &[fa.into(), fb.into()], next, || {
                         serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
-                    ))
-                }
+                    })?;
+                Ok(TypedDecoder::Repeat1Until(gt.clone(), tree, Box::new(da)))
             }
             TypedFormat::RepeatCount(gt, expr, a) => {
                 let next = Self::__repeat_next(a, next);
@@ -636,13 +626,9 @@ impl<'a> GTCompiler<'a> {
                         );
                         branches.push(f_count.into());
                     }
-                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        return Err(anyhow!(
-                            "cannot build match tree for {}",
-                            serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
-                        ));
-                    };
-                    tree
+                    MatchTree::build_for(self.module, &branches[..], next, || {
+                        serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()
+                    })?
                 };
                 Ok(TypedDecoder::RepeatBetween(
                     gt.clone(),
@@ -835,7 +821,8 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(inner, None, next)?);
                 Ok(TypedDecoder::Permit(gt.clone(), da, expr.clone()))
             }
-        }?;
+        };
+        let dec = dec?;
         Ok(TypedDecoderExt::new(dec, args))
     }
 }
