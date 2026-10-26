@@ -909,7 +909,10 @@ impl Format {
 
     /// Returns `true` if values associated to this format should be handled as multi-character ASCII strings
     pub fn is_ascii_string_format(&self, module: &FormatModule) -> bool {
-        match self {
+        let Some(this) = self.as_inner_format() else {
+            return false;
+        };
+        match this {
             Format::Hint(StyleHint::AsciiStr, _) => true,
             Format::ItemVar(level, ..) => module.get_format(*level).is_ascii_string_format(module),
             Format::RecVar(..) => unreachable!("RecVar should have been resolved"),
@@ -977,6 +980,30 @@ impl Format {
 mod tests {
     use super::*;
     use crate::helper::*;
+
+    /// `is_ascii_string_format` sees through the same type-preserving wrappers as its UTF-8 and
+    /// ASCII-character siblings, e.g. `tar`'s `filename`, a `Slice` around a call to an
+    /// ASCII-string-hinted format.
+    #[test]
+    fn is_ascii_string_format_sees_through_wrappers() {
+        let mut module = FormatModule::new();
+        let ascii = || mk_ascii_string(repeat(not_byte(0x00)));
+        let named = module.define_format("test.ascii-string", ascii());
+        let cases = [
+            ("ItemVar", named.call()),
+            ("Slice", slice(Expr::U16(100), ascii())),
+            ("Slice(ItemVar)", slice(Expr::U16(100), named.call())),
+            ("MonadSeq", monad_seq(is_byte(0x00), ascii())),
+            ("LetFormat", chain(is_byte(0x00), "x", ascii())),
+        ];
+        for (name, format) in cases {
+            assert!(
+                format.is_ascii_string_format(&module),
+                "{name}: expected an ASCII-string format"
+            );
+        }
+        assert!(!Format::Peek(Box::new(ascii())).is_ascii_string_format(&module));
+    }
 
     /// `lookahead_effect` must only call a format transparent when skipping it in a `Next` cannot
     /// change any `MatchTree`: zero-width formats that constrain lookahead are opaque, and the
