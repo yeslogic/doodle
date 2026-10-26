@@ -811,25 +811,7 @@ impl Decoder {
         input: ReadCtxt<'input>,
     ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
         match self {
-            Decoder::Call(n, es, vs) => {
-                let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
-                for (name, e) in es {
-                    let v = e
-                        .eval_value(scope)
-                        .trace_eval(|| ("Call(e)", format!("{e:?}")))?;
-                    new_scope.push_owned(name.clone(), v);
-                }
-                for (name, v) in vs {
-                    let vv = Self::eval_view_expr(scope, v)?;
-                    new_scope.push_view(name.clone(), vv);
-                }
-                Ok(try_with! (
-                program.decoders[*n]
-                    .0
-                    .parse(program, &Scope::Multi(&new_scope), input)
-                => ("parse@Call", *n)
-                ))
-            }
+            Decoder::Call(n, es, vs) => Self::parse_call(n, es, vs, program, scope, input),
             Decoder::Phantom => Ok(WithErr::new((Value::PhantomData, input))),
             Decoder::Fail => Err(DecodeErrorKind::<Value>::fail(scope, input).into()),
             Decoder::Pos => Ok(WithErr::new((Value::from_pos(input.offset), input))),
@@ -857,565 +839,984 @@ impl Decoder {
                     Err(DecodeErrorKind::unexpected(b, *bs, input.offset).into())
                 }
             }
-            Decoder::Variant(label, d) => Ok(d
-                .parse(program, scope, input)?
-                .map(move |(v, input)| (Value::Variant(label.clone(), Box::new(v)), input))),
+            Decoder::Variant(label, d) => Self::parse_variant(label, d, program, scope, input),
             Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
-                    offset: input.offset,
-                })?;
-                let d = &branches[index];
-                Ok(d.parse(program, scope, input)?
-                    .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)))
+                Self::parse_branch(tree, branches, program, scope, input)
             }
-            Decoder::Parallel(branches) => {
-                for (index, d) in branches.iter().enumerate() {
-                    let res = d.parse(program, scope, input);
-                    if let Ok(p) = res {
-                        return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
-                    }
-                }
-                Err(DecodeErrorKind::<Value>::fail(scope, input).with_trace("no valid branch"))
-            }
-            Decoder::Tuple(fields) => Ok(WithErr::fold(
-                (Vec::with_capacity(fields.len()), input),
-                fields.iter().enumerate(),
-                |(mut v, input), (ix, f)| {
-                    Ok(
-                        try_with!(f.parse(program, scope, input) => ("Tuple", ix)).map(
-                            move |(vf, new_input)| {
-                                v.push(vf);
-                                (v, new_input)
-                            },
-                        ),
-                    )
-                },
-            )?
-            .map(|(v, input)| (Value::Tuple(v), input))),
-            Decoder::Sequence(decs) => Ok(WithErr::fold(
-                (Vec::with_capacity(decs.len()), input),
-                decs.iter(),
-                |(mut v, input), f| {
-                    Ok(
-                        try_with!(f.parse(program, scope, input) => ("Sequence", v.len())).map(
-                            move |(vf, new_input)| {
-                                v.push(vf);
-                                (v, new_input)
-                            },
-                        ),
-                    )
-                },
-            )?
-            .map(|(v, input)| (Value::Seq(SeqKind::Strict(v)), input))),
-            Decoder::While(tree, a) => {
-                let mut input = input;
-                let mut res = WithErr::new((Vec::new(), input));
-                while try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
-                    offset: input.offset,
-                }) => ("While(matchtree)", res.as_ref().0.len()))
-                    == 0
-                {
-                    res = res.join(|(mut v, input)| {
-                        Ok(
-                            try_with!(a.parse(program, scope, input) => ("While(parse)", v.len()))
-                                .map(|(va, next_input)| {
-                                    v.push(va);
-                                    (v, next_input)
-                                }),
-                        )
-                    })?;
-                    input = res.as_ref().1;
-                }
-                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
-            }
-            Decoder::Until(tree, a) => {
-                let mut res = WithErr::new((Vec::new(), input));
-                loop {
-                    res = res.join(|(mut v, input)| {
-                        Ok(
-                            try_with!(a.parse(program, scope, input) => ("Until(parse)", v.len()))
-                                .map(|(va, next_input)| {
-                                    v.push(va);
-                                    (v, next_input)
-                                }),
-                        )
-                    })?;
-                    let input = res.as_ref().1;
-                    if try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
-                        offset: input.offset,
-                    }) => ("Until(matchtree)", res.as_ref().0.len()))
-                        == 0
-                    {
-                        break;
-                    }
-                }
-                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
-            }
+            Decoder::Parallel(branches) => Self::parse_parallel(branches, program, scope, input),
+            Decoder::Tuple(fields) => Self::parse_tuple(fields, program, scope, input),
+            Decoder::Sequence(decs) => Self::parse_sequence(decs, program, scope, input),
+            Decoder::While(tree, a) => Self::parse_while(tree, a, program, scope, input),
+            Decoder::Until(tree, a) => Self::parse_until(tree, a, program, scope, input),
             Decoder::DecodeBytes(bytes, a) => {
-                let bytes = {
-                    let raw = bytes
-                        .eval_value(scope)
-                        .trace_eval(|| ("DecodeBytes(bytes)", format!("{bytes:?}")))?;
-                    let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals
-                        .into_iter()
-                        .map(|v| v.get_as_u8())
-                        .collect::<Vec<u8>>()
-                };
-                let new_input = ReadCtxt::from_value(&bytes);
-                try_with!(a.parse(program, scope, new_input) => ("DecodeBytes", bytes.len())).join(
-                    |(va, rem_input)| {
-                        // FIXME: trailing bytes here are reported as a warning embedded in an
-                        // `Ok(WithErr)`, not a hard `Err`. `Decoder::Permit` only branches on
-                        // `Err` from its first sub-decoder, so it can never see this warning and
-                        // therefore can't fall back to its second branch when `DecodeBytes`'s
-                        // held format under-consumes the sub-buffer. `permit(decode_bytes(...))`
-                        // used as a strict "fully valid or not" gate is silently unsound as a
-                        // result. Tracked in a separate issue (see git issue tracker).
-                        Ok(match rem_input.read_byte() {
-                            Some((b, _)) => {
-                                let err = rem_input.kind.trailing(b, rem_input.offset).into();
-                                WithErr::with_err((va, input), err)
-                            }
-                            None => WithErr::new((va, input)),
-                        })
-                    },
-                )
+                Self::parse_decode_bytes(bytes, a, program, scope, input)
             }
             Decoder::ParseFromView(v_expr, a) => {
-                let view_window = Self::eval_view_expr(scope, v_expr)?;
-                Ok(try_with!(a.parse(program, scope, view_window) => ("ParseFromView", format!("{:?}", v_expr)))
-                    .map(|(va, _)| (va, input)))
+                Self::parse_from_view(v_expr, a, program, scope, input)
             }
             Decoder::LetFormat(da, name, db) => {
-                try_with!(da.parse(program, scope, input) => ("LetFormat(lhs)", name.to_string()))
-                    .join(|(va, input)| {
-                        let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
-                        db.parse(program, &new_scope, input)
-                    })
+                Self::parse_let_format(da, name, db, program, scope, input)
             }
-            Decoder::MonadSeq(da, db) => {
-                try_with!(da.parse(program, scope, input) => "MonadSeq(lhs)").join(|(_, input)| {
-                    Ok(try_with!(db.parse(program, scope, input) => "MonadSeq(rhs)"))
-                })
-            }
+            Decoder::MonadSeq(da, db) => Self::parse_monad_seq(da, db, program, scope, input),
             Decoder::ForEach(expr, lbl, a) => {
-                // we need val because it would otherwise be a dropped temporary binding
-                let val = expr
-                    .eval_value(scope)
-                    .trace_eval(|| ("ForEach(expr)", format!("{expr:?}")))?;
-                let seq = val.get_sequence().expect("bad type for ForEach input");
-                Ok(WithErr::fold(
-                    (Vec::with_capacity(seq.len()), input),
-                    seq,
-                    |(mut v, input), e| {
-                        let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
-                        Ok(try_with!(a.parse(program, &new_scope, input) => ("ForEach", v.len(), format!("{e:?}")))
-                            .map(|(va, next_input)| {
-                                v.push(va);
-                                (v, next_input)
-                            }))
-                    },
-                )?
-                .map(|(v, input)| (Value::Seq(v.into()), input)))
+                Self::parse_for_each(expr, lbl, a, program, scope, input)
             }
             Decoder::RepeatCount(expr, a) => {
-                let count = expr
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("RepeatCount(expr)", format!("{expr:?}")))?;
-                Ok(WithErr::fold(
-                    (Vec::with_capacity(count), input),
-                    0..count,
-                    |(mut v, input), _| {
-                        Ok(
-                            try_with!(a.parse(program, scope, input) => ("RepeatCount", v.len()))
-                                .map(|(va, next_input)| {
-                                    v.push(va);
-                                    (v, next_input)
-                                }),
-                        )
-                    },
-                )?
-                .map(|(v, input)| (Value::Seq(v.into()), input)))
+                Self::parse_repeat_count(expr, a, program, scope, input)
             }
             Decoder::RepeatBetween(reps_left_tree, range, a) => {
-                let (min, max) = (range.min(), range.max());
-                let mut res = WithErr::new((Vec::new(), input));
-                loop {
-                    // NOTE - lookahead must be performed from the current position, not the start of the repetition
-                    let (v, cur_input) = res.as_ref();
-                    let reps_left = reps_left_tree.matches(*cur_input).ok_or(
-                        DecodeErrorKind::NoValidBranch {
-                            offset: cur_input.offset,
-                        }
-                        .with_trace(v.len()),
-                    )?;
-                    if reps_left == 0 || v.len() == max {
-                        if v.len() < min {
-                            return Err(DecodeErrorKind::InsufficientRepeats {
-                                min,
-                                found: v.len(),
-                                offset: cur_input.offset,
-                            }
-                            .with_trace("RepeatBetween"));
-                        }
-                        break;
-                    }
-                    res = res.join(|(mut v, input)| {
-                        Ok(
-                            try_with!(a.parse(program, scope, input) => ("RepeatBetween", v.len()))
-                                .map(|(va, next_input)| {
-                                    v.push(va);
-                                    (v, next_input)
-                                }),
-                        )
-                    })?;
-                }
-                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
+                Self::parse_repeat_between(reps_left_tree, range, a, program, scope, input)
             }
-            Decoder::Maybe(expr, a) => {
-                let is_present = expr
-                    .eval_value(scope)
-                    .trace_eval(|| ("Maybe(expr)", format!("{expr:?}")))?
-                    .unwrap_bool();
-                if is_present {
-                    Ok(try_with!(a.parse(program, scope, input) => "Maybe")
-                        .map(|(val, input)| (Value::Option(Some(Box::new(val))), input)))
-                } else {
-                    Ok(WithErr::new((Value::Option(None), input)))
-                }
-            }
+            Decoder::Maybe(expr, a) => Self::parse_maybe(expr, a, program, scope, input),
             Decoder::RepeatUntilLast(expr, a) => {
-                // third value is "done" flag
-                let mut res = WithErr::new((Vec::new(), input, false));
-                loop {
-                    res = res.join(|(mut v, input, _done)| {
-                        try_with!(a.parse(program, scope, input) => ("RepeatUntilLast", v.len()))
-                            .join(|(va, next_input)| {
-                                let done = expr
-                                    .eval_lambda(scope, &va)
-                                    .trace_eval(|| ("RepeatUntilLast(expr)", format!("{expr:?}")))?
-                                    .unwrap_bool();
-                                v.push(va);
-                                Ok(WithErr::new((v, next_input, done)))
-                            })
-                    })?;
-                    break_if_done!(res => (v, input));
-                }
-                Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
+                Self::parse_repeat_until_last(expr, a, program, scope, input)
             }
             Decoder::RepeatUntilSeq(expr, a) => {
-                // third value is "done" flag
-                let mut res = WithErr::new((Vec::new(), input, false));
-                loop {
-                    res = res.join(|(mut v, input, _done)| {
-                        try_with!(a.parse(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
-                            .join(|(va, next_input)| {
-                                v.push(va);
-                                let vs = Value::Seq(v.into());
-                                let done = expr.eval_lambda(scope, &vs).trace_eval(|| ("RepeatUntilSeq(expr)", format!("{expr:?}")))?.unwrap_bool();
-                                let v = match vs {
-                                    Value::Seq(v) => v.into_vec(),
-                                    _ => unreachable!(),
-                                };
-                                Ok(WithErr::new((v, next_input, done)))
-                            })
-                    })?;
-                    break_if_done!(res => (v, input));
-                }
-                Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
+                Self::parse_repeat_until_seq(expr, a, program, scope, input)
             }
             Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
-                let accum = init
-                    .eval_value(scope)
-                    .trace_eval(|| ("AccumUntil(init)", format!("{init:?}")))?;
-                let mut res = WithErr::new((Vec::new(), accum, input, false));
-                loop {
-                    res = res.join(|(mut v, accum, input, _done)| {
-                        let done_arg =
-                            Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
-                        let is_done = f_done.eval_lambda(scope, &done_arg).trace_eval(|| ("AccumUntil(f_done)", format!("{f_done:?}")))?.unwrap_bool();
-                        if is_done {
-                            return Ok(WithErr::new((v, accum, input, true)));
-                        }
-                        try_with!(a.parse(program, scope, input) => ("AccumUntil", format!("len={}", v.len()), format!("accum={:?}", accum)))
-                            .join(|(next_elem, next_input)| {
-                                v.push(next_elem.clone());
-                                let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
-                                let next_accum = f_update.eval_lambda(scope, &update_arg).trace_eval(|| ("AccumUntil(f_update)", format!("{f_update:?}")))?;
-                                Ok(WithErr::new((v, next_accum, next_input, false)))
-                            })
-                    })?;
-                    break_if_done!(res => (v, accum, input));
-                }
-                Ok(res.map(|(v, accum, input, _)| {
-                    (Value::Tuple(vec![accum, Value::Seq(v.into())]), input)
-                }))
+                Self::parse_accum_until(f_done, f_update, init, a, program, scope, input)
             }
-            Decoder::Peek(a) => Ok(a.parse(program, scope, input)?.map(|(v, _)| (v, input))),
-            Decoder::PeekNot(a) => {
-                if a.parse(program, scope, input).is_ok() {
-                    Err(DecodeErrorKind::<Value>::fail(scope, input)
-                        .with_trace(("PeekNot", format!("{:?}", a))))
-                } else {
-                    Ok(WithErr::new((Value::Tuple(vec![]), input)))
-                }
-            }
-            Decoder::Slice(expr, a) => {
-                let size = expr
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("Slice(expr)", format!("{expr:?}")))?;
-                let (mut slice, input) = input.split_at(size).ok_or(
-                    input
-                        .kind
-                        .overrun(size, input.offset)
-                        .with_trace(("Slice(create)", format!("{:?}->{size}", expr))),
-                )?;
-                slice.kind &= BufferKind::Slice;
-                Ok(try_with!(a.parse(program, scope, slice) => ("Slice(parse)", format!("{:?}", a))).map(|(v, _)| (v, input)))
-            }
-            Decoder::Bits(a) => {
-                // FIXME - copying the entire buffer as bits feels inefficient, we should measure performance and see if there is a better alternative
-                let mut bits = Vec::with_capacity(input.remaining().len() * 8);
-                for b in input.remaining() {
-                    for i in 0..8 {
-                        bits.push((b & (1 << i)) >> i);
-                    }
-                }
-                try_with!(a.parse(program, scope, ReadCtxt::new(&bits)) => ("Bits(parse)", format!("{a:?}")))
-                    .join(|(v, bits)| {
-                        let bytes_remain = bits.remaining().len() >> 3;
-                        let bytes_read = input.remaining().len() - bytes_remain;
-                        let (_, input) = input
-                            .split_at(bytes_read)
-                            .ok_or(input.kind.overrun(bytes_read, input.offset))?;
-                        Ok(WithErr::new((v, input)))
-                    })
-            }
+            Decoder::Peek(a) => Self::parse_peek(a, program, scope, input),
+            Decoder::PeekNot(a) => Self::parse_peek_not(a, program, scope, input),
+            Decoder::Slice(expr, a) => Self::parse_slice(expr, a, program, scope, input),
+            Decoder::Bits(a) => Self::parse_bits(a, program, scope, input),
             Decoder::WithRelativeOffset(base_addr, expr, a) => {
-                let base = base_addr
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("WithRelativeOffset(base_addr)", format!("{base_addr:?}")))?;
-                let offset = expr
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("WithRelativeOffset(expr)", format!("{expr:?}")))?;
-                // `checked_add` rather than `+`: an unchecked add here would panic on overflow in
-                // debug builds and silently wrap in release builds, potentially seeking to a
-                // small, wrapped-around (and spuriously valid-looking) offset instead of failing.
-                let abs_offset = base.checked_add(offset).ok_or_else(|| {
-                    input
-                        .kind
-                        .offset_overflow(base, offset)
-                        .with_trace("WithRelativeOffset(seek)")
-                })?;
-                let seek_input = input.seek_to(abs_offset).ok_or(
-                    input
-                        .kind
-                        .bad_seek(abs_offset, input.input.len())
-                        .with_trace("WithRelativeOffset(seek)"),
-                )?;
-                Ok(try_with!(a.parse(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
-                    .map(|(v, _)| (v, input)))
+                Self::parse_with_relative_offset(base_addr, expr, a, program, scope, input)
             }
-            Decoder::Map(d, expr) => {
-                try_with!(d.parse(program, scope, input) => ("Map(parse)", format!("{d:?}"))).join(
-                    |(orig, input)| {
-                        let v = expr
-                            .eval_lambda(scope, &orig)
-                            .trace_eval(|| ("Map(expr)", format!("{expr:?}")))?;
-                        Ok(WithErr::new((
-                            Value::Mapped(Box::new(orig), Box::new(v)),
-                            input,
-                        )))
-                    },
-                )
-            }
-            Decoder::Where(d, cond) => {
-                try_with!(d.parse(program, scope, input) => ("Where(parse)", format!("{d:?}")))
-                    .join(|(v, input)| {
-                        let Condition { expr, severity } = cond;
-                        match expr
-                            .eval_lambda(scope, &v)
-                            .trace_eval(|| ("Where(expr)", format!("{expr:?}")))?
-                            .unwrap_bool()
-                        {
-                            true => Ok(WithErr::new((v, input))),
-                            false => {
-                                let err = DecodeErrorKind::bad_where(
-                                    scope,
-                                    expr.clone(),
-                                    Box::new(v.clone()),
-                                )
-                                .into();
-                                if severity.is_strict() {
-                                    Err(err)
-                                } else {
-                                    Ok(WithErr::with_err((v, input), err))
-                                }
-                            }
-                        }
-                    })
-            }
-            Decoder::Compute(expr) => {
-                let v = expr
-                    .eval_value(scope)
-                    .trace_eval(|| ("Compute(expr)", format!("{expr:?}")))?;
-                Ok(WithErr::new((v, input)))
-            }
-            Decoder::Let(name, expr, d) => {
-                let v = expr
-                    .eval_value(scope)
-                    .trace_eval(|| ("Let(expr)", format!("{expr:?}")))?;
-                let let_scope = SingleScope::new(scope, name, &v);
-                Ok(
-                    try_with!(d.parse(program, &Scope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),
-                )
-            }
-            Decoder::LetView(name, d) => {
-                let mut view = input;
-                view.kind &= BufferKind::View;
-                let let_scope = ViewScope::new(scope, name, view);
-                Ok(
-                    try_with!(d.parse(program, &Scope::View(let_scope), input) => ("LetView(parse)", name.to_string(), format!("{d:?}"))),
-                )
-            }
+            Decoder::Map(d, expr) => Self::parse_map(d, expr, program, scope, input),
+            Decoder::Where(d, cond) => Self::parse_where(d, cond, program, scope, input),
+            Decoder::Compute(expr) => Self::parse_compute(expr, scope, input),
+            Decoder::Let(name, expr, d) => Self::parse_let(name, expr, d, program, scope, input),
+            Decoder::LetView(name, d) => Self::parse_let_view(name, d, program, scope, input),
             Decoder::Match(head, branches) => {
-                let head = head
-                    .eval(scope)
-                    .trace_eval(|| ("Match(head)", format!("{head:?}")))?;
-                for (index, (pattern, decoder)) in branches.iter().enumerate() {
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        return Ok(try_with!(decoder.parse(program, &Scope::Multi(&pattern_scope), input)
-                        => ("Match(parse)", format!("[{}]: {:?} => {:?}", index, pattern, decoder))
-                        )
-                            .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
-                    }
-                }
-                // NOTE - if we reach this point, it means that none of the patterns matched the head value, and we therefore have to return an error
-                let cases = branches.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>();
-                Err(DecodeError::from(DecodeErrorKind::RefutedPatternMatch {
-                    cases,
-                    value: Box::new(head.into_owned()),
-                }))
+                Self::parse_match(head, branches, program, scope, input)
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
-                let lengths_val = lengths_expr
-                    .eval(scope)
-                    .trace_eval(|| ("Dynamic(lengths_expr)", format!("{lengths_expr:?}")))?;
-                let lengths = value_to_vec_usize(lengths_val.as_ref());
-                let lengths = match opt_values_expr {
-                    None => lengths,
-                    Some(e) => {
-                        let values = value_to_vec_usize(
-                            e.eval(scope)
-                                .trace_eval(|| ("Dynamic(e)", format!("{e:?}")))?
-                                .as_ref(),
-                        );
-                        let mut new_lengths = [0].repeat(values.len());
-                        for i in 0..lengths.len() {
-                            new_lengths[values[i]] = lengths[i];
-                        }
-                        new_lengths
-                    }
-                };
-                let f = make_huffman_codes(&lengths);
-                let dyn_d = Compiler::compile_one(&f).unwrap();
-                let child_scope = DecoderScope::new(scope, name, dyn_d);
-                Ok(
-                    try_with!(d.parse(program, &Scope::Decoder(child_scope), input) => ("Dynamic(parse)", name.to_string(), format!("{d:?}"))),
+                Self::parse_dynamic_huffman(
+                    name,
+                    lengths_expr,
+                    opt_values_expr,
+                    d,
+                    program,
+                    scope,
+                    input,
                 )
             }
-            Decoder::Apply(name) => {
-                let d = scope.get_decoder_by_name(name);
-                Ok(
-                    try_with!(d.parse(program, scope, input) => ("Apply(parse)", name.to_string(), format!("{d:?}"))),
-                )
-            }
+            Decoder::Apply(name) => Self::parse_apply(name, program, scope, input),
             Decoder::LiftedOption(None) => Ok(WithErr::new((Value::Option(None), input))),
-            Decoder::LiftedOption(Some(dec)) => Ok(try_with!(dec
-                .parse(program, scope, input) => ("LiftedOption(parse)", format!("{dec:?}")))
-            .map(|(v, input)| (Value::Option(Some(Box::new(v))), input))),
+            Decoder::LiftedOption(Some(dec)) => {
+                Self::parse_lifted_option(dec, program, scope, input)
+            }
             Decoder::CaptureBytes(v_expr, len) => {
-                let len = len
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("CaptureBytes(len)", format!("{len:?}")))?;
-
-                let view_window = Self::eval_view_expr(scope, v_expr)?;
-
-                // accumulate `len` bytes into a Vec<Value>
-                let mut accum = Vec::with_capacity(len);
-                let mut buf = view_window;
-                for _ in 0..len {
-                    let Some((byte, new_buf)) = buf.read_byte() else {
-                        return Err(input.kind.overbyte(buf.offset).with_trace((
-                            "CaptureBytes",
-                            format!("len: {len}"),
-                            format!("view: {v_expr:?}"),
-                        )));
-                    };
-                    accum.push(Value::U8(byte));
-                    buf = new_buf;
-                }
-
-                // return the accumulated bytes, along with the original input
-                Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
+                Self::parse_capture_bytes(v_expr, len, scope, input)
             }
             Decoder::ReadArray(v_expr, len, kind) => {
-                let len = len
-                    .eval_value(scope)
-                    .and_then(|v| v.try_as_usize())
-                    .trace_eval(|| ("ReadArray(len)", format!("{len:?}")))?;
-                let view_window = Self::eval_view_expr(scope, v_expr)?;
-
-                let folded = WithErr::fold(
-                    (Vec::with_capacity(len), view_window),
-                    0..len,
-                    |(mut accum, buf), ix| {
-                        Ok(try_with!(read_array_elem(program, buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}"))).map(|(val, new_buf)| {
-                            accum.push(val);
-                            (accum, new_buf)
-                        }))
-                    },
-                )?;
-                Ok(folded.map(|(accum, _buf)| (Value::Seq(SeqKind::Strict(accum)), input)))
+                Self::parse_read_array(v_expr, len, kind, program, scope, input)
             }
-            Decoder::ReifyView(v_expr) => {
-                let view = try_with!(Self::eval_view_expr(scope, v_expr) => ("ReifyView", format!("view: {v_expr:?}")));
-                Ok(WithErr::new((
-                    Value::View {
-                        offset: view.offset,
+            Decoder::ReifyView(v_expr) => Self::parse_reify_view(v_expr, scope, input),
+            #[cfg(feature = "format_enforce")]
+            Decoder::Enforce(a) => Self::parse_enforce(a, program, scope, input),
+            Decoder::Permit(a, expr) => Self::parse_permit(a, expr, program, scope, input),
+        }
+    }
+
+    #[inline(never)]
+    fn parse_call<'input>(
+        n: &usize,
+        es: &[(Label, Expr)],
+        vs: &[(Label, ViewExpr)],
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
+        for (name, e) in es {
+            let v = e
+                .eval_value(scope)
+                .trace_eval(|| ("Call(e)", format!("{e:?}")))?;
+            new_scope.push_owned(name.clone(), v);
+        }
+        for (name, v) in vs {
+            let vv = Self::eval_view_expr(scope, v)?;
+            new_scope.push_view(name.clone(), vv);
+        }
+        Ok(try_with! (
+        program.decoders[*n]
+            .0
+            .parse(program, &Scope::Multi(&new_scope), input)
+        => ("parse@Call", *n)
+        ))
+    }
+
+    #[inline(never)]
+    fn parse_variant<'input>(
+        label: &Label,
+        d: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        Ok(d.parse(program, scope, input)?
+            .map(move |(v, input)| (Value::Variant(label.clone(), Box::new(v)), input)))
+    }
+
+    #[inline(never)]
+    fn parse_branch<'input>(
+        tree: &MatchTree,
+        branches: &[Decoder],
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let index = tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
+            offset: input.offset,
+        })?;
+        let d = &branches[index];
+        Ok(d.parse(program, scope, input)?
+            .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)))
+    }
+
+    #[inline(never)]
+    fn parse_parallel<'input>(
+        branches: &[Decoder],
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        for (index, d) in branches.iter().enumerate() {
+            let res = d.parse(program, scope, input);
+            if let Ok(p) = res {
+                return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
+            }
+        }
+        Err(DecodeErrorKind::<Value>::fail(scope, input).with_trace("no valid branch"))
+    }
+
+    #[inline(never)]
+    fn parse_tuple<'input>(
+        fields: &[Decoder],
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        Ok(WithErr::fold(
+            (Vec::with_capacity(fields.len()), input),
+            fields.iter().enumerate(),
+            |(mut v, input), (ix, f)| {
+                Ok(
+                    try_with!(f.parse(program, scope, input) => ("Tuple", ix)).map(
+                        move |(vf, new_input)| {
+                            v.push(vf);
+                            (v, new_input)
+                        },
+                    ),
+                )
+            },
+        )?
+        .map(|(v, input)| (Value::Tuple(v), input)))
+    }
+
+    #[inline(never)]
+    fn parse_sequence<'input>(
+        decs: &[Decoder],
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        Ok(WithErr::fold(
+            (Vec::with_capacity(decs.len()), input),
+            decs.iter(),
+            |(mut v, input), f| {
+                Ok(
+                    try_with!(f.parse(program, scope, input) => ("Sequence", v.len())).map(
+                        move |(vf, new_input)| {
+                            v.push(vf);
+                            (v, new_input)
+                        },
+                    ),
+                )
+            },
+        )?
+        .map(|(v, input)| (Value::Seq(SeqKind::Strict(v)), input)))
+    }
+
+    #[inline(never)]
+    fn parse_while<'input>(
+        tree: &MatchTree,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let mut input = input;
+        let mut res = WithErr::new((Vec::new(), input));
+        while try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
+            offset: input.offset,
+        }) => ("While(matchtree)", res.as_ref().0.len()))
+            == 0
+        {
+            res = res.join(|(mut v, input)| {
+                Ok(
+                    try_with!(a.parse(program, scope, input) => ("While(parse)", v.len())).map(
+                        |(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        },
+                    ),
+                )
+            })?;
+            input = res.as_ref().1;
+        }
+        Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_until<'input>(
+        tree: &MatchTree,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let mut res = WithErr::new((Vec::new(), input));
+        loop {
+            res = res.join(|(mut v, input)| {
+                Ok(
+                    try_with!(a.parse(program, scope, input) => ("Until(parse)", v.len())).map(
+                        |(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        },
+                    ),
+                )
+            })?;
+            let input = res.as_ref().1;
+            if try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
+                offset: input.offset,
+            }) => ("Until(matchtree)", res.as_ref().0.len()))
+                == 0
+            {
+                break;
+            }
+        }
+        Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_decode_bytes<'input>(
+        bytes: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let bytes = {
+            let raw = bytes
+                .eval_value(scope)
+                .trace_eval(|| ("DecodeBytes(bytes)", format!("{bytes:?}")))?;
+            let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
+            seq_vals
+                .into_iter()
+                .map(|v| v.get_as_u8())
+                .collect::<Vec<u8>>()
+        };
+        let new_input = ReadCtxt::from_value(&bytes);
+        try_with!(a.parse(program, scope, new_input) => ("DecodeBytes", bytes.len())).join(
+            |(va, rem_input)| {
+                // FIXME: trailing bytes here are reported as a warning embedded in an
+                // `Ok(WithErr)`, not a hard `Err`. `Decoder::Permit` only branches on
+                // `Err` from its first sub-decoder, so it can never see this warning and
+                // therefore can't fall back to its second branch when `DecodeBytes`'s
+                // held format under-consumes the sub-buffer. `permit(decode_bytes(...))`
+                // used as a strict "fully valid or not" gate is silently unsound as a
+                // result. Tracked in a separate issue (see git issue tracker).
+                Ok(match rem_input.read_byte() {
+                    Some((b, _)) => {
+                        let err = rem_input.kind.trailing(b, rem_input.offset).into();
+                        WithErr::with_err((va, input), err)
+                    }
+                    None => WithErr::new((va, input)),
+                })
+            },
+        )
+    }
+
+    #[inline(never)]
+    fn parse_from_view<'input>(
+        v_expr: &ViewExpr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let view_window = Self::eval_view_expr(scope, v_expr)?;
+        Ok(try_with!(a.parse(program, scope, view_window) => ("ParseFromView", format!("{:?}", v_expr)))
+            .map(|(va, _)| (va, input)))
+    }
+
+    #[inline(never)]
+    fn parse_let_format<'input>(
+        da: &Decoder,
+        name: &Label,
+        db: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        try_with!(da.parse(program, scope, input) => ("LetFormat(lhs)", name.to_string())).join(
+            |(va, input)| {
+                let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
+                db.parse(program, &new_scope, input)
+            },
+        )
+    }
+
+    #[inline(never)]
+    fn parse_monad_seq<'input>(
+        da: &Decoder,
+        db: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        try_with!(da.parse(program, scope, input) => "MonadSeq(lhs)")
+            .join(|(_, input)| Ok(try_with!(db.parse(program, scope, input) => "MonadSeq(rhs)")))
+    }
+
+    #[inline(never)]
+    fn parse_for_each<'input>(
+        expr: &Expr,
+        lbl: &Label,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        // we need val because it would otherwise be a dropped temporary binding
+        let val = expr
+            .eval_value(scope)
+            .trace_eval(|| ("ForEach(expr)", format!("{expr:?}")))?;
+        let seq = val.get_sequence().expect("bad type for ForEach input");
+        Ok(WithErr::fold(
+            (Vec::with_capacity(seq.len()), input),
+            seq,
+            |(mut v, input), e| {
+                let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
+                Ok(try_with!(a.parse(program, &new_scope, input) => ("ForEach", v.len(), format!("{e:?}")))
+                    .map(|(va, next_input)| {
+                        v.push(va);
+                        (v, next_input)
+                    }))
+            },
+        )?
+        .map(|(v, input)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_repeat_count<'input>(
+        expr: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let count = expr
+            .eval_value(scope)
+            .and_then(|v| v.try_as_usize())
+            .trace_eval(|| ("RepeatCount(expr)", format!("{expr:?}")))?;
+        Ok(WithErr::fold(
+            (Vec::with_capacity(count), input),
+            0..count,
+            |(mut v, input), _| {
+                Ok(
+                    try_with!(a.parse(program, scope, input) => ("RepeatCount", v.len())).map(
+                        |(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        },
+                    ),
+                )
+            },
+        )?
+        .map(|(v, input)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_repeat_between<'input>(
+        reps_left_tree: &MatchTree,
+        range: &RepeatRange,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let (min, max) = (range.min(), range.max());
+        let mut res = WithErr::new((Vec::new(), input));
+        loop {
+            // NOTE - lookahead must be performed from the current position, not the start of the repetition
+            let (v, cur_input) = res.as_ref();
+            let reps_left = reps_left_tree.matches(*cur_input).ok_or(
+                DecodeErrorKind::NoValidBranch {
+                    offset: cur_input.offset,
+                }
+                .with_trace(v.len()),
+            )?;
+            if reps_left == 0 || v.len() == max {
+                if v.len() < min {
+                    return Err(DecodeErrorKind::InsufficientRepeats {
+                        min,
+                        found: v.len(),
+                        offset: cur_input.offset,
+                    }
+                    .with_trace("RepeatBetween"));
+                }
+                break;
+            }
+            res = res.join(|(mut v, input)| {
+                Ok(
+                    try_with!(a.parse(program, scope, input) => ("RepeatBetween", v.len())).map(
+                        |(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        },
+                    ),
+                )
+            })?;
+        }
+        Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_maybe<'input>(
+        expr: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let is_present = expr
+            .eval_value(scope)
+            .trace_eval(|| ("Maybe(expr)", format!("{expr:?}")))?
+            .unwrap_bool();
+        if is_present {
+            Ok(try_with!(a.parse(program, scope, input) => "Maybe")
+                .map(|(val, input)| (Value::Option(Some(Box::new(val))), input)))
+        } else {
+            Ok(WithErr::new((Value::Option(None), input)))
+        }
+    }
+
+    #[inline(never)]
+    fn parse_repeat_until_last<'input>(
+        expr: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        // third value is "done" flag
+        let mut res = WithErr::new((Vec::new(), input, false));
+        loop {
+            res = res.join(|(mut v, input, _done)| {
+                try_with!(a.parse(program, scope, input) => ("RepeatUntilLast", v.len())).join(
+                    |(va, next_input)| {
+                        let done = expr
+                            .eval_lambda(scope, &va)
+                            .trace_eval(|| ("RepeatUntilLast(expr)", format!("{expr:?}")))?
+                            .unwrap_bool();
+                        v.push(va);
+                        Ok(WithErr::new((v, next_input, done)))
                     },
+                )
+            })?;
+            break_if_done!(res => (v, input));
+        }
+        Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_repeat_until_seq<'input>(
+        expr: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        // third value is "done" flag
+        let mut res = WithErr::new((Vec::new(), input, false));
+        loop {
+            res = res.join(|(mut v, input, _done)| {
+                try_with!(a.parse(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
+                    .join(|(va, next_input)| {
+                        v.push(va);
+                        let vs = Value::Seq(v.into());
+                        let done = expr.eval_lambda(scope, &vs).trace_eval(|| ("RepeatUntilSeq(expr)", format!("{expr:?}")))?.unwrap_bool();
+                        let v = match vs {
+                            Value::Seq(v) => v.into_vec(),
+                            _ => unreachable!(),
+                        };
+                        Ok(WithErr::new((v, next_input, done)))
+                    })
+            })?;
+            break_if_done!(res => (v, input));
+        }
+        Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
+    }
+
+    #[inline(never)]
+    fn parse_accum_until<'input>(
+        f_done: &Expr,
+        f_update: &Expr,
+        init: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let accum = init
+            .eval_value(scope)
+            .trace_eval(|| ("AccumUntil(init)", format!("{init:?}")))?;
+        let mut res = WithErr::new((Vec::new(), accum, input, false));
+        loop {
+            res = res.join(|(mut v, accum, input, _done)| {
+                let done_arg =
+                    Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
+                let is_done = f_done.eval_lambda(scope, &done_arg).trace_eval(|| ("AccumUntil(f_done)", format!("{f_done:?}")))?.unwrap_bool();
+                if is_done {
+                    return Ok(WithErr::new((v, accum, input, true)));
+                }
+                try_with!(a.parse(program, scope, input) => ("AccumUntil", format!("len={}", v.len()), format!("accum={:?}", accum)))
+                    .join(|(next_elem, next_input)| {
+                        v.push(next_elem.clone());
+                        let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
+                        let next_accum = f_update.eval_lambda(scope, &update_arg).trace_eval(|| ("AccumUntil(f_update)", format!("{f_update:?}")))?;
+                        Ok(WithErr::new((v, next_accum, next_input, false)))
+                    })
+            })?;
+            break_if_done!(res => (v, accum, input));
+        }
+        Ok(
+            res.map(|(v, accum, input, _)| {
+                (Value::Tuple(vec![accum, Value::Seq(v.into())]), input)
+            }),
+        )
+    }
+
+    #[inline(never)]
+    fn parse_peek<'input>(
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        Ok(a.parse(program, scope, input)?.map(|(v, _)| (v, input)))
+    }
+
+    #[inline(never)]
+    fn parse_peek_not<'input>(
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        if a.parse(program, scope, input).is_ok() {
+            Err(DecodeErrorKind::<Value>::fail(scope, input)
+                .with_trace(("PeekNot", format!("{:?}", a))))
+        } else {
+            Ok(WithErr::new((Value::Tuple(vec![]), input)))
+        }
+    }
+
+    #[inline(never)]
+    fn parse_slice<'input>(
+        expr: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let size = expr
+            .eval_value(scope)
+            .and_then(|v| v.try_as_usize())
+            .trace_eval(|| ("Slice(expr)", format!("{expr:?}")))?;
+        let (mut slice, input) = input.split_at(size).ok_or(
+            input
+                .kind
+                .overrun(size, input.offset)
+                .with_trace(("Slice(create)", format!("{:?}->{size}", expr))),
+        )?;
+        slice.kind &= BufferKind::Slice;
+        Ok(
+            try_with!(a.parse(program, scope, slice) => ("Slice(parse)", format!("{:?}", a)))
+                .map(|(v, _)| (v, input)),
+        )
+    }
+
+    #[inline(never)]
+    fn parse_bits<'input>(
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        // FIXME - copying the entire buffer as bits feels inefficient, we should measure performance and see if there is a better alternative
+        let mut bits = Vec::with_capacity(input.remaining().len() * 8);
+        for b in input.remaining() {
+            for i in 0..8 {
+                bits.push((b & (1 << i)) >> i);
+            }
+        }
+        try_with!(a.parse(program, scope, ReadCtxt::new(&bits)) => ("Bits(parse)", format!("{a:?}")))
+            .join(|(v, bits)| {
+                let bytes_remain = bits.remaining().len() >> 3;
+                let bytes_read = input.remaining().len() - bytes_remain;
+                let (_, input) = input
+                    .split_at(bytes_read)
+                    .ok_or(input.kind.overrun(bytes_read, input.offset))?;
+                Ok(WithErr::new((v, input)))
+            })
+    }
+
+    #[inline(never)]
+    fn parse_with_relative_offset<'input>(
+        base_addr: &Expr,
+        expr: &Expr,
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let base = base_addr
+            .eval_value(scope)
+            .and_then(|v| v.try_as_usize())
+            .trace_eval(|| ("WithRelativeOffset(base_addr)", format!("{base_addr:?}")))?;
+        let offset = expr
+            .eval_value(scope)
+            .and_then(|v| v.try_as_usize())
+            .trace_eval(|| ("WithRelativeOffset(expr)", format!("{expr:?}")))?;
+        // `checked_add` rather than `+`: an unchecked add here would panic on overflow in
+        // debug builds and silently wrap in release builds, potentially seeking to a
+        // small, wrapped-around (and spuriously valid-looking) offset instead of failing.
+        let abs_offset = base.checked_add(offset).ok_or_else(|| {
+            input
+                .kind
+                .offset_overflow(base, offset)
+                .with_trace("WithRelativeOffset(seek)")
+        })?;
+        let seek_input = input.seek_to(abs_offset).ok_or(
+            input
+                .kind
+                .bad_seek(abs_offset, input.input.len())
+                .with_trace("WithRelativeOffset(seek)"),
+        )?;
+        Ok(try_with!(a.parse(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
+            .map(|(v, _)| (v, input)))
+    }
+
+    #[inline(never)]
+    fn parse_map<'input>(
+        d: &Decoder,
+        expr: &Expr,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        try_with!(d.parse(program, scope, input) => ("Map(parse)", format!("{d:?}"))).join(
+            |(orig, input)| {
+                let v = expr
+                    .eval_lambda(scope, &orig)
+                    .trace_eval(|| ("Map(expr)", format!("{expr:?}")))?;
+                Ok(WithErr::new((
+                    Value::Mapped(Box::new(orig), Box::new(v)),
                     input,
                 )))
-            }
-            #[cfg(feature = "format_enforce")]
-            Decoder::Enforce(a) => {
-                let res = a.parse(program, scope, input)?;
-                match res.into_strict() {
-                    Ok((v, input)) => Ok(WithErr::new((v, input))),
-                    Err(mut errs) => {
-                        let e = errs.swap_remove(0);
-                        return Err(e);
+            },
+        )
+    }
+
+    #[inline(never)]
+    fn parse_where<'input>(
+        d: &Decoder,
+        cond: &Condition,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        try_with!(d.parse(program, scope, input) => ("Where(parse)", format!("{d:?}"))).join(
+            |(v, input)| {
+                let Condition { expr, severity } = cond;
+                match expr
+                    .eval_lambda(scope, &v)
+                    .trace_eval(|| ("Where(expr)", format!("{expr:?}")))?
+                    .unwrap_bool()
+                {
+                    true => Ok(WithErr::new((v, input))),
+                    false => {
+                        let err =
+                            DecodeErrorKind::bad_where(scope, expr.clone(), Box::new(v.clone()))
+                                .into();
+                        if severity.is_strict() {
+                            Err(err)
+                        } else {
+                            Ok(WithErr::with_err((v, input), err))
+                        }
                     }
                 }
+            },
+        )
+    }
+
+    #[inline(never)]
+    fn parse_compute<'input>(
+        expr: &Expr,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let v = expr
+            .eval_value(scope)
+            .trace_eval(|| ("Compute(expr)", format!("{expr:?}")))?;
+        Ok(WithErr::new((v, input)))
+    }
+
+    #[inline(never)]
+    fn parse_let<'input>(
+        name: &Label,
+        expr: &Expr,
+        d: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let v = expr
+            .eval_value(scope)
+            .trace_eval(|| ("Let(expr)", format!("{expr:?}")))?;
+        let let_scope = SingleScope::new(scope, name, &v);
+        Ok(
+            try_with!(d.parse(program, &Scope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),
+        )
+    }
+
+    #[inline(never)]
+    fn parse_let_view<'input>(
+        name: &Label,
+        d: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let mut view = input;
+        view.kind &= BufferKind::View;
+        let let_scope = ViewScope::new(scope, name, view);
+        Ok(
+            try_with!(d.parse(program, &Scope::View(let_scope), input) => ("LetView(parse)", name.to_string(), format!("{d:?}"))),
+        )
+    }
+
+    #[inline(never)]
+    fn parse_match<'input>(
+        head: &Expr,
+        branches: &[(Pattern, Decoder)],
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let head = head
+            .eval(scope)
+            .trace_eval(|| ("Match(head)", format!("{head:?}")))?;
+        for (index, (pattern, decoder)) in branches.iter().enumerate() {
+            if let Some(pattern_scope) = head.matches(scope, pattern) {
+                return Ok(
+                    try_with!(decoder.parse(program, &Scope::Multi(&pattern_scope), input)
+                    => ("Match(parse)", format!("[{}]: {:?} => {:?}", index, pattern, decoder))
+                    )
+                    .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)),
+                );
             }
-            Decoder::Permit(a, expr) => Ok(try_downgrade_error_with(
-                a.parse(program, scope, input)
-                    .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
-                || {
-                    Ok::<_, EvalError>((
-                        Value::Permit(Err(Some(Box::new(expr.eval_value(scope)?)))),
-                        input,
-                    ))
-                },
-            )
-            .trace_eval(|| ("Permit(default)", format!("{expr:?}")))?),
         }
+        // NOTE - if we reach this point, it means that none of the patterns matched the head value, and we therefore have to return an error
+        let cases = branches.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>();
+        Err(DecodeError::from(DecodeErrorKind::RefutedPatternMatch {
+            cases,
+            value: Box::new(head.into_owned()),
+        }))
+    }
+
+    #[inline(never)]
+    fn parse_dynamic_huffman<'input>(
+        name: &Label,
+        lengths_expr: &Expr,
+        opt_values_expr: &Option<Box<Expr>>,
+        d: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let lengths_val = lengths_expr
+            .eval(scope)
+            .trace_eval(|| ("Dynamic(lengths_expr)", format!("{lengths_expr:?}")))?;
+        let lengths = value_to_vec_usize(lengths_val.as_ref());
+        let lengths = match opt_values_expr {
+            None => lengths,
+            Some(e) => {
+                let values = value_to_vec_usize(
+                    e.eval(scope)
+                        .trace_eval(|| ("Dynamic(e)", format!("{e:?}")))?
+                        .as_ref(),
+                );
+                let mut new_lengths = [0].repeat(values.len());
+                for i in 0..lengths.len() {
+                    new_lengths[values[i]] = lengths[i];
+                }
+                new_lengths
+            }
+        };
+        let f = make_huffman_codes(&lengths);
+        let dyn_d = Compiler::compile_one(&f).unwrap();
+        let child_scope = DecoderScope::new(scope, name, dyn_d);
+        Ok(
+            try_with!(d.parse(program, &Scope::Decoder(child_scope), input) => ("Dynamic(parse)", name.to_string(), format!("{d:?}"))),
+        )
+    }
+
+    #[inline(never)]
+    fn parse_apply<'input>(
+        name: &Label,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let d = scope.get_decoder_by_name(name);
+        Ok(
+            try_with!(d.parse(program, scope, input) => ("Apply(parse)", name.to_string(), format!("{d:?}"))),
+        )
+    }
+
+    #[inline(never)]
+    fn parse_lifted_option<'input>(
+        dec: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        Ok(try_with!(dec
+            .parse(program, scope, input) => ("LiftedOption(parse)", format!("{dec:?}")))
+        .map(|(v, input)| (Value::Option(Some(Box::new(v))), input)))
+    }
+
+    #[inline(never)]
+    fn parse_capture_bytes<'input>(
+        v_expr: &ViewExpr,
+        len: &Expr,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let len = len
+            .eval_value(scope)
+            .and_then(|v| v.try_as_usize())
+            .trace_eval(|| ("CaptureBytes(len)", format!("{len:?}")))?;
+
+        let view_window = Self::eval_view_expr(scope, v_expr)?;
+
+        // accumulate `len` bytes into a Vec<Value>
+        let mut accum = Vec::with_capacity(len);
+        let mut buf = view_window;
+        for _ in 0..len {
+            let Some((byte, new_buf)) = buf.read_byte() else {
+                return Err(input.kind.overbyte(buf.offset).with_trace((
+                    "CaptureBytes",
+                    format!("len: {len}"),
+                    format!("view: {v_expr:?}"),
+                )));
+            };
+            accum.push(Value::U8(byte));
+            buf = new_buf;
+        }
+
+        // return the accumulated bytes, along with the original input
+        Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
+    }
+
+    #[inline(never)]
+    fn parse_read_array<'input>(
+        v_expr: &ViewExpr,
+        len: &Expr,
+        kind: &ReadArrayKind,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let len = len
+            .eval_value(scope)
+            .and_then(|v| v.try_as_usize())
+            .trace_eval(|| ("ReadArray(len)", format!("{len:?}")))?;
+        let view_window = Self::eval_view_expr(scope, v_expr)?;
+
+        let folded = WithErr::fold(
+            (Vec::with_capacity(len), view_window),
+            0..len,
+            |(mut accum, buf), ix| {
+                Ok(try_with!(read_array_elem(program, buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}"))).map(|(val, new_buf)| {
+                    accum.push(val);
+                    (accum, new_buf)
+                }))
+            },
+        )?;
+        Ok(folded.map(|(accum, _buf)| (Value::Seq(SeqKind::Strict(accum)), input)))
+    }
+
+    #[inline(never)]
+    fn parse_reify_view<'input>(
+        v_expr: &ViewExpr,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let view = try_with!(Self::eval_view_expr(scope, v_expr) => ("ReifyView", format!("view: {v_expr:?}")));
+        Ok(WithErr::new((
+            Value::View {
+                offset: view.offset,
+            },
+            input,
+        )))
+    }
+
+    #[cfg(feature = "format_enforce")]
+    #[inline(never)]
+    fn parse_enforce<'input>(
+        a: &Decoder,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        let res = a.parse(program, scope, input)?;
+        match res.into_strict() {
+            Ok((v, input)) => Ok(WithErr::new((v, input))),
+            Err(mut errs) => {
+                let e = errs.swap_remove(0);
+                return Err(e);
+            }
+        }
+    }
+
+    #[inline(never)]
+    fn parse_permit<'input>(
+        a: &Decoder,
+        expr: &Expr,
+        program: &Program,
+        scope: &Scope<'_>,
+        input: ReadCtxt<'input>,
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
+        Ok(try_downgrade_error_with(
+            a.parse(program, scope, input)
+                .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
+            || {
+                Ok::<_, EvalError>((
+                    Value::Permit(Err(Some(Box::new(expr.eval_value(scope)?)))),
+                    input,
+                ))
+            },
+        )
+        .trace_eval(|| ("Permit(default)", format!("{expr:?}")))?)
     }
     /// Given a `ViewExpr` and a `Scope` to evaluate named views under, returns the appropriate `View`
     /// (`:= ReadCtxt`).
