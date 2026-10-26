@@ -903,6 +903,8 @@ impl FormatModuleExt {
                 .into_iter()
                 .map(|t| t.reify(compiler))
                 .collect(),
+            // `FormatModuleExt` has no recursive batches
+            recursive_levels: Default::default(),
         }
     }
 
