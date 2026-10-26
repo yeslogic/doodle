@@ -2079,6 +2079,16 @@ struct MatchTreeLevel<'a> {
 /// A bundle of follow-sets with an externally significant index, e.g. into an array of decoders
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 
+thread_local! {
+    // `Format` is not `Sync`, so a `'static` instance is leaked once per thread instead.
+    static ANY_BYTE: &'static Format = Box::leak(Box::new(Format::Byte(ByteSet::full())));
+}
+
+/// Any single byte, for over-approximating continuations (see [`MatchTreeStep::any_bytes`]).
+fn any_byte() -> &'static Format {
+    ANY_BYTE.with(|f| *f)
+}
+
 /// Maximum number of bytes of lookahead a [`MatchTree`] examines past its decision point.
 const MATCH_TREE_MAX_DEPTH: usize = 80;
 
@@ -2585,11 +2595,9 @@ impl<'a> MatchTreeStep<'a> {
             }
             TypedFormat::Fail => Self::reject(),
             TypedFormat::EndOfInput => Self::accept(),
-            TypedFormat::Align(_) => {
-                Self::accept() // FIXME
-            }
-            TypedFormat::Phantom(..) => Self::accept(),
-            TypedFormat::SkipRemainder => Self::accept(),
+            TypedFormat::Align(n) => Self::from_align(module, next, *n, guard),
+            TypedFormat::Phantom(..) => Self::from_next(module, next, guard),
+            TypedFormat::SkipRemainder => Self::any_bytes(module, Rc::new(Next::Empty), guard),
             TypedFormat::Byte(bs) => Self::branch(*bs, next),
             TypedFormat::Variant(_, _label, f) => {
                 Self::from_gt_format(module, f, next.clone(), guard)
@@ -2628,11 +2636,7 @@ impl<'a> MatchTreeStep<'a> {
                 if bounds.min() == 0 {
                     match bounds.max() {
                         Some(0) => tree,
-                        _ => {
-                            // format is nullable but might match something
-                            // FIXME - this is a stopgap for the complex logic we would otherwise need to model
-                            Self::accept()
-                        }
+                        _ => Self::any_bytes(module, next, guard),
                     }
                 } else {
                     tree.union(Self::from_gt_format(
@@ -2716,14 +2720,29 @@ impl<'a> MatchTreeStep<'a> {
                     )
                 }
             }
-            TypedFormat::RepeatUntilLast(_, _expr, _a) => {
-                Self::accept() // FIXME
+            // as for `Format::RepeatUntilLast`/`RepeatUntilSeq`/`AccumUntil` in `from_format`
+            TypedFormat::RepeatUntilLast(_, _expr, a) => {
+                if a.is_nullable() {
+                    Self::any_bytes(module, next, guard)
+                } else {
+                    Self::from_gt_format(
+                        module,
+                        a,
+                        Rc::new(Next::Repeat(MaybeTyped::Typed(a), next)),
+                        guard,
+                    )
+                }
             }
-            TypedFormat::RepeatUntilSeq(_, _expr, _a) => {
-                Self::accept() // FIXME
-            }
-            TypedFormat::AccumUntil(.., _a) => {
-                Self::accept() // FIXME
+            TypedFormat::RepeatUntilSeq(_, _, a) | TypedFormat::AccumUntil(.., a) => {
+                if a.is_nullable() {
+                    Self::any_bytes(module, next, guard)
+                } else {
+                    Self::from_next(
+                        module,
+                        Rc::new(Next::Repeat(MaybeTyped::Typed(a), next)),
+                        guard,
+                    )
+                }
             }
             TypedFormat::Maybe(_, _cond, a) => {
                 let tree_some = Self::from_gt_format(module, a, next.clone(), guard);
@@ -2754,11 +2773,9 @@ impl<'a> MatchTreeStep<'a> {
                     Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty), guard)
                 }
             }
-            TypedFormat::Bits(_, _a) => {
-                Self::accept() // FIXME
-            }
+            TypedFormat::Bits(_, _a) => Self::any_bytes(module, next, guard),
             TypedFormat::WithRelativeOffset(_, _base_addr, _offset, _a) => {
-                Self::accept() // FIXME
+                Self::from_next(module, next, guard)
             }
             TypedFormat::Map(_, f, _) | TypedFormat::Where(_, f, _) => {
                 Self::from_gt_format(module, f, next, guard)
@@ -2781,7 +2798,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Dynamic(_, _name, _expr, f) => {
                 Self::from_gt_format(module, f, next, guard)
             }
-            TypedFormat::Apply(..) => Self::accept(),
+            TypedFormat::Apply(..) => Self::any_bytes(module, next, guard),
             TypedFormat::MonadSeq(_, f0, f) | TypedFormat::LetFormat(_, f0, _, f) => {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Typed(f), next));
                 Self::from_gt_format(module, f0, next0, guard)
@@ -2811,10 +2828,12 @@ impl<'a> MatchTreeStep<'a> {
             Format::RecVar(_) => unreachable!(
                 "Format::RecVar is rewritten to ItemVar at batch registration; never appears in a stored Format"
             ),
-            Format::Phantom(..) => Self::accept(),
+            // never decoded, so consumes nothing
+            Format::Phantom(..) => Self::from_next(module, next, guard),
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
-            Format::SkipRemainder => Self::accept(),
+            // consumes whatever remains, which only the empty continuation can follow
+            Format::SkipRemainder => Self::any_bytes(module, Rc::new(Next::Empty), guard),
             Format::Align(n) => Self::from_align(module, next, *n, guard),
             Format::DecodeBytes(_bytes, _f) => Self::from_next(module, next, guard),
             Format::ParseFromView(_view, _f) => Self::from_next(module, next, guard),
@@ -2846,11 +2865,8 @@ impl<'a> MatchTreeStep<'a> {
                 if bounds.min() == 0 {
                     match bounds.max() {
                         Some(0) => tree,
-                        _ => {
-                            // format is nullable but might match something
-                            // FIXME - this is a stopgap for the complex logic we would otherwise need to model
-                            Self::accept()
-                        }
+                        // `a*` cannot be walked when `a` is nullable
+                        _ => Self::any_bytes(module, next, guard),
                     }
                 } else {
                     tree.union(Self::from_format(
@@ -2882,14 +2898,30 @@ impl<'a> MatchTreeStep<'a> {
                 next.clone(),
                 guard,
             ),
-            Format::RepeatUntilLast(_expr, _a) => {
-                Self::accept() // FIXME
+            // when to stop is decided by the values read, so these are modelled by the repetitions
+            // they could make: at least one `a` for `RepeatUntilLast`, any number for the others
+            Format::RepeatUntilLast(_expr, a) => {
+                if a.is_nullable(module) {
+                    Self::any_bytes(module, next, guard)
+                } else {
+                    Self::from_format(
+                        module,
+                        a,
+                        Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next)),
+                        guard,
+                    )
+                }
             }
-            Format::RepeatUntilSeq(_expr, _a) => {
-                Self::accept() // FIXME
-            }
-            Format::AccumUntil(.., _a) => {
-                Self::accept() // FIXME
+            Format::RepeatUntilSeq(_, a) | Format::AccumUntil(.., a) => {
+                if a.is_nullable(module) {
+                    Self::any_bytes(module, next, guard)
+                } else {
+                    Self::from_next(
+                        module,
+                        Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next)),
+                        guard,
+                    )
+                }
             }
             Format::Maybe(_expr, a) => {
                 let tree_some = Self::from_format(module, a, next.clone(), guard);
@@ -2918,12 +2950,10 @@ impl<'a> MatchTreeStep<'a> {
                     Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty), guard)
                 }
             }
-            Format::Bits(_a) => {
-                Self::accept() // FIXME
-            }
-            Format::WithRelativeOffset(_addr, _offset, _a) => {
-                Self::accept() // FIXME
-            }
+            // bit-level, so has no byte-level language to model
+            Format::Bits(_a) => Self::any_bytes(module, next, guard),
+            // reads elsewhere, consuming nothing here
+            Format::WithRelativeOffset(_addr, _offset, _a) => Self::from_next(module, next, guard),
             Format::Map(f, _expr) => Self::from_format(module, f, next, guard),
             Format::Where(f, _expr) => Self::from_format(module, f, next, guard),
             Format::Pos => Self::from_next(module, next, guard),
@@ -2945,7 +2975,8 @@ impl<'a> MatchTreeStep<'a> {
                 tree
             }
             Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next, guard),
-            Format::Apply(_name) => Self::accept(),
+            // a dynamically built format, whose language is unknown here
+            Format::Apply(_name) => Self::any_bytes(module, next, guard),
             Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Untyped(f), next));
                 Self::from_format(module, f0, next0, guard)
@@ -2971,12 +3002,33 @@ impl<'a> MatchTreeStep<'a> {
     ) -> MatchTreeStep<'a> {
         match n.get() {
             1 => Self::from_next(module, next, guard), // guaranteed to already be in alignment
-            _ => {
-                // FIXME - this is still hackish but it is at least somewhat better than before
-                // TODO - consider handling very small cases like 2..=4, with bespoke tree-unions over each potential distance from `next` we might skip over
-                Self::accept()
-            }
+            // skips up to `n - 1` bytes, depending on the position
+            n => Self::from_next(
+                module,
+                Rc::new(Next::RepeatMax(
+                    n - 1,
+                    MaybeTyped::Untyped(any_byte()),
+                    next,
+                )),
+                guard,
+            ),
         }
+    }
+
+    /// Over-approximates a format whose byte-level language cannot be modelled here as `Σ*`,
+    /// followed by `next`. A `MatchTree` can then never tell it apart from an alternative by what
+    /// the alternative reads, so such a choice is rejected (as ambiguous or needing too much
+    /// lookahead) rather than settled by treating the format as matching nothing.
+    fn any_bytes(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        guard: &mut CycleGuard,
+    ) -> MatchTreeStep<'a> {
+        Self::from_next(
+            module,
+            Rc::new(Next::Repeat(MaybeTyped::Untyped(any_byte()), next)),
+            guard,
+        )
     }
 }
 
@@ -3780,10 +3832,9 @@ mod test {
         );
     }
 
-    /// `MatchTreeStep::from_format` stubs some formats (here `RepeatUntilLast`) as accepting at
-    /// once rather than modelling their bytes, so in `A | B` with `A := RepeatUntilLast(until 'x',
-    /// any byte)` and `B := "ab"`, the tree takes `B` on any leading `'a'`. `"ax"` matches only
-    /// `A`, so it must either decode (as `A`), or the format must be rejected up front as
+    /// In `A | B` with `A := RepeatUntilLast(until 'x', any byte)` and `B := "ab"`, where `A`
+    /// stops is decided by the bytes' values, which a `MatchTree` cannot model. `"ax"` matches
+    /// only `A`, so it must either decode (as `A`), or the format must be rejected up front as
     /// undecidable; choosing `B` and then failing to decode is wrong either way.
     #[test]
     fn matchtree_accept_stub_does_not_lose_to_byte_reading_branch() {
@@ -3807,6 +3858,46 @@ mod test {
             matches!(res, Ok((Value::Branch(0, _), _))),
             "\"ax\" matches only the `RepeatUntilLast` branch, got {res:?}"
         );
+    }
+
+    /// A format that consumes nothing where it is parsed (`Phantom`, `WithRelativeOffset`) must not
+    /// hide what follows it from a `MatchTree`: in `A | B` with `A := (z, 'a', 'x')` and
+    /// `B := ('a', 'b')`, the second byte decides.
+    #[test]
+    fn zero_width_format_leading_a_branch_does_not_hide_what_follows() {
+        use crate::helper::{alts, is_byte, tuple};
+        use decoder::Value;
+
+        let any_byte = || Box::new(Format::Byte(ByteSet::full()));
+        for (name, zero_width) in [
+            ("Phantom", Format::Phantom(any_byte())),
+            (
+                "WithRelativeOffset",
+                Format::WithRelativeOffset(
+                    Box::new(Expr::U32(0)),
+                    Box::new(Expr::U32(0)),
+                    any_byte(),
+                ),
+            ),
+        ] {
+            let mut module = FormatModule::new();
+            let top = module.define_format(
+                "test.zero_width_lead",
+                alts([
+                    ("A", tuple([zero_width, is_byte(b'a'), is_byte(b'x')])),
+                    ("B", tuple([is_byte(b'a'), is_byte(b'b')])),
+                ]),
+            );
+            let prog = super::decoder::Compiler::compile_program(&module, &top.call())
+                .unwrap_or_else(|e| panic!("{name}: {e}"));
+            for (input, branch) in [(&b"ax"[..], 0), (b"ab", 1)] {
+                let res = prog.run(ReadCtxt::new(input));
+                assert!(
+                    matches!(res, Ok((Value::Branch(b, _), _)) if b == branch),
+                    "{name}: {input:?} should decode as branch {branch}, got {res:?}"
+                );
+            }
+        }
     }
 
     /// `Next::cat` must not drop a zero-width continuation that still *constrains* lookahead.
