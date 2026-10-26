@@ -227,7 +227,7 @@ impl Fragment {
     ///
     /// # Note
     ///
-    /// There are currently no display rules that differentiate [`Fragment::Group`](x) from `x` itself, but
+    /// There are currently no display rules that differentiate `Fragment::Group(x)` from `x` itself, but
     /// it is defined anyway and supported with this helper to allow for cleaner adoption of a more nuanced
     /// model in which logically-grouped fragments have their own display rules.
     pub fn group(self) -> Self {

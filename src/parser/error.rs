@@ -190,7 +190,7 @@ impl std::error::Error for ParseError {
 }
 
 /// Sub-class of [`StateError`] for errors that arise purely from incoherent usage or improper
-/// nesting/bracketing of the various state-manipulation methods on [`BufferOffset`].
+/// nesting/bracketing of the various state-manipulation methods on `BufferOffset`.
 ///
 /// These indicate a bug in the parsing logic itself (or in `doodle`'s code-generation), and can
 /// never be triggered by a well-formed decoder processing any buffer, however malformed or
@@ -297,7 +297,7 @@ impl std::error::Error for DataStateError {}
 
 /// Sub-class of errors that only occur when an illegal operation is attempted,
 /// due to incoherent usage or improperly nesting of various state-manipulation methods
-/// within the [`BufferOffset`], or due to contrarian, adversarial, or otherwise malformed
+/// within the `BufferOffset`, or due to contrarian, adversarial, or otherwise malformed
 /// buffer-data being processed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum StateError {
@@ -348,7 +348,7 @@ impl From<StateError> for ParseError {
 /// Trait for conditionally suppressing errors that can be triggered by non-conformant buffer-data,
 /// without silencing more fundamental state errors related to the integrity of a parser definition.
 pub trait Permissible: Sized {
-    /// Returns `Ok(self)` if the error is eligible for suppression (e.g. [`Format::Permit`]), and `Err(self)`
+    /// Returns `Ok(self)` if the error is eligible for suppression (e.g. [`Format::Permit`](crate::Format::Permit)), and `Err(self)`
     /// if it cannot be triggered by non-conformant buffer-data alone.
     fn permit(self) -> Result<Self, Self>;
 

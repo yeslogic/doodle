@@ -383,7 +383,7 @@ impl std::fmt::Display for Value {
 }
 
 impl Value {
-    /// Internal helper for [`Coerced::tuple_proj`].
+    /// Internal helper for [`EvalValue::tuple_proj_raw`].
     fn _tuple_proj(&self, index: usize) -> &Value {
         match self {
             Value::Tuple(vs) => &vs[index],
@@ -392,7 +392,7 @@ impl Value {
         }
     }
 
-    /// Internal helper for [`Coerced::record_proj`].
+    /// Internal helper for [`EvalValue::record_proj_raw`].
     fn _record_proj(&self, label: &str) -> &Value {
         match self {
             Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {

@@ -206,11 +206,11 @@ pub enum Expr {
     /// LeftFold :: ((Acc, T) -> Acc) -> Acc -> \[T\] -> Acc
     LeftFold(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
 
-    /// Dup :: U32 -> T -> [T]
+    /// `Dup :: U32 -> T -> [T]`
     Dup(Box<Expr>, Box<Expr>),
 
     LiftOption(Option<Box<Expr>>),
-    /// [T] -> [T] -> [T] (append operation)
+    /// `[T] -> [T] -> [T]` (append operation)
     Append(Box<Expr>, Box<Expr>),
 }
 
@@ -1264,7 +1264,7 @@ impl FormatModule {
     /// `ValueType::unify` accepts unconditionally. An ill-typed use of such a reference (e.g.
     /// comparing a recursive field against a `u8`) therefore passes this pass.
     ///
-    /// The batch is then solved by [`TypeChecker::solve_batch_types`], whose equirecursive
+    /// The batch is then solved by [`TypeChecker::solve_batch_types`](typecheck::TypeChecker::solve_batch_types), whose equirecursive
     /// inference sees through the cycle and rejects such a use. Its solution, in which a reference
     /// back to a batch level is [`ValueType::Rec`] instead of a placeholder, is what gets installed,
     /// so a later registration that reaches into a member's recursive field sees its real type.
@@ -3245,7 +3245,7 @@ impl MatchTree {
         Self::try_build(module, branches, next).ok()
     }
 
-    /// Like [`Self::build`], but reports why construction failed.
+    /// Builds the `MatchTree` for `branches` followed by `next`, or reports why it cannot be built.
     fn try_build(
         module: &FormatModule,
         branches: &[Format],

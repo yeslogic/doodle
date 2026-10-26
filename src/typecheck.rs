@@ -322,7 +322,7 @@ macro_rules! define_metavariable {
 define_metavariable! {
     UVar, doc = "Generic unification metavariable used by [TypeChecker]";
     // TVar, doc = "Tree (forest-index) metavariable used by [TypeChecker] to refer to (the root-type of) embedded numeric trees", deprecated;
-    NVar, doc = "Local unification metavariable used by [InferenceEngine]";
+    NVar, doc = "Local unification metavariable used by [`InferenceEngine`](inference::InferenceEngine)";
 }
 
 // SECTION - UType definition and impls
@@ -803,7 +803,7 @@ impl TypeChecker {
         ret
     }
 
-    /// Same as [`get_new_uvar`], but additionally informs the initial constraints to indicate that the type
+    /// Same as [`get_new_uvar`](Self::get_new_uvar), but additionally informs the initial constraints to indicate that the type
     /// must be numeric
     fn get_new_uvar_numtree(&mut self) -> UVar {
         let var = self.get_new_uvar();

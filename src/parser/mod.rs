@@ -364,7 +364,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Returns a `u64`-valued byte-offset equivalent to the stored `ByteOffset`, for
-    /// use in association with [`Format::Pos`].
+    /// use in association with [`Format::Pos`](crate::Format::Pos).
     ///
     /// # Panics
     ///

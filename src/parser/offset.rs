@@ -413,38 +413,38 @@ impl ViewStack {
 
 /// Control structure that manages state for individual parse-operations that change how the buffer is viewed or processed.
 ///
-/// Used to provide support for various kinds of speculative parses, as well as [`Format::Slice`].
+/// Used to provide support for various kinds of speculative parses, as well as [`Format::Slice`](crate::Format::Slice).
 ///
 /// This is the element-type for [`ViewStack`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Lens {
-    /// Lens generated when processing [`Format::UnionNondet`], to record the original start-offset to re-attempt an alternate branch-parse
+    /// Lens generated when processing [`Format::UnionNondet`](crate::Format::UnionNondet), to record the original start-offset to re-attempt an alternate branch-parse
     /// from whenever a given branch-parse fails.
     Alts {
-        /// The original offset at the time when we began processing [`Format::UnionNondet`]
+        /// The original offset at the time when we began processing [`Format::UnionNondet`](crate::Format::UnionNondet)
         ///
         /// This is a 'recovery'-point, in that we return to it if the current parse we are attempting hits a failure at any point.
         checkpoint: ByteOffset,
     },
-    /// Lens generated when processing [`Format::Peek`], to record the offset we will continue processing the buffer-data from after the peek succeeds
+    /// Lens generated when processing [`Format::Peek`](crate::Format::Peek), to record the offset we will continue processing the buffer-data from after the peek succeeds
     Peek {
-        /// The original offset at the time when we began processing [`Format::Peek`]
+        /// The original offset at the time when we began processing [`Format::Peek`](crate::Format::Peek)
         ///
         /// This is a 'restore'-point, in that we return to it when the current parse we are attempting fully succeeds.
         checkpoint: ByteOffset,
     },
-    /// Lens generated when processing [`Format::PeekNot`], to record the offset we will continue processing the buffer-data from after we have confirmed that the inner parse is unsuccessful
+    /// Lens generated when processing [`Format::PeekNot`](crate::Format::PeekNot), to record the offset we will continue processing the buffer-data from after we have confirmed that the inner parse is unsuccessful
     PeekNot {
-        /// The original offset at the time when we began processing [`Format::PeekNot`]
+        /// The original offset at the time when we began processing [`Format::PeekNot`](crate::Format::PeekNot)
         ///
         /// This is a 'recovery'-point, in that we return to it if the current parse we are attempting hits a failure at any point.
         checkpoint: ByteOffset,
     },
     /// Random-access Seek, pushed onto the `ViewStack` whenever a seek is performed.
     ///
-    /// `Seek` is an engine-level operation (with no one-to-one mapping to a [`Format`]) that
-    /// is conditionally performed by [`BufferOffset::seek_to_offset`]. Otherwise, it is effectively
-    /// a [`Peek`] that happens to start reading from somewhere other than the current checkpointed
+    /// `Seek` is an engine-level operation (with no one-to-one mapping to a [`Format`](crate::Format)) that
+    /// is conditionally performed by `BufferOffset::seek_to_offset`. Otherwise, it is effectively
+    /// a [`Peek`](Lens::Peek) that happens to start reading from somewhere other than the current checkpointed
     /// byte-offset.
     ///
     /// It contains an extra boolean flag-value, `is_transparent`, which determines whether
@@ -455,7 +455,7 @@ pub enum Lens {
         ///
         /// A 'transparent' seek is treated as a proximal [`Lens::Peek`], and any [`Lens::Slice`]
         /// enclosing it (i.e. lower down in the stack) is still actively limiting the upper-bound
-        /// reported by a [`ViewStack`], and enforced by a [`BufferOffset`]. [`ViewStack::get_limit`]
+        /// reported by a [`ViewStack`], and enforced by a `BufferOffset`. [`ViewStack::get_limit`]
         /// will ignore any transparent seeks it finds, and continue down the stack until it either
         /// finds a slice or reaches the bottom of the stack.
         ///
@@ -560,7 +560,7 @@ impl BufferOffset {
     /// # Note
     ///
     /// This operation is fragile and may lead to unexpected conditions under normal parsing. If the seek-to offset
-    /// is statically known to be ahead of the current offset, use [`try_increment`] instead.
+    /// is statically known to be ahead of the current offset, use [`try_increment`](Self::try_increment) instead.
     pub(crate) fn seek_to_offset(
         &mut self,
         abs_offset: usize,
@@ -682,7 +682,7 @@ impl BufferOffset {
         unsafe { self.push_lens(lens) }
     }
 
-    /// Escapes the context of a [`Format::Slice`] by skipping to its endpoint, popping the corresponding
+    /// Escapes the context of a [`Format::Slice`](crate::Format::Slice) by skipping to its endpoint, popping the corresponding
     /// [`Lens::Slice`] (and any lenses above it) from the [`ViewStack`].
     ///
     /// Performs a top-down search of the `ViewStack` to find the most recent [`Lens::Slice`],
@@ -823,7 +823,7 @@ impl BufferOffset {
     /// no open- close-method of its own).
     ///
     /// This design ensures that, no matter which internal decision is made by [`Parser::advance_or_seek`](crate::parser::Parser::advance_or_seek),
-    /// [`close_peek`] is the correct method to call after the corresponding speculative parse is finished.
+    /// [`close_peek`](Self::close_peek) is the correct method to call after the corresponding speculative parse is finished.
     pub(crate) fn close_peek(&mut self) -> Result<(), StateError> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);

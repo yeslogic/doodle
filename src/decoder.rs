@@ -161,7 +161,7 @@ pub(crate) mod search;
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReadArrayKind {
     Base(BaseKind<Endian>),
-    /// A single `SpineElem` (see [`crate::fixed::FixedShape::Single`]), read directly as the
+    /// A single `SpineElem` (see `crate::fixed::FixedShape::Single`), read directly as the
     /// element value with no record-wrapping.
     Single {
         elem: SpineDecoder,
@@ -180,7 +180,7 @@ pub enum ReadArrayKind {
     },
 }
 
-/// Compiled (interpreter-ready) form of [`crate::fixed::SpineElem`]: either a direct base-kind
+/// Compiled (interpreter-ready) form of `crate::fixed::SpineElem`: either a direct base-kind
 /// read, or a self-contained sub-`Decoder` compiled from the target of a `SpineElem::Indirect`'s
 /// `FormatRef` (which is restricted to a single `CommonOp` read, possibly `Variant`-wrapped, so
 /// the compiled `Decoder` never contains a `Decoder::Call` of its own and can be parsed standalone).

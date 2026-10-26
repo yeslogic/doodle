@@ -377,7 +377,7 @@ impl TypedFormat<GenType> {
         unsafe { &**ptr }
     }
 
-    /// One-to-one analogue for [`Format::lookahead_bounds`] that can be called referentially
+    /// One-to-one analogue for [`Format::lookahead_bounds`](crate::Format::lookahead_bounds) that can be called referentially
     /// on a `TypedFormat` without needing to clone and erase type information.
     ///
     /// Because `TypedFormat::FormatCall` stores the resolved definition of the format it is calling into,
@@ -387,7 +387,7 @@ impl TypedFormat<GenType> {
             .into_bounds()
     }
 
-    /// Analog of [`Format::lookahead_bounds_recursive`] (`src/format.rs`). Two distinct hazards are
+    /// Analog of [`Format::lookahead_bounds_recursive`](crate::Format::lookahead_bounds_recursive) (`src/format.rs`). Two distinct hazards are
     /// guarded against here, since `FormatCall`'s indirection is resolved once, eagerly, at
     /// elaboration time (unlike `Format::ItemVar`'s always-fresh `module.get_format` lookup):
     ///
@@ -546,7 +546,7 @@ impl TypedFormat<GenType> {
         }
     }
 
-    /// One-to-one analogue for [`Format::match_bounds`] that can be called referentially
+    /// One-to-one analogue for [`Format::match_bounds`](crate::Format::match_bounds) that can be called referentially
     /// on a `TypedFormat` without needing to clone and erase type information.
     ///
     /// Because `TypedFormat::FormatCall` stores the resolved definition of the format it is calling into,
@@ -556,7 +556,7 @@ impl TypedFormat<GenType> {
             .into_bounds()
     }
 
-    /// Analog of [`Format::match_bounds_recursive`] (`src/format.rs`) - see
+    /// Analog of [`Format::match_bounds_recursive`](crate::Format::match_bounds_recursive) (`src/format.rs`) - see
     /// [`Self::lookahead_bounds_recursive`] for why `open` is needed here.
     fn match_bounds_recursive(&self, open: &mut OpenSet) -> RecursiveBounds {
         match self {
@@ -1084,14 +1084,14 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
 }
 
 impl<TypeRep: Clone> TypedExpr<TypeRep> {
-    /// Performs the same computation as [`Expr::bounds`] over a borrowed [`TypedExpr`] with arbitrary type-rep value.
+    /// Performs the same computation as [`Expr::bounds`](crate::Expr::bounds) over a borrowed [`TypedExpr`] with arbitrary type-rep value.
     ///
     /// Avoids deep cloning and descends purely by reference, but the logic has to be duplicated and kept up-to-date with
-    /// the implementation of [`Expr::bounds`] itself.
+    /// the implementation of [`Expr::bounds`](crate::Expr::bounds) itself.
     ///
     /// # Notes
     ///
-    /// Care should be taken to ensure that the implementation does not diverge from what [`Expr::bounds`] would return
+    /// Care should be taken to ensure that the implementation does not diverge from what [`Expr::bounds`](crate::Expr::bounds) would return
     /// over the analogous `Expr` tree (e.g. cloning, mapping via `Expr::from`, and calling `.bounds()` on the resulting value).
     pub(crate) fn bounds(&self) -> Bounds {
         match self {

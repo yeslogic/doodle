@@ -140,7 +140,7 @@ pub enum SeqBorrowHint {
     /// whether requiring variable-width or context-dependent decoding of a section of
     /// buffer-data, or whose source-bytes are non-contiguous.
     Constructed,
-    /// Hint specific to [`ViewFormat::ReadArray`], which is backed by a fixed slice of the source-buffer
+    /// Hint specific to [`ViewFormat::ReadArray`](crate::ViewFormat::ReadArray), which is backed by a fixed slice of the source-buffer
     /// and interpreted dynamically as a series of fixed-width values with a common type and unambiguous
     /// mapping from bytes to values (e.g. `U16Be`).
     ReadArray,
@@ -182,7 +182,7 @@ pub enum ValueType {
     /// Place-holding marker type to associate a selectively deferred parse with its proper type
     PhantomData(Box<ValueType>),
     Base(BaseType),
-    /// Like [`Any`], but for polymorphic numeric nodes or embedded NumTrees with an `Auto` rep.
+    /// Like [`Any`](Self::Any), but for polymorphic numeric nodes or embedded NumTrees with an `Auto` rep.
     NumericHole,
     Signed(SignedIntType),
     Tuple(Vec<ValueType>),
