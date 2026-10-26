@@ -479,7 +479,7 @@ impl<'a> GTCompiler<'a> {
                 let n = if let Some(n) = self.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
-                    let real = TypedFormat::leak_level_cell(deref);
+                    let real = deref.body();
                     let n = self.queue_compile(gt.clone(), real, sig_args, next.clone());
                     self.decoder_map.insert((*level, next.clone()), n);
                     n

@@ -288,7 +288,7 @@ pub mod smallsorts {
             &self,
             fref: FormatRef,
         ) -> Option<(usize, Label, Option<Box<UseParams>>)> {
-            let t_inner = self.t_formats.get(&fref.get_level())?.borrow();
+            let t_inner = self.t_formats.get(&fref.get_level())?.get()?;
             let gt = t_inner.get_type()?;
             let (ix, name, params) = gt.try_as_adhoc()?;
             Some((ix, name.clone(), params))
@@ -313,7 +313,7 @@ pub mod smallsorts {
         /// Given a `FormatRef` pointing to a proposed fixed-size type, extract the type it associates to,
         /// whether an adhoc LocalType or a primitive MarkerType
         fn to_marker_or_adhoc(&self, fref: FormatRef) -> Option<SpineType> {
-            let t_inner = self.t_formats.get(&fref.get_level())?.borrow();
+            let t_inner = self.t_formats.get(&fref.get_level())?.get()?;
             if let Some(hint) = t_inner.get_hint() {
                 match hint {
                     &crate::StyleHint::Common(crate::CommonOp::EndianParse(k)) => {

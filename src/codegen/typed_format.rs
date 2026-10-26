@@ -1,5 +1,6 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
+use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::rc::Rc;
 
@@ -221,17 +222,94 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
     }
 }
 
-/// Shared, backpatchable slot for a recursive level's elaborated body.
+/// Shared, write-once slot for the elaborated body of the level a `FormatCall` refers to.
 ///
-/// Every `FormatCall` occurrence for a given level - regardless of whether it was elaborated
-/// before or after that level's own body finished (see `Elaborator::elaborate_format`'s
-/// `Format::ItemVar` arm) - holds a `clone()` of the *same* cell, so that once the level's real
-/// body is known, backfilling it once (`*cell.borrow_mut() = real_body`) is instantly visible to
-/// every occurrence, including ones frozen mid-elaboration on [`TypedFormat::recursion_placeholder`].
-/// Without this sharing, an occurrence discovered while its own level was still "open" (e.g. a
-/// second, sibling recursive definition reached from within another's still-elaborating body) would
-/// keep the placeholder forever, even though it denotes an ordinary, resolvable reference.
-pub(crate) type LevelCell<TypeRep> = Rc<RefCell<Rc<TypedFormat<TypeRep>>>>;
+/// An elaboration creates one `LevelCell` per level, and every `FormatCall` occurrence of that
+/// level holds a clone of it. The cell is created empty when elaboration of the level's body
+/// begins (see `Elaborator::elaborate_format`'s `Format::ItemVar` arm) and set once that body is
+/// finished, so an occurrence reached in between (a self- or sibling-reference while the level is
+/// still open) sees the same body as every other occurrence once it is set.
+///
+/// The body of a recursive level contains a `FormatCall` holding its own cell, so a `TypedFormat`
+/// tree can be cyclic through `LevelCell`s. Hence:
+///
+/// - equality is identity: two cells are equal only if they are the same cell. Within one
+///   elaboration that coincides with structural equality, since a level has exactly one cell and
+///   `FormatCall` compares its level before its cell.
+/// - `Debug` prints a cell's body only where that cell is not already being printed, and
+///   `<recursive>` where it is.
+pub struct LevelCell<TypeRep>(Rc<OnceCell<Rc<TypedFormat<TypeRep>>>>);
+
+impl<TypeRep> LevelCell<TypeRep> {
+    /// A cell for a level whose body is not yet elaborated.
+    pub(crate) fn open() -> Self {
+        LevelCell(Rc::new(OnceCell::new()))
+    }
+
+    /// A cell for a level whose body is already elaborated.
+    pub(crate) fn resolved(body: Rc<TypedFormat<TypeRep>>) -> Self {
+        LevelCell(Rc::new(OnceCell::from(body)))
+    }
+
+    /// The level's body, or `None` if its elaboration is still in progress.
+    pub(crate) fn get(&self) -> Option<&Rc<TypedFormat<TypeRep>>> {
+        self.0.get()
+    }
+
+    /// Sets the level's body.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the body was already set.
+    pub(crate) fn set(&self, body: Rc<TypedFormat<TypeRep>>) {
+        if self.0.set(body).is_err() {
+            panic!("LevelCell::set: level body already set");
+        }
+    }
+
+    /// The level's body, for use once elaboration is complete.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the level's elaboration is still in progress.
+    pub(crate) fn body(&self) -> &TypedFormat<TypeRep> {
+        self.get()
+            .expect("LevelCell::body: level body read before its elaboration finished")
+    }
+}
+
+impl<TypeRep> Clone for LevelCell<TypeRep> {
+    fn clone(&self) -> Self {
+        LevelCell(self.0.clone())
+    }
+}
+
+impl<TypeRep> PartialEq for LevelCell<TypeRep> {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl<TypeRep> Eq for LevelCell<TypeRep> {}
+
+impl<TypeRep: std::fmt::Debug> std::fmt::Debug for LevelCell<TypeRep> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::thread_local! {
+            /// Addresses of the cells whose bodies are currently being printed.
+            static PRINTING: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
+        }
+        let Some(body) = self.get() else {
+            return f.write_str("LevelCell(<open>)");
+        };
+        let addr = Rc::as_ptr(&self.0) as usize;
+        if !PRINTING.with_borrow_mut(|printing| printing.insert(addr)) {
+            return f.write_str("LevelCell(<recursive>)");
+        }
+        let ret = f.debug_tuple("LevelCell").field(body).finish();
+        PRINTING.with_borrow_mut(|printing| printing.remove(&addr));
+        ret
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedFormat<TypeRep> {
@@ -328,54 +406,8 @@ pub enum TypedFormat<TypeRep> {
     Permit(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
 }
 
-std::thread_local! {
-    /// Canonical sentinel installed as a `FormatCall::def` by `Elaborator::elaborate_format`'s
-    /// `Format::ItemVar` arm (`src/codegen/mod.rs`) to reserve a level's slot *before* recursing
-    /// into that level's own body - see [`TypedFormat::recursion_placeholder`].
-    static RECURSION_PLACEHOLDER: Rc<TypedFormat<GenType>> = Rc::new(TypedFormat::Fail);
-}
-
 impl TypedFormat<GenType> {
     pub const EMPTY: Self = TypedFormat::Tuple(GenType::Inline(RustType::UNIT), Vec::new());
-
-    /// Returns the canonical placeholder `Rc` that `Elaborator::elaborate_format` installs as a
-    /// `FormatCall::def` before recursing into that level's own body, so that a self-reference
-    /// reached while the level is still open resolves to *this* value rather than looping forever.
-    ///
-    /// Every reservation uses this single, thread-local `Rc` (rather than a fresh
-    /// `Rc::new(TypedFormat::Fail)` per level) specifically so that [`Self::is_recursion_placeholder`]
-    /// can recognize it later via `Rc::ptr_eq` - a structural check against `TypedFormat::Fail`
-    /// would also true-positive on a level whose real, resolved body is *itself* just `Fail`.
-    pub(crate) fn recursion_placeholder() -> Rc<TypedFormat<GenType>> {
-        RECURSION_PLACEHOLDER.with(|p| p.clone())
-    }
-
-    /// True if `def`'s *current* content is still [`Self::recursion_placeholder`]'s sentinel - i.e.
-    /// the cell hasn't yet been backfilled with its level's real body (see [`LevelCell`]). Consulted
-    /// by [`Self::match_bounds_recursive`]/[`Self::lookahead_bounds_recursive`] so a still-open
-    /// `FormatCall` reports [`RecursiveBounds::unresolved`] instead of trusting `Fail`'s trivial
-    /// `exact(0)`.
-    fn is_recursion_placeholder(def: &LevelCell<GenType>) -> bool {
-        RECURSION_PLACEHOLDER.with(|p| Rc::ptr_eq(p, &def.borrow()))
-    }
-
-    /// Borrows a [`LevelCell`]'s current content for the full lifetime of the cell reference itself,
-    /// bypassing `RefCell`'s runtime borrow tracking.
-    ///
-    /// # Safety (well, soundness - this fn takes no unsafe preconditions from its caller)
-    ///
-    /// Every `LevelCell` is written to exactly once, by `Elaborator::elaborate_format`'s
-    /// `Format::ItemVar` arm (`*cell.borrow_mut() = ...`), and only *during* elaboration
-    /// (`Elaborator::elaborate_module`). `GTCompiler::compile_program` - the sole caller of this,
-    /// via `compile_gt_format`'s `FormatCall` case - only ever runs after `elaborate_module` has
-    /// already returned, at which point no `LevelCell` is ever mutated again. Treating the content
-    /// as valid for the reference's own lifetime is therefore sound in practice, even though the
-    /// borrow-checker can't verify it through `RefCell`'s ordinary (runtime-scoped) `Ref` API -
-    /// which is also why this can't just be `std::cell::Ref::leak` (stable Rust doesn't expose it).
-    pub(crate) fn leak_level_cell(cell: &LevelCell<GenType>) -> &TypedFormat<GenType> {
-        let ptr: *mut Rc<TypedFormat<GenType>> = cell.as_ptr();
-        unsafe { &**ptr }
-    }
 
     /// One-to-one analogue for [`Format::lookahead_bounds`](crate::Format::lookahead_bounds) that can be called referentially
     /// on a `TypedFormat` without needing to clone and erase type information.
@@ -391,21 +423,18 @@ impl TypedFormat<GenType> {
     /// guarded against here, since `FormatCall`'s indirection is resolved once, eagerly, at
     /// elaboration time (unlike `Format::ItemVar`'s always-fresh `module.get_format` lookup):
     ///
-    /// - `def` may be [`Self::recursion_placeholder`]'s sentinel, reserved by the elaborator before
-    ///   its own level's body was available (see that method's docs) - trusting it would silently
-    ///   under-report a genuinely recursive, byte-consuming reference as `Fail`'s `exact(0)`.
-    /// - `open` additionally tracks which `FormatCall` levels this *traversal* is currently walking,
-    ///   as a defensive backstop against any other route to a live re-entrant `def` (none is known to
-    ///   exist given the elaborator always resolves self-reference via the placeholder above, but
-    ///   this costs little to keep).
+    /// - `def` may still be open (see [`LevelCell`]) while the elaborator is inside that level's
+    ///   own body, in which case the call reports [`RecursiveBounds::unresolved`].
+    /// - once set, `def` of a recursive level leads back to a `FormatCall` of the same level, so
+    ///   `open` tracks which `FormatCall` levels this traversal is currently walking.
     fn lookahead_bounds_recursive(&self, open: &mut OpenSet) -> RecursiveBounds {
         match self {
             TypedFormat::FormatCall(_gt, level, _args, _views, def) => {
-                if Self::is_recursion_placeholder(def) {
+                let Some(def) = def.get() else {
                     return RecursiveBounds::unresolved();
-                }
+                };
                 guarded_bounds(*level, open, move |open| {
-                    def.borrow().lookahead_bounds_recursive(open)
+                    def.lookahead_bounds_recursive(open)
                 })
             }
 
@@ -561,12 +590,10 @@ impl TypedFormat<GenType> {
     fn match_bounds_recursive(&self, open: &mut OpenSet) -> RecursiveBounds {
         match self {
             TypedFormat::FormatCall(_gt, level, _args, _views, def) => {
-                if Self::is_recursion_placeholder(def) {
+                let Some(def) = def.get() else {
                     return RecursiveBounds::unresolved();
-                }
-                guarded_bounds(*level, open, move |open| {
-                    def.borrow().match_bounds_recursive(open)
-                })
+                };
+                guarded_bounds(*level, open, move |open| def.match_bounds_recursive(open))
             }
 
             TypedFormat::DecodeBytes(_, _, _)
