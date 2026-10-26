@@ -2309,16 +2309,12 @@ mod tests {
         fn default_limit_is_256() {
             let mut module = FormatModule::new();
             let top = nat(&mut module).call();
-            let program = Compiler::compile_program(&module, &top).unwrap();
-            assert_eq!(program.recursion_limit(), 256);
-            // only `run`: `run_with_loc` overflows a debug-build stack well short of 256 levels
-            let run = |input: &[u8]| {
-                let res = program.run(ReadCtxt::new(input));
-                assert_eq!(recursion_depth(), 0, "run left recursive decoders counted");
-                res.map(|_| ()).map_err(|err| err.is_recursion_limit())
-            };
-            assert_eq!(run(&s_then_z(255)), Ok(()));
-            assert_eq!(run(&s_then_z(256)), Err(true));
+            let limit = Compiler::compile_program(&module, &top)
+                .unwrap()
+                .recursion_limit();
+            assert_eq!(limit, 256);
+            assert_eq!(run(&module, &top, limit, &s_then_z(255)), Ok(()));
+            assert_eq!(run(&module, &top, limit, &s_then_z(256)), Err(true));
         }
 
         /// `Permit` would otherwise substitute its default.
