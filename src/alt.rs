@@ -399,7 +399,7 @@ impl ValueTypeExt {
 
     /// Returns `true` for unsigned machine-integer types and for `NumericHole` (Auto), but not for signed types.
     ///
-    /// Mirrors [`ValueType::is_unsigned_or_auto`]; an `EngineSpecific` type qualifies if both of its models do.
+    /// Mirrors `ValueType::is_unsigned_or_auto`; an `EngineSpecific` type qualifies if both of its models do.
     pub fn is_unsigned_or_auto(&self) -> bool {
         match self {
             ValueTypeExt::Base(bt) => bt.is_numeric(),

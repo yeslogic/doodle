@@ -26,7 +26,7 @@ pub enum EvalError {
     UnknownVar(UnknownVarError),
     /// Checked integer arithmetic underflowed, overflowed, or divided by zero.
     Arith(ArithError),
-    /// Evaluation of an embedded [`NumExpr`](crate::numeric::core::NumExpr) failed.
+    /// Evaluation of an embedded [`NumExpr`](crate::numeric::core::Expr) failed.
     Numeric(NumExprError),
     /// A fixed-width integer conversion (e.g. a narrowing `AsU8`) was out of range.
     IntCast(std::num::TryFromIntError),
@@ -296,7 +296,7 @@ impl std::error::Error for BufferLimitError {}
 
 #[derive(Debug)]
 pub enum DecodeErrorKind<V: Clone = Value> {
-    /// Explicit [`Format::Fail`] token encountered, or successful parse in a `PeekNot` context.
+    /// Explicit [`Format::Fail`](crate::Format::Fail) token encountered, or successful parse in a `PeekNot` context.
     Fail {
         bindings: Vec<(Label, ScopeEntry<V>)>,
         offset: usize,

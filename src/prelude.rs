@@ -213,7 +213,7 @@ where
 }
 
 /// Performs a binary search through a slice, returning the element at the index found by the
-/// slice method [`std::slice::binary_search_by_key`]. If this search fails, returns `None`
+/// slice method [`binary_search_by_key`](slice::binary_search_by_key). If this search fails, returns `None`
 /// instead.
 pub fn find_by_key_sorted<T, K>(f: impl FnMut(&T) -> K, query: K, slice: &[T]) -> Option<&T>
 where
@@ -522,7 +522,7 @@ pub fn slice_ext<T: Copy>(vs: &[T], range: std::ops::Range<usize>) -> Cow<'_, [T
 }
 
 #[inline]
-/// Returns a boolean indicating whether we are finished processing a bounded repetition ([`Format::RepeatBetween`])
+/// Returns a boolean indicating whether we are finished processing a bounded repetition (`Format::RepeatBetween`)
 /// given whether we are out of available repeats (`out_of_reps`), and based on whether the current length (repetition count)
 /// is in the half-open range `[min, max)`, or otherwise under `min` or exactly at `max`.
 ///

@@ -365,7 +365,7 @@ impl Bounds {
         self.min <= inferior.min && self.max >= inferior.max
     }
 
-    /// Dual to [`encompasses`].
+    /// Dual to [`encompasses`](Self::encompasses).
     ///
     /// Returns `true` if every value in `self` is also within `superior`.
     ///
@@ -675,7 +675,7 @@ impl TypedConst {
     /// Numeric equality test on `self`, that the value it holds is equal to `other` regardless of the
     /// `NumRep` chosen.
     ///
-    /// Saves the construction of a new TypedConst compared to [`eq_val`] if the query is made starting with a BigInt in mind.
+    /// Saves the construction of a new TypedConst compared to [`eq_val`](Self::eq_val) if the query is made starting with a BigInt in mind.
     pub fn eq_num(&self, other: &BigInt) -> bool {
         &self.0 == other
     }

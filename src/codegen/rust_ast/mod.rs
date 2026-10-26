@@ -941,7 +941,7 @@ impl RustType {
         }
     }
 
-    /// Returns `true` if seq-formats ([`Format::Sequence`]) of type `Seq(<self>)` should prefer to use
+    /// Returns `true` if seq-formats ([`Format::Sequence`](crate::Format::Sequence)) of type `Seq(<self>)` should prefer to use
     /// fixed-size arrays (`[T; N]`) over vectors (`Vec<T>`) during construction. An additional parameter,
     /// the length of the sequence (`len`), is passed in to guide the decision, as simple types can be
     /// preferable as vectors depending more on the length of the sequence than anything else.
@@ -954,7 +954,7 @@ impl RustType {
     ///
     /// # Note
     ///
-    /// Though superficially similar to [`can_be_copy`], these methods serve starkly different purposes.
+    /// Though superficially similar to [`can_be_copy`](Self::can_be_copy), these methods serve starkly different purposes.
     ///
     /// The in-crate use-case for `RustType::is_copy` is as a direct heuristic on pattern-introspection on
     /// `Some` (or similar) should be destructive (when `true`) or referential (when `false`) to allow for

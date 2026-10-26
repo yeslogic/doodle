@@ -3324,7 +3324,7 @@ impl GenBlock {
     /// by short-circuiting behavior of `?` and `return Err(...)` within the block in question
     ///
     /// Used when the value of `Err` must be inspected (as in `PeekNot` or `Alts`),
-    /// rather than externally short-circuited on via `?` (in which case, [`local_try`] should be used).
+    /// rather than externally short-circuited on via `?` (in which case, [`local_try`](Self::local_try) should be used).
     fn abstracted_try(self) -> GenBlock {
         if self.stmts.iter().any(GenStmt::is_short_circuiting) {
             let GenBlock { stmts, ret } = self;

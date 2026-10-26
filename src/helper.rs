@@ -906,8 +906,8 @@ pub fn shr(value: Expr, places: Expr) -> Expr {
 ///
 /// Like `Format::Pos`, the length takes the type of whatever operand it meets:
 ///
-/// - [`crate::Expr::infer_type`] types it as `NumericHole`, and the interpreter evaluates it to an Auto Numeric.
-/// - [`crate::typecheck::TypeChecker::infer_var_expr`] admits any unsigned type, preferring `U32` when nothing
+/// - `Expr::infer_type` (registration) types it as `NumericHole`, and the interpreter evaluates it to an Auto Numeric.
+/// - `TypeChecker::infer_var_expr` admits any unsigned type, preferring `U32` when nothing
 ///   in the context pins one (a historic effort to use the priority-set `[U32 > U8, U16, U64]` instead was
 ///   reverted, as polymorphic unification with `Format::Pos` yielded no clear winner). Codegen emits
 ///   `len() as <inferred solution type>`.
@@ -1132,7 +1132,7 @@ where
 /// is inferred as a type-sensitive value. Specifically, `RangeFrom<X>` uses `X::MAX` as the max-bound (inclusive),
 /// and `RangeToInclusive<X>` uses `X::MIN` as the min-bound (inclusive). In order for the compiler to determine
 /// the type-param of an inline range-expressions, numeric literals should be given with the appropriate type-suffix.
-/// The type-suffix to use will almost always be the one corresponding to the machine-type of `format``:
+/// The type-suffix to use will almost always be the one corresponding to the machine-type of `format`:
 /// for `where_within_z(i32be(), <range>)` the `range` should be type-suffixed with `i32`, and so forth.
 ///
 /// This function is designed to support ergonomic range-constrants over signed-integer parses. For unsigned integer parses,
@@ -1406,7 +1406,7 @@ pub fn unwrap_singleton(expr: Expr) -> Expr {
     )
 }
 
-/// Given a value `expr` of type ``Expr@Option<T>` and a format-closure `opt_f` of type `Expr@T -> Format@Option<U>`,
+/// Given a value `expr` of type `Expr@Option<T>` and a format-closure `opt_f` of type `Expr@T -> Format@Option<U>`,
 /// parses a format that is equivalent to `opt_f(x)` if `expr` evaluates to `Some(x)`, and which yields `None` otherwise.
 ///
 /// The `binding_name` argument is used for the capture-variable of the `Some(..)` match-branch, as well as the
@@ -1590,7 +1590,7 @@ pub fn concat(xs: Expr) -> Expr {
     flat_map(f_id(), xs)
 }
 
-/// Helper for the lambda-abstracted form of [`concat`].
+/// Helper for the lambda-abstracted form of [`concat()`].
 pub fn f_concat() -> Expr {
     lambda("xs", concat(var("xs")))
 }

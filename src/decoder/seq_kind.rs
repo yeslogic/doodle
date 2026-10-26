@@ -48,7 +48,7 @@ impl std::fmt::Display for SeqBoundsError {
 impl std::error::Error for SeqBoundsError {}
 
 /// Performs a virtual 'slice' operation on a [`Range<usize>`](std::ops::Range) as if it were an array/slice holding those values,
-/// mirroring the intended behavior of [`Expr::SubSeq`] when applied to a sequence-value backed by `ValueSeq::IntRange`.
+/// mirroring the intended behavior of [`Expr::SubSeq`](crate::Expr::SubSeq) when applied to a sequence-value backed by `ValueSeq::IntRange`.
 ///
 /// Checks its own bounds and returns `Err` rather than panicking: `start + len == range.len()`
 /// is the valid full-range case (e.g. `start=0, len=range.len()`), so the check is `<=`, not `<`.
@@ -72,7 +72,7 @@ pub(crate) fn sub_range(
 /// Abstraction over Value-like constructs that can be iterated over
 /// to yield members of type `V`, where `V` is either [`crate::decoder::Value`] or [`crate::loc_decoder::ParsedValue`].
 ///
-/// This type is designed to allow [`Expr::EnumFromTo`] to yield an iterable value-container
+/// This type is designed to allow [`Expr::EnumFromTo`](crate::Expr::EnumFromTo) to yield an iterable value-container
 /// that behaves like a proper sequence, without needing to allocate a `Vec` of `Value`/`ParsedValue`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSeq<'a, V: Clone = super::Value> {

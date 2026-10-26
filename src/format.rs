@@ -106,7 +106,7 @@ pub enum Format {
     /// Repeat a format until a condition is satisfied by the sequence (condition is only checked post-append)
     RepeatUntilSeq(Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
-    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])
+    /// `AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])`
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Format>),
     /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
     ForEach(Box<Expr>, Label, Box<Format>),
@@ -141,7 +141,7 @@ pub enum Format {
     Pos,
     /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
     SkipRemainder,
-    /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
+    /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output `Vec<u8>` or similar
     DecodeBytes(Box<Expr>, Box<Format>),
     /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
     LetFormat(Box<Format>, Label, Box<Format>),
@@ -566,7 +566,7 @@ impl Format {
             .into_bounds()
     }
 
-    /// Analog of [`match_bounds_recursive`] for [`lookahead_bounds`]
+    /// Analog of [`match_bounds_recursive`](Self::match_bounds_recursive) for [`lookahead_bounds`](Self::lookahead_bounds)
     fn lookahead_bounds_recursive(
         &self,
         module: &FormatModule,
@@ -833,7 +833,7 @@ impl Format {
     ///
     /// If called on a leaf-node without a meaningful valuetype, or an interpretation barrier (peek, peeknot), returns `None`.
     ///
-    /// Returns `Some(self)` for [`ItemVar`], [`Hint`], and any structurally-significant wrappers.
+    /// Returns `Some(self)` for [`ItemVar`](Format::ItemVar), [`Hint`](Format::Hint), and any structurally-significant wrappers.
     pub fn as_inner_format(&self) -> Option<&Self> {
         match self {
             // Format indirections - return Some(self)

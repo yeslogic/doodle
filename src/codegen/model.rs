@@ -204,7 +204,7 @@ const fn mk_method(ident: &'static str) -> MethodSpecifier {
 }
 
 // SECTION - helper functions for constructing `Err(ParseError::..)`-values corresponding to various kinds of failure-state
-/// Model RustExpr for handling [`Format::Fail`], as an `Err(<..>)`-value with accompanying trace-hash.
+/// Model RustExpr for handling [`Format::Fail`](crate::Format::Fail), as an `Err(<..>)`-value with accompanying trace-hash.
 pub fn err_fail(trace: u64) -> RustExpr {
     RustExpr::ResultErr(Box::new(RustExpr::FunctionCall(
         Box::new(RustExpr::Entity(RustEntity::Scoped(
@@ -215,7 +215,7 @@ pub fn err_fail(trace: u64) -> RustExpr {
     )))
 }
 
-/// Model RustExpr for the failure-branch of [`Format::PeekNot`] (i.e. when the excluded parse is observed).
+/// Model RustExpr for the failure-branch of [`Format::PeekNot`](crate::Format::PeekNot) (i.e. when the excluded parse is observed).
 pub fn err_bad_peek_not() -> RustExpr {
     RustExpr::ResultErr(Box::new(RustExpr::Entity(RustEntity::Scoped(
         vec![lbl("ParseError")],
@@ -223,7 +223,7 @@ pub fn err_bad_peek_not() -> RustExpr {
     ))))
 }
 
-/// model RustExpr for the failure-branch of [`Format::Repeat1`] and [`Format::RepeatBetween`] when the promised minimum number
+/// model RustExpr for the failure-branch of [`Format::Repeat1`](crate::Format::Repeat1) and [`Format::RepeatBetween`](crate::Format::RepeatBetween) when the promised minimum number
 /// of repeats cannot be fulfilled.
 pub fn err_too_few() -> RustExpr {
     RustExpr::ResultErr(Box::new(RustExpr::Entity(RustEntity::Scoped(
@@ -317,7 +317,7 @@ pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
     try_(call!(view, offset, offset))
 }
 
-/// Model RustExpr for handling [`Format::EndOfInput`] as a Try-pattern (`<..>?`).
+/// Model RustExpr for handling [`Format::EndOfInput`](crate::Format::EndOfInput) as a Try-pattern (`<..>?`).
 pub fn try_enforce_eos(parser: RustExpr) -> RustExpr {
     try_(call!(parser, finish))
 }
