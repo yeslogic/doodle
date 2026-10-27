@@ -549,11 +549,12 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::Compute(..)
             | TypedFormat::Pos(_)
+            | TypedFormat::Phantom(..)
             | TypedFormat::DecodeBytes(..)
             | TypedFormat::ParseFromView(..)
             | TypedFormat::WithView(..)
             | TypedFormat::LiftedOption(_, None) => LookaheadEffect::Transparent,
-            TypedFormat::EndOfInput | TypedFormat::Phantom(..) => LookaheadEffect::Terminal,
+            TypedFormat::EndOfInput => LookaheadEffect::Terminal,
             TypedFormat::Variant(_, _, f)
             | TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)

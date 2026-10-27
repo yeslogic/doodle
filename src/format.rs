@@ -221,8 +221,8 @@ impl std::fmt::Display for RepeatRange {
 pub(crate) enum LookaheadEffect {
     /// The walk reduces to walking `next`: no bytes consumed, no constraint on what follows.
     Transparent,
-    /// The walk accepts without consulting `next` (`EndOfInput`, `Phantom`), so it is the same as
-    /// walking `Next::Empty`.
+    /// The walk accepts without consulting `next` (`EndOfInput`), so it is the same as walking
+    /// `Next::Empty`.
     Terminal,
     /// Anything else, including zero-width formats that constrain lookahead (`Peek`, `PeekNot`,
     /// `Fail`).
@@ -373,11 +373,12 @@ impl Format {
         match self {
             Format::Compute(_)
             | Format::Pos
+            | Format::Phantom(_)
             | Format::DecodeBytes(..)
             | Format::ParseFromView(..)
             | Format::WithView(..)
             | Format::LiftedOption(None) => LookaheadEffect::Transparent,
-            Format::EndOfInput | Format::Phantom(_) => LookaheadEffect::Terminal,
+            Format::EndOfInput => LookaheadEffect::Terminal,
             Format::Variant(_, f)
             | Format::Map(f, _)
             | Format::Where(f, _)
@@ -1016,6 +1017,7 @@ mod tests {
             (compute(Expr::U8(0)), Transparent),
             (Format::Pos, Transparent),
             (Format::EMPTY, Transparent),
+            (Format::Phantom(Box::new(is_byte(0))), Transparent),
             (Format::EndOfInput, Terminal),
             (Format::Peek(Box::new(is_byte(0))), Opaque),
             (Format::PeekNot(Box::new(is_byte(0))), Opaque),

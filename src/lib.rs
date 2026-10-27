@@ -4017,6 +4017,43 @@ mod test {
         );
     }
 
+    /// `Next::sequence` must not cut a continuation short at a `Phantom`, which consumes nothing
+    /// and so leaves what follows it visible to lookahead.
+    ///
+    /// `('a' | 'a' ~ 'c', Phantom(_), 'c')` on input `"ac"`: only branch 0 can succeed, and the
+    /// union's `MatchTree` can only see that if it is built against the trailing `'c'`. If the
+    /// `Phantom` ends the continuation, the tree prefers branch 1 on seeing `'c'`, which consumes
+    /// the whole input and then fails the trailing `'c'`.
+    #[test]
+    fn phantom_continuation_does_not_hide_what_follows() {
+        use crate::helper::is_byte;
+
+        let mut module = FormatModule::new();
+        let top = module.define_format(
+            "test.phantom_after_union",
+            Format::Tuple(vec![
+                Format::Union(vec![
+                    Format::Variant(Label::Borrowed("A"), Box::new(is_byte(b'a'))),
+                    Format::Variant(
+                        Label::Borrowed("AC"),
+                        Box::new(Format::Tuple(vec![is_byte(b'a'), is_byte(b'c')])),
+                    ),
+                ]),
+                Format::Phantom(Box::new(Format::Byte(ByteSet::full()))),
+                is_byte(b'c'),
+            ]),
+        );
+        let prog = super::decoder::Compiler::compile_program(&module, &top.call()).unwrap();
+        assert!(
+            prog.run(ReadCtxt::new(b"acc")).is_ok(),
+            "branch 1 followed by the trailing 'c' must decode"
+        );
+        assert!(
+            prog.run(ReadCtxt::new(b"ac")).is_ok(),
+            "the union must pick branch 0 so that the trailing 'c' can be read"
+        );
+    }
+
     /// End-to-end test of `FormatModule::define_batch_recvar` for a self-recursive format,
     /// through the *real* public registration API (unlike the hand-poked-field tests above) and
     /// the actual interpreter, at real recursion depth >= 2 - proving `Format::RecVar`'s
