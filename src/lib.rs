@@ -910,7 +910,7 @@ pub struct FormatModule {
     views: IxHeap<Vec<Label>>,
     formats: Vec<Format>,
     format_types: Vec<ValueType>,
-    /// Levels registered as members of a recursive batch (see [`Self::define_format_rec_batch`]),
+    /// Levels registered as members of a recursive batch (see [`Self::define_batch_recvar`]),
     /// the only levels that can take part in a cycle of references.
     #[serde(skip)]
     recursive_levels: BTreeSet<usize>,
@@ -929,7 +929,7 @@ impl FormatModule {
     }
 
     /// Whether `level` was registered as a member of a recursive batch, by
-    /// [`Self::define_format_rec_batch`] or [`Self::define_format_recursive`].
+    /// [`Self::define_batch_recvar`] or [`Self::define_batch_with`].
     ///
     /// Only such levels can be referenced before their definition, so every cycle of references
     /// between levels passes through them; the interpreter bounds how deeply calls to them may
@@ -1103,6 +1103,8 @@ impl FormatModule {
 
     /// Registers a batch of mutually-referencing formats under the given names.
     ///
+    /// Here, as in the method name, "batch" means "batch of recursive formats".
+    ///
     /// Unlike [`Self::define_format_phantom_rec_args_views`] (which permits exactly one format to
     /// reference only its own, [`Format::Phantom`]-confined level), this reserves
     /// `formats.len()` levels up front, then rewrites every [`Format::RecVar`] in each supplied
@@ -1122,7 +1124,7 @@ impl FormatModule {
     /// reachable, non-recursive base case (see `check_batch_has_base_case`) - e.g. `F := 'a' F`,
     /// unconditionally self-referential with no non-recursive alternative anywhere on its cycle,
     /// which can never complete on finite input.
-    pub fn define_format_rec_batch<L: IntoLabel>(
+    pub fn define_batch_recvar<L: IntoLabel>(
         &mut self,
         formats: Vec<(L, Format)>,
     ) -> Vec<FormatRef> {
@@ -1146,7 +1148,9 @@ impl FormatModule {
 
     /// Registers a batch of `N` co-referential formats specified via delayed-construction closures.
     ///
-    /// Reserves all `N` levels up front, exactly like [`Self::define_format_rec_batch`], but hands
+    /// Here, as in the method name, "batch" means "batch of recursive formats".
+    ///
+    /// Reserves all `N` levels up front, exactly like [`Self::define_batch_recvar`], but hands
     /// each member-builder (a reference to) the resulting `[FormatRef; N]`, rather than requiring the
     /// caller to pre-build a whole `Format` tree using raw `RecVar` indices. Since [`FormatRef`] is
     /// `Copy` (unlike [`Format`]), a builder can call `.call()`/`.call_args()`/etc. on any of `refs`
@@ -1170,14 +1174,14 @@ impl FormatModule {
     /// and passes the resulting `Box` into `formats` like any other member.
     ///
     /// Builders are invoked in `formats` order, and the same order-dependent type-inference
-    /// behavior documented on [`Self::define_format_rec_batch`] applies here too: a member
+    /// behavior documented on [`Self::define_batch_recvar`] applies here too: a member
     /// referencing an *earlier* sibling sees that sibling's real, already-solved type, while one
     /// referencing itself or a *later* sibling sees the still-provisional placeholder.
     ///
     /// This is presently a thin, additive convenience layer over the same underlying level/`ItemVar`
-    /// machinery `define_format_rec_batch` uses (a builder's returned `Format` never contains a
+    /// machinery `define_batch_recvar` uses (a builder's returned `Format` never contains a
     /// `RecVar` to begin with, so no substitution pass is needed) - it does not remove or replace
-    /// `Format::RecVar`/`define_format_rec_batch`, which remain the lower-level, `Vec`-based entry
+    /// `Format::RecVar`/`define_batch_recvar`, which remain the lower-level, `Vec`-based entry
     /// point.
     ///
     /// Builders are boxed (`Box<dyn FnOnce(..) -> Format>`) rather than a single generic `F`,
@@ -1188,9 +1192,9 @@ impl FormatModule {
     /// # Panics
     ///
     /// Panics if any constructed format fails to type-check, or if any batch member has no
-    /// reachable, non-recursive base case - see [`Self::define_format_rec_batch`]'s own `# Panics`
+    /// reachable, non-recursive base case - see [`Self::define_batch_recvar`]'s own `# Panics`
     /// section.
-    pub fn define_format_recursive<L: IntoLabel, const N: usize>(
+    pub fn define_batch_with<L: IntoLabel, const N: usize>(
         &mut self,
         names: [L; N],
         formats: [Box<dyn FnOnce(&[FormatRef; N]) -> Format>; N],
@@ -1214,7 +1218,7 @@ impl FormatModule {
     /// a placeholder (`Format::EMPTY`/`ValueType::Any`) body - so that a self- or forward-reference
     /// to any reserved level (including one still awaiting its real body) resolves to a real, if
     /// still type-provisional, slot rather than indexing out of bounds. Shared by
-    /// [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`]; returns the starting
+    /// [`Self::define_batch_recvar`] and [`Self::define_batch_with`]; returns the starting
     /// level.
     fn reserve_batch_levels(&mut self, names: impl IntoIterator<Item = Label>) -> usize {
         let start = self.names.len();
@@ -1245,7 +1249,7 @@ impl FormatModule {
     /// code does not. The check is also syntactic: a `Fail` alternative counts as a base case.
     ///
     /// This is a distinct, narrower check than genuine left recursion (`bad := bad | 'Z'`, still
-    /// only caught later, at `MatchTree`-build time - see [`Self::define_format_rec_batch`]'s own
+    /// only caught later, at `MatchTree`-build time - see [`Self::define_batch_recvar`]'s own
     /// doc comment): a format can have a perfectly reachable base case and still be left-recursive
     /// (progress is not reachability), and a format can make byte progress on every single step and
     /// still have no base case at all (reachability is not progress). Neither check subsumes the
@@ -1284,7 +1288,7 @@ impl FormatModule {
     /// inference sees through the cycle and rejects such a use. Its solution, in which a reference
     /// back to a batch level is [`ValueType::Rec`] instead of a placeholder, is what gets installed,
     /// so a later registration that reaches into a member's recursive field sees its real type.
-    /// Shared by [`Self::define_format_rec_batch`] and [`Self::define_format_recursive`].
+    /// Shared by [`Self::define_batch_recvar`] and [`Self::define_batch_with`].
     fn infer_batch_types(&mut self, start: usize, n: usize) {
         for ix in start..start + n {
             let scope = TypeScope::with_rec_types(&self.format_types);
@@ -1376,12 +1380,12 @@ impl FormatModule {
                 }
                 Ok(self.get_format_type(*level).clone())
             }
-            // `define_format_rec_batch` rewrites every `RecVar` before inferring types, so one
+            // `define_batch_recvar` rewrites every `RecVar` before inferring types, so one
             // reaching here was passed to some other registration path (e.g. `define_format`, or
-            // returned from a `define_format_recursive` builder).
+            // returned from a `define_batch_with` builder).
             Format::RecVar(ix) => Err(anyhow!(
-                "Format::RecVar({ix}) is only valid in the body of a `define_format_rec_batch` member \
-                 (in a `define_format_recursive` builder, use the provided `FormatRef`s instead)"
+                "Format::RecVar({ix}) is only valid in the body of a `define_batch_recvar` member \
+                 (in a `define_batch_with` builder, use the provided `FormatRef`s instead)"
             )),
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
@@ -3994,14 +3998,14 @@ mod test {
         );
     }
 
-    /// End-to-end test of `FormatModule::define_format_rec_batch` for a self-recursive format,
+    /// End-to-end test of `FormatModule::define_batch_recvar` for a self-recursive format,
     /// through the *real* public registration API (unlike the hand-poked-field tests above) and
     /// the actual interpreter, at real recursion depth >= 2 - proving `Format::RecVar`'s
     /// construction-time rewrite, `infer_format_type`'s registration-time type inference, and the
     /// Phase 1 `MatchTree` cycle guard all compose correctly for a format nobody could have built
     /// through the public API before this.
     #[test]
-    fn define_format_rec_batch_self_recursive_peano_decodes() {
+    fn define_batch_recvar_self_recursive_peano_decodes() {
         use crate::helper::is_byte;
         use decoder::Value;
 
@@ -4013,7 +4017,7 @@ mod test {
                 Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
             ),
         ]);
-        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let refs = module.define_batch_recvar(vec![("test.peano", peano_body)]);
         let peano_ref = refs[0];
 
         let prog = super::decoder::Compiler::compile_program(&module, &peano_ref.call()).unwrap();
@@ -4056,11 +4060,11 @@ mod test {
 
     /// Phase 5's capstone (see `experiments/doodle-rec/PLAN.md`) explicitly calls for a
     /// malformed-input rejection case through the interpreter, not just the build-time
-    /// left-recursion rejection `define_format_rec_batch_left_recursion_still_rejected_at_compile_time`
+    /// left-recursion rejection `define_batch_recvar_left_recursion_still_rejected_at_compile_time`
     /// already covers - this proves a *well-formed* recursive grammar's `MatchTree`/decoder still
     /// correctly rejects bad bytes deep inside a real recursive descent, not just at the top level.
     #[test]
-    fn define_format_rec_batch_self_recursive_peano_rejects_malformed_input() {
+    fn define_batch_recvar_self_recursive_peano_rejects_malformed_input() {
         use crate::helper::is_byte;
 
         let mut module = FormatModule::new();
@@ -4071,7 +4075,7 @@ mod test {
                 Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
             ),
         ]);
-        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let refs = module.define_batch_recvar(vec![("test.peano", peano_body)]);
         let peano_ref = refs[0];
 
         let prog = super::decoder::Compiler::compile_program(&module, &peano_ref.call()).unwrap();
@@ -4090,7 +4094,7 @@ mod test {
     /// types, relevant to a later phase). Decodes real input alternating between both members at
     /// depth >= 2.
     #[test]
-    fn define_format_rec_batch_mutual_recursion_ping_pong_decodes() {
+    fn define_batch_recvar_mutual_recursion_ping_pong_decodes() {
         use crate::helper::is_byte;
         use decoder::Value;
 
@@ -4111,7 +4115,7 @@ mod test {
             ),
         ]);
         let refs = module
-            .define_format_rec_batch(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
+            .define_batch_recvar(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
         let ping_ref = refs[0];
 
         let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
@@ -4165,7 +4169,7 @@ mod test {
     /// duplicate compile of `ping`, surfacing as an `anyhow!` error from `compile_program` rather
     /// than a decode.
     #[test]
-    fn define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes() {
+    fn define_batch_recvar_mutual_recursion_ping_pong_record_variant_decodes() {
         use crate::helper::{is_byte, record};
         use decoder::Value;
 
@@ -4190,7 +4194,7 @@ mod test {
                 ])),
             ),
         ]);
-        let refs = module.define_format_rec_batch(vec![
+        let refs = module.define_batch_recvar(vec![
             ("test.ping_rec", ping_body),
             ("test.pong_rec", pong_body),
         ]);
@@ -4240,19 +4244,19 @@ mod test {
     }
 
     /// A batch member registered via the real public API can still be genuinely left-recursive
-    /// (`define_format_rec_batch` itself never checks for progress - `infer_format_type` has no
+    /// (`define_batch_recvar` itself never checks for progress - `infer_format_type` has no
     /// occurs-check at all, see its own doc comment on `Format::RecVar`) - proving Phase 1's guard
     /// still catches it at `MatchTree`-build time, reached this time via the ordinary
     /// `decoder::Compiler::compile_program` entry point rather than calling `MatchTree::build`
     /// directly, and that registration itself does not hang or panic.
     #[test]
-    fn define_format_rec_batch_left_recursion_still_rejected_at_compile_time() {
+    fn define_batch_recvar_left_recursion_still_rejected_at_compile_time() {
         use crate::helper::is_byte;
 
         let mut module = FormatModule::new();
         // bad := bad | 'Z' -- zero-progress self-reference in the first branch.
         let bad_body = Format::Union(vec![Format::RecVar(0), is_byte(b'Z')]);
-        let refs = module.define_format_rec_batch(vec![("test.bad", bad_body)]);
+        let refs = module.define_batch_recvar(vec![("test.bad", bad_body)]);
         let bad_ref = refs[0];
 
         let result = super::decoder::Compiler::compile_program(&module, &bad_ref.call());
@@ -4286,7 +4290,7 @@ mod test {
 
         let mut module = FormatModule::new();
         let bad_body = Format::Union(vec![Format::RecVar(0), is_byte(b'Z')]);
-        let bad = module.define_format_rec_batch(vec![("test.bad", bad_body)])[0];
+        let bad = module.define_batch_recvar(vec![("test.bad", bad_body)])[0];
         assert!(
             error_for(&module, &bad.call())
                 .contains("zero-progress recursive cycle through `test.bad`")
@@ -4300,7 +4304,7 @@ mod test {
     #[should_panic(
         expected = "Format::RecVar(1) is out of range for a recursive batch of 1 member(s)"
     )]
-    fn define_format_rec_batch_rejects_out_of_range_rec_var() {
+    fn define_batch_recvar_rejects_out_of_range_rec_var() {
         use crate::helper::is_byte;
 
         let mut module = FormatModule::new();
@@ -4311,13 +4315,13 @@ mod test {
                 Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(1)])),
             ),
         ]);
-        let _ = module.define_format_rec_batch(vec![("test.typo", body)]);
+        let _ = module.define_batch_recvar(vec![("test.typo", body)]);
     }
 
     /// A `RecVar` passed to `define_format` (outside any batch) is a usage error, and the panic
     /// must say so.
     #[test]
-    #[should_panic(expected = "is only valid in the body of a `define_format_rec_batch` member")]
+    #[should_panic(expected = "is only valid in the body of a `define_batch_recvar` member")]
     fn define_format_rejects_rec_var() {
         use crate::helper::is_byte;
 
@@ -4328,15 +4332,15 @@ mod test {
         );
     }
 
-    /// Same as above, for a `RecVar` returned from a `define_format_recursive` builder, which must
+    /// Same as above, for a `RecVar` returned from a `define_batch_with` builder, which must
     /// use its `FormatRef`s instead.
     #[test]
-    #[should_panic(expected = "is only valid in the body of a `define_format_rec_batch` member")]
-    fn define_format_recursive_rejects_rec_var() {
+    #[should_panic(expected = "is only valid in the body of a `define_batch_recvar` member")]
+    fn define_batch_with_rejects_rec_var() {
         use crate::helper::is_byte;
 
         let mut module = FormatModule::new();
-        let _ = module.define_format_recursive(
+        let _ = module.define_batch_with(
             ["test.stray"],
             [Box::new(|_refs: &[FormatRef; 1]| {
                 Format::Union(vec![
@@ -4372,7 +4376,7 @@ mod test {
         ]);
         let mut module = FormatModule::new();
         let Ok(refs) = catch_unwind(AssertUnwindSafe(|| {
-            module.define_format_rec_batch(vec![("test.peano_ill_typed", body)])
+            module.define_batch_recvar(vec![("test.peano_ill_typed", body)])
         })) else {
             return; // rejected at registration
         };
@@ -4403,7 +4407,7 @@ mod test {
                 ])),
             ),
         ]);
-        module.define_format_rec_batch(vec![("test.tree", tree)])[0]
+        module.define_batch_recvar(vec![("test.tree", tree)])[0]
     }
 
     /// `t := 'a' | 'a' ~ 'b' | 'N' ~ t* ~ 'E'`, registered as a batch: whether an `'a'` is
@@ -4427,7 +4431,7 @@ mod test {
                 ])),
             ),
         ]);
-        module.define_format_rec_batch(vec![("test.cont_tree", t)])[0]
+        module.define_batch_recvar(vec![("test.cont_tree", t)])[0]
     }
 
     /// `tree` settles every choice before reaching its own continuation (`'L'`/`'N'` against `'E'`),
@@ -4493,7 +4497,7 @@ mod test {
                 Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
             ),
         ]);
-        module.define_format_rec_batch(vec![("test.peano", body)])[0]
+        module.define_batch_recvar(vec![("test.peano", body)])[0]
     }
 
     /// A format registered after a batch, rather than as part of it, can reach a member's
@@ -4577,7 +4581,7 @@ mod test {
             ),
         ]);
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![("test.conventions", body)]);
+        let refs = module.define_batch_recvar(vec![("test.conventions", body)]);
         let level = refs[0].get_level();
         assert_eq!(
             module.get_format_type(level),
@@ -4594,7 +4598,7 @@ mod test {
 
     /// The specific gap `check_batch_has_base_case` closes: `F := 'a' F`, with no non-recursive
     /// alternative anywhere on its cycle, makes byte progress on every step (unlike
-    /// `define_format_rec_batch_left_recursion_still_rejected_at_compile_time`'s `bad` above), so
+    /// `define_batch_recvar_left_recursion_still_rejected_at_compile_time`'s `bad` above), so
     /// neither the `MatchTree` cycle guard nor `infer_format_type`'s occurs-check has any reason to
     /// reject it - it would otherwise reach `MatchTree`/codegen and recurse at decode time with no
     /// depth bound, bounded only by how much input an attacker supplies. Must now be rejected at
@@ -4602,13 +4606,13 @@ mod test {
     /// codegen.
     #[test]
     #[should_panic(expected = "no reachable base case for: test.no_base_case")]
-    fn define_format_rec_batch_no_base_case_rejected_at_registration() {
+    fn define_batch_recvar_no_base_case_rejected_at_registration() {
         use crate::helper::is_byte;
 
         let mut module = FormatModule::new();
         // F := 'a' F -- unconditionally, mandatorily self-referential; no branch ever escapes.
         let no_base_case = Format::Tuple(vec![is_byte(b'a'), Format::RecVar(0)]);
-        let _ = module.define_format_rec_batch(vec![("test.no_base_case", no_base_case)]);
+        let _ = module.define_batch_recvar(vec![("test.no_base_case", no_base_case)]);
     }
 
     /// Mutual-recursion counterpart of the above: two batch members that unconditionally call each
@@ -4617,14 +4621,14 @@ mod test {
     /// single member's own body.
     #[test]
     #[should_panic(expected = "no reachable base case for: test.mutual_a, test.mutual_b")]
-    fn define_format_rec_batch_mutual_no_base_case_rejected_at_registration() {
+    fn define_batch_recvar_mutual_no_base_case_rejected_at_registration() {
         use crate::helper::is_byte;
 
         let mut module = FormatModule::new();
         let a_body = Format::Tuple(vec![is_byte(b'a'), Format::RecVar(1)]);
         let b_body = Format::Tuple(vec![is_byte(b'b'), Format::RecVar(0)]);
         let _ = module
-            .define_format_rec_batch(vec![("test.mutual_a", a_body), ("test.mutual_b", b_body)]);
+            .define_batch_recvar(vec![("test.mutual_a", a_body), ("test.mutual_b", b_body)]);
     }
 
     /// Guards a subtle correctness boundary inside `Format::has_reachable_base_case` itself, not
@@ -4633,7 +4637,7 @@ mod test {
     /// inner format is - `match_bounds_recursive`'s `Repeat` arm reports `RecursiveBounds::any()`
     /// without even inspecting `inner` at all. Deliberately calls `has_reachable_base_case` directly
     /// on a hand-built `Format` against an otherwise-empty `FormatModule` (level `0` is never
-    /// actually installed) rather than going through `define_format_rec_batch` end-to-end: this
+    /// actually installed) rather than going through `define_batch_recvar` end-to-end: this
     /// isolates the exact algorithmic claim (`Repeat` never needs to resolve what's inside it) from
     /// `MatchTree`'s own, separate and unrelated inability to disambiguate repetition of a directly
     /// self-referential item at decode time - a real but orthogonal limitation, not a regression in
@@ -4664,10 +4668,10 @@ mod test {
     /// "any `Repeat*` variant has a free escape" simplification would wrongly let through.
     #[test]
     #[should_panic(expected = "no reachable base case for: test.repeat1_self")]
-    fn define_format_rec_batch_self_recursive_via_repeat1_still_rejected() {
+    fn define_batch_recvar_self_recursive_via_repeat1_still_rejected() {
         let mut module = FormatModule::new();
         // F := Repeat1(F) -- one-or-more copies of itself, with no non-recursive alternative.
         let body = Format::Repeat1(Box::new(Format::RecVar(0)));
-        let _ = module.define_format_rec_batch(vec![("test.repeat1_self", body)]);
+        let _ = module.define_batch_recvar(vec![("test.repeat1_self", body)]);
     }
 }

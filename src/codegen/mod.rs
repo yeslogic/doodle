@@ -5250,7 +5250,7 @@ impl<'a> Elaborator<'a> {
                     // Such a reference occurs inside a `Format::Phantom` (the one place `ItemVar`
                     // may name its own not-yet-elaborated level), or inside another recursive
                     // definition's body reached from this level's own still-open elaboration (e.g.
-                    // two definitions in the same `define_format_rec_batch` that both call back
+                    // two definitions in the same `define_batch_recvar` that both call back
                     // into a shared hub).
                     //
                     // Every occurrence of this level holds a clone of this one `LevelCell`, so

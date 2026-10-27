@@ -108,7 +108,7 @@ inert content that a decoder never actually walks, so it can't build an unrepres
 type regardless of what it contains) - it does not go through the indirection-tracking machinery
 above at all. See `doc/RECURSION.md` for the full recursion-model writeup this occurs-check
 generalization was built for (self/mutually-recursive formats built via
-`FormatModule::define_format_rec_batch`), including where the analogous reservation-before-recursing
+`FormatModule::define_batch_recvar`), including where the analogous reservation-before-recursing
 pattern shows up again in `MatchTree` construction and codegen's `CodeGen::lift_uvar`.
 
 ### Basic Unification Guide

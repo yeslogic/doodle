@@ -5362,7 +5362,7 @@ mod tests {
     }
 
     /// The actual unblock, end-to-end: a genuinely self-recursive format (built via Phase 1.5's
-    /// `FormatModule::define_format_rec_batch`, indirected through a union arm exactly as
+    /// `FormatModule::define_batch_recvar`, indirected through a union arm exactly as
     /// `self_reference_behind_a_union_variant_is_accepted` tests in isolation) now typechecks through the
     /// real production entry point, `TypeChecker::infer_module` - not just the raw `UType`-level
     /// `occurs` check above. Before this phase, this format could be registered (Phase 1.5) and
@@ -5379,7 +5379,7 @@ mod tests {
                 Box::new(Format::Tuple(vec![is_byte(b'S'), Format::RecVar(0)])),
             ),
         ]);
-        let refs = module.define_format_rec_batch(vec![("test.peano", peano_body)]);
+        let refs = module.define_batch_recvar(vec![("test.peano", peano_body)]);
         let peano_ref = refs[0];
 
         TypeChecker::infer_module(&module, &peano_ref.call())
