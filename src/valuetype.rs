@@ -193,7 +193,7 @@ pub enum ValueType {
     /// Reference to the registered type of the format at the given level of a `FormatModule`.
     ///
     /// Only occurs within the type of a recursive-batch member (see
-    /// `FormatModule::define_format_rec_batch`), at the point where that type refers back to a
+    /// `FormatModule::define_batch_recvar`), at the point where that type refers back to a
     /// batch level whose type is still being expanded, which no finite `ValueType` could otherwise
     /// express. The referenced type always has a structural head (never another `Rec`, nor a base
     /// or numeric type). Resolved via [`ValueType::unify_with`] and `TypeScope`'s unfolding.

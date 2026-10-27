@@ -197,7 +197,7 @@ const BSON_TAG_MINKEY: i8 = -1;
 /// the `bson.element`/`bson.document`/`bson.array` recursive batch, same as any other auxiliary
 /// sub-format, rather than above it. The recursive `document`/`array` batch members don't exist
 /// yet at that point, so the final dispatch is returned as a residual closure that extracts them
-/// from `refs` once `define_format_recursive` has reserved the batch's levels; `document` is
+/// from `refs` once `define_batch_with` has reserved the batch's levels; `document` is
 /// called twice within it (once for the plain `document` arm, once for `code_w_scope`'s embedded
 /// scope) since `FormatRef` is `Copy`.
 fn element(
@@ -339,7 +339,7 @@ pub fn main(module: &mut FormatModule, utf8_nz: FormatRef) -> FormatRef {
     let cstring = cstring(module, utf8_nz);
     let string = string(module, utf8_nz);
     let element_residual = element(module, cstring, string);
-    let [_element, document, _array] = module.define_format_recursive(
+    let [_element, document, _array] = module.define_batch_with(
         ["bson.element", "bson.document", "bson.array"],
         [
             element_residual,

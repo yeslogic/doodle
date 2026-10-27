@@ -39,7 +39,7 @@ mod elaboration {
             ]),
         );
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tchain"), body)]);
+        let refs = module.define_batch_recvar(vec![(Label::Borrowed("test.tchain"), body)]);
         let top = refs[0].call();
         if TypeChecker::infer_module(&module, &top).is_ok() {
             let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -72,7 +72,7 @@ mod elaboration {
             ),
         ]);
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tree"), tree)]);
+        let refs = module.define_batch_recvar(vec![(Label::Borrowed("test.tree"), tree)]);
         let src = produce_string_gencode(&module, &refs[0].call());
         assert!(src.contains("Vec<"), "source was:\n{src}");
     }
@@ -100,7 +100,7 @@ mod elaboration {
             ),
         ]);
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.cont_tree"), t)]);
+        let refs = module.define_batch_recvar(vec![(Label::Borrowed("test.cont_tree"), t)]);
         let src = produce_string_gencode(&module, &refs[0].call());
         let decoders = src.matches("\nfn Decoder").count();
         assert!(
@@ -188,7 +188,7 @@ mod elaboration {
     }
 
     /// Phase 4's codegen-path counterpart to `lib.rs`'s
-    /// `define_format_rec_batch_mutual_recursion_ping_pong_record_variant_decodes`: the same
+    /// `define_batch_recvar_mutual_recursion_ping_pong_record_variant_decodes`: the same
     /// record-shaped mutual recursion, but run through the real production codegen path
     /// (`generate_code`/`GTCompiler`) rather than the interpreter, since Phase 4's "Finding B"
     /// (see `experiments/doodle-rec/PLAN.md`) found the identically-shaped `LetFormat`/`MonadSeq`
@@ -219,7 +219,7 @@ mod elaboration {
                 ])),
             ),
         ]);
-        let refs = module.define_format_rec_batch(vec![
+        let refs = module.define_batch_recvar(vec![
             ("test.ping_rec_cg", ping_body),
             ("test.pong_rec_cg", pong_body),
         ]);
@@ -261,7 +261,7 @@ mod elaboration {
             ),
         ]);
         let mut module = FormatModule::new();
-        let frefs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+        let frefs = module.define_batch_recvar(vec![(Label::Borrowed("peano"), peano)]);
         let top = frefs[0].call();
         let src = produce_string_gencode(&module, &top);
         assert!(src.contains("Box<peano>"), "source was:\n{src}");
@@ -281,7 +281,7 @@ mod elaboration {
         ]);
         let pong = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
         let mut module2 = FormatModule::new();
-        let frefs2 = module2.define_format_rec_batch(vec![
+        let frefs2 = module2.define_batch_recvar(vec![
             (Label::Borrowed("ping"), ping),
             (Label::Borrowed("pong"), pong),
         ]);
@@ -428,7 +428,7 @@ mod elaboration {
         ]);
 
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![
+        let refs = module.define_batch_recvar(vec![
             (Label::Borrowed("json.value"), value),
             (Label::Borrowed("json.member"), member),
             (Label::Borrowed("json.array"), array),
@@ -457,7 +457,7 @@ mod elaboration {
         use crate::helper::{alts, is_byte, tuple};
 
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![(
+        let refs = module.define_batch_recvar(vec![(
             Label::Borrowed("test.r"),
             alts([
                 ("A", tuple([is_byte(b'a'), Format::RecVar(0)])),
@@ -619,10 +619,10 @@ mod elaboration {
     /// reachable base case (a `Tuple`'s own sequencing has no analog of `Union`'s "pick a different
     /// branch" escape, and nothing here wraps the recursive field in a `Repeat` to give it one) - so
     /// `FormatModule::check_batch_has_base_case` now rejects this exact shape earlier, at
-    /// `define_format_rec_batch` registration time, before a `FormatRef` to it can ever reach
+    /// `define_batch_recvar` registration time, before a `FormatRef` to it can ever reach
     /// `produce_string_gencode` (or the interpreter) to hit the older codegen-specific guard at all.
     /// The codegen `unreachable!` is kept as a defensive backstop - see `doc/RECURSION.md`'s
-    /// Anti-patterns section - since `define_format_rec_batch`/`define_format_recursive` are
+    /// Anti-patterns section - since `define_batch_recvar`/`define_batch_with` are
     /// documented as the only sanctioned entry points for real recursion, so nothing in the public
     /// API can currently construct a batch member that reaches it.
     #[test]
@@ -631,7 +631,7 @@ mod elaboration {
         let pair_a = Format::Tuple(vec![Format::Byte(ByteSet::from([b'A'])), Format::RecVar(1)]);
         let pair_b = Format::Tuple(vec![Format::Byte(ByteSet::from([b'B'])), Format::RecVar(0)]);
         let mut module = FormatModule::new();
-        let frefs = module.define_format_rec_batch(vec![
+        let frefs = module.define_batch_recvar(vec![
             (Label::Borrowed("pair_a"), pair_a),
             (Label::Borrowed("pair_b"), pair_b),
         ]);
@@ -1139,7 +1139,7 @@ mod fixture_gen {
             ),
         ]);
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.tree"), tree)]);
+        let refs = module.define_batch_recvar(vec![(Label::Borrowed("test.tree"), tree)]);
         let top = refs[0].call();
         let frag = generate_code(&module, &top).to_fragment();
         const TEST_PATH: &str = "tests/recursive_repeat/mod.rs";
@@ -1163,7 +1163,7 @@ mod fixture_gen {
             ),
         ]);
         let mut module = FormatModule::new();
-        let refs = module.define_format_rec_batch(vec![(Label::Borrowed("test.chain"), chain)]);
+        let refs = module.define_batch_recvar(vec![(Label::Borrowed("test.chain"), chain)]);
         let top = refs[0].call();
         let frag = generate_code(&module, &top).to_fragment();
         const TEST_PATH: &str = "tests/recursive_maybe/mod.rs";
@@ -1256,8 +1256,8 @@ mod fixture_gen {
         ]);
 
         let mut module = FormatModule::new();
-        let peano_refs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
-        let pingpong_refs = module.define_format_rec_batch(vec![
+        let peano_refs = module.define_batch_recvar(vec![(Label::Borrowed("peano"), peano)]);
+        let pingpong_refs = module.define_batch_recvar(vec![
             (Label::Borrowed("ping"), ping),
             (Label::Borrowed("pong"), pong),
         ]);

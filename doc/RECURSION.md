@@ -48,7 +48,7 @@ existing behavior interacts with the newer, real-recursion mechanisms (see
 
 ## Constructing a recursive format
 
-Use `Format::RecVar(usize)` and `FormatModule::define_format_rec_batch`:
+Use `Format::RecVar(usize)` and `FormatModule::define_batch_recvar`:
 
 ```rust
 let peano = Format::Union(vec![
@@ -62,13 +62,13 @@ let peano = Format::Union(vec![
     ),
 ]);
 let mut module = FormatModule::new();
-let refs = module.define_format_rec_batch(vec![(Label::Borrowed("peano"), peano)]);
+let refs = module.define_batch_recvar(vec![(Label::Borrowed("peano"), peano)]);
 let peano_ref = refs[0];
 ```
 
 `RecVar(n)` is batch-relative sugar only: it names the `n`th format passed to
-`define_format_rec_batch` in the same call (`0` for a singly-recursive format's own level, `1` for
-the second member of a mutually-recursive pair, and so on). `define_format_rec_batch` reserves all
+`define_batch_recvar` in the same call (`0` for a singly-recursive format's own level, `1` for
+the second member of a mutually-recursive pair, and so on). `define_batch_recvar` reserves all
 `formats.len()` levels up front (so every `RecVar` has a real level to resolve against, even before
 any body is installed), rewrites every `RecVar` occurrence to the corresponding real, absolute
 `Format::ItemVar` via `Format::substitute_rec_var`, and only then installs and type-checks each
@@ -79,7 +79,7 @@ compiler's own exhaustiveness checking whenever a new match is added.
 There is no lower-level public constructor for a genuinely self-referential, non-`Phantom` format —
 `FormatModule::define_format`/`define_format_args_views` type-check a format *before* the level it
 would occupy exists, so an out-of-bounds self-reference is rejected outright by design.
-`define_format_rec_batch` is the one sanctioned entry point.
+`define_batch_recvar` is the one sanctioned entry point.
 
 ## The five mechanisms
 
@@ -89,8 +89,8 @@ recursive case while leaving non-recursive formats' behavior unchanged.
 ### 0. Reachable-base-case check at batch registration
 
 **Where**: `FormatModule::check_batch_has_base_case` (`src/lib.rs`), called from both
-`define_format_rec_batch` and `define_format_recursive` right after a batch's bodies are installed
-(and, for `define_format_rec_batch`, after `Format::substitute_rec_var` has rewritten every
+`define_batch_recvar` and `define_batch_with` right after a batch's bodies are installed
+(and, for `define_batch_recvar`, after `Format::substitute_rec_var` has rewritten every
 `RecVar` to a real `ItemVar`), before `infer_batch_types` runs. Backed by
 `Format::has_reachable_base_case` (`src/format.rs`) and `RecursiveBounds::is_min_unresolved`
 (`src/recursion.rs`).
@@ -381,13 +381,13 @@ module lookup should be needed. Two distinct hazards had to be closed before tha
   `Tuple[Byte, ItemVar(other)]`, referencing each other with nothing else in between). Such a cycle
   is, by construction, always *also* a cycle with no reachable base case (a `Tuple`'s sequencing has
   no analog of `Union`'s "pick a different branch" escape), so in practice this is now rejected even
-  earlier, at `define_format_rec_batch`/`define_format_recursive` registration time, by
+  earlier, at `define_batch_recvar`/`define_batch_with` registration time, by
   [mechanism 0](#0-reachable-base-case-check-at-batch-registration)'s
   `no reachable base case for: ...` panic - before a `FormatRef` to it can ever reach codegen. The
   original, codegen-specific guard (`unreachable!("Expansion::Tuple(UVar) is directly
   self-referential (an anonymous tuple whose own element type is itself, with no Record/Union
   boundary in between) - not yet supported by codegen")`) is kept as a defensive backstop - since
-  `define_format_rec_batch`/`define_format_recursive` are documented as the only sanctioned entry
+  `define_batch_recvar`/`define_batch_with` are documented as the only sanctioned entry
   points for real recursion, nothing in the public API can currently reach it, but it costs little to
   leave in place against a future construction path this reasoning doesn't anticipate. This is a
   real, load-bearing distinction from the pattern above: `pong` (a bare `Tuple`) is fine specifically
@@ -401,11 +401,11 @@ module lookup should be needed. Two distinct hazards had to be closed before tha
   non-recursive alternative anywhere on its cycle - see [mechanism 0](#0-reachable-base-case-check-at-batch-registration)).
   Unlike left recursion below, this makes byte progress on every step, so nothing about `MatchTree`
   or the occurs-check would otherwise catch it; rejected immediately at
-  `define_format_rec_batch`/`define_format_recursive` registration time instead, naming every
+  `define_batch_recvar`/`define_batch_with` registration time instead, naming every
   offending batch member.
 - **Genuine left recursion** — a self-reference reached with zero possible byte-consuming progress
   (`bad := bad | 'Z'`). Rejected at `MatchTree`-build time (see [mechanism 1](#1-matchtree-cycle-guard)
-  above), not a stack overflow or hang. `define_format_rec_batch` itself does **not** check for this
+  above), not a stack overflow or hang. `define_batch_recvar` itself does **not** check for this
   at registration time (`infer_format_type` has no occurs-check of its own for progress, only for
   representability) — the rejection only happens once something actually tries to build a
   `MatchTree` for the offending `Union`, e.g. via `decoder::Compiler::compile_program` or the codegen
@@ -437,11 +437,11 @@ module lookup should be needed. Two distinct hazards had to be closed before tha
 
 ## Where the tests live
 
-- `src/lib.rs`'s `mod test` — `define_format_rec_batch_*`: self-recursive peano and mutually-recursive
+- `src/lib.rs`'s `mod test` — `define_batch_recvar_*`: self-recursive peano and mutually-recursive
   ping/pong through the real public API and the plain interpreter, a left-recursion-rejection case,
   a record-shaped mutual-recursion case (exercising the `LetFormat`/`MonadSeq` fix specifically), and
-  `define_format_rec_batch_no_base_case_rejected_at_registration`/
-  `define_format_rec_batch_mutual_no_base_case_rejected_at_registration` (mechanism 0: `F := 'a' F`
+  `define_batch_recvar_no_base_case_rejected_at_registration`/
+  `define_batch_recvar_mutual_no_base_case_rejected_at_registration` (mechanism 0: `F := 'a' F`
   self- and mutually-recursive shapes, confirmed to panic naming every offending member, at
   registration time rather than reaching `MatchTree`/codegen at all).
 - `src/codegen/mod.rs`'s `mod tests` — `phase3_final_check_peano_and_ping_pong` (Box placement,

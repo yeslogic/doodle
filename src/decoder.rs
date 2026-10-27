@@ -426,7 +426,7 @@ impl Program {
     }
 
     /// Sets how many decoders of recursive levels (levels registered by
-    /// [`FormatModule::define_format_rec_batch`] or [`FormatModule::define_format_recursive`]) may
+    /// [`FormatModule::define_batch_recvar`] or [`FormatModule::define_batch_with`]) may
     /// be running at once, nested within each other; a call that would exceed it fails with
     /// [`DecodeErrorKind::RecursionLimit`]. Defaults to [`Self::DEFAULT_RECURSION_LIMIT`].
     ///
@@ -2252,7 +2252,7 @@ mod tests {
 
         /// Registers `nat := 'Z' | 'S' nat`, whose every call to itself counts towards the limit.
         fn nat(module: &mut FormatModule) -> FormatRef {
-            module.define_format_rec_batch(vec![(
+            module.define_batch_recvar(vec![(
                 "test.nat",
                 alts([
                     ("Z", is_byte(b'Z')),
@@ -2351,7 +2351,7 @@ mod tests {
         #[test]
         fn union_nondet_inside_recursion_propagates_it() {
             let mut module = FormatModule::new();
-            let deep = module.define_format_rec_batch(vec![(
+            let deep = module.define_batch_recvar(vec![(
                 "test.deep",
                 alts_nondet([
                     ("Deep", tuple([is_byte(b'S'), Format::RecVar(0)])),

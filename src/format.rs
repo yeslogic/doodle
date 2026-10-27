@@ -60,13 +60,13 @@ pub enum Format {
     /// Reference to a format within the same recursive batch-definition, given by batch-local index
     /// (`0` is the first format in the batch, or "self" when the batch has only one member).
     ///
-    /// Construction-time sugar only: written literally by a caller of `FormatModule::define_format_rec_batch`
+    /// Construction-time sugar only: written literally by a caller of `FormatModule::define_batch_recvar`
     /// to allow formats to refer to one another even before they are assigned `ItemVar` levels;
     /// during this registration, `RecVar` is invariably converted to the proper `ItemVar` before
     /// it  is stored in the module, so it should never appear in a `Format` after that point.
     ///
     /// This Format has no individual semantics and it should be treated as an unsupported value
-    /// anywhere other than `define_format_rec_batch`.
+    /// anywhere other than `define_batch_recvar`.
     RecVar(usize),
     /// A format that never matches
     Fail,
@@ -435,7 +435,7 @@ impl Format {
     ///
     /// # Notes
     ///
-    /// Called by [`define_format_rec_batch`](FormatModule::define_format_rec_batch)/[`define_format_recursive`](FormatModule::define_format_recursive) over every format
+    /// Called by [`define_batch_recvar`](FormatModule::define_batch_recvar)/[`define_batch_with`](FormatModule::define_batch_with) over every format
     /// in the recursive batch, to prevent silent acceptance of any format definition that can never terminate
     /// over finite-length input. If any definition within the batch fails this predicate, the registration
     /// method will panic.
@@ -683,7 +683,7 @@ impl Format {
     }
 
     /// Rewrites every `Format::RecVar(ix)` in `self` to `Format::ItemVar(start + ix, vec![], vec![])`,
-    /// recursively. Used exactly once, by `FormatModule::define_format_rec_batch`, to desugar a
+    /// recursively. Used exactly once, by `FormatModule::define_batch_recvar`, to desugar a
     /// batch member's body (written using batch-relative `RecVar` indices) into the real, absolute
     /// `ItemVar` references every other pass over `Format` expects to see - see `Format::RecVar`'s
     /// own doc comment.
@@ -693,12 +693,12 @@ impl Format {
     /// Panics if any `RecVar(ix)` has `ix >= len`, where `len` is the number of batch members:
     /// such an index would otherwise point past the batch, either out of bounds or at whatever
     /// unrelated format is registered at that level later. `len == 0` rejects every `RecVar`,
-    /// which is how `FormatModule::define_format_recursive` checks its builders' output.
+    /// which is how `FormatModule::define_batch_with` checks its builders' output.
     pub(crate) fn substitute_rec_var(self, start: usize, len: usize) -> Format {
         match self {
             Format::RecVar(ix) if len == 0 => panic!(
-                "Format::RecVar({ix}) is only valid in the body of a `define_format_rec_batch` member \
-                 (in a `define_format_recursive` builder, use the provided `FormatRef`s instead)"
+                "Format::RecVar({ix}) is only valid in the body of a `define_batch_recvar` member \
+                 (in a `define_batch_with` builder, use the provided `FormatRef`s instead)"
             ),
             Format::RecVar(ix) => {
                 assert!(
@@ -1072,7 +1072,7 @@ mod tests {
             ("Long", byte_seq(&[b'A'; 10])),
             ("Rec", tuple([is_byte(b'x'), Format::RecVar(0)])),
         ]);
-        let refs = module.define_format_rec_batch(vec![("test.rec", body)]);
+        let refs = module.define_batch_recvar(vec![("test.rec", body)]);
         let bounds = refs[0].call().match_bounds(&module);
         assert_eq!(
             bounds.min(),
@@ -1100,7 +1100,7 @@ mod tests {
                 ("Shorter", byte_seq(&[b'B'; 7])),
                 ("Rec", tuple([is_byte(b'y'), Format::RecVar(0)])),
             ]);
-            module.define_format_rec_batch(vec![("test.a", a0), ("test.b", b1)])
+            module.define_batch_recvar(vec![("test.a", a0), ("test.b", b1)])
         };
         let bounds = refs[0].call().match_bounds(&module);
         assert_eq!(
