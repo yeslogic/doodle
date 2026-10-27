@@ -4,3 +4,4 @@ custom/*.hi
 custom/*.o
 custom/MakeNumbers
 **/CLAUDE.md
+.context/**

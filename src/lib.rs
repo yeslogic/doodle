@@ -1109,7 +1109,7 @@ impl FormatModule {
     /// reference only its own, [`Format::Phantom`]-confined level), this reserves
     /// `formats.len()` levels up front, then rewrites every [`Format::RecVar`] in each supplied
     /// body to the real, absolute [`Format::ItemVar`] for its batch position (`RecVar(0)` is the
-    /// first name in `formats`, `RecVar(1)` the second, and so on - "self" for a singly-recursive
+    /// first name in `formats`, `RecVar(1)` the second, and so on; "self" for a singly-recursive
     /// member is just `RecVar` of its own batch position). Every occurrence is rewritten before
     /// the format is ever installed into the module, so no other pass over `Format` ever
     /// encounters a `RecVar` - see that variant's own doc comment.
@@ -1154,35 +1154,50 @@ impl FormatModule {
     /// each member-builder (a reference to) the resulting `[FormatRef; N]`, rather than requiring the
     /// caller to pre-build a whole `Format` tree using raw `RecVar` indices. Since [`FormatRef`] is
     /// `Copy` (unlike [`Format`]), a builder can call `.call()`/`.call_args()`/etc. on any of `refs`
-    /// as many times as it needs, without having to thread a fresh `Format::RecVar(i)`-valued
-    /// parameter through its own signature for each additional use site of the same recursive
-    /// reference - the exact friction that motivated this constructor (see `doc/RECURSION.md`'s
-    /// "mental model" section for the underlying `ItemVar`/level model this still builds on).
-    ///
-    /// Builders do *not* receive `&mut FormatModule` - unlike every other `define_format_*`
-    /// helper, a batch member's own body is built *after* all `N` levels are reserved, so any
-    /// auxiliary sub-format a builder registered mid-build would land at a level *above* the
-    /// batch it logically belongs under, the one place in the module where the usual "a format
-    /// can only be referenced by a later one" ordering would silently fail to hold. A builder
-    /// that needs its own named auxiliary sub-formats (e.g. one that dispatches on a tagged union
-    /// of many sub-formats worth naming independently) registers them *before* this call instead,
-    /// in an ordinary function taking `&mut FormatModule` that returns the residual
-    /// `Box<dyn FnOnce(&[FormatRef; N]) -> Format>` - e.g. `bson.rs`'s `element`, which takes
-    /// `&mut FormatModule` and two sibling `FormatRef`s, registers its sixteen
-    /// `bson.element.*` tag-dispatch sub-formats, and returns the boxed closure that finishes the
-    /// job once `refs` exists. The caller applies it eagerly (`element(module, cstring, string)`)
-    /// and passes the resulting `Box` into `formats` like any other member.
-    ///
-    /// Builders are invoked in `formats` order, and the same order-dependent type-inference
-    /// behavior documented on [`Self::define_batch_recvar`] applies here too: a member
-    /// referencing an *earlier* sibling sees that sibling's real, already-solved type, while one
-    /// referencing itself or a *later* sibling sees the still-provisional placeholder.
+    /// as many times as it needs. This avoids cluttering the signature of a standalone factory-function
+    /// with additional slots holding `Format`/`usize` arguments to avoid hard-coding fragile `RecVar`
+    /// indices into the structure of the ensuing `Format`.
     ///
     /// This is presently a thin, additive convenience layer over the same underlying level/`ItemVar`
-    /// machinery `define_batch_recvar` uses (a builder's returned `Format` never contains a
-    /// `RecVar` to begin with, so no substitution pass is needed) - it does not remove or replace
+    /// machinery `define_batch_recvar` uses (a format-builder's returned `Format` should never contain a
+    /// `RecVar`, so no substitution pass is needed) - it does not remove or replace
     /// `Format::RecVar`/`define_batch_recvar`, which remain the lower-level, `Vec`-based entry
     /// point.
+    ///
+    /// # Usage Notes
+    ///
+    /// Each batch-member (`Box<dyn FnOnce`) is only provided the array of `FormatRef`
+    /// and must one-shot a Format definition without the ability to register sub-formats
+    /// along the way. As a workaround, the nature of the boxed-closure still allows
+    /// for auxiliary registrations scoped to a batch-member, to be registered in the preamble of
+    /// a factory-function taking `&mut FormatModule`; the lcocally-bound `FormatRef`s defined in
+    /// this way can then be `move`d into the body of the (boxed) closure that said factory function returns.
+    ///
+    /// ```ignore
+    /// fn batch_member_0(module: &mut FormatModule) -> Box<dyn FnOnce(&[FormatRef; <N>]) -> Format> {
+    ///     let subformat = module.define_format(..);
+    ///     Box::new(move |batch_array| { ... subformat.call() })
+    /// }
+    ///
+    /// fn my_batch(module: &mut FormatModule) -> [FormatRef; <N>] {
+    ///     let member0 = batch_member_0(module);
+    ///     module.define_batch_with([(<name>, member0)])
+    /// }
+    /// ```
+    ///
+    /// This also ensures that non-recursive sub-formats of each batch-member end up
+    /// occupying earlier levels than the entire batch, preserving the logical invariant
+    /// that an `ItemVar` level can only exceed the level of the format it is installed in
+    /// if it is part of a recursive batch-definition.
+    ///
+    /// # Notes
+    ///
+    /// The level that will be occupied by the batch member at index `i` is `start + i`, where `start` is
+    /// the number of formats already registered in `module` at the time when this method was called.
+    /// After reserving levels for the entire batch, each member is invoked, processed, and installed in order;
+    /// in particular, the same order-dependent type-inference behavior documented on [`Self::define_batch_recvar`]
+    /// applies here for this method as well: a member referencing an *earlier* sibling sees that sibling's real,
+    /// already-solved type, while one referencing itself or a *later* sibling sees the still-provisional placeholder.
     ///
     /// Builders are boxed (`Box<dyn FnOnce(..) -> Format>`) rather than a single generic `F`,
     /// because distinct batch members typically close over distinct free variables (e.g. one member
@@ -1194,6 +1209,10 @@ impl FormatModule {
     /// Panics if any constructed format fails to type-check, or if any batch member has no
     /// reachable, non-recursive base case - see [`Self::define_batch_recvar`]'s own `# Panics`
     /// section.
+    ///
+    /// Additionally, this method will panic if any builder that produces `Format::RecVar`. This method
+    /// is specifically designed as an alternate path to avoid reliance on `RecVar`, so there is no legitimate
+    /// reason why `Format::RecVar` would ever appear in the output of an invoked builder.
     pub fn define_batch_with<L: IntoLabel, const N: usize>(
         &mut self,
         names: [L; N],
@@ -1203,11 +1222,11 @@ impl FormatModule {
         let refs: [FormatRef; N] = std::array::from_fn(|ix| FormatRef(start + ix));
 
         for (ix, build) in formats.into_iter().enumerate() {
-            // A batch length of 0 rejects any `RecVar` a builder returned, before the base-case
-            // check below can trip over it.
+            // NOTE - we run a vacuous substitution pass with a batch length of 0, which will reject (via panic) any `RecVar` a builder returns
             let body = build(&refs).substitute_rec_var(start, 0);
             self.formats[start + ix] = body;
         }
+        // NOTE - even without the vacuous substitution-pass above, this will still panic on RecVar, but the error will be less diagnostically useful
         self.check_batch_has_base_case(start, N);
         self.infer_batch_types(start, N);
 
