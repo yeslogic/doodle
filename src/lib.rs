@@ -4170,8 +4170,8 @@ mod test {
                 Box::new(Format::Tuple(vec![is_byte(b'q'), Format::RecVar(0)])),
             ),
         ]);
-        let refs = module
-            .define_batch_recvar(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
+        let refs =
+            module.define_batch_recvar(vec![("test.ping", ping_body), ("test.pong", pong_body)]);
         let ping_ref = refs[0];
 
         let prog = super::decoder::Compiler::compile_program(&module, &ping_ref.call()).unwrap();
@@ -4683,8 +4683,8 @@ mod test {
         let mut module = FormatModule::new();
         let a_body = Format::Tuple(vec![is_byte(b'a'), Format::RecVar(1)]);
         let b_body = Format::Tuple(vec![is_byte(b'b'), Format::RecVar(0)]);
-        let _ = module
-            .define_batch_recvar(vec![("test.mutual_a", a_body), ("test.mutual_b", b_body)]);
+        let _ =
+            module.define_batch_recvar(vec![("test.mutual_a", a_body), ("test.mutual_b", b_body)]);
     }
 
     /// Guards a subtle correctness boundary inside `Format::has_reachable_base_case` itself, not
