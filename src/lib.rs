@@ -840,6 +840,10 @@ impl ViewExpr {
     }
 }
 
+impl Format {
+
+}
+
 /// Operations we want to treat as semi-first-class in downstream processing,
 /// without forcing us to add new primitives into the Format layer.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
