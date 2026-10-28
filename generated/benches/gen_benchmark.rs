@@ -3,7 +3,16 @@ use doodle_gencode::api_helper::try_decode_gzip;
 
 pub fn inflate_benchmark(c: &mut Criterion) {
     c.bench_function("test4.gz generated", |b| {
-        b.iter(|| try_decode_gzip(black_box("../test4.gz")).unwrap().len())
+        b.iter(|| {
+            try_decode_gzip(black_box(concat!(
+                env!("TEST_OBJ_ROOT"),
+                "/",
+                env!("TEST_OBJ_SUFFIX_GZIP"),
+                "/test4.gz"
+            )))
+            .unwrap()
+            .len()
+        })
     });
 }
 

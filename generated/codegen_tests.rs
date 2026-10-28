@@ -2,13 +2,28 @@
 use super::api_helper::*;
 use super::*;
 
-fn testpath(filename: &str) -> String {
-    format!("../{filename}")
+/// Directory holding the test-files of the kind whose location is given by `TEST_OBJ_SUFFIX_<$kind>`
+/// (see `.cargo/config.toml`).
+macro_rules! test_dir {
+    ($kind:literal) => {
+        concat!(
+            env!("TEST_OBJ_ROOT"),
+            "/",
+            env!(concat!("TEST_OBJ_SUFFIX_", $kind))
+        )
+    };
+}
+
+fn testpath(dir: &str, filename: &str) -> String {
+    format!("{dir}/{filename}")
 }
 
 #[test]
 fn test_decoder_tgz() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.tgz")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("TGZ"),
+        "test.tgz",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder5(&mut input)?;
     for block in parsed_data.iter().flat_map(|x| x.contents.iter()) {
@@ -23,15 +38,20 @@ fn test_decoder_tgz() -> TestResult {
 
 #[test]
 fn test_decoder_font() -> TestResult {
-    let metrics =
-        otf_metrics::analyze_font(&testpath("test-fonts/SourceCodePro-Regular.otf"), false)?;
+    let metrics = otf_metrics::analyze_font(
+        &testpath(test_dir!("FONT"), "SourceCodePro-Regular.otf"),
+        false,
+    )?;
     otf_metrics::output::show_opentype_stats(&metrics, &otf_metrics::Config::default());
     Ok(())
 }
 
 #[test]
 fn test_decoder_gif() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.gif")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("GIF"),
+        "test.gif",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -45,7 +65,7 @@ mod gzip {
     use super::*;
 
     fn test_gzip_decode(filename: &str) -> TestResult {
-        let dat = try_decode_gzip(&testpath(filename))?;
+        let dat = try_decode_gzip(&testpath(test_dir!("GZIP"), filename))?;
         println!("{:?}", &dat[0].header);
         Ok(())
     }
@@ -79,7 +99,10 @@ mod gzip {
 mod jpeg {
     use super::*;
     fn test_decoder_jpeg(test_file: &str) -> TestResult {
-        let buffer = std::fs::read(std::path::Path::new(&testpath(test_file)))?;
+        let buffer = std::fs::read(std::path::Path::new(&testpath(
+            test_dir!("JPEG"),
+            test_file,
+        )))?;
         let mut input = Parser::new(&buffer);
         let parsed_data = Decoder1(&mut input)?.data;
         match parsed_data {
@@ -102,7 +125,10 @@ mod jpeg {
 
 #[test]
 fn test_decoder_waldo() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.waldo")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("WALDO"),
+        "test.waldo",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -119,7 +145,10 @@ fn test_decoder_waldo() -> TestResult {
 
 #[test]
 fn test_decoder_peano() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.peano")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("PEANO"),
+        "test.peano",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -131,7 +160,10 @@ fn test_decoder_peano() -> TestResult {
 
 #[test]
 fn test_decoder_mpeg4() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.mp4")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("MP4"),
+        "test.mp4",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -143,7 +175,10 @@ fn test_decoder_mpeg4() -> TestResult {
 
 #[test]
 fn test_decoder_png() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.png")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("PNG"),
+        "test.png",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -155,7 +190,10 @@ fn test_decoder_png() -> TestResult {
 
 #[test]
 fn test_decoder_riff() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.webp")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("WEBP"),
+        "test.webp",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -167,7 +205,10 @@ fn test_decoder_riff() -> TestResult {
 
 #[test]
 fn test_decoder_tar() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("TAR"),
+        "test.tar",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder_tar_header_with_data(&mut input)?;
     match parsed_data {
@@ -181,7 +222,10 @@ fn test_decoder_tar() -> TestResult {
 
 #[test]
 fn test_decoder_text_ascii() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.txt")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("TEXT"),
+        "test.txt",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -198,7 +242,10 @@ fn test_decoder_text_ascii() -> TestResult {
 
 #[test]
 fn test_decoder_text_utf8() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("test.utf8")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("UTF8"),
+        "test.utf8",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -215,7 +262,10 @@ fn test_decoder_text_utf8() -> TestResult {
 
 #[test]
 fn test_decoder_text_mixed() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath("mixed.utf8")))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        test_dir!("UTF8"),
+        "mixed.utf8",
+    )))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -363,39 +413,44 @@ mod test_files {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "UnstackableSlices")]
     fn test_errant_png() {
-        check_png(&testpath("test-images/broken.png")).unwrap()
+        check_png(&testpath(test_dir!("IMAGE_CORPUS"), "broken.png")).unwrap()
     }
 
     #[test]
     fn test_all_extra_images() -> TestResult {
         let mut residue = Vec::new();
-        for entry in std::fs::read_dir(&testpath("test-images"))?.flatten() {
+        for entry in std::fs::read_dir(test_dir!("IMAGE_CORPUS"))?.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             match () {
                 _ if name.contains("broken.png") => {
-                    assert!(check_png(format!("../test-images/{}", name).as_str()).is_err());
+                    assert!(
+                        check_png(testpath(test_dir!("IMAGE_CORPUS"), &name).as_str()).is_err()
+                    );
                     println!("Broken PNG (expected)");
                 }
                 _ if name.ends_with(".png") => {
-                    check_png(format!("../test-images/{}", name).as_str())?;
+                    check_png(testpath(test_dir!("IMAGE_CORPUS"), &name).as_str())?;
                 }
                 _ if name.ends_with(".jpg") || name.ends_with(".jpeg") => {
-                    check_jpeg(format!("../test-images/{}", name).as_str())?;
+                    check_jpeg(testpath(test_dir!("IMAGE_CORPUS"), &name).as_str())?;
                 }
                 _ if name.ends_with(".gif") => {
-                    check_gif(format!("../test-images/{}", name).as_str())?;
+                    check_gif(testpath(test_dir!("IMAGE_CORPUS"), &name).as_str())?;
                 }
                 _ if name.ends_with(".tif") => {
-                    check_tiff(format!("../test-images/{}", name).as_str())?;
+                    check_tiff(testpath(test_dir!("IMAGE_CORPUS"), &name).as_str())?;
                 }
                 _ if name.ends_with(".webp") => {
-                    check_riff(format!("../test-images/{}", name).as_str())?;
+                    check_riff(testpath(test_dir!("IMAGE_CORPUS"), &name).as_str())?;
                 }
                 // FIXME: add more cases as we add handlers for each image type
                 _ => {
-                    residue.push(format!("[../test_images/{}]: Skipping...", name));
+                    residue.push(format!(
+                        "[{}]: Skipping...",
+                        testpath(test_dir!("IMAGE_CORPUS"), &name)
+                    ));
                 }
             }
         }
@@ -441,7 +496,7 @@ mod bson {
     }
 
     fn check_bson(filename: &str, expected: Stats) -> TestResult {
-        let buffer = std::fs::read(testpath(&format!("test_bson/{filename}")))?;
+        let buffer = std::fs::read(testpath(test_dir!("BSON"), filename))?;
         let mut input = Parser::new(&buffer);
         let parsed_data = Decoder1(&mut input)?.data;
         match parsed_data {

@@ -10,3 +10,28 @@ debug = true
 
 [env]
 RUST_MIN_STACK = "8388608"
+
+# Locations of the test-files (inputs of tests, benches, and the default inputs of some binaries).
+# Each kind of test-file lives at `$TEST_OBJ_ROOT/$TEST_OBJ_SUFFIX_<KIND>/`; consumers read these
+# at compile-time with `env!`, so binaries keep working when run outside of cargo.
+TEST_OBJ_ROOT = { value = "test-data", relative = true }
+TEST_OBJ_SUFFIX_GIF = "images"
+TEST_OBJ_SUFFIX_HEIC = "images"
+TEST_OBJ_SUFFIX_JPEG = "images"
+TEST_OBJ_SUFFIX_PNG = "images"
+TEST_OBJ_SUFFIX_WEBP = "images"
+TEST_OBJ_SUFFIX_IMAGE_CORPUS = "images/corpus"
+TEST_OBJ_SUFFIX_MP4 = "media"
+TEST_OBJ_SUFFIX_TAR = "archive"
+TEST_OBJ_SUFFIX_TGZ = "archive"
+TEST_OBJ_SUFFIX_GZIP = "archive"
+TEST_OBJ_SUFFIX_TEXT = "text"
+TEST_OBJ_SUFFIX_UTF8 = "text"
+TEST_OBJ_SUFFIX_BSON = "bson"
+TEST_OBJ_SUFFIX_ELF = "synthetic"
+TEST_OBJ_SUFFIX_WALDO = "synthetic"
+TEST_OBJ_SUFFIX_RLE = "synthetic"
+TEST_OBJ_SUFFIX_NUMBERS = "synthetic"
+TEST_OBJ_SUFFIX_PEANO = "synthetic"
+TEST_OBJ_SUFFIX_FONT = "fonts/corpus"
+TEST_OBJ_SUFFIX_FONT_MALFORMED = "fonts/malformed"

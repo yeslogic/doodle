@@ -27,7 +27,14 @@ fn run_decoder(f: &str) -> Value {
 
 pub fn inflate_benchmark(c: &mut Criterion) {
     c.bench_function("test4.gz interpreted", |b| {
-        b.iter(|| black_box(run_decoder("../test4.gz")))
+        b.iter(|| {
+            black_box(run_decoder(concat!(
+                env!("TEST_OBJ_ROOT"),
+                "/",
+                env!("TEST_OBJ_SUFFIX_GZIP"),
+                "/test4.gz"
+            )))
+        })
     });
 }
 
