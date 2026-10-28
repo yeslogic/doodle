@@ -25,5 +25,7 @@ jobs:
         env:
           RUST_BACKTRACE: 1
           RUST_LOG: debug
-        run: cargo test --workspace --exclude smallsorts --exclude analytic-engine --exclude analytic-parser
-      - run: cargo build
+          RUST_MIN_STACK: 8388608
+        run: cargo test --workspace --exclude smallsorts --exclude analytic-parser
+      - name: Cargo Build
+        run: cargo build
