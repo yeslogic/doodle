@@ -26,10 +26,26 @@ fn check_output(output: Output, expected: ExpectFile) {
     expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
 }
 
+/// Path of the font `$name` in the test-font corpus (see `TEST_OBJ_SUFFIX_FONT` in `.cargo/config.toml`).
+///
+/// Asserts that the file exists: `fontinfo` reports unreadable fonts but still exits successfully, so a
+/// missing font would otherwise only show up as a snapshot mismatch (or, under `UPDATE_EXPECT=1`, as a
+/// silently emptied snapshot).
 macro_rules! fontfile {
-    ( $name:expr ) => {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../test-fonts/", $name)
-    };
+    ( $name:expr ) => {{
+        let path = concat!(
+            env!("TEST_OBJ_ROOT"),
+            "/",
+            env!("TEST_OBJ_SUFFIX_FONT"),
+            "/",
+            $name
+        );
+        assert!(
+            std::path::Path::new(path).is_file(),
+            "missing font test-file: {path}"
+        );
+        path
+    }};
 }
 
 macro_rules! testfile {

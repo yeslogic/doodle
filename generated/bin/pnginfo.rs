@@ -1,14 +1,21 @@
 use doodle_gencode::api_helper::*;
 
+/// Default inputs when no paths are given: the test-image corpus (see `.cargo/config.toml`).
+const IMAGE_CORPUS_DIR: &str = concat!(
+    env!("TEST_OBJ_ROOT"),
+    "/",
+    env!("TEST_OBJ_SUFFIX_IMAGE_CORPUS")
+);
+
 pub fn main() -> std::io::Result<()> {
     let args = std::env::args().skip(1).collect::<Vec<String>>();
     let iter: Box<dyn Iterator<Item = String>> = if !args.is_empty() {
         Box::new(args.into_iter())
     } else {
         Box::new(
-            std::fs::read_dir("test-images")?
+            std::fs::read_dir(IMAGE_CORPUS_DIR)?
                 .flatten()
-                .map(|entry| format!("test-images/{}", entry.file_name().to_string_lossy())),
+                .map(|entry| format!("{IMAGE_CORPUS_DIR}/{}", entry.file_name().to_string_lossy())),
         )
     };
     do_work(iter)

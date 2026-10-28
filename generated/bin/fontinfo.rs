@@ -15,7 +15,8 @@ struct Cli {
     #[command(subcommand)]
     command: Command,
 
-    /// Paths of the fonts to scan - if none provided, scans each file in `./test-fonts/*`.
+    /// Paths of the fonts to scan - if none provided, scans each file in the test-font corpus
+    /// (`$TEST_OBJ_ROOT/$TEST_OBJ_SUFFIX_FONT/*`, as set in `.cargo/config.toml`).
     #[arg(global = true)]
     paths: Vec<OsString>,
 }
@@ -64,6 +65,9 @@ struct VerFilter {
     minor: Option<u16>,
 }
 
+/// Default inputs when no paths are given: the test-font corpus (see `.cargo/config.toml`).
+const FONT_CORPUS_DIR: &str = concat!(env!("TEST_OBJ_ROOT"), "/", env!("TEST_OBJ_SUFFIX_FONT"));
+
 type RunError = Box<dyn std::error::Error + Sync + Send + 'static>;
 type RunResult<T> = Result<T, RunError>;
 
@@ -84,9 +88,9 @@ pub fn main() -> RunResult<()> {
     let paths = if !cli.paths.is_empty() {
         cli.paths
     } else {
-        std::fs::read_dir("test-fonts")?
+        std::fs::read_dir(FONT_CORPUS_DIR)?
             .flatten()
-            .map(|entry| prepend_dir("test-fonts", entry.file_name()))
+            .map(|entry| prepend_dir(FONT_CORPUS_DIR, entry.file_name()))
             .collect()
     };
 
