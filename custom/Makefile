@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -O2
-TGT_DIR=..
+TGT_DIR=../test-data/synthetic
 
 %.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
